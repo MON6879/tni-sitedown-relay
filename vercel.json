@@ -3,6 +3,10 @@
     "api/index.py": {
       "runtime": "python3.12",
       "maxDuration": 60
+    },
+    "api/collector.py": {
+      "runtime": "python3.12",
+      "maxDuration": 60
     }
   }
 }

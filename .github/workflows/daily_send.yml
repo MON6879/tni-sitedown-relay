@@ -1,0 +1,33 @@
+name: "📢 Gửi thông báo task lúc 17:30 VN"
+
+on:
+  schedule:
+    - cron: '30 10 * * *'   # 10:30 UTC = 17:30 Vietnam (UTC+7)
+  workflow_dispatch:          # Cho phép chạy thủ công để test
+
+jobs:
+  send-tasks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: "📥 Checkout code"
+        uses: actions/checkout@v4
+
+      - name: "🐍 Setup Python 3.12"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: "📦 Cài dependencies"
+        run: |
+          pip install \
+            python-telegram-bot==21.9 \
+            pandas==2.2.2 \
+            requests==2.31.0 \
+            python-dotenv==1.0.1
+
+      - name: "🚀 Gửi thông báo"
+        env:
+          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+        run: python send_now.py
