@@ -166,8 +166,13 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(b"OK")
 
     def do_GET(self):
+        token_ok  = "SET" if COLLECTOR_BOT_TOKEN else "MISSING"
+        script_ok = "SET" if APPS_SCRIPT_URL else "MISSING"
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Collector Bot OK")
+        self.wfile.write(
+            f"Collector Bot OK | TOKEN:{token_ok} | SCRIPT_URL:{script_ok}".encode()
+        )
+
 
     def log_message(self, *a): pass
