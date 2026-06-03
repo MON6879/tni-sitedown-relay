@@ -1,9 +1,9 @@
 """
-Vercel webhook handler cho Collector Bot.
-Nhận Order/Revoke/Export/Move từ nhân viên → ghi Google Sheet.
-URL: https://your-app.vercel.app/api/collector
+Vercel webhook handler for Collector Bot (TNIAsset_BO).
+Receives Order/Revoke/Export/Move commands → writes to Google Sheet.
+Webhook URL: https://<your-app>.vercel.app/api/collector
 """
-import os, re, json, asyncio, logging, requests
+import os, re, json, asyncio, logging, requests, html
 from http.server import BaseHTTPRequestHandler
 from telegram import Bot, Update
 from datetime import datetime, timezone, timedelta
@@ -15,103 +15,143 @@ COLLECTOR_BOT_TOKEN = os.environ.get("COLLECTOR_BOT_TOKEN", "")
 APPS_SCRIPT_URL     = os.environ.get("APPS_SCRIPT_URL", "")
 TZ_VN = timezone(timedelta(hours=7))
 
+KEYWORDS = ["order", "revoke", "export", "move"]
 
-def fetch_keywords():
+
+# ── Send data to Google Sheet via Apps Script ─────────────────────────────
+def post_sheet(payload: dict):
+    """POST JSON to Apps Script Web App."""
+    if not APPS_SCRIPT_URL:
+        logger.error("APPS_SCRIPT_URL not set.")
+        return {"status": "error", "message": "APPS_SCRIPT_URL not configured"}
     try:
-        resp = requests.get(APPS_SCRIPT_URL, timeout=10)
-        data = resp.json()
-        if data.get("status") == "ok":
-            return data.get("keywords", ["Order","Revoke","Export","Move"])
-    except Exception:
-        pass
-    return ["Order","Revoke","Export","Move"]
-
-
-def parse_msg(text, keywords):
-    result     = {}
-    kw_pattern = "|".join(re.escape(k) for k in keywords) + "|done"
-    pattern    = rf"({kw_pattern})\s*:\s*(.+?)(?=(?:{kw_pattern})\s*:|$)"
-    for key, value in re.findall(pattern, text, re.IGNORECASE | re.DOTALL):
-        result[key.lower()] = value.strip()
-    return result
-
-
-def post_sheet(payload):
-    try:
-        return requests.post(APPS_SCRIPT_URL, json=payload, timeout=10).json()
+        resp = requests.post(APPS_SCRIPT_URL, json=payload, timeout=15)
+        resp.raise_for_status()
+        logger.info(f"Apps Script response: {resp.text[:300]}")
+        return resp.json()
     except Exception as e:
-        return {"status":"error","message":str(e)}
+        logger.error(f"Apps Script POST error: {e}")
+        return {"status": "error", "message": str(e)}
 
 
-async def handle(data):
+# ── Detect collector keyword in message ───────────────────────────────────
+def is_collector_msg(text: str) -> bool:
+    lower = text.lower()
+    return any(f"{k}:" in lower for k in KEYWORDS)
+
+
+# ── Main async handler ────────────────────────────────────────────────────
+async def handle(data: dict):
     async with Bot(token=COLLECTOR_BOT_TOKEN) as bot:
         update = Update.de_json(data, bot)
         if not update.message or not update.message.text:
             return
 
-        msg      = update.message
-        user     = msg.from_user
-        text     = msg.text.strip()
-        now      = datetime.now(TZ_VN)
-        keywords = fetch_keywords()
-        name     = user.full_name or "Unknown"
-        uname    = f"@{user.username}" if user.username else str(user.id)
+        msg     = update.message
+        user    = msg.from_user
+        text    = msg.text.strip()
+        chat_id = msg.chat_id
+        now     = datetime.now(TZ_VN)
 
-        # /start
+        sender_name = (user.full_name if user else "") or ""
+        username    = (f"@{user.username}" if user and user.username else str(user.id)) if user else ""
+
+        # ── /start ────────────────────────────────────────────────────────
         if text.startswith("/start"):
-            kw_lines = "\n".join(f"{k}: ..." for k in keywords)
-            await bot.send_message(msg.chat_id,
-                f"👋 *မင်္ဂလာပါ!*\n\n📌 *ပုံစံ:*\n```\n{kw_lines}\n```\n\n"
-                f"✅ ပြီးပါက Bot ၏ reply ကို Reply ပြု၍ `Done: ...` ပို့ပါ",
-                parse_mode="Markdown")
+            await bot.send_message(
+                chat_id,
+                "👋 <b>Asset Request Bot</b>\n\n"
+                "📌 Send asset commands in this format:\n\n"
+                "<code>Order: TNI0001 detail</code>\n"
+                "<code>Revoke: TNI0001 detail</code>\n"
+                "<code>Export: TNI0001 detail</code>\n"
+                "<code>Move: from TNI0001 to TNI0002 detail</code>\n\n"
+                "⚡ You can combine multiple commands:\n"
+                "<code>Order: TNI0002 battery\n"
+                "Move: TNI0001 to TNI0003</code>\n\n"
+                "✅ When done, reply to the bot's confirmation:\n"
+                "<code>Done: #ID</code>",
+                parse_mode="HTML"
+            )
             return
 
-        # Done reply
-        if msg.reply_to_message and re.search(r"done\s*:", text, re.IGNORECASE):
-            parsed   = parse_msg(text, keywords)
-            done_txt = parsed.get("done", text)
-            orig     = msg.reply_to_message.text or ""
-            ref      = re.search(r"#(\d+)", orig)
-            ref_id   = ref.group(1) if ref else None
-            result   = post_sheet({"action":"done","ref_id":ref_id,"done":done_txt,
-                                   "done_date":now.strftime("%d/%m/%Y"),
-                                   "done_time":now.strftime("%H:%M"),
-                                   "chat_id":str(user.id)})
+        # ── Done: #ID (standalone, no need to reply) ──────────────────────
+        done_match = re.match(r"^done[:\s]+#?(\d+)", text, re.IGNORECASE)
+        if done_match:
+            ref_id = done_match.group(1)
+            result = post_sheet({
+                "action":    "done",
+                "ref_id":    ref_id,
+                "done_date": now.strftime("%d/%m/%Y"),
+                "done_time": now.strftime("%H:%M"),
+                "chat_id":   str(user.id if user else chat_id),
+            })
+            status = result.get("status")
+            if status == "ok":
+                await bot.send_message(
+                    chat_id,
+                    f"✅ <b>Marked as Done</b> — Request <b>#{ref_id}</b>\n"
+                    f"📅 {now.strftime('%d/%m/%Y %H:%M')}",
+                    parse_mode="HTML"
+                )
+            elif status == "denied":
+                await bot.send_message(
+                    chat_id,
+                    f"🚫 <b>Not authorised.</b>\n"
+                    f"Your Telegram ID <code>{user.id if user else chat_id}</code> "
+                    f"is not in the allowed list.\n"
+                    f"Ask your admin to add your ID to the <b>Config</b> sheet.",
+                    parse_mode="HTML"
+                )
+            else:
+                err = html.escape(result.get("message", "unknown error"))
+                await bot.send_message(chat_id, f"⚠️ Could not mark #{ref_id} as done: {err}", parse_mode="HTML")
+            return
+
+        # ── Collector commands ─────────────────────────────────────────────
+        if is_collector_msg(text):
+            result = post_sheet({
+                "action":  "add",
+                "date":    now.strftime("%d/%m/%Y %H:%M"),   # Column A
+                "chat_id": str(user.id if user else chat_id),# Column B
+                "msg":     text,                              # Column C
+            })
+
             if result.get("status") == "ok":
-                await bot.send_message(msg.chat_id,
-                    f"✅ *#{ref_id} ပြီးစီးပြီ!*\n📝 {done_txt}\n🕐 {now.strftime('%d/%m/%Y %H:%M')}",
-                    parse_mode="Markdown")
+                row_id = str(result.get("row", "???")).zfill(5)
+                await bot.send_message(
+                    chat_id,
+                    f"✅ <b>Recorded</b> — 🆔 <b>#{row_id}</b>\n"
+                    f"📅 {now.strftime('%d/%m/%Y %H:%M')}\n\n"
+                    f"📦 {html.escape(text)}\n\n"
+                    f"When complete, reply:\n<code>Done: #{row_id}</code>",
+                    parse_mode="HTML"
+                )
+            else:
+                err = html.escape(result.get("message", "no response from Apps Script"))
+                logger.error(f"Sheet error: {err}")
+                await bot.send_message(
+                    chat_id,
+                    f"⚠️ <b>Failed to record.</b>\n<i>{err}</i>",
+                    parse_mode="HTML"
+                )
             return
 
-        # Tin thường
-        parsed = parse_msg(text, keywords)
-        if not parsed:
-            kw_lines = "\n".join(f"{k}: ..." for k in keywords)
-            await bot.send_message(msg.chat_id,
-                f"❓ *မမှတ်မိပါ။* ပုံစံ:\n```\n{kw_lines}\n```",
-                parse_mode="Markdown")
-            return
-
-        fields = {k:v for k,v in parsed.items() if k != "done"}
-        result = post_sheet({"action":"add","date":now.strftime("%d/%m/%Y"),
-                             "time":now.strftime("%H:%M"),"sender_name":name,
-                             "username":uname,"chat_id":str(user.id),"fields":fields})
-
-        if result.get("status") == "ok":
-            ref_id = str(result.get("row","???")).zfill(5)
-            icons  = {"order":"📦","revoke":"↩️","export":"📤","move":"🚚",
-                      "install":"🔧","check":"🔍","repair":"🛠️"}
-            lines  = [f"✅ *လက်ခံပြီး — 🆔 #{ref_id}*\n📅 {now.strftime('%d/%m/%Y %H:%M')}\n"]
-            for k,v in fields.items():
-                if v: lines.append(f"{icons.get(k,'▪️')} {k.capitalize()}: {v}")
-            lines.append("\n_Reply ပြု၍_ `Done: ...` _ပို့ပါ_")
-            await bot.send_message(msg.chat_id, "\n".join(lines), parse_mode="Markdown")
-        else:
-            await bot.send_message(msg.chat_id, f"❌ Error: `{result.get('message','')}`",
-                                   parse_mode="Markdown")
+        # ── Unknown message ────────────────────────────────────────────────
+        await bot.send_message(
+            chat_id,
+            "❓ <b>Command not recognised.</b>\n\n"
+            "Please use one of:\n"
+            "<code>Order: ...</code>\n"
+            "<code>Revoke: ...</code>\n"
+            "<code>Export: ...</code>\n"
+            "<code>Move: ...</code>\n\n"
+            "Or send <code>/start</code> for help.",
+            parse_mode="HTML"
+        )
 
 
-# ── Vercel entry point ───────────────────────────────────────────
+# ── Vercel entry point ────────────────────────────────────────────────────
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
@@ -119,7 +159,7 @@ class handler(BaseHTTPRequestHandler):
             data   = json.loads(self.rfile.read(length))
             asyncio.run(handle(data))
         except Exception as e:
-            logger.error(f"Webhook:{e}")
+            logger.error(f"Webhook error: {e}")
         finally:
             self.send_response(200)
             self.end_headers()
