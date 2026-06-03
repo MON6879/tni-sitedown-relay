@@ -1,0 +1,9 @@
+# Bot TNI Search
+# Không commit file .env lên GitHub!
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.log
+check_gids.py
+get_chatid_bot.py

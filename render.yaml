@@ -1,0 +1,19 @@
+services:
+  - type: worker
+    name: combined-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python combined_bot.py
+    envVars:
+      - key: SEND_BOT_TOKEN
+        value: "8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A"
+      - key: SEND_HOUR
+        value: "17"
+      - key: SEND_MINUTE
+        value: "30"
+      - key: COLLECTOR_BOT_TOKEN
+        value: "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM"
+      - key: APPS_SCRIPT_URL
+        value: "https://script.google.com/macros/s/AKfycbyIZ-fX9RONRBxLTvpBkHQo6BbnJQJy65sjepFecvAu4yk_XG3TNNYK8rovQsxid8KA/exec"
+      - key: PYTHON_VERSION
+        value: "3.12.0"
