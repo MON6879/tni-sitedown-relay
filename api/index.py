@@ -138,8 +138,8 @@ def parse_collector(text: str):
 
 # ── core handler ─────────────────────────────────────────────────────────
 async def handle(data):
-    # Use COLLECTOR_BOT_TOKEN if configured, fallback to TOKEN
-    token_to_use = COLLECTOR_BOT_TOKEN if COLLECTOR_BOT_TOKEN else TOKEN
+    # Always use TELEGRAM_TOKEN (SEARCHTNITASKWOBOT) — webhook is registered for this bot
+    token_to_use = TOKEN if TOKEN else COLLECTOR_BOT_TOKEN
 
     async with Bot(token=token_to_use) as bot:
         update = Update.de_json(data, bot)
