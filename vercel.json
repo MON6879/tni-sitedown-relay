@@ -1,12 +1,10 @@
 {
-  "functions": {
-    "api/index.py": {
-      "runtime": "python3.12",
-      "maxDuration": 60
-    },
-    "api/collector.py": {
-      "runtime": "python3.12",
-      "maxDuration": 60
-    }
-  }
+  "builds": [
+    { "src": "api/index.py",     "use": "@vercel/python", "config": { "maxDuration": 60 } },
+    { "src": "api/collector.py", "use": "@vercel/python", "config": { "maxDuration": 30 } }
+  ],
+  "routes": [
+    { "src": "/api/index",     "dest": "api/index.py" },
+    { "src": "/api/collector", "dest": "api/collector.py" }
+  ]
 }
