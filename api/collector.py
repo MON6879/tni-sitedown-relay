@@ -71,74 +71,59 @@ async def handle(data: dict):
             )
             return
 
-        # ── Done — Reply to original request message only ────────────────────
+        # ── Done ──────────────────────────────────────────────────────────
         if re.match(r"^done\b", text, re.IGNORECASE):
-            reply = msg.reply_to_message
-            if not reply or not reply.text:
-                await bot.send_message(
-                    chat_id,
-                    "⚠️ Hãy <b>Reply</b> vào tin nhắn yêu cầu gốc,\n"
-                    "rồi gõ <code>Done</code>.",
-                    parse_mode="HTML"
-                )
-                return
-
-            reply_text = reply.text.strip().lower()
-
-            # Read sheet CSV directly to find matching row (no Apps Script update needed)
-            sheet_url = (
-                "https://docs.google.com/spreadsheets/d/"
-                "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
-                "/gviz/tq?tqx=out:csv&gid=199426270"
-            )
+            # Extract #ID from user's text: "Done: #00008" or "Done: #8"
+            id_in_text = re.search(r"#(\d+)", text)
             ref_id = None
-            try:
-                import csv, io
-                resp = requests.get(sheet_url, timeout=10)
-                rows = list(csv.reader(io.StringIO(resp.text)))
-                for i, row in enumerate(rows[1:], start=1):  # skip header
-                    if len(row) >= 3 and row[2].strip().lower() == reply_text:
-                        ref_id = str(i)
-                        break
-            except Exception:
-                pass
+
+            if id_in_text:
+                ref_id = id_in_text.group(1)
+            else:
+                # Try to extract #ID from reply_to_message (bot's confirmation)
+                reply = msg.reply_to_message
+                if reply and reply.text:
+                    id_in_reply = re.search(r"#(\d+)", reply.text)
+                    if id_in_reply:
+                        ref_id = id_in_reply.group(1)
 
             if not ref_id:
                 await bot.send_message(
                     chat_id,
-                    "❓ <b>Không tìm thấy yêu cầu trong sheet.</b>\n"
-                    "Hãy Reply đúng vào tin nhắn yêu cầu gốc.",
+                    "⚠️ Reply vào tin nhắn bot xác nhận (có #ID), "
+                    "hoặc gõ <code>Done: #ID</code>",
                     parse_mode="HTML"
                 )
                 return
 
+            # Extract done detail if any: "Done: fixed it" → "fixed it"
+            done_detail = re.sub(r"^done\s*:?\s*#?\d*\s*", "", text, flags=re.IGNORECASE).strip()
+
             result = post_sheet({
                 "action":    "done",
                 "ref_id":    ref_id,
+                "done":      done_detail or "Done",
                 "done_date": now.strftime("%d/%m/%Y"),
                 "done_time": now.strftime("%H:%M"),
                 "chat_id":   str(user.id if user else chat_id),
             })
             status = result.get("status")
             if status == "ok":
+                detail_txt = f" — {html.escape(done_detail)}" if done_detail else ""
                 await bot.send_message(
                     chat_id,
-                    f"✅ <b>Đã hoàn thành</b> — Yêu cầu <b>#{ref_id}</b>\n"
-                    f"📅 {now.strftime('%d/%m/%Y %H:%M')}",
+                    f"REQUEST_BOT ✅ Done #{ref_id}{detail_txt}📅 {now.strftime('%d/%m/%Y %H:%M')}",
                     parse_mode="HTML"
                 )
             elif status == "denied":
                 await bot.send_message(
                     chat_id,
-                    f"🚫 <b>Không có quyền.</b>\n"
-                    f"ID Telegram <code>{user.id if user else chat_id}</code> "
-                    f"chưa có trong danh sách Config.",
+                    f"🚫 ID <code>{user.id if user else chat_id}</code> chưa có quyền.",
                     parse_mode="HTML"
                 )
             else:
                 err = html.escape(result.get("message", "unknown error"))
-                await bot.send_message(chat_id,
-                    f"⚠️ Lỗi: {err}", parse_mode="HTML")
+                await bot.send_message(chat_id, f"⚠️ Lỗi: {err}", parse_mode="HTML")
             return
 
 
