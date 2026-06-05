@@ -4,6 +4,7 @@ import io
 import html
 import asyncio
 import logging
+import threading
 import requests
 import pandas as pd
 from dotenv import load_dotenv
@@ -245,7 +246,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tni      = m.group(1).upper()
     logger.info(f"Lookup: {tni}")
     wait_msg = await update.message.reply_text(
-        f"⏳ Đang tìm <b>{html.escape(tni)}</b>...", parse_mode="HTML"
+        f"⏳ Searching <b>{html.escape(tni)}</b>...", parse_mode="HTML"
     )
     try:
         reply  = lookup_tni(tni)
@@ -255,50 +256,139 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Gửi các chunk còn lại (nếu tin nhắn quá dài)
         for chunk in chunks[1:]:
             await update.message.reply_text(chunk, parse_mode="HTML")
+
+        # ── Ghi log tìm kiếm (fire & forget, không chờ) ──
+        apps_url = os.getenv("APPS_SCRIPT_URL", "")
+        if apps_url:
+            user      = update.effective_user
+            from datetime import datetime, timezone, timedelta
+            now_mm    = datetime.now(timezone(timedelta(hours=6, minutes=30)))
+            payload   = {
+                "action":    "log_search",
+                "user_name": user.full_name or user.first_name or str(user.id),
+                "user_id":   str(user.id),
+                "tni_code":  tni,
+                "date":      now_mm.strftime("%d/%m/%Y"),
+                "time":      now_mm.strftime("%H:%M"),
+            }
+            threading.Thread(
+                target=lambda: requests.post(apps_url, json=payload, timeout=15),
+                daemon=True,
+            ).start()
+
     except Exception as err:
         logger.error(f"handle_message error [{tni}]: {err}")
         await wait_msg.edit_text(
-            f"❌ <b>Fail</b> – {html.escape(tni)}\n<i>{html.escape(str(err))}</i>",
+            f"❌ <b>Error</b> – {html.escape(tni)}\n<i>{html.escape(str(err))}</i>",
             parse_mode="HTML",
         )
 
 
+async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Trả về tên + ID của chat hiện tại và lưu vào Google Sheet."""
+    chat     = update.effective_chat
+    user     = update.effective_user
+    chat_id  = str(chat.id)
+    title    = chat.title or chat.full_name or "Private"
+    reg_by   = user.full_name or user.first_name or str(user.id)
+
+    apps_url = os.getenv("APPS_SCRIPT_URL", "")
+    saved    = False
+    msg_extra = ""
+    if apps_url:
+        try:
+            r = requests.post(apps_url, json={
+                "action":     "register_chat",
+                "chat_id":    chat_id,
+                "chat_title": title,
+                "chat_type":  chat.type,
+                "reg_by":     reg_by,
+            }, timeout=15)
+            res = r.json()
+            if res.get("status") == "ok":
+                saved     = True
+                msg_extra = "\n✅ Saved to <b>Chat IDs</b> sheet"
+            elif res.get("status") == "duplicate":
+                msg_extra = "\n⚠️ Already exists in sheet"
+        except Exception as ex:
+            logger.error(f"register_chat error: {ex}")
+
+    await update.message.reply_text(
+        f"💬 <b>{html.escape(title)}</b>\n"
+        f"🔑 <code>{chat_id}</code>\n"
+        f"📍 Type: {chat.type}"
+        + msg_extra,
+        parse_mode="HTML",
+    )
+
+
+async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Mỗi người tự gõ /myid → bot hiện ID cá nhân + lưu vào Config sheet."""
+    user      = update.effective_user
+    user_id   = str(user.id)
+    full_name = user.full_name or user.first_name or "Unknown"
+
+    apps_url  = os.getenv("APPS_SCRIPT_URL", "")
+    msg_extra = ""
+    if apps_url:
+        try:
+            r = requests.post(apps_url, json={
+                "action":    "register_user",
+                "user_id":   user_id,
+                "user_name": full_name,
+            }, timeout=15)
+            res = r.json()
+            if res.get("status") == "ok":
+                msg_extra = "\n✅ Added to report list"
+            elif res.get("status") == "duplicate":
+                msg_extra = "\n⚠️ You are already in the list"
+        except Exception as ex:
+            logger.error(f"register_user error: {ex}")
+
+    await update.message.reply_text(
+        f"👤 <b>{html.escape(full_name)}</b>\n"
+        f"🔑 ID: <code>{user_id}</code>"
+        + msg_extra,
+        parse_mode="HTML",
+    )
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 <b>Bot tra cứu TNI</b>\n\n"
-        "📌 Gõ mã TNI, ví dụ: <code>TNI0154</code>\n\n"
-        "Bot trả về:\n"
+        "👋 <b>TNI Search Bot</b>\n\n"
+        "📌 Type TNI code, e.g.: <code>TNI0154</code>\n\n"
+        "Bot returns:\n"
         "• 📍 Site Info (alarm)\n"
-        "• 📋 Task còn tồn\n"
+        "• 📋 Pending Tasks\n"
         "• 🔧 Work Orders\n\n"
-        "⚙️ /reload – Tải lại dữ liệu\n"
-        "⚙️ /help   – Hướng dẫn",
+        "⚙️ /reload – Reload data\n"
+        "⚙️ /help   – Help",
         parse_mode="HTML",
     )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📖 <b>Hướng dẫn</b>\n\n"
-        "Gõ mã TNI bất kỳ, ví dụ: <code>TNI0154</code>\n\n"
-        "/reload – Tải lại dữ liệu từ Google Sheet",
+        "📖 <b>Help</b>\n\n"
+        "Type any TNI code, e.g.: <code>TNI0154</code>\n\n"
+        "/reload – Reload data from Google Sheet",
         parse_mode="HTML",
     )
 
 
 async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⏳ Đang tải lại dữ liệu...")
+    await update.message.reply_text("⏳ Reloading data...")
     try:
         load_all_sheets()
         await update.message.reply_text(
-            f"✅ <b>Tải lại thành công!</b>\n"
+            f"✅ <b>Reload successful!</b>\n"
             f"• Site: {max(0,len(df_site)-2)} sites\n"
             f"• Task: {max(0,len(df_task)-2)} tasks\n"
             f"• WO:   {max(0,len(df_wo)-3)} WOs",
             parse_mode="HTML",
         )
     except Exception as e:
-        await update.message.reply_text(f"❌ Lỗi: {html.escape(str(e))}",
+        await update.message.reply_text(f"❌ Error: {html.escape(str(e))}",
                                         parse_mode="HTML")
 
 
@@ -313,6 +403,8 @@ async def main():
     app.add_handler(CommandHandler("start",  start_command))
     app.add_handler(CommandHandler("help",   help_command))
     app.add_handler(CommandHandler("reload", reload_command))
+    app.add_handler(CommandHandler("id",     id_command))
+    app.add_handler(CommandHandler("myid",   myid_command))
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, handle_message
     ))
