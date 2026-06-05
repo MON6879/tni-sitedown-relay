@@ -60,25 +60,58 @@ async def handle(data: dict):
         if text.startswith("/start"):
             await bot.send_message(
                 chat_id,
-                "👋 <b>Asset Request Bot</b>\n\n"
-                "📌 Send asset commands in this format:\n\n"
+                "👋 <b>Asset Request Bot</b>\n"
+                "📌 Send asset commands in this format:\n"
                 "<code>Order: TNI0001 detail</code>\n"
                 "<code>Revoke: TNI0001 detail</code>\n"
                 "<code>Export: TNI0001 detail</code>\n"
-                "<code>Move: from TNI0001 to TNI0002 detail</code>\n\n"
-                "⚡ You can combine multiple commands:\n"
-                "<code>Order: TNI0002 battery\n"
-                "Move: TNI0001 to TNI0003</code>\n\n"
-                "✅ When done, reply to the bot's confirmation:\n"
-                "<code>Done: #ID</code>",
+                "<code>Move: from TNI0001 to TNI0002 detail</code>\n"
+                "<code>......: TNI0000 Detail</code>",
                 parse_mode="HTML"
             )
             return
 
-        # ── Done: #ID (standalone, no need to reply) ──────────────────────
-        done_match = re.match(r"^done[:\s]+#?(\d+)", text, re.IGNORECASE)
-        if done_match:
-            ref_id = done_match.group(1)
+        # ── Done — Reply to original request message only ────────────────────
+        if re.match(r"^done\b", text, re.IGNORECASE):
+            reply = msg.reply_to_message
+            if not reply or not reply.text:
+                await bot.send_message(
+                    chat_id,
+                    "⚠️ Hãy <b>Reply</b> vào tin nhắn yêu cầu gốc,\n"
+                    "rồi gõ <code>Done</code>.",
+                    parse_mode="HTML"
+                )
+                return
+
+            reply_text = reply.text.strip().lower()
+
+            # Read sheet CSV directly to find matching row (no Apps Script update needed)
+            sheet_url = (
+                "https://docs.google.com/spreadsheets/d/"
+                "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
+                "/gviz/tq?tqx=out:csv&gid=199426270"
+            )
+            ref_id = None
+            try:
+                import csv, io
+                resp = requests.get(sheet_url, timeout=10)
+                rows = list(csv.reader(io.StringIO(resp.text)))
+                for i, row in enumerate(rows[1:], start=1):  # skip header
+                    if len(row) >= 3 and row[2].strip().lower() == reply_text:
+                        ref_id = str(i)
+                        break
+            except Exception:
+                pass
+
+            if not ref_id:
+                await bot.send_message(
+                    chat_id,
+                    "❓ <b>Không tìm thấy yêu cầu trong sheet.</b>\n"
+                    "Hãy Reply đúng vào tin nhắn yêu cầu gốc.",
+                    parse_mode="HTML"
+                )
+                return
+
             result = post_sheet({
                 "action":    "done",
                 "ref_id":    ref_id,
@@ -90,23 +123,24 @@ async def handle(data: dict):
             if status == "ok":
                 await bot.send_message(
                     chat_id,
-                    f"✅ <b>Marked as Done</b> — Request <b>#{ref_id}</b>\n"
+                    f"✅ <b>Đã hoàn thành</b> — Yêu cầu <b>#{ref_id}</b>\n"
                     f"📅 {now.strftime('%d/%m/%Y %H:%M')}",
                     parse_mode="HTML"
                 )
             elif status == "denied":
                 await bot.send_message(
                     chat_id,
-                    f"🚫 <b>Not authorised.</b>\n"
-                    f"Your Telegram ID <code>{user.id if user else chat_id}</code> "
-                    f"is not in the allowed list.\n"
-                    f"Ask your admin to add your ID to the <b>Config</b> sheet.",
+                    f"🚫 <b>Không có quyền.</b>\n"
+                    f"ID Telegram <code>{user.id if user else chat_id}</code> "
+                    f"chưa có trong danh sách Config.",
                     parse_mode="HTML"
                 )
             else:
                 err = html.escape(result.get("message", "unknown error"))
-                await bot.send_message(chat_id, f"⚠️ Could not mark #{ref_id} as done: {err}", parse_mode="HTML")
+                await bot.send_message(chat_id,
+                    f"⚠️ Lỗi: {err}", parse_mode="HTML")
             return
+
 
         # ── Collector commands ─────────────────────────────────────────────
         if is_collector_msg(text):
@@ -121,10 +155,7 @@ async def handle(data: dict):
                 row_id = str(result.get("row", "???")).zfill(5)
                 await bot.send_message(
                     chat_id,
-                    f"✅ <b>Recorded</b> — 🆔 <b>#{row_id}</b>\n"
-                    f"📅 {now.strftime('%d/%m/%Y %H:%M')}\n\n"
-                    f"📦 {html.escape(text)}\n\n"
-                    f"When complete, reply:\n<code>Done: #{row_id}</code>",
+                    f"REQUEST_BOT ✅ Recorded — 🆔 #{row_id}📅 {now.strftime('%d/%m/%Y %H:%M')}",
                     parse_mode="HTML"
                 )
             else:

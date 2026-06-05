@@ -262,10 +262,7 @@ def handle(data):
         if res and res.get("status") == "ok":
             row_id = res.get("row", "?")
             tg_send(chat_id,
-                f"✅ <b>Recorded</b> – Request <b>#{row_id}</b>\n"
-                f"📅 {now.strftime('%d/%m/%Y %H:%M')}\n\n"
-                f"📦 {html.escape(text)}\n\n"
-                f"Khi xong, reply:\n<code>Done: #{row_id}</code>"
+                f"REQUEST_BOT ✅ Recorded — 🆔 #{row_id}📅 {now.strftime('%d/%m/%Y %H:%M')}"
             )
         else:
             err = res.get("message", "unknown") if res else "no response"
