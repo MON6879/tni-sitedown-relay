@@ -90,8 +90,8 @@ async def handle(data: dict):
             if not ref_id:
                 await bot.send_message(
                     chat_id,
-                    "⚠️ Reply vào tin nhắn bot xác nhận (có #ID), "
-                    "hoặc gõ <code>Done: #ID</code>",
+                    "⚠️ Reply to bot confirmation (with #ID), "
+                    "or type <code>Done: #ID</code>",
                     parse_mode="HTML"
                 )
                 return
@@ -118,12 +118,12 @@ async def handle(data: dict):
             elif status == "denied":
                 await bot.send_message(
                     chat_id,
-                    f"🚫 ID <code>{user.id if user else chat_id}</code> chưa có quyền.",
+                    f"🚫 ID <code>{user.id if user else chat_id}</code> not authorised.",
                     parse_mode="HTML"
                 )
             else:
                 err = html.escape(result.get("message", "unknown error"))
-                await bot.send_message(chat_id, f"⚠️ Lỗi: {err}", parse_mode="HTML")
+                await bot.send_message(chat_id, f"⚠️ Error: {err}", parse_mode="HTML")
             return
 
 
