@@ -5,8 +5,9 @@ from http.server import BaseHTTPRequestHandler
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-TOKEN           = os.environ.get("TELEGRAM_TOKEN", "")
-APPS_SCRIPT_URL = os.environ.get("APPS_SCRIPT_URL", "")
+TOKEN           = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
+APPS_SCRIPT_URL = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
+logger.info(f"APPS_SCRIPT_URL = '{APPS_SCRIPT_URL[:60]}...'")
 
 SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
 BASE_URL       = (f"https://docs.google.com/spreadsheets/d/"

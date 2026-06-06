@@ -11,8 +11,8 @@ from datetime import datetime, timezone, timedelta
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-COLLECTOR_BOT_TOKEN = os.environ.get("COLLECTOR_BOT_TOKEN", "")
-APPS_SCRIPT_URL     = os.environ.get("APPS_SCRIPT_URL", "")
+COLLECTOR_BOT_TOKEN = os.environ.get("COLLECTOR_BOT_TOKEN", "").strip().strip("\ufeff")
+APPS_SCRIPT_URL     = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 TZ_VN = timezone(timedelta(hours=7))
 
 KEYWORDS = ["order", "revoke", "export", "move"]
