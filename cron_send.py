@@ -23,7 +23,7 @@ APPS_SCRIPT_URL         = os.getenv("APPS_SCRIPT_URL", "")
 SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
 SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
-    "/gviz/tq?tqx=out:csv&gid=133591305"
+    "/gviz/tq?tqx=out:csv&gid=133591305&range=A1:E90"
 )
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 HEADER_ROWS = 2
@@ -59,6 +59,45 @@ def get_asset_stats():
         logger.warning(f"get_asset_stats failed: {data.get('message', 'unknown')}")
         return {}
     return data
+
+
+def get_report_data():
+    """Get search stats from Apps Script (employees, leaders, teamSummary, grandTotal)."""
+    data = call_apps_script({"action": "get_report_data"}, timeout=120)
+    if data.get("status") != "ok":
+        logger.warning(f"get_report_data failed: {data.get('message', 'unknown')}")
+        return {}
+    return data
+
+
+def build_search_summary(now_str, report_data):
+    """Build search stats summary with 3-day/7-day/month per team + grand total."""
+    team_summary = report_data.get("teamSummary", [])
+    grand = report_data.get("grandTotal", {})
+    if not team_summary:
+        return ""
+
+    TEAM_SHORT = {
+        "MYT_TNI_TEAM01_Dawei": "Team1(Dawei)",
+        "MYT_TNI_TEAM02_Myeik": "Team2(Myeik)",
+        "MYT_TNI_TEAM03_Bokpyin": "Team3(Bokpyin)",
+        "MYT_TNI_TEAM04_Kawthoung": "Team4(Kawthoung)",
+    }
+
+    lines = [f"🔍 Search Stats – {now_str}"]
+    for ts in team_summary:
+        tm = TEAM_SHORT.get(ts.get("team", ""), ts.get("team", ""))
+        lines.append(
+            f"🏷️ {tm}: "
+            f"3Day:{ts.get('d2',0)}/{ts.get('d1',0)}/{ts.get('today',0)} "
+            f"7Day:{ts.get('week',0)} Month:{ts.get('month',0)}"
+        )
+    lines.append(
+        f"📊 Total: "
+        f"3Day:{grand.get('d2',0)}/{grand.get('d1',0)}/{grand.get('today',0)} "
+        f"7Day:{grand.get('week',0)} Month:{grand.get('month',0)}"
+    )
+    return "\n".join(lines)
 
 
 def build_asset_msg(now_str, asset_data):
@@ -186,14 +225,9 @@ async def main():
     asset_data = get_asset_stats()
     asset_msg = build_asset_msg(now_str, asset_data)
 
-    # ── 4. Collect E75:E87 content for management report ──
-    tech_content_lines = []
-    for idx, row in df.iterrows():
-        sheet_row = idx + 1
-        if 75 <= sheet_row <= 87:
-            content = safe(row, COL_D)
-            if content:
-                tech_content_lines.append(content[:300])
+    # ── 4. Get search stats for summaries ──
+    report_data = get_report_data()
+    search_msg = build_search_summary(now_str, report_data)
 
     # ── 5. Build management report ──
     mgmt_parts = [f"📊 Báo cáo tổng hợp – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
@@ -201,6 +235,11 @@ async def main():
     # Asset stats
     if asset_msg:
         mgmt_parts.append(asset_msg)
+        mgmt_parts.append("━━━━━━━━━━━━━━━━━━━━")
+
+    # Search stats
+    if search_msg:
+        mgmt_parts.append(search_msg)
         mgmt_parts.append("━━━━━━━━━━━━━━━━━━━━")
 
     # Team leader reports
@@ -237,7 +276,7 @@ async def main():
             # Management rows: send compiled report (even if D is empty)
             msg = mgmt_report
         elif 75 <= sheet_row <= 87:
-            # Technical dept: D content + asset stats summary
+            # Technical dept: D content + asset stats + search stats summary
             parts = []
             if content:
                 parts.append(
@@ -248,6 +287,8 @@ async def main():
                 )
             if asset_msg:
                 parts.append(f"\n{asset_msg}")
+            if search_msg:
+                parts.append(f"\n{search_msg}")
             if parts:
                 msg = "\n".join(parts)
             else:
