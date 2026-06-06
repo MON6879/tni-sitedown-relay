@@ -1,0 +1,27 @@
+name: Daily Task Reminder (17:30 Myanmar)
+
+on:
+  schedule:
+    # 17:30 Myanmar (UTC+6:30) = 11:00 UTC
+    - cron: '0 11 * * *'
+  workflow_dispatch:  # cho phép chạy tay
+
+jobs:
+  send-tasks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install python-telegram-bot requests pandas python-dotenv
+
+      - name: Send task reminders
+        env:
+          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+          REPORT_TASK_BOT_TOKEN: ${{ secrets.REPORT_TASK_BOT_TOKEN }}
+          TECHNICAL_DEP_BOT_TOKEN: ${{ secrets.TECHNICAL_DEP_BOT_TOKEN }}
+        run: python cron_send.py
