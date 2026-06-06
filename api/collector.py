@@ -15,7 +15,39 @@ COLLECTOR_BOT_TOKEN = os.environ.get("COLLECTOR_BOT_TOKEN", "").strip().strip("\
 APPS_SCRIPT_URL     = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 TZ_VN = timezone(timedelta(hours=7))
 
-KEYWORDS = ["order", "revoke", "export", "move"]
+KEYWORDS_DEFAULT = ["order", "revoke", "export", "move", "asset sent", "destroys"]
+_keywords_cache = None
+
+def get_keywords() -> list:
+    """Load keywords from Config sheet col A (text before ':'), cache result."""
+    global _keywords_cache
+    if _keywords_cache is not None:
+        return _keywords_cache
+    try:
+        url = (
+            "https://docs.google.com/spreadsheets/d/"
+            "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
+            "/gviz/tq?tqx=out:csv&gid=1236389870&tq=select+A+limit+30"
+        )
+        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        import csv, io
+        rows = list(csv.reader(io.StringIO(resp.text)))
+        kws = []
+        for row in rows[1:]:  # skip header
+            val = (row[0] if row else "").strip()
+            if ":" in val:
+                kw = val.split(":")[0].strip().lower()
+                if kw and kw not in kws:
+                    kws.append(kw)
+        if kws:
+            _keywords_cache = kws
+            logger.info(f"Keywords from Config: {kws}")
+            return kws
+    except Exception as e:
+        logger.warning(f"Config keyword load failed: {e}, using defaults")
+    _keywords_cache = KEYWORDS_DEFAULT
+    return _keywords_cache
+
 
 
 # ── Send data to Google Sheet via Apps Script ─────────────────────────────
@@ -37,7 +69,7 @@ def post_sheet(payload: dict):
 # ── Detect collector keyword in message ───────────────────────────────────
 def is_collector_msg(text: str) -> bool:
     lower = text.lower()
-    return any(f"{k}:" in lower for k in KEYWORDS)
+    return any(f"{k}:" in lower for k in get_keywords())
 
 
 # ── Main async handler ────────────────────────────────────────────────────
@@ -58,15 +90,13 @@ async def handle(data: dict):
 
         # ── /start ────────────────────────────────────────────────────────
         if text.startswith("/start"):
+            kws = get_keywords()
+            kw_lines = "\n".join(f"<code>{k.title()}: TNI0001 detail</code>" for k in kws)
             await bot.send_message(
                 chat_id,
-                "👋 <b>Asset Request Bot</b>\n"
-                "📌 Send asset commands in this format:\n"
-                "<code>Order: TNI0001 detail</code>\n"
-                "<code>Revoke: TNI0001 detail</code>\n"
-                "<code>Export: TNI0001 detail</code>\n"
-                "<code>Move: from TNI0001 to TNI0002 detail</code>\n"
-                "<code>......: TNI0000 Detail</code>",
+                f"👋 <b>Asset Request Bot</b>\n"
+                f"📌 Send asset commands in this format:\n"
+                f"{kw_lines}",
                 parse_mode="HTML"
             )
             return
@@ -172,18 +202,18 @@ async def handle(data: dict):
                 )
             return
 
-        # ── Unknown message ────────────────────────────────────────────────
-        await bot.send_message(
-            chat_id,
-            "❓ <b>Command not recognised.</b>\n\n"
-            "Please use one of:\n"
-            "<code>Order: ...</code>\n"
-            "<code>Revoke: ...</code>\n"
-            "<code>Export: ...</code>\n"
-            "<code>Move: ...</code>\n\n"
-            "Or send <code>/start</code> for help.",
-            parse_mode="HTML"
-        )
+        # ── Unknown message — ignore silently in groups ─────────────────
+        # Only reply in private chat to avoid spam in groups
+        if msg.chat.type == "private":
+            kws = get_keywords()
+            kw_list = ", ".join(k.title() + ":" for k in kws)
+            await bot.send_message(
+                chat_id,
+                f"❓ <b>Command not recognised.</b>\n"
+                f"Use: {kw_list}\n"
+                f"Send <code>/start</code> for help.",
+                parse_mode="HTML"
+            )
 
 
 # ── Vercel entry point ────────────────────────────────────────────────────

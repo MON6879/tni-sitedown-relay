@@ -43,6 +43,12 @@ COL_CONTENT = 3   # Cột D
 COL_CHAT_ID = 4   # Cột E
 HEADER_ROWS = 2
 
+# 2 bot gửi nhân viên theo dải row
+# @TNIREPORTTASK_BOT → E4:E32 (row 4-32, offset from header=2 → data row 2-30)
+REPORT_TASK_BOT_TOKEN    = os.getenv("REPORT_TASK_BOT_TOKEN", "")
+# @TNITECHINICALDEPREPORT_BOT → E75:E87 (row 75-87)
+TECHNICAL_DEP_BOT_TOKEN  = os.getenv("TECHNICAL_DEP_BOT_TOKEN", "")
+
 # Timezone VN
 TZ_VN = timezone(timedelta(hours=7))
 
@@ -77,9 +83,6 @@ async def send_all_tasks():
     now_vn = datetime.now(TZ_VN).strftime("%d/%m/%Y %H:%M")
     logger.info(f"[Scheduler] 🚀 Bắt đầu gửi – {now_vn}")
 
-    if not SEND_BOT_TOKEN:
-        logger.error("[Scheduler] ❌ Thiếu SEND_BOT_TOKEN!")
-        return
     try:
         df = load_task_sheet()
     except Exception:
@@ -89,37 +92,64 @@ async def send_all_tasks():
         logger.info("[Scheduler] ℹ️ Sheet trống.")
         return
 
-    async with Bot(token=SEND_BOT_TOKEN) as bot:
-        success = fail = skip = 0
-        for idx, row in df.iterrows():
-            content     = safe_val(row, COL_CONTENT)
-            chat_id_raw = safe_val(row, COL_CHAT_ID)
+    # Build list of (sheet_row, content, chat_id)
+    tasks = []
+    for idx, row in df.iterrows():
+        content     = safe_val(row, COL_CONTENT)
+        chat_id_raw = safe_val(row, COL_CHAT_ID)
+        if not content or not chat_id_raw or chat_id_raw == "-":
+            continue
+        chat_id = chat_id_raw[:-2] if chat_id_raw.endswith(".0") else chat_id_raw
+        sheet_row = idx + HEADER_ROWS + 1  # convert df index → actual sheet row
+        tasks.append((sheet_row, content, chat_id))
 
-            if not content:
-                skip += 1
-                continue
-            if not chat_id_raw or chat_id_raw == "-":
-                skip += 1
-                continue
+    # Group tasks by bot token based on sheet row
+    # Row 4-32  → @TNIREPORTTASK_BOT
+    # Row 33-74 → SEND_BOT_TOKEN (BOD/managers)
+    # Row 75-87 → @TNITECHINICALDEPREPORT_BOT
+    groups = {}
+    for sheet_row, content, chat_id in tasks:
+        if 4 <= sheet_row <= 32 and REPORT_TASK_BOT_TOKEN:
+            token = REPORT_TASK_BOT_TOKEN
+        elif 75 <= sheet_row <= 87 and TECHNICAL_DEP_BOT_TOKEN:
+            token = TECHNICAL_DEP_BOT_TOKEN
+        elif SEND_BOT_TOKEN:
+            token = SEND_BOT_TOKEN
+        else:
+            logger.warning(f"[Scheduler] ⚠️ No bot token for row {sheet_row}")
+            continue
+        groups.setdefault(token, []).append((sheet_row, content, chat_id))
 
-            chat_id = chat_id_raw[:-2] if chat_id_raw.endswith(".0") else chat_id_raw
-            message = (
-                f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_vn}\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"{content}\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
-            )
-            try:
-                await bot.send_message(chat_id=chat_id, text=message)
-                logger.info(f"[Scheduler] ✅ → {chat_id}: {content[:50]}")
-                success += 1
-            except Exception as e:
-                logger.error(f"[Scheduler] ❌ → {chat_id}: {e}")
-                fail += 1
-            await asyncio.sleep(0.4)
+    total_ok = total_fail = 0
+    for token, items in groups.items():
+        # Identify which bot
+        if token == REPORT_TASK_BOT_TOKEN:
+            bot_name = "@TNIREPORTTASK_BOT"
+        elif token == TECHNICAL_DEP_BOT_TOKEN:
+            bot_name = "@TNITECHINICALDEPREPORT_BOT"
+        else:
+            bot_name = "SEND_BOT"
+        logger.info(f"[Scheduler] --- {bot_name}: {len(items)} messages ---")
 
-    logger.info(f"[Scheduler] 📊 ✅{success} | ❌{fail} | ⏭️{skip}")
+        async with Bot(token=token) as bot:
+            for sheet_row, content, chat_id in items:
+                message = (
+                    f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_vn}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{content}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
+                )
+                try:
+                    await bot.send_message(chat_id=chat_id, text=message)
+                    logger.info(f"[Scheduler] ✅ {bot_name} → row{sheet_row} ({chat_id})")
+                    total_ok += 1
+                except Exception as e:
+                    logger.error(f"[Scheduler] ❌ {bot_name} → row{sheet_row} ({chat_id}): {e}")
+                    total_fail += 1
+                await asyncio.sleep(0.4)
+
+    logger.info(f"[Scheduler] 📊 ✅{total_ok} | ❌{total_fail}")
 
 
 # ══════════════════════════════════════════════════
