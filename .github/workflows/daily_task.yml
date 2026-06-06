@@ -24,4 +24,5 @@ jobs:
           SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
           REPORT_TASK_BOT_TOKEN: ${{ secrets.REPORT_TASK_BOT_TOKEN }}
           TECHNICAL_DEP_BOT_TOKEN: ${{ secrets.TECHNICAL_DEP_BOT_TOKEN }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
         run: python cron_send.py

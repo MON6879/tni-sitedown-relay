@@ -1,9 +1,10 @@
 """
-cron_send.py — Render Cron Job: gửi task remain 1 lần rồi thoát.
+cron_send.py — GitHub Actions Cron Job: gửi task remain + management report.
 Dùng 3 bot theo dải row trong sheet Task remain (gid=133591305):
-  Row 4-32:  @TNIREPORTTASK_BOT
-  Row 33-74: SEND_BOT (BOD/managers)
-  Row 75-87: @TNITECHINICALDEPREPORT_BOT
+  Row 4-32:  @TNIREPORTTASK_BOT        (nhân viên)
+  Row 33-59: SEND_BOT                  (team leaders)
+  Row 60-74: SEND_BOT + compiled report (management)
+  Row 75-87: @TNITECHINICALDEPREPORT_BOT (technical dept)
 """
 import asyncio, io, logging, os, requests, pandas as pd
 from datetime import datetime, timezone, timedelta
@@ -17,15 +18,16 @@ logger = logging.getLogger(__name__)
 SEND_BOT_TOKEN          = os.getenv("SEND_BOT_TOKEN", "")
 REPORT_TASK_BOT_TOKEN   = os.getenv("REPORT_TASK_BOT_TOKEN", "")
 TECHNICAL_DEP_BOT_TOKEN = os.getenv("TECHNICAL_DEP_BOT_TOKEN", "")
+APPS_SCRIPT_URL         = os.getenv("APPS_SCRIPT_URL", "")
+
+SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
 SHEET_URL = (
-    "https://docs.google.com/spreadsheets/d/"
-    "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
+    f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
     "/gviz/tq?tqx=out:csv&gid=133591305"
 )
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 HEADER_ROWS = 2
-COL_CONTENT = 3  # D
-COL_CHAT_ID = 4  # E
+COL_A, COL_B, COL_C, COL_D, COL_E = 0, 1, 2, 3, 4
 
 
 def safe(row, idx):
@@ -37,61 +39,226 @@ def safe(row, idx):
         return ""
 
 
-async def main():
-    now = datetime.now(TZ_MM).strftime("%d/%m/%Y %H:%M")
-    logger.info(f"🚀 Cron send start – {now}")
+def call_apps_script(payload, timeout=30):
+    """Call Apps Script and return JSON response."""
+    if not APPS_SCRIPT_URL:
+        return {}
+    try:
+        resp = requests.post(APPS_SCRIPT_URL, json=payload, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        logger.error(f"Apps Script error: {e}")
+        return {}
 
+
+def get_asset_stats():
+    """Get asset stats from Apps Script."""
+    data = call_apps_script({"action": "get_asset_stats"}, timeout=120)
+    if data.get("status") != "ok":
+        logger.warning(f"get_asset_stats failed: {data.get('message', 'unknown')}")
+        return {}
+    return data
+
+
+def build_asset_msg(now_str, asset_data):
+    """Build compact asset stats message with 3-day/7-day/month."""
+    if not asset_data.get("actionTypes"):
+        return ""
+
+    action_types = asset_data.get("actionTypes", [])
+    teams = asset_data.get("teams", [])
+    stats = asset_data.get("stats", {})
+    grand = asset_data.get("grandTotal", {})
+
+    TEAM_SHORT = {
+        "MYT_TNI_TEAM01_Dawei": "Team1(Dawei)",
+        "MYT_TNI_TEAM02_Myeik": "Team2(Myeik)",
+        "MYT_TNI_TEAM03_Bokpyin": "Team3(Bokpyin)",
+        "MYT_TNI_TEAM04_Kawthoung": "Team4(Kawthoung)",
+    }
+
+    def fmt(s):
+        total = s.get("total", 0)
+        done = s.get("done", 0)
+        return f"{total} Done {done}"
+
+    def fmt_period(s):
+        return (
+            f"3Day:{s.get('d0',0)}/{s.get('d1',0)}/{s.get('d2',0)} "
+            f"7Day:{s.get('d6',0)} Month:{s.get('d15',0)}"
+        )
+
+    lines = [f"📦 Thống kê Asset – {now_str}"]
+
+    for tm in teams:
+        tm_short = TEAM_SHORT.get(tm, tm)
+        parts = [f"{at}: {fmt(stats.get(at,{}).get(tm,{}))}" for at in action_types]
+        lines.append(f"🏷️ {tm_short}: " + " | ".join(parts))
+        # Period summary per team
+        team_total = {"d0":0,"d1":0,"d2":0,"d6":0,"d15":0}
+        for at in action_types:
+            s = stats.get(at, {}).get(tm, {})
+            for k in team_total:
+                team_total[k] += s.get(k, 0)
+        lines.append(f"   📅 {fmt_period(team_total)}")
+
+    # Grand total
+    parts = [f"{at}: {fmt(grand.get(at,{}))}" for at in action_types]
+    lines.append(f"📊 Total: " + " | ".join(parts))
+
+    # Grand period
+    g_period = {"d0":0,"d1":0,"d2":0,"d6":0,"d15":0}
+    for at in action_types:
+        g = grand.get(at, {})
+        for k in g_period:
+            g_period[k] += g.get(k, 0)
+    lines.append(f"📅 Total {fmt_period(g_period)}")
+
+    return "\n".join(lines)
+
+
+async def send_msg(bot, cid, text, label=""):
+    """Send message, handle >4096 char limit."""
+    MAX = 4000
+    try:
+        if len(text) <= MAX:
+            await bot.send_message(chat_id=cid, text=text)
+        else:
+            # Split by lines
+            parts, current = [], ""
+            for line in text.split("\n"):
+                if len(current) + len(line) + 1 > MAX:
+                    parts.append(current)
+                    current = line
+                else:
+                    current += ("\n" if current else "") + line
+            if current:
+                parts.append(current)
+            for p in parts:
+                await bot.send_message(chat_id=cid, text=p)
+                await asyncio.sleep(0.3)
+        logger.info(f"✅ {label} → {cid}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ {label} → {cid}: {e}")
+        return False
+
+
+async def main():
+    now = datetime.now(TZ_MM)
+    now_str = now.strftime("%d/%m/%Y %H:%M")
+    logger.info(f"🚀 Cron send start – {now_str}")
+
+    # ── 1. Read full sheet ──
     resp = requests.get(SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
     resp.raise_for_status()
     df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str, on_bad_lines="skip")
-    df = df.iloc[HEADER_ROWS:].reset_index(drop=True)
-    logger.info(f"Sheet: {len(df)} rows")
+    logger.info(f"Sheet: {len(df)} total rows (including headers)")
 
-    # Build tasks
-    tasks = []
+    # ── 2. Collect team leader content + employee content ──
+    team_leader_content = []
+    all_rows = []  # (sheet_row, content, chat_id)
+
     for idx, row in df.iterrows():
-        content = safe(row, COL_CONTENT)
-        cid_raw = safe(row, COL_CHAT_ID)
-        if not content or not cid_raw or cid_raw == "-":
-            continue
-        cid = cid_raw[:-2] if cid_raw.endswith(".0") else cid_raw
-        sheet_row = idx + HEADER_ROWS + 1
-        tasks.append((sheet_row, content, cid))
+        sheet_row = idx + 1  # 1-indexed
+        if sheet_row <= HEADER_ROWS:
+            continue  # skip headers
 
-    # Group by bot
-    groups = {}
-    for sheet_row, content, cid in tasks:
+        content = safe(row, COL_D)
+        cid_raw = safe(row, COL_E)
+        col_c = safe(row, COL_C)
+        col_b = safe(row, COL_B)
+
+        cid = cid_raw[:-2] if cid_raw.endswith(".0") else cid_raw
+
+        # Collect team leader content for management report
+        if col_c and "team leader" in col_c.lower() and content:
+            team_name = safe(row, COL_A) or col_b or "Unknown"
+            team_leader_content.append({"team": team_name, "name": col_b, "content": content})
+
+        if not cid or cid == "-" or not cid.lstrip("-").isdigit():
+            continue
+
+        all_rows.append((sheet_row, content, cid, col_c))
+
+    # ── 3. Get asset stats for management report ──
+    asset_data = get_asset_stats()
+    asset_msg = build_asset_msg(now_str, asset_data)
+
+    # ── 4. Collect E75:E87 content for management report ──
+    tech_content_lines = []
+    for idx, row in df.iterrows():
+        sheet_row = idx + 1
+        if 75 <= sheet_row <= 87:
+            content = safe(row, COL_D)
+            if content:
+                tech_content_lines.append(content[:300])
+
+    # ── 5. Build management report ──
+    mgmt_parts = [f"📊 Báo cáo tổng hợp – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
+
+    # Asset stats
+    if asset_msg:
+        mgmt_parts.append(asset_msg)
+        mgmt_parts.append("━━━━━━━━━━━━━━━━━━━━")
+
+    # Team leader reports
+    if team_leader_content:
+        mgmt_parts.append("👑 Team Leader Reports:")
+        for tl in team_leader_content:
+            short = tl["content"][:600] + "..." if len(tl["content"]) > 600 else tl["content"]
+            mgmt_parts.append(f"\n🏷️ {tl['team']}:\n{short}")
+
+    mgmt_report = "\n".join(mgmt_parts)
+
+    # ── 6. Send messages ──
+    ok = fail = 0
+
+    # Group by bot token
+    groups = {}  # token -> [(sheet_row, message, cid, label)]
+
+    for sheet_row, content, cid, col_c in all_rows:
+        # Determine bot token
         if 4 <= sheet_row <= 32 and REPORT_TASK_BOT_TOKEN:
-            tok = REPORT_TASK_BOT_TOKEN
+            token = REPORT_TASK_BOT_TOKEN
+            bot_label = "@TNIREPORTTASK"
         elif 75 <= sheet_row <= 87 and TECHNICAL_DEP_BOT_TOKEN:
-            tok = TECHNICAL_DEP_BOT_TOKEN
+            token = TECHNICAL_DEP_BOT_TOKEN
+            bot_label = "@TNITECHNICAL"
         elif SEND_BOT_TOKEN:
-            tok = SEND_BOT_TOKEN
+            token = SEND_BOT_TOKEN
+            bot_label = "SEND_BOT"
         else:
             continue
-        groups.setdefault(tok, []).append((sheet_row, content, cid))
 
-    ok = fail = 0
-    for tok, items in groups.items():
-        name = "@TNIREPORTTASK" if tok == REPORT_TASK_BOT_TOKEN \
-            else "@TNITECHNICAL" if tok == TECHNICAL_DEP_BOT_TOKEN \
-            else "SEND_BOT"
-        logger.info(f"--- {name}: {len(items)} msgs ---")
-        async with Bot(token=tok) as bot:
-            for sr, content, cid in items:
-                msg = (
-                    f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"{content}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
-                )
-                try:
-                    await bot.send_message(chat_id=cid, text=msg)
-                    logger.info(f"✅ {name} → row{sr} ({cid})")
+        # Determine message content
+        if 60 <= sheet_row <= 74:
+            # Management rows: send compiled report (even if D is empty)
+            msg = mgmt_report
+        elif content:
+            # Normal rows: send task reminder
+            msg = (
+                f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"{content}\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
+            )
+        else:
+            continue  # skip rows with no content and not management
+
+        groups.setdefault(token, []).append((sheet_row, msg, cid, bot_label))
+
+    for token, items in groups.items():
+        bot_name = items[0][3] if items else "BOT"
+        logger.info(f"--- {bot_name}: {len(items)} messages ---")
+        async with Bot(token=token) as bot:
+            for sheet_row, msg, cid, label in items:
+                result = await send_msg(bot, cid, msg, f"{label} row{sheet_row}")
+                if result:
                     ok += 1
-                except Exception as e:
-                    logger.error(f"❌ {name} → row{sr} ({cid}): {e}")
+                else:
                     fail += 1
                 await asyncio.sleep(0.4)
 
