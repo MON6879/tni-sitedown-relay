@@ -73,19 +73,37 @@ async def handle(data: dict):
 
         # ── Done ──────────────────────────────────────────────────────────
         if re.match(r"^done\b", text, re.IGNORECASE):
-            # Extract #ID from user's text: "Done: #00008" or "Done: #8"
+            # 1) Extract #ID from user's text: "Done: #00008" or "Done: #8"
             id_in_text = re.search(r"#(\d+)", text)
             ref_id = None
 
             if id_in_text:
                 ref_id = id_in_text.group(1)
             else:
-                # Try to extract #ID from reply_to_message (bot's confirmation)
+                # 2) Extract #ID from reply_to_message (bot's confirmation)
                 reply = msg.reply_to_message
                 if reply and reply.text:
                     id_in_reply = re.search(r"#(\d+)", reply.text)
                     if id_in_reply:
                         ref_id = id_in_reply.group(1)
+                    else:
+                        # 3) Fallback: search sheet column C for reply text
+                        try:
+                            import csv, io
+                            sheet_url = (
+                                "https://docs.google.com/spreadsheets/d/"
+                                "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
+                                "/gviz/tq?tqx=out:csv&gid=199426270"
+                            )
+                            resp = requests.get(sheet_url, timeout=10)
+                            rows = list(csv.reader(io.StringIO(resp.text)))
+                            reply_lower = reply.text.strip().lower()
+                            for i, row in enumerate(rows[1:], start=1):
+                                if len(row) >= 3 and row[2].strip().lower() == reply_lower:
+                                    ref_id = str(i)
+                                    break
+                        except Exception as ex:
+                            logger.error(f"CSV search error: {ex}")
 
             if not ref_id:
                 await bot.send_message(
@@ -95,7 +113,7 @@ async def handle(data: dict):
                 )
                 return
 
-            # Extract done detail if any: "Done: fixed it" → "fixed it"
+            # Extract done detail: "Done: fixed it" → "fixed it"
             done_detail = re.sub(r"^done\s*:?\s*#?\d*\s*", "", text, flags=re.IGNORECASE).strip()
 
             result = post_sheet({
@@ -105,6 +123,7 @@ async def handle(data: dict):
                 "done_date": now.strftime("%d/%m/%Y"),
                 "done_time": now.strftime("%H:%M"),
                 "chat_id":   str(user.id if user else chat_id),
+                "sender_name": sender_name,
             })
             status = result.get("status")
             if status == "ok":
