@@ -90,8 +90,7 @@ async def handle(data: dict):
             if not ref_id:
                 await bot.send_message(
                     chat_id,
-                    "⚠️ Reply to bot confirmation (with #ID), "
-                    "or type <code>Done: #ID</code>",
+                    "Receive Done (Only asset or Team leader reply Done or Done detail)",
                     parse_mode="HTML"
                 )
                 return
@@ -140,8 +139,7 @@ async def handle(data: dict):
                 row_id = str(result.get("row", "???")).zfill(5)
                 await bot.send_message(
                     chat_id,
-                    f"REQUEST_BOT ✅ Recorded — 🆔 #{row_id}📅 {now.strftime('%d/%m/%Y %H:%M')}\n"
-                    f"Only asset or Team leader reply Done or Done detail",
+                    f"REQUEST_BOT ✅ Recorded — 🆔 #{row_id}📅 {now.strftime('%d/%m/%Y %H:%M')}",
                     parse_mode="HTML"
                 )
             else:
