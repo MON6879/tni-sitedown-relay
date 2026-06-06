@@ -236,6 +236,22 @@ async def main():
         if 60 <= sheet_row <= 74:
             # Management rows: send compiled report (even if D is empty)
             msg = mgmt_report
+        elif 75 <= sheet_row <= 87:
+            # Technical dept: D content + asset stats summary
+            parts = []
+            if content:
+                parts.append(
+                    f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{content}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━"
+                )
+            if asset_msg:
+                parts.append(f"\n{asset_msg}")
+            if parts:
+                msg = "\n".join(parts)
+            else:
+                continue
         elif content:
             # Normal rows: send task reminder
             msg = (
