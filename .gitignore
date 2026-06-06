@@ -7,3 +7,5 @@ __pycache__/
 *.log
 check_gids.py
 get_chatid_bot.py
+
+.vercel

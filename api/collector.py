@@ -80,30 +80,29 @@ async def handle(data: dict):
             if id_in_text:
                 ref_id = id_in_text.group(1)
             else:
-                # 2) Extract #ID from reply_to_message (bot's confirmation)
+                # 2) Extract #ID or REF:ID from reply_to_message
                 reply = msg.reply_to_message
-                if reply and reply.text:
-                    id_in_reply = re.search(r"#(\d+)", reply.text)
-                    if id_in_reply:
-                        ref_id = id_in_reply.group(1)
-                    else:
-                        # 3) Fallback: search sheet column C for reply text
-                        try:
-                            import csv, io
-                            sheet_url = (
-                                "https://docs.google.com/spreadsheets/d/"
-                                "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
-                                "/gviz/tq?tqx=out:csv&gid=199426270"
-                            )
-                            resp = requests.get(sheet_url, timeout=10)
-                            rows = list(csv.reader(io.StringIO(resp.text)))
-                            reply_lower = reply.text.strip().lower()
-                            for i, row in enumerate(rows[1:], start=1):
-                                if len(row) >= 3 and row[2].strip().lower() == reply_lower:
-                                    ref_id = str(i)
-                                    break
-                        except Exception as ex:
-                            logger.error(f"CSV search error: {ex}")
+                if reply:
+                    reply_text = reply.text or reply.caption or ""
+                    if reply_text:
+                        # Try #00010 or REF:00010 format
+                        id_in_reply = (
+                            re.search(r"#(\d+)", reply_text) or
+                            re.search(r"REF:(\d+)", reply_text)
+                        )
+                        if id_in_reply:
+                            ref_id = id_in_reply.group(1)
+                        else:
+                            # 3) Fallback: use Apps Script "find" to search
+                            #    by original message content in sheet
+                            logger.info(f"[Done] Fallback find: {reply_text[:80]}")
+                            find_result = post_sheet({
+                                "action": "find",
+                                "text":   reply_text.strip()
+                            })
+                            if find_result.get("status") == "ok":
+                                ref_id = str(find_result.get("row", ""))
+                                logger.info(f"[Done] Found ref_id={ref_id} via sheet find")
 
             if not ref_id:
                 await bot.send_message(
@@ -119,7 +118,7 @@ async def handle(data: dict):
             result = post_sheet({
                 "action":    "done",
                 "ref_id":    ref_id,
-                "done":      done_detail or "Done",
+                "done":      done_detail,
                 "done_date": now.strftime("%d/%m/%Y"),
                 "done_time": now.strftime("%H:%M"),
                 "chat_id":   str(user.id if user else chat_id),
@@ -127,12 +126,14 @@ async def handle(data: dict):
             })
             status = result.get("status")
             if status == "ok":
-                detail_txt = f" — {html.escape(done_detail)}" if done_detail else ""
-                await bot.send_message(
-                    chat_id,
-                    f"REQUEST_BOT ✅ Done #{ref_id}{detail_txt}📅 {now.strftime('%d/%m/%Y %H:%M')}",
-                    parse_mode="HTML"
-                )
+                ref_padded = str(ref_id).zfill(5)
+                # 2 dòng: dòng 1 = REF, dòng 2 = Done + ngày
+                line1 = f"REQUEST_BOT ✅ Recorded — 🆔 #{ref_padded} 🏷️"
+                line2 = "Done"
+                if done_detail:
+                    line2 += ": " + html.escape(done_detail)
+                line2 += f" 📅 {now.strftime('%d/%m/%Y %H:%M')}"
+                await bot.send_message(chat_id, f"{line1}\n{line2}", parse_mode="HTML")
             elif status == "denied":
                 await bot.send_message(
                     chat_id,

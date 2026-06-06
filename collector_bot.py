@@ -38,6 +38,9 @@ _keyword_cache      = []
 _keyword_cache_time = None
 CACHE_SECONDS       = 300   # refresh mỗi 5 phút
 
+# Mapping message_id → REF (để Done reply vào tin gốc cũng tìm được)
+MSG_REF_MAP: dict[int, str] = {}   # { original_msg_id: "00001" }
+
 
 # ===================== LẤY KEYWORD TỪ SHEET =====================
 def fetch_keywords() -> list[str]:
@@ -86,12 +89,18 @@ def parse_message(text: str, keywords: list[str]) -> dict:
 def send_to_sheet(payload: dict) -> dict:
     if not APPS_SCRIPT_URL:
         return {"status": "error", "message": "Chưa cấu hình APPS_SCRIPT_URL"}
-    try:
-        resp = requests.post(APPS_SCRIPT_URL, json=payload, timeout=15)
-        return resp.json()
-    except Exception as e:
-        logger.error(f"Apps Script error: {e}")
-        return {"status": "error", "message": str(e)}
+    for attempt in range(3):          # thử tối đa 3 lần
+        try:
+            resp = requests.post(APPS_SCRIPT_URL, json=payload, timeout=45)
+            return resp.json()
+        except requests.exceptions.Timeout:
+            logger.warning(f"⏱ Apps Script timeout (lần {attempt+1}/3)")
+            if attempt == 2:
+                return {"status": "error", "message": "Apps Script timeout sau 3 lần thử"}
+        except Exception as e:
+            logger.error(f"Apps Script error: {e}")
+            return {"status": "error", "message": str(e)}
+    return {"status": "error", "message": "Không kết nối được Apps Script"}
 
 
 # ===================== HANDLER: /start =====================
@@ -135,32 +144,79 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username    = f"@{user.username}" if user.username else str(user.id)
     keywords    = fetch_keywords()
 
-    # ── Kiểm tra Reply với "Done:" ──
-    if msg.reply_to_message and re.search(r"done\s*:", text, re.IGNORECASE):
-        data        = parse_message(text, keywords)
-        done_content = data.get("done", text.strip())
+    # ── Reply "Done" / "Done: detail" / "Done detail" ──
+    if msg.reply_to_message and re.match(r"done\b", text.strip(), re.IGNORECASE):
+        data         = parse_message(text, keywords)
+        # Bỏ chữ Done + dấu câu ở đầu, lấy phần còn lại
+        done_content = re.sub(r"(?i)^done\s*[:\-]?\s*", "", text).strip()
+        note_content = data.get("note", "").strip()
+        # Nếu note nằm trong done_content, tách ra
+        if "note:" in done_content.lower():
+            note_match = re.search(r"(?i)note\s*:\s*(.+)", done_content)
+            if note_match:
+                note_content = note_match.group(1).strip()
+                done_content = re.sub(r"(?i)\s*note\s*:.+", "", done_content).strip()
 
-        original_text = msg.reply_to_message.text or ""
-        ref_match     = re.search(r"#(\d+)", original_text)
-        ref_id        = ref_match.group(1) if ref_match else None
+        original_text = (msg.reply_to_message.text or
+                         msg.reply_to_message.caption or "")
+        logger.info(f"[Done] original_text: {repr(original_text[:80])}")
+
+        # Hỗ trợ cả REF:00006 (mới) và #00006 (cũ)
+        ref_match = (re.search(r"REF:(\d+)", original_text) or
+                     re.search(r"#(\d+)", original_text))
+        ref_id    = ref_match.group(1) if ref_match else None
+
+        # Nếu reply vào tin gốc (không có REF) → tra cứu từ MSG_REF_MAP
+        if not ref_id:
+            orig_msg_id = msg.reply_to_message.message_id
+            ref_id      = MSG_REF_MAP.get(orig_msg_id)
+            if ref_id:
+                logger.info(f"[Done] ref_id={ref_id} (từ MSG_REF_MAP)")
+
+        # Fallback cuối: tìm theo nội dung tin gốc trong sheet
+        if not ref_id and original_text.strip():
+            find_res = send_to_sheet({"action": "find", "text": original_text.strip()})
+            if find_res.get("status") == "ok":
+                ref_id = str(find_res.get("row", "")).zfill(5)
+                logger.info(f"[Done] ref_id={ref_id} (từ sheet find)")
+
+        logger.info(f"[Done] ref_id={ref_id}")
+
+        # Tóm tắt task gốc (bỏ các dòng hướng dẫn)
+        orig_lines = [
+            l.strip() for l in original_text.splitlines()
+            if l.strip()
+            and not l.strip().startswith("_")
+            and "Reply" not in l
+            and "Done:" not in l
+            and "Note:" not in l
+            and "━" not in l
+        ]
+        orig_summary = "\n".join(orig_lines[:6])
 
         payload = {
-            "action":    "done",
-            "ref_id":    ref_id,
-            "done":      done_content,
-            "done_date": now.strftime("%d/%m/%Y"),
-            "done_time": now.strftime("%H:%M"),
-            "chat_id":   str(user.id),
+            "action":      "done",
+            "ref_id":      ref_id,
+            "done":        done_content,
+            "note":        note_content,
+            "done_date":   now.strftime("%d/%m/%Y"),
+            "done_time":   now.strftime("%H:%M"),
+            "sender_name": sender_name,
+            "username":    username,
+            "chat_id":     str(user.id),
         }
         result = send_to_sheet(payload)
 
         if result.get("status") == "ok":
-            await msg.reply_text(
-                f"✅ *#{ref_id} ပြီးစီးပြီ!*\n"
-                f"📝 {done_content}\n"
-                f"🕐 {now.strftime('%d/%m/%Y %H:%M')}",
-                parse_mode="Markdown",
-            )
+            # Reply ngắn gọn — đúng như nội dung ghi vào cột E
+            from_sheet = result.get("done_text", "")
+            config_name = sender_name  # Apps Script dùng Config name, bot dùng sender_name làm fallback
+            short = "Done"
+            if done_content:  short += " " + done_content
+            short += " + " + now.strftime("%d/%m/%Y %H:%M")
+            short += f" ({config_name})"
+            if note_content:  short += " | " + note_content
+            await msg.reply_text(short)
         else:
             await msg.reply_text(
                 f"⚠️ ဒေတာသိမ်းဆည်းမှု မအောင်မြင်ပါ။\n`{result.get('message','')}`",
@@ -193,17 +249,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if result.get("status") == "ok":
         ref_id = str(result.get("row", "???")).zfill(5)
-        lines  = [f"✅ *လက်ခံပြီး — 🆔 #{ref_id}*\n📅 {now.strftime('%d/%m/%Y %H:%M')}\n"]
-
-        icons = {"order":"📦","revoke":"↩️","export":"📤","move":"🚚",
-                 "install":"🔧","check":"🔍","repair":"🛠️"}
-        for k, v in fields.items():
-            if v:
-                icon = icons.get(k.lower(), "▪️")
-                lines.append(f"{icon} {k.capitalize()}: {v}")
-
-        lines.append("\n_ပြီးစီးပါက ဤ မက်ဆေ့ကို Reply ပြု၍_ `Done: ...` _ပို့ပါ_")
-        await msg.reply_text("\n".join(lines), parse_mode="Markdown")
+        sent   = await msg.reply_text(
+            f"✅ Recorded — REF:{ref_id}\n"
+            f"📅 {now.strftime('%d/%m/%Y %H:%M')}",
+        )
+        # Lưu mapping: tin gốc → REF (để Done reply vào tin gốc cũng tìm được)
+        MSG_REF_MAP[msg.message_id] = ref_id
+        # Cũng lưu message_id của tin xác nhận
+        MSG_REF_MAP[sent.message_id] = ref_id
     else:
         await msg.reply_text(
             f"❌ ဒေတာသိမ်းဆည်းမှု မအောင်မြင်ပါ!\n`{result.get('message','')}`",

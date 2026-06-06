@@ -8,11 +8,23 @@
 const SHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8";
 
 // Tab where collected data is stored (gid = 199426270)
-const DATA_TAB  = "Asset order and request";
+const DATA_TAB        = "Asset order and request";
 
 // Tab where authorised users are listed (gid = 1236389870)
 // Layout: Col A = Field Name (existing)  |  Col B = Name  |  Col C = Telegram ID
-const CFG_TAB   = "Config";
+const CFG_TAB         = "Config";
+
+// Tab for search activity log
+const SEARCH_LOG_TAB  = "Search Log";
+
+// Tab for aggregated search stats (one row per user)
+const SEARCH_STATS_TAB = "Search Stats";
+
+// Tab for general combined report (Name + ID + Content + Search stats)
+const GENERAL_TAB      = "General";
+
+// GID of the daily report sheet (gid=133591305)
+const REPORT_GID       = "133591305";
 
 // ============================================================
 // ENTRY POINTS
@@ -24,8 +36,17 @@ function doPost(e) {
     const ss    = SpreadsheetApp.openById(SHEET_ID);
     const sheet = getDataSheet(ss);
 
-    if (body.action === "add")  return handleAdd(sheet, body);
-    if (body.action === "done") return handleDone(sheet, ss, body);
+    if (body.action === "add")              return handleAdd(sheet, body);
+    if (body.action === "done")             return handleDone(sheet, ss, body);
+    if (body.action === "find")             return handleFind(sheet, body);
+    if (body.action === "register_chat")    return handleRegisterChat(ss, body);
+    if (body.action === "register_user")    return handleRegisterUser(ss, body);
+    if (body.action === "get_users")        return handleGetUsers(ss);
+    if (body.action === "log_search")       return handleLogSearch(ss, body);
+    if (body.action === "refresh_general") return handleRefreshGeneral(ss);
+    if (body.action === "get_general")      return handleGetGeneral(ss);
+    if (body.action === "get_report_data")   return handleGetReportData(ss);
+    if (body.action === "get_asset_stats")   return handleGetAssetStats(ss);
 
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
@@ -52,21 +73,31 @@ function doGet(e) {
 // ============================================================
 
 function handleAdd(sheet, body) {
-  const row = [
-    body.date    || "",   // A: Date Sent
-    body.chat_id || "",   // B: Telegram ID
-    body.msg     || "",   // C: Content
-    ""                    // D: Asset action done (empty until Done)
-  ];
+  const dateTime = body.date    || "";
+  const chatId   = body.chat_id || "";
 
+  // NEW format: body.msg = "Order: TNI0002 ..."
+  // OLD format: body.fields = {order:"...", revoke:"..."} + body.sender_name
+  let content = body.msg || "";
+  if (!content && body.fields && typeof body.fields === "object") {
+    const parts = [];
+    for (const [k, v] of Object.entries(body.fields)) {
+      if (v) parts.push(k.charAt(0).toUpperCase() + k.slice(1) + ": " + v);
+    }
+    content = parts.join("\n");
+  }
+
+  const row = ["", dateTime, chatId, content, ""];
   sheet.appendRow(row);
 
   const rowNum = sheet.getLastRow();
-  const seqId  = rowNum - 1;   // sequential ID (excludes header row)
+  const seqId  = rowNum - 1;   // sequential ID (1-based)
 
-  // Zebra striping
+  // Ghi REF vào cột A — dùng để tìm hàng khi Done, không phụ thuộc vị trí hàng
+  sheet.getRange(rowNum, 1).setValue(seqId);
+
   const bg = seqId % 2 === 0 ? "#EBF3FB" : "#FFFFFF";
-  sheet.getRange(rowNum, 1, 1, 4).setBackground(bg);
+  sheet.getRange(rowNum, 1, 1, 5).setBackground(bg);
 
   return json({ status: "ok", message: "Row added", row: seqId });
 }
@@ -95,34 +126,288 @@ function handleDone(sheet, ss, body) {
     });
   }
 
-  // Find the target row (header = row 1, so data row N = row N+1)
-  const targetRow = refId + 1;
+  // Tìm hàng bằng cách quét cột A (REF ID) — an toàn khi xóa dòng
   const lastRow   = sheet.getLastRow();
-
-  if (targetRow < 2 || targetRow > lastRow) {
-    return json({
-      status:  "error",
-      message: "Request #" + refId + " not found. Last ID is #" + (lastRow - 1) + "."
-    });
+  if (lastRow < 2) {
+    return json({ status: "error", message: "Sheet trống" });
   }
 
-  // Build done text for column D
-  const doneDate = body.done_date || "";
-  const doneTime = body.done_time || "";
-  const doneText = "✅ Done — " + doneDate + " " + doneTime + (doerId ? " (ID:" + doerId + ")" : "");
+  const colA      = sheet.getRange(2, 1, lastRow - 1, 1).getValues().flat();
+  const rowIndex  = colA.findIndex(v => parseInt(v) === refId);
 
-  sheet.getRange(targetRow, 4)
+  if (rowIndex === -1) {
+    return json({ status: "error", message: "Không tìm thấy REF:" + String(refId).padStart(5,"0") + " (có thể đã bị xóa)" });
+  }
+
+  const targetRow = rowIndex + 2;   // +1 header, +1 vì findIndex bắt đầu từ 0
+
+  // Cột E (col 5): gộp Done nhiều lần vào 1 ô (append)
+  const existing = sheet.getRange(targetRow, 5).getValue().toString().trim();
+
+  const doneDate   = body.done_date   || "";
+  const doneTime   = body.done_time   || "";
+  const doneDetail = body.done        || "";
+  const doneNote   = body.note        || "";
+  const configName = getNameById(ss, doerId) || (body.sender_name || "");
+
+  let newEntry = "Done";
+  if (doneDetail) newEntry += " " + doneDetail;
+  newEntry += " + " + doneDate + " " + doneTime;
+  if (configName) newEntry += " (" + configName + ")";
+  if (doneNote)   newEntry += " | " + doneNote;
+
+  // Gộp vào ô hiện có (nếu đã có nội dung trước đó)
+  const doneText = existing ? existing + "\n" + newEntry : newEntry;
+
+  sheet.getRange(targetRow, 5)
        .setValue(doneText)
        .setBackground("#D9EAD3")
        .setFontColor("#137333")
-       .setFontWeight("bold");
+       .setFontWeight("bold")
+       .setWrap(true);
 
-  return json({ status: "ok", message: "Done updated", row: refId });
+  return json({ status: "ok", message: "Done updated", row: refId, done_text: newEntry });
 }
 
 // ============================================================
-// HELPERS
+// ACTION: REGISTER_CHAT — lưu tên + ID nhóm vào sheet "Chat IDs"
 // ============================================================
+function handleRegisterChat(ss, body) {
+  const chatId    = String(body.chat_id    || "").trim();
+  const chatTitle = String(body.chat_title || "").trim();
+  const chatType  = String(body.chat_type  || "").trim();
+  const regBy     = String(body.reg_by     || "").trim();
+  const now       = new Date();
+  const dateStr   = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy HH:mm");
+
+  if (!chatId) return json({ status: "error", message: "chat_id is required" });
+
+  // Tạo hoặc lấy sheet "Chat IDs"
+  let sheet = ss.getSheetByName("Chat IDs");
+  if (!sheet) {
+    sheet = ss.insertSheet("Chat IDs");
+    const headers = ["Chat Title", "Chat ID", "Type", "Registered By", "Date"];
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, 5)
+         .setFontWeight("bold")
+         .setBackground("#4472C4")
+         .setFontColor("#FFFFFF")
+         .setHorizontalAlignment("center");
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidths(1, 5, 180);
+    SpreadsheetApp.flush();
+  }
+
+  // Kiểm tra trùng chat_id
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    const ids = sheet.getRange(2, 2, lastRow - 1, 1).getValues().flat().map(String);
+    if (ids.includes(chatId)) {
+      return json({ status: "duplicate", message: "Chat \"" + chatTitle + "\" (" + chatId + ") đã có rồi" });
+    }
+  }
+
+  sheet.appendRow([chatTitle, chatId, chatType, regBy, dateStr]);
+  return json({ status: "ok", message: "Đã lưu: " + chatTitle + " (" + chatId + ")" });
+}
+
+// ============================================================
+// ACTION: FIND — search column C for matching content text
+// Returns the first matching row ID (sequential, not row number)
+// Payload: { action, text }
+// ============================================================
+function handleFind(sheet, body) {
+  const searchText = (body.text || "").trim().toLowerCase();
+  if (!searchText) return json({ status: "error", message: "text is required" });
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return json({ status: "not_found", message: "Sheet is empty" });
+
+  // Col A = REF, Col D = Content (sau khi thêm cột A)
+  const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues(); // A,B,C,D
+
+  // Tìm từ dưới lên (ưu tiên dòng mới nhất nếu trùng nội dung)
+  for (let i = data.length - 1; i >= 0; i--) {
+    const refVal  = data[i][0];  // col A = REF
+    const content = (data[i][3] || "").toString().trim().toLowerCase(); // col D = content
+    if (!content) continue;
+    // Bi-directional: content chứa searchText HOẶC searchText chứa content
+    if (content === searchText || content.includes(searchText) || searchText.includes(content)) {
+      return json({ status: "ok", row: parseInt(refVal) || (i + 1) });
+    }
+  }
+  return json({ status: "not_found", message: "No matching request found" });
+}
+
+// ============================================================
+// ACTION: REGISTER_USER — lưu tên + Telegram ID vào tab Config
+// Col B = Name  |  Col C = Telegram ID
+// ============================================================
+function handleRegisterUser(ss, body) {
+  const userId   = String(body.user_id   || "").trim();
+  const userName = String(body.user_name || "").trim();
+
+  if (!userId) return json({ status: "error", message: "user_id is required" });
+
+  // Tạo hoặc lấy sheet "User IDs"
+  let sheet = ss.getSheetByName("User IDs");
+  if (!sheet) {
+    sheet = ss.insertSheet("User IDs");
+    const headers = ["Name", "Telegram ID", "Date"];
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, 3)
+         .setFontWeight("bold")
+         .setBackground("#4472C4")
+         .setFontColor("#FFFFFF")
+         .setHorizontalAlignment("center");
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(1, 220);
+    sheet.setColumnWidth(2, 160);
+    sheet.setColumnWidth(3, 160);
+    SpreadsheetApp.flush();
+  }
+
+  // Kiểm tra trùng Telegram ID (col B)
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    const ids = sheet.getRange(2, 2, lastRow - 1, 1).getValues().flat().map(String);
+    if (ids.includes(userId)) {
+      return json({ status: "duplicate", message: "ID " + userId + " đã có rồi" });
+    }
+  }
+
+  const now     = new Date();
+  const dateStr = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy HH:mm");
+  sheet.appendRow([userName, userId, dateStr]);
+  return json({ status: "ok", message: "Đã lưu: " + userName + " (" + userId + ")" });
+}
+
+// ============================================================
+// ACTION: GET_USERS — trả về danh sách Name + Telegram ID từ Config
+// Dùng bởi send_now.py để tra cứu ID theo tên
+// ============================================================
+function handleGetUsers(ss) {
+  const config = ss.getSheetByName("Config");
+  if (!config) return json({ status: "error", message: "Config sheet not found" });
+
+  const lastRow = config.getLastRow();
+  if (lastRow < 2) return json({ status: "ok", users: [] });
+
+  const data  = config.getRange(2, 1, lastRow - 1, 3).getValues(); // col A,B,C
+  const users = [];
+  for (const row of data) {
+    const name = (row[0] || "").toString().trim();
+    const id   = (row[1] || "").toString().trim();
+    if (name && id) users.push({ name, id });
+  }
+  return json({ status: "ok", users });
+}
+
+// ============================================================
+// ACTION: LOG_SEARCH — ghi nhật ký tìm kiếm TNI + cập nhật stats
+// ============================================================
+function handleLogSearch(ss, body) {
+  const userName = (body.user_name || "").toString().trim();
+  const userId   = (body.user_id   || "").toString().trim();
+  const tniCode  = (body.tni_code  || "").toString().trim().toUpperCase();
+  const dateStr  = (body.date      || "").toString().trim();
+  const timeStr  = (body.time      || "").toString().trim();
+
+  if (!userId || !tniCode) {
+    return json({ status: "error", message: "Thiếu user_id hoặc tni_code" });
+  }
+
+  // Lấy / tạo tab "Search Log"
+  let logSheet = ss.getSheetByName(SEARCH_LOG_TAB);
+  if (!logSheet) {
+    logSheet = ss.insertSheet(SEARCH_LOG_TAB);
+    logSheet.appendRow(["Date", "Time", "User Name", "User ID", "TNI Code"]);
+    logSheet.getRange(1, 1, 1, 5).setFontWeight("bold")
+            .setBackground("#34A853").setFontColor("#FFFFFF");
+  }
+
+  // Ghi 1 dòng log
+  logSheet.appendRow([dateStr, timeStr, userName, userId, tniCode]);
+
+  // Cập nhật Search Stats
+  refreshStats(ss);
+
+  return json({ status: "ok" });
+}
+
+// ============================================================
+// HELPER: refreshStats — tính lại thống kê, ghi vào "Search Stats"
+// Format: "Name & ID & Day:D-2/D-1/Today & Week:X & Month:Y"
+// ============================================================
+function refreshStats(ss) {
+  const logSheet = ss.getSheetByName(SEARCH_LOG_TAB);
+  if (!logSheet || logSheet.getLastRow() < 2) return;
+
+  // Đọc toàn bộ log (bỏ header)
+  const lastRow = logSheet.getLastRow();
+  const data    = logSheet.getRange(2, 1, lastRow - 1, 5).getValues();
+  // Cols: 0=Date, 1=Time, 2=UserName, 3=UserID, 4=TNICode
+
+  // Ngày hôm nay (Rangoon UTC+6:30)
+  const now     = new Date();
+  const tz      = "Asia/Rangoon";
+  const today   = Utilities.formatDate(now, tz, "dd/MM/yyyy");
+  const d1      = Utilities.formatDate(new Date(now - 86400000),   tz, "dd/MM/yyyy");
+  const d2      = Utilities.formatDate(new Date(now - 2*86400000), tz, "dd/MM/yyyy");
+  const msWeek  = 7  * 86400000;
+  const msMonth = 30 * 86400000;
+
+  // Tổng hợp theo user
+  const users = {};  // key = userId
+  for (const row of data) {
+    const dateVal  = (row[0] || "").toString().trim();
+    const userName = (row[2] || "").toString().trim();
+    const userId   = (row[3] || "").toString().trim();
+    if (!userId) continue;
+
+    if (!users[userId]) {
+      users[userId] = { name: userName, today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    }
+    const u = users[userId];
+
+    // Parse dd/MM/yyyy → Date
+    const parts = dateVal.split("/");
+    let rowDate = null;
+    if (parts.length === 3) {
+      rowDate = new Date(+parts[2], +parts[1]-1, +parts[0]);
+    }
+    if (!rowDate) continue;
+
+    const diffMs = now - rowDate;
+    if (dateVal === today)   u.today++;
+    if (dateVal === d1)      u.d1++;
+    if (dateVal === d2)      u.d2++;
+    if (diffMs <= msWeek)    u.week++;
+    if (diffMs <= msMonth)   u.month++;
+  }
+
+  // Lấy / tạo tab "Search Stats"
+  let statsSheet = ss.getSheetByName(SEARCH_STATS_TAB);
+  if (!statsSheet) {
+    statsSheet = ss.insertSheet(SEARCH_STATS_TAB);
+    statsSheet.getRange(1, 1).setValue("Search Stats (auto-updated)");
+    statsSheet.getRange(1, 1).setFontWeight("bold")
+              .setBackground("#4285F4").setFontColor("#FFFFFF");
+  }
+
+  // Xóa dữ liệu cũ (từ hàng 2 trở đi)
+  const statLast = statsSheet.getLastRow();
+  if (statLast >= 2) statsSheet.getRange(2, 1, statLast - 1, 1).clearContent();
+
+  // Ghi từng dòng tổng hợp
+  let writeRow = 2;
+  for (const uid of Object.keys(users)) {
+    const u = users[uid];
+    const summary = `${u.name} & ${uid} & Day:${u.d2}/${u.d1}/${u.today} & Week:${u.week} & Month:${u.month}`;
+    statsSheet.getRange(writeRow, 1).setValue(summary);
+    writeRow++;
+  }
+}
 
 // Get or create the data sheet
 function getDataSheet(ss) {
@@ -156,6 +441,25 @@ function getDataSheet(ss) {
   }
 
   return sheet;
+}
+
+// Tìm tên trong Config (col B) theo Telegram ID (col C)
+function getNameById(ss, telegramId) {
+  let cfg = ss.getSheetByName(CFG_TAB);
+  if (!cfg) {
+    for (const s of ss.getSheets()) {
+      if (s.getSheetId().toString() === "1236389870") { cfg = s; break; }
+    }
+  }
+  if (!cfg || cfg.getLastRow() < 2) return "";
+
+  const rows = cfg.getRange(2, 1, cfg.getLastRow() - 1, 3).getValues();
+  for (const r of rows) {
+    if (String(r[2]).trim() === String(telegramId).trim()) {
+      return String(r[1]).trim();  // col B = Name
+    }
+  }
+  return "";
 }
 
 // Read allowed Telegram IDs from Config tab, column C
@@ -199,9 +503,508 @@ function setupConfigHeaders(ss) {
   SpreadsheetApp.flush();
 }
 
+// ============================================================
+// HELPER: buildSearchStatsMap
+// ============================================================
+function buildSearchStatsMap(ss) {
+  const map = {};
+  const logSheet = ss.getSheetByName(SEARCH_LOG_TAB);
+  if (!logSheet || logSheet.getLastRow() < 2) return map;
+  const tz = 'Asia/Rangoon';
+  const now = new Date();
+  const today = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
+  const d1 = Utilities.formatDate(new Date(now - 86400000), tz, 'dd/MM/yyyy');
+  const d2 = Utilities.formatDate(new Date(now - 2*86400000), tz, 'dd/MM/yyyy');
+  const msWeek = 7 * 86400000;
+  const msMonth = 30 * 86400000;
+  const last = logSheet.getLastRow();
+  const data = logSheet.getRange(2, 1, last - 1, 4).getValues();
+  for (const row of data) {
+    const dateVal = (row[0] || '').toString().trim();
+    const name = (row[2] || '').toString().trim().toLowerCase();
+    if (!name) continue;
+    if (!map[name]) map[name] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const u = map[name];
+    const parts = dateVal.split('/');
+    if (parts.length !== 3) continue;
+    const rowDate = new Date(+parts[2], +parts[1]-1, +parts[0]);
+    const diffMs = now - rowDate;
+    if (dateVal === today) u.today++;
+    if (dateVal === d1) u.d1++;
+    if (dateVal === d2) u.d2++;
+    if (diffMs <= msWeek) u.week++;
+    if (diffMs <= msMonth) u.month++;
+  }
+  return map;
+}
+
+// ============================================================
+// HELPER: fetchReportSheet
+// ============================================================
+function fetchReportSheet() {
+  // Dung SpreadsheetApp doc truc tiep (khong can UrlFetchApp)
+  // Report sheet co GID = 133591305, nam trong cung spreadsheet
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let reportSheet = null;
+  for (const s of ss.getSheets()) {
+    if (s.getSheetId().toString() === REPORT_GID) { reportSheet = s; break; }
+  }
+  if (!reportSheet) return { employees: [], leaders: [] };
+
+  const lastRow = reportSheet.getLastRow();
+  if (lastRow < 3) return { employees: [], leaders: [] };
+
+  // Doc tu dong 1 den cuoi (giu nguyen index de biet vi tri)
+  const data = reportSheet.getRange(1, 1, lastRow, 5).getValues();
+  const employees = [];
+  const leaders   = [];
+  const managers  = [];
+
+  for (let i = 0; i < data.length; i++) {
+    const row  = data[i];
+    const team = (row[0] || '').toString().trim();
+    const name = (row[1] || '').toString().trim();
+    const colC = (row[2] || '').toString().trim();
+    const cont = (row[3] || '').toString().trim();
+    const colE = (row[4] || '').toString().trim();
+
+    // Bo qua dong header
+    if (team === 'Assign Site' || team.indexOf('Export time') >= 0) continue;
+    if (name === 'Assign Site' || name === 'Name System') continue;
+    // Bo qua team "All WO" (gia)
+    if (team === 'All WO') continue;
+
+    if (/Team leader/i.test(colC)) {
+      // Doi truong: co team, ten, noi dung
+      leaders.push({ team: team, name: name, content: cont, chat_id: colE });
+    } else if (team && name) {
+      // Nhan vien: co ca team va ten - lay chat_id tu cot E
+      employees.push({ team: team, name: name, content: cont, chat_id: colE });
+    } else if (colE && /^\d{5,}$/.test(colE.trim())) {
+      // Quan ly: co ID cot E la so (Telegram ID dang so, khong phai "-")
+      const mgName = name || team || colC || ('ID:' + colE);
+      managers.push({ role: colC || 'Manager', name: mgName, chat_id: colE.trim() });
+    }
+  }
+  return { employees: employees, leaders: leaders, managers: managers };
+}
+
+// ============================================================
+// ACTION: REFRESH_GENERAL
+// ============================================================
+function handleRefreshGeneral(ss) {
+  const statsMap = buildSearchStatsMap(ss);
+  const data = fetchReportSheet();
+  const employees = data.employees;
+  let gen = ss.getSheetByName(GENERAL_TAB);
+  if (!gen) gen = ss.insertSheet(GENERAL_TAB);
+  gen.clearContents();
+  gen.appendRow(['Team', 'Nhan vien', 'Hom nay', 'Hom qua', 'Hom kia', 'Tuan', 'Thang']);
+  gen.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+  for (const emp of employees) {
+    const s = statsMap[emp.name.toLowerCase()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    gen.appendRow([emp.team, emp.name, s.today, s.d1, s.d2, s.week, s.month]);
+  }
+  gen.setColumnWidth(1, 200);
+  gen.setColumnWidth(2, 160);
+  SpreadsheetApp.flush();
+  return json({ status: 'ok', message: 'General refreshed — ' + employees.length + ' rows' });
+}
+
+// ============================================================
+// ACTION: GET_REPORT_DATA — for send_now.py at 17:30
+// ============================================================
+function handleGetReportData(ss) {
+  const statsMap = buildSearchStatsMap(ss);
+  const cfgIdMap = {};
+  const cfg = ss.getSheetByName(CFG_TAB);
+  if (cfg && cfg.getLastRow() >= 2) {
+    const cfgData = cfg.getRange(2, 1, cfg.getLastRow() - 1, 2).getValues();
+    for (const row of cfgData) {
+      const n = (row[0] || '').toString().trim().toLowerCase();
+      const id = (row[1] || '').toString().trim();
+      if (n && id) cfgIdMap[n] = id;
+    }
+  }
+  const data = fetchReportSheet();
+  const employees = data.employees;
+  const leaders   = data.leaders;
+  const managers  = data.managers;
+  const teamStats = {};
+  for (const emp of employees) {
+    const s = statsMap[emp.name.toLowerCase()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    if (!teamStats[emp.team]) teamStats[emp.team] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const t = teamStats[emp.team];
+    t.today += s.today; t.d1 += s.d1; t.d2 += s.d2; t.week += s.week; t.month += s.month;
+  }
+  const empResult = [];
+  for (const emp of employees) {
+    const s = statsMap[emp.name.toLowerCase()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const chatId = emp.chat_id || cfgIdMap[emp.name.toLowerCase()] || '';
+    empResult.push({ name: emp.name, team: emp.team, chat_id: chatId, today: s.today, d1: s.d1, d2: s.d2, week: s.week, month: s.month });
+  }
+  const ldResult = [];
+  for (const ld of leaders) {
+    const s = teamStats[ld.team] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const chatId = ld.chat_id || cfgIdMap[ld.name.toLowerCase()] || '';
+    ldResult.push({ name: ld.name, team: ld.team, chat_id: chatId, content: ld.content, today: s.today, d1: s.d1, d2: s.d2, week: s.week, month: s.month });
+  }
+
+  // --- Tổng toàn bộ (cho ban quản lý) ---
+  const grandTotal = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+  for (const t of Object.values(teamStats)) {
+    grandTotal.today += t.today; grandTotal.d1 += t.d1; grandTotal.d2 += t.d2;
+    grandTotal.week += t.week;   grandTotal.month += t.month;
+  }
+
+  // --- Team summary list (for management message) ---
+  const teamSummary = [];
+  for (const [team, s] of Object.entries(teamStats)) {
+    teamSummary.push({ team: team, today: s.today, d1: s.d1, d2: s.d2, week: s.week, month: s.month });
+  }
+
+  handleRefreshGeneral(ss);
+  return json({
+    status: 'ok',
+    employees: empResult,
+    leaders: ldResult,
+    managers: managers,
+    teamSummary: teamSummary,
+    grandTotal: grandTotal
+  });
+}
+
 // JSON response helper
 function json(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ============================================================
+// ACTION: GET_ASSET_STATS
+// Đếm Order/Revoke/... theo Team + theo khoảng thời gian
+// Col A=REF | Col B=Date | Col C=chat_id | Col D=Content | Col E=Done
+// Periods: today(1) / yesterday(1) / 2days / 6days / 15days
+// ============================================================
+function handleGetAssetStats(ss) {
+  const TEAMS = [
+    'MYT_TNI_TEAM01_Dawei',
+    'MYT_TNI_TEAM02_Myeik',
+    'MYT_TNI_TEAM03_Bokpyin',
+    'MYT_TNI_TEAM04_Kawthoung'
+  ];
+  const PERIODS = [0, 1, 2, 6, 15]; // ngày: 0=hôm nay, 1=hôm qua, 2=2 ngày trước, 6=tuần, 15=nửa tháng
+
+  // Mốc thời gian (giờ Myanmar = UTC+6:30)
+  const now   = new Date();
+  const tzOff = 6.5 * 60 * 60 * 1000;
+  const today = new Date(Math.floor((now.getTime() + tzOff) / 86400000) * 86400000 - tzOff);
+  // today = đầu ngày hôm nay theo giờ Myanmar
+
+  function dayStart(daysAgo) {
+    return new Date(today.getTime() - daysAgo * 86400000);
+  }
+
+  // --- Bước 1: Config ---
+  const cfgSheet   = ss.getSheetByName(CFG_TAB);
+  const actionTypes = [];
+  const recipients  = [];
+  if (cfgSheet && cfgSheet.getLastRow() >= 2) {
+    const cfgData = cfgSheet.getRange(2, 1, cfgSheet.getLastRow() - 1, 3).getValues();
+    for (const row of cfgData) {
+      const colA = (row[0] || '').toString().trim();
+      const colC = (row[2] || '').toString().trim();
+      if (colC && /^\d{5,}$/.test(colC)) recipients.push(colC);
+      if (colA) {
+        const type = colA.split(':')[0].trim();
+        if (type && !actionTypes.includes(type)) actionTypes.push(type);
+      }
+    }
+  }
+
+  // --- Bước 2: Map chat_id → team ---
+  const reportSheet = SpreadsheetApp.openById(SHEET_ID).getSheets()
+    .find(s => s.getSheetId().toString() === REPORT_GID);
+  const idToTeam = {};
+  if (reportSheet && reportSheet.getLastRow() >= 2) {
+    const rData = reportSheet.getRange(2, 1, reportSheet.getLastRow() - 1, 5).getValues();
+    for (const r of rData) {
+      const team   = (r[0] || '').toString().trim();
+      const chatId = (r[4] || '').toString().trim();
+      if (team && chatId && TEAMS.includes(team)) idToTeam[chatId] = team;
+    }
+  }
+
+  // --- Bước 3: Khởi tạo stats ---
+  // stats[at][team] = { d0,d1,d2,d6,d15,done_d0,done_d1,done_d2,done_d6,done_d15,total,done }
+  function emptyPeriod() {
+    return { d0:0,d1:0,d2:0,d6:0,d15:0, done_d0:0,done_d1:0,done_d2:0,done_d6:0,done_d15:0, total:0,done:0 };
+  }
+  const stats = {};
+  for (const at of actionTypes) {
+    stats[at] = {};
+    for (const tm of TEAMS) stats[at][tm] = emptyPeriod();
+  }
+
+  // --- Bước 4: Đọc và đếm ---
+  const dataSh = ss.getSheetByName(DATA_TAB);
+  if (dataSh && dataSh.getLastRow() >= 2) {
+    const rows = dataSh.getRange(2, 1, dataSh.getLastRow() - 1, 5).getValues();
+    for (const r of rows) {
+      const rawDate = r[1];                                    // Col B = date
+      const chatId  = (r[2] || '').toString().trim();         // Col C
+      const content = (r[3] || '').toString().trim();         // Col D
+      const doneVal = (r[4] || '').toString().trim();         // Col E
+      if (!content) continue;
+
+      const actionType = content.split(':')[0].trim();
+      if (!actionTypes.includes(actionType)) continue;
+
+      const team = idToTeam[chatId] || null;
+      if (!team) continue;
+
+      // Parse ngày
+      let rowDate = null;
+      if (rawDate instanceof Date) {
+        rowDate = rawDate;
+      } else if (rawDate) {
+        const parts = rawDate.toString().split('/');
+        if (parts.length === 3) rowDate = new Date(parts[2], parts[1]-1, parts[0]);
+      }
+
+      const isDone = doneVal.length > 0;
+      const s = stats[actionType][team];
+      s.total += 1;
+      if (isDone) s.done += 1;
+
+      if (rowDate) {
+        const diffDays = Math.floor((today.getTime() - rowDate.getTime()) / 86400000);
+        if (diffDays === 0)  { s.d0++;  if (isDone) s.done_d0++;  }
+        if (diffDays === 1)  { s.d1++;  if (isDone) s.done_d1++;  }
+        if (diffDays === 2)  { s.d2++;  if (isDone) s.done_d2++;  }
+        if (diffDays <  6)  { s.d6++;  if (isDone) s.done_d6++;  }
+        if (diffDays < 15)  { s.d15++; if (isDone) s.done_d15++; }
+      }
+    }
+  }
+
+  // --- Bước 5: Grand total ---
+  const grandTotal = {};
+  for (const at of actionTypes) {
+    grandTotal[at] = emptyPeriod();
+    for (const tm of TEAMS) {
+      const s = stats[at][tm];
+      const g = grandTotal[at];
+      ['d0','d1','d2','d6','d15','done_d0','done_d1','done_d2','done_d6','done_d15','total','done']
+        .forEach(k => g[k] += s[k]);
+    }
+  }
+
+  return json({
+    status:      'ok',
+    actionTypes: actionTypes,
+    teams:       TEAMS,
+    stats:       stats,
+    grandTotal:  grandTotal,
+    recipients:  recipients
+  });
+}
+
+// ============================================================
+// GỬI TELEGRAM HÀNG LOẠT — Thêm vào cuối file, không đụng code cũ
+// Sheet: SEND_TELEGRAM | Cột B=Tên | C=Nội dung | D=Chat ID | E=Kết quả
+// ============================================================
+
+const TG_SEND_TOKEN  = '8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A';
+const SEND_TAB_NAME  = 'SEND_TELEGRAM';
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('📲 Gửi Telegram')
+    .addItem('🆕 Tạo Sheet Gửi',   'setupSendTelegramSheet')
+    .addItem('📤 Gửi tin nhắn',    'sendTelegramBulk')
+    .addItem('🗑️ Xóa kết quả',    'clearTelegramResults')
+    .addItem('🧪 Test 1 tin nhắn', 'sendTestMessage')
+    .addToUi();
+}
+
+function setupSendTelegramSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(SEND_TAB_NAME);
+  if (sh) ss.deleteSheet(sh);
+  sh = ss.insertSheet(SEND_TAB_NAME);
+
+  // Tiêu đề
+  sh.getRange('A1:E1').merge()
+    .setValue('📲 GỬI TIN NHẮN TELEGRAM HÀNG LOẠT')
+    .setBackground('#1565C0').setFontColor('#FFFFFF')
+    .setFontSize(14).setFontWeight('bold')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sh.setRowHeight(1, 45);
+
+  // Hướng dẫn
+  sh.getRange('A2:E2').merge()
+    .setValue('💡 Điền Tên (B) + Nội dung (C) + Chat ID Telegram (D) → Bấm nút GỬI')
+    .setBackground('#E3F2FD').setFontColor('#0D47A1').setFontSize(10)
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sh.setRowHeight(2, 30);
+
+  // Header
+  sh.getRange('A3:E3')
+    .setValues([['STT','TÊN NHÂN VIÊN','NỘI DUNG TIN NHẮN','CHAT ID TELEGRAM','KẾT QUẢ']])
+    .setBackground('#1976D2').setFontColor('#FFFFFF').setFontWeight('bold')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sh.setRowHeight(3, 35);
+
+  // Độ rộng cột
+  sh.setColumnWidth(1, 50);
+  sh.setColumnWidth(2, 160);
+  sh.setColumnWidth(3, 380);
+  sh.setColumnWidth(4, 170);
+  sh.setColumnWidth(5, 200);
+
+  // 100 dòng
+  for (let i = 1; i <= 100; i++) {
+    const r  = i + 3;
+    const bg = (r % 2 === 0) ? '#F8F9FA' : '#FFFFFF';
+    sh.getRange(r, 1).setValue(i);
+    sh.getRange(r, 1, 1, 5).setBackground(bg);
+  }
+  // Dòng mẫu
+  sh.getRange('B4').setValue('Ví dụ: Maung Aung');
+  sh.getRange('C4').setValue('📋 Xin chào! Đây là tin nhắn thử nghiệm từ hệ thống TNI.');
+
+  // Định dạng
+  sh.getRange('A4:E103').setBorder(true,true,true,true,true,true,'#BBDEFB',SpreadsheetApp.BorderStyle.SOLID).setVerticalAlignment('middle');
+  sh.getRange('B4:B103').setHorizontalAlignment('left').setFontSize(10).setFontWeight('bold');
+  sh.getRange('C4:C103').setWrap(true).setHorizontalAlignment('left').setFontSize(10);
+  sh.getRange('D4:D103').setHorizontalAlignment('center').setFontSize(10).setFontFamily('Courier New');
+  sh.getRange('E4:E103').setHorizontalAlignment('center').setFontSize(10);
+
+  // Nút bấm (ô màu)
+  sh.setColumnWidth(6, 20);
+  sh.setColumnWidth(7, 145);
+  sh.setColumnWidth(8, 145);
+
+  sh.getRange('G1:H2').merge()
+    .setValue('📤 GỬI TIN NHẮN')
+    .setBackground('#E53935').setFontColor('#FFFFFF')
+    .setFontSize(13).setFontWeight('bold')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle')
+    .setBorder(true,true,true,true,false,false,'#B71C1C',SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+
+  sh.getRange('G3:H3').merge()
+    .setValue('🗑️ XÓA KẾT QUẢ')
+    .setBackground('#757575').setFontColor('#FFFFFF')
+    .setFontSize(10).setFontWeight('bold')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sh.setRowHeight(3, 28);
+
+  // Thống kê tự động
+  sh.getRange('G4').setValue('📊 THỐNG KÊ').setBackground('#E8EAF6').setFontWeight('bold').setHorizontalAlignment('center');
+  sh.getRange('G5').setValue('✅ Thành công:').setBackground('#E8F5E9');
+  sh.getRange('H5').setFormula('=COUNTIF(E4:E103,"✅*")').setBackground('#E8F5E9').setFontWeight('bold').setHorizontalAlignment('center');
+  sh.getRange('G6').setValue('❌ Thất bại:').setBackground('#FFEBEE');
+  sh.getRange('H6').setFormula('=COUNTIF(E4:E103,"❌*")').setBackground('#FFEBEE').setFontWeight('bold').setHorizontalAlignment('center');
+  sh.getRange('G7').setValue('📋 Tổng có ID:').setBackground('#E3F2FD');
+  sh.getRange('H7').setFormula('=COUNTA(D4:D103)').setBackground('#E3F2FD').setFontWeight('bold').setHorizontalAlignment('center');
+
+  sh.setFrozenRows(3);
+  ss.setActiveSheet(sh);
+  ss.moveActiveSheet(ss.getNumSheets());
+
+  SpreadsheetApp.getUi().alert(
+    '✅ Tạo sheet xong! (100 dòng)\n\n' +
+    '📌 Gán nút đỏ:\n' +
+    '   Click ô đỏ → 3 chấm ⋮ → Assign script\n' +
+    '   → Gõ: sendTelegramBulk → OK\n\n' +
+    '📌 Gán nút xám:\n' +
+    '   → Gõ: clearTelegramResults → OK'
+  );
+}
+
+function sendTelegramBulk() {
+  const ss  = SpreadsheetApp.getActiveSpreadsheet();
+  const sh  = ss.getSheetByName(SEND_TAB_NAME);
+  if (!sh) { SpreadsheetApp.getUi().alert('❌ Chưa tạo sheet!\nVào menu 📲 → Tạo Sheet Gửi'); return; }
+
+  const lastRow = sh.getLastRow();
+  if (lastRow < 4) { SpreadsheetApp.getUi().alert('⚠️ Chưa có dữ liệu!'); return; }
+
+  const data   = sh.getRange(4, 2, lastRow - 3, 3).getValues(); // B, C, D
+  const resCol = sh.getRange(4, 5, lastRow - 3, 1);             // E
+  const now    = Utilities.formatDate(new Date(), 'Asia/Rangoon', 'dd/MM/yyyy HH:mm');
+
+  let ok = 0, fail = 0, skip = 0;
+  const results = [];
+
+  for (let i = 0; i < data.length; i++) {
+    const content = String(data[i][1] || '').trim();   // C
+    const chatId  = String(data[i][2] || '').trim().replace(/\.0$/, ''); // D
+
+    if (!content && !chatId) { results.push(['']); skip++; continue; }
+    if (!content)            { results.push(['⚠️ Thiếu nội dung']); skip++; continue; }
+    if (!chatId)             { results.push(['⚠️ Thiếu Chat ID']);   skip++; continue; }
+
+    const r = _tgSendMsg(chatId, content);
+    if (r.ok) { results.push([`✅ ${now}`]); ok++; }
+    else       { results.push([`❌ ${r.error}`]);  fail++; }
+    Utilities.sleep(300);
+  }
+
+  if (results.length > 0) {
+    resCol.setValues(results);
+    for (let i = 0; i < results.length; i++) {
+      const cell = sh.getRange(4 + i, 5);
+      const val  = results[i][0];
+      if      (val.startsWith('✅')) cell.setBackground('#E8F5E9').setFontColor('#1B5E20');
+      else if (val.startsWith('❌')) cell.setBackground('#FFEBEE').setFontColor('#B71C1C');
+      else if (val.startsWith('⚠️')) cell.setBackground('#FFF8E1').setFontColor('#E65100');
+      else                           cell.setBackground('#FFFFFF').setFontColor('#000000');
+    }
+  }
+  SpreadsheetApp.getUi().alert(`📊 KẾT QUẢ\n\n✅ Thành công : ${ok}\n❌ Thất bại  : ${fail}\n⚠️ Bỏ qua    : ${skip}`);
+}
+
+function clearTelegramResults() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SEND_TAB_NAME);
+  if (!sh) return;
+  sh.getRange(4, 5, 100, 1).clearContent().setBackground('#FFFFFF').setFontColor('#000000');
+  SpreadsheetApp.getUi().alert('🗑️ Đã xóa kết quả cột E!');
+}
+
+function sendTestMessage() {
+  const ui = SpreadsheetApp.getUi();
+  const r  = ui.prompt('🧪 TEST', 'Nhập Chat ID Telegram của bạn:', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const chatId = r.getResponseText().trim();
+  if (!chatId) { ui.alert('❌ Chưa nhập Chat ID!'); return; }
+  const now = Utilities.formatDate(new Date(), 'Asia/Rangoon', 'dd/MM/yyyy HH:mm');
+  const res = _tgSendMsg(chatId, `🧪 <b>Test thành công!</b>\n📅 ${now}\n✅ Bot hoạt động bình thường!`);
+  ui.alert(res.ok ? '✅ Gửi thành công!\nKiểm tra Telegram.' : `❌ Lỗi: ${res.error}`);
+}
+
+function _tgSendMsg(chatId, text) {
+  try {
+    const resp = UrlFetchApp.fetch(
+      `https://api.telegram.org/bot${TG_SEND_TOKEN}/sendMessage`,
+      { method      : 'post',
+        contentType : 'application/json',
+        payload     : JSON.stringify({ chat_id: chatId, text: text, parse_mode: 'HTML' }),
+        muteHttpExceptions: true,
+        deadline    : 10   // ← tối đa 10 giây mỗi lần gọi
+      }
+    );
+    const j = JSON.parse(resp.getContentText());
+    return j.ok ? { ok: true } : { ok: false, error: j.description };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+// ── Chạy hàm này 1 lần để cấp quyền UrlFetchApp ──
+function authorizeNow() {
+  UrlFetchApp.fetch('https://api.telegram.org');
+  SpreadsheetApp.getUi().alert('✅ Cấp quyền thành công!');
 }
