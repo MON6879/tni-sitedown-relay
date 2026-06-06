@@ -140,7 +140,8 @@ async def handle(data: dict):
                 row_id = str(result.get("row", "???")).zfill(5)
                 await bot.send_message(
                     chat_id,
-                    f"REQUEST_BOT ✅ Recorded — 🆔 #{row_id}📅 {now.strftime('%d/%m/%Y %H:%M')}",
+                    f"REQUEST_BOT ✅ Recorded — 🆔 #{row_id}📅 {now.strftime('%d/%m/%Y %H:%M')}\n"
+                    f"Only asset or Team leader reply Done or Done detail",
                     parse_mode="HTML"
                 )
             else:
