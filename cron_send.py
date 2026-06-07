@@ -21,12 +21,13 @@ TECHNICAL_DEP_BOT_TOKEN = os.getenv("TECHNICAL_DEP_BOT_TOKEN", "")
 APPS_SCRIPT_URL         = os.getenv("APPS_SCRIPT_URL", "")
 
 SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
+# Dùng export CSV trực tiếp thay vì gviz/tq để giữ đúng số hàng (bao gồm hàng trống)
 SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
-    "/gviz/tq?tqx=out:csv&gid=133591305&range=A1:E90"
+    "/export?format=csv&gid=133591305"
 )
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
-HEADER_ROWS = 2
+HEADER_ROWS = 3  # rows 1-3 là header (row 3 có 'export sms')
 COL_A, COL_B, COL_C, COL_D, COL_E = 0, 1, 2, 3, 4
 
 
