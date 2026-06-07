@@ -259,10 +259,9 @@ async def main():
 
     for sheet_row, content, cid, col_c in all_rows:
         # Determine bot token
-        if 4 <= sheet_row <= 32 and REPORT_TASK_BOT_TOKEN:
-            token = REPORT_TASK_BOT_TOKEN
-            bot_label = "@TNIREPORTTASK"
-        elif 75 <= sheet_row <= 87 and TECHNICAL_DEP_BOT_TOKEN:
+        # NOTE: Rows 4-32 (nhân viên) dùng SEND_BOT vì nhân viên đã start SEND_BOT,
+        #       không phải @TNIREPORTTASK. Dùng cùng bot với gửi thủ công.
+        if 75 <= sheet_row <= 87 and TECHNICAL_DEP_BOT_TOKEN:
             token = TECHNICAL_DEP_BOT_TOKEN
             bot_label = "@TNITECHNICAL"
         elif SEND_BOT_TOKEN:
