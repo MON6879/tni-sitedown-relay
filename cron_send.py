@@ -218,6 +218,77 @@ def get_input_task_summary() -> str:
         return ""
 
 
+def build_asset_progress_summary(content: str) -> str:
+    """
+    Chèn dòng tổng hợp ngay SAU header section (vd: "CM 06/06/2026").
+
+    Input (cú pháp cũ):
+      CM 06/06/2026
+      Team 01
+      Request Export material : total : 28  Progress 3 day: 0/0/0, 7 day: 0, Month: 0
+      Team 02
+      Request Export material : total : 14  Progress 3 day: 0/0/0, 7 day: 0, Month: 0
+      ...
+
+    Output:
+      CM 06/06/2026
+      📊 Tổng: Total:61 | 3day:0/0/0 | 7day:0 | Month:0
+      Team 01
+      Request Export material : total : 28  Progress 3 day: 0/0/0, 7 day: 0, Month: 0
+      ...
+    """
+    # Pattern nhận biết dòng data có số liệu: "total : X  Progress 3 day: a/b/c, 7 day: d, Month: e"
+    data_pat = re.compile(
+        r'total\s*:\s*(\d+).*?3\s*day\s*:\s*(\d+)/(\d+)/(\d+).*?7\s*day\s*:\s*(\d+).*?Month\s*:\s*(\d+)',
+        re.IGNORECASE,
+    )
+    # Pattern nhận biết header section: dòng có dạng "WordWord DD/MM/YYYY"
+    header_pat = re.compile(
+        r'^([A-Za-z&/]+(?:\s[A-Za-z&/]+)?)\s+\d{2}/\d{2}/\d{4}\s*$',
+        re.MULTILINE,
+    )
+
+    lines = content.splitlines()
+    result = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if header_pat.match(line.strip()):
+            # Đây là header section → tính tổng cho toàn bộ section phía dưới
+            result.append(line)
+            # Gom các dòng dữ liệu của section này (đến header tiếp theo hoặc hết)
+            j = i + 1
+            section_lines = []
+            while j < len(lines):
+                if header_pat.match(lines[j].strip()):
+                    break
+                section_lines.append(lines[j])
+                j += 1
+            # Tính tổng
+            t_total = d3a = d3b = d3c = d7 = d_month = 0
+            for sl in section_lines:
+                m = data_pat.search(sl)
+                if m:
+                    t_total  += int(m.group(1))
+                    d3a      += int(m.group(2))
+                    d3b      += int(m.group(3))
+                    d3c      += int(m.group(4))
+                    d7       += int(m.group(5))
+                    d_month  += int(m.group(6))
+            if t_total > 0 or d7 > 0 or d_month > 0:
+                result.append(
+                    f"📊 Tổng: Total:{t_total} | 3day:{d3a}/{d3b}/{d3c} | 7day:{d7} | Month:{d_month}"
+                )
+            # Thêm các dòng section vào kết quả
+            result.extend(section_lines)
+            i = j
+        else:
+            result.append(line)
+            i += 1
+
+    return "\n".join(result)
+
+
 def build_summary_header(content: str) -> str:
     """
     Phân tích nội dung cột D và tạo dòng tổng hợp đầu tin nhắn:
@@ -401,32 +472,39 @@ async def main():
             msg = mgmt_report
         elif 75 <= sheet_row <= 87:
             # Technical dept:
-            # Header = Input task summary (theo Dep) + WO summary (theo nhân viên)
-            # Body   = col D content + asset/search stats
+            # 1. Input Task summary (theo Dep: Done/Total/Remain) ở đầu
+            # 2. Col D content (đã chèn dòng tổng sau mỗi section header)
+            # 3. Asset/search stats
             parts = []
 
-            # Xây dựng block tóm tắt đầu
-            header_lines = [f"📋 ကျန်ရှိသောလုပ်င်းများ သတိပေးချက် – {now_str}",
-                            "━━━━━━━━━━━━━━━━━━━━"]
+            # ── Header cố định ──
+            header_lines = [
+                f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}",
+                "━━━━━━━━━━━━━━━━━━━━",
+            ]
+
+            # ── Input task summary (Admin/Asset/CM... Done/Total/Remain) ──
             if input_task_summary:
                 header_lines.append(input_task_summary)
                 header_lines.append("━━━━━━━━━━━━━━━━━━━━")
-            if content:
-                wo_summary = build_summary_header(content)
-                if wo_summary:
-                    header_lines.append(wo_summary)
-                    header_lines.append("━━━━━━━━━━━━━━━━━━━━")
-                header_lines.append(content)
-                header_lines.append("━━━━━━━━━━━━━━━━━━━━")
+
             parts.append("\n".join(header_lines))
 
+            # ── Col D content: chèn dòng tổng ngay sau mỗi section header ──
+            if content:
+                transformed = build_asset_progress_summary(content)
+                parts.append(transformed)
+                parts.append("━━━━━━━━━━━━━━━━━━━━")
+
             if asset_msg:
-                parts.append(f"\n{asset_msg}")
+                parts.append(asset_msg)
             if search_msg:
-                parts.append(f"\n{search_msg}")
-            if len(parts) == 1 and not content:
-                continue  # không có gì gửi
+                parts.append(search_msg)
+
+            if len(parts) <= 1 and not content:
+                continue
             msg = "\n".join(parts)
+
         elif content:
             # Normal rows: send task reminder
             msg = (
