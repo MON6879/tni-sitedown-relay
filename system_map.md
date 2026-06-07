@@ -15,7 +15,7 @@
 | **Task remain** | `133591305` | Dữ liệu WO + chat_id nhân viên/quản lý |
 | **Config** | `1236389870` | Keywords (col A), Chat ID authorized (col D), Asset recipients (col C) |
 | **Data** | DATA_TAB | Collector bot lưu tin nhắn Order/Revoke/Export... |
-| **Input task** | ? | Nội dung task cho E75:E87 |
+| **Input task** | `1755404595` | Nội dung task cho E75:E87. Col B=Dep, Col D=content, Col J=Done date |
 
 ### Task remain — Cấu trúc row (ĐÃ XÁC NHẬN từ screenshot 07/06/2026)
 
@@ -42,9 +42,19 @@
 > **Ghi chú quan trọng**: Code đọc row 60-74 và gửi `mgmt_report` cho bất kỳ cid hợp lệ nào trong vùng này (kể cả cột D trống). BOD ở row 63 sẽ nhận báo cáo tổng hợp.
 
 ### Row 75-87 (Technical Dept) nhận:
-1. 📋 Nội dung col D (nếu có, từ Input task sheet)
-2. 📦 Asset stats + 3Day/7Day/Month
-3. 🔍 Search stats + 3Day/7Day/Month
+1. 📋 Header cố định + Input task summary theo Dep (Done/Total/Remain từ gid=1755404595)
+2. 📝 Col D content **đã chèn dòng tổng** (Total/3day/7day/Month) ngay sau mỗi section header (vd: "CM 06/06/2026")
+3. 📦 Asset stats + 3Day/7Day/Month
+4. 🔍 Search stats + 3Day/7Day/Month
+
+> **Format dòng tổng tự động chèn:**
+> ```
+> CM 06/06/2026
+> 📊 Tổng: Total:61 | 3day:0/0/0 | 7day:0 | Month:0  ← tự động
+> Team 01
+> Request Export material : total : 28  Progress 3 day: 0/0/0, 7 day: 0, Month: 0
+> ...
+> ```
 
 ---
 
