@@ -158,6 +158,66 @@ def build_asset_msg(now_str, asset_data):
     return "\n".join(lines)
 
 
+INPUT_TASK_URL = (
+    f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
+    "/gviz/tq?tqx=out:csv&gid=1755404595"
+)
+
+
+def get_input_task_summary() -> str:
+    """
+    Đọc sheet Input task (gid=1755404595) và tổng hợp theo từng Dep:
+      Col B = Dep assign (Admin/Asset/CM/M&E/PM/Finance/Transmission)
+      Col J = Team leader update Date complete (đã hoàn thành nếu không trống)
+    Kết quả: mỗi Dep hiển thị Total | Done | Remain
+    """
+    try:
+        resp = requests.get(
+            INPUT_TASK_URL,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=20,
+        )
+        resp.raise_for_status()
+        df = pd.read_csv(
+            io.StringIO(resp.text),
+            header=0,  # dòng 1 là header
+            dtype=str,
+            on_bad_lines="skip",
+        )
+        # Cột B = index 1, Cột J = index 9
+        COL_DEP = 1
+        COL_DONE = 9
+        stats = {}  # dep -> {"total": int, "done": int}
+        for _, row in df.iterrows():
+            dep = str(row.iloc[COL_DEP]).strip() if not pd.isna(row.iloc[COL_DEP]) else ""
+            if not dep or dep.lower() in ("", "nan", "dep assign", "sum"):
+                continue
+            done_val = str(row.iloc[COL_DONE]).strip() if not pd.isna(row.iloc[COL_DONE]) else ""
+            is_done = done_val not in ("", "nan", "0", "-")
+            if dep not in stats:
+                stats[dep] = {"total": 0, "done": 0}
+            stats[dep]["total"] += 1
+            if is_done:
+                stats[dep]["done"] += 1
+
+        if not stats:
+            return ""
+
+        lines = ["📋 Input Task theo Dep:"]
+        grand_total = grand_done = 0
+        for dep, s in sorted(stats.items()):
+            t, d = s["total"], s["done"]
+            r = t - d
+            grand_total += t
+            grand_done += d
+            lines.append(f"  • {dep}: ✅{d}/{t} | ⏳Remain:{r}")
+        lines.append(f"  → Tổng: ✅{grand_done}/{grand_total} | ⏳{grand_total - grand_done}")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.warning(f"get_input_task_summary failed: {e}")
+        return ""
+
+
 def build_summary_header(content: str) -> str:
     """
     Phân tích nội dung cột D và tạo dòng tổng hợp đầu tin nhắn:
@@ -195,7 +255,7 @@ def build_summary_header(content: str) -> str:
 
     if not lines:
         return ""
-    header = "📊 Tổng hợp hoàn thành:\n" + "\n".join(lines)
+    header = "📊 WO hoàn thành:\n" + "\n".join(lines)
     return header
 
 
@@ -309,7 +369,14 @@ async def main():
 
     mgmt_report = "\n".join(mgmt_parts)
 
-    # ── 6. Send messages ──
+    # ── 6. Fetch Input Task summary (for Technical Dept header) ──
+    input_task_summary = get_input_task_summary()
+    if input_task_summary:
+        logger.info("Input task summary: OK")
+    else:
+        logger.warning("Input task summary: empty or failed")
+
+    # ── 7. Send messages ──
     ok = fail = 0
 
     # Group by bot token
@@ -333,26 +400,33 @@ async def main():
             # Management rows: send compiled report (even if D is empty)
             msg = mgmt_report
         elif 75 <= sheet_row <= 87:
-            # Technical dept: summary header + D content + asset/search stats
+            # Technical dept:
+            # Header = Input task summary (theo Dep) + WO summary (theo nhân viên)
+            # Body   = col D content + asset/search stats
             parts = []
+
+            # Xây dựng block tóm tắt đầu
+            header_lines = [f"📋 ကျန်ရှိသောလုပ်င်းများ သတိပေးချက် – {now_str}",
+                            "━━━━━━━━━━━━━━━━━━━━"]
+            if input_task_summary:
+                header_lines.append(input_task_summary)
+                header_lines.append("━━━━━━━━━━━━━━━━━━━━")
             if content:
-                summary = build_summary_header(content)
-                task_block = (
-                    f"📋 ကျန်ရှိသောလုပ်င်းများ သတိပေးချက် – {now_str}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                )
-                if summary:
-                    task_block += summary + "\n━━━━━━━━━━━━━━━━━━━━\n"
-                task_block += content + "\n━━━━━━━━━━━━━━━━━━━━"
-                parts.append(task_block)
+                wo_summary = build_summary_header(content)
+                if wo_summary:
+                    header_lines.append(wo_summary)
+                    header_lines.append("━━━━━━━━━━━━━━━━━━━━")
+                header_lines.append(content)
+                header_lines.append("━━━━━━━━━━━━━━━━━━━━")
+            parts.append("\n".join(header_lines))
+
             if asset_msg:
                 parts.append(f"\n{asset_msg}")
             if search_msg:
                 parts.append(f"\n{search_msg}")
-            if parts:
-                msg = "\n".join(parts)
-            else:
-                continue
+            if len(parts) == 1 and not content:
+                continue  # không có gì gửi
+            msg = "\n".join(parts)
         elif content:
             # Normal rows: send task reminder
             msg = (
