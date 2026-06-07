@@ -158,25 +158,41 @@ def build_asset_msg(now_str, asset_data):
 
 
 async def send_msg(bot, cid, text, label=""):
-    """Send message, handle >4096 char limit."""
+    """Send message, handle >4096 char limit.
+    Splits by newlines first, then by MAX chars if a single line is too long.
+    """
     MAX = 4000
+
+    def chunk_text(t):
+        """Split text into parts <= MAX chars, preserving newlines where possible."""
+        parts, current = [], ""
+        for line in t.split("\n"):
+            # If a single line itself is too long, break it by char count
+            while len(line) > MAX:
+                segment = line[:MAX]
+                if current:
+                    parts.append(current)
+                    current = ""
+                parts.append(segment)
+                line = line[MAX:]
+            # Normal line
+            if len(current) + len(line) + 1 > MAX:
+                parts.append(current)
+                current = line
+            else:
+                current += ("\n" if current else "") + line
+        if current:
+            parts.append(current)
+        return parts
+
     try:
         if len(text) <= MAX:
             await bot.send_message(chat_id=cid, text=text)
         else:
-            # Split by lines
-            parts, current = [], ""
-            for line in text.split("\n"):
-                if len(current) + len(line) + 1 > MAX:
-                    parts.append(current)
-                    current = line
-                else:
-                    current += ("\n" if current else "") + line
-            if current:
-                parts.append(current)
-            for p in parts:
-                await bot.send_message(chat_id=cid, text=p)
-                await asyncio.sleep(0.3)
+            for p in chunk_text(text):
+                if p.strip():
+                    await bot.send_message(chat_id=cid, text=p)
+                    await asyncio.sleep(0.3)
         logger.info(f"✅ {label} → {cid}")
         return True
     except Exception as e:
