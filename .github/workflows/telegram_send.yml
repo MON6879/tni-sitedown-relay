@@ -1,0 +1,31 @@
+name: Telegram Daily Send
+
+on:
+  schedule:
+    - cron: "30 17 * * *"   # 17:30 VN (UTC+7) => 10:30 UTC
+  workflow_dispatch:
+
+jobs:
+  send-messages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run cron_send script
+        env:
+          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+          REPORT_TASK_BOT_TOKEN: ${{ secrets.REPORT_TASK_BOT_TOKEN }}
+          TECHNICAL_DEP_BOT_TOKEN: ${{ secrets.TECHNICAL_DEP_BOT_TOKEN }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+        run: python cron_send.py
