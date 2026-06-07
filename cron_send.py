@@ -6,7 +6,7 @@ Dùng 3 bot theo dải row trong sheet Task remain (gid=133591305):
   Row 60-74: SEND_BOT + compiled report (management)
   Row 75-87: @TNITECHINICALDEPREPORT_BOT (technical dept)
 """
-import asyncio, io, logging, os, requests, pandas as pd
+import asyncio, io, logging, os, re, requests, pandas as pd
 from datetime import datetime, timezone, timedelta
 from telegram import Bot
 from dotenv import load_dotenv
@@ -158,6 +158,47 @@ def build_asset_msg(now_str, asset_data):
     return "\n".join(lines)
 
 
+def build_summary_header(content: str) -> str:
+    """
+    Phân tích nội dung cột D và tạo dòng tổng hợp đầu tin nhắn:
+    Mỗi nhân viên hiển thị: Tên | 3day | 7day | Month
+
+    Format mẫu trong content:
+      *Họ Tên-myt_username*: 7-day results: *X* M: X /26 ...
+      Month Xday :Y /Close 7day: Z <=> rank: *R* =Close: *P% <a/b/c>
+    """
+    lines = []
+    # Mỗi nhân viên bắt đầu bằng *Tên-myt_...*:
+    # Tách block bằng pattern *<OTHER>*
+    blocks = re.split(r'\*<OTHER>\*', content)
+    for block in blocks:
+        # Tên: lấy phần trước dấu `-myt_` trong `*...-myt_...*:`
+        name_m = re.search(r'\*([^*]+?)-myt_[^*]+\*:', block)
+        if not name_m:
+            continue
+        name = name_m.group(1).strip()
+        # 7-day close: `Close 7day: X`
+        d7_m = re.search(r'Close 7day:\s*(\d+)', block)
+        d7 = d7_m.group(1) if d7_m else "?"
+        # Month close: `Month Xday :Y` -> Y là số trước `/Close`
+        month_m = re.search(r'Month \d+day\s*:(\d+)\s*/Close', block)
+        month = month_m.group(1) if month_m else "?"
+        # 3-day: `<a/b/c>` (3 số trong ngoặc nhọn sau Close%)
+        d3_m = re.search(r'Close:\s*\*?\d+%?\*?\s*<(\d+)/(\d+)/(\d+)>', block)
+        if d3_m:
+            d3 = f"{d3_m.group(1)}/{d3_m.group(2)}/{d3_m.group(3)}"
+        else:
+            # fallback: tìm bất kỳ <a/b/c>
+            d3_fb = re.search(r'<(\d+)/(\d+)/(\d+)>', block)
+            d3 = f"{d3_fb.group(1)}/{d3_fb.group(2)}/{d3_fb.group(3)}" if d3_fb else "?/?"
+        lines.append(f"  • {name}: 3day:{d3} | 7day:{d7} | Month:{month}")
+
+    if not lines:
+        return ""
+    header = "📊 Tổng hợp hoàn thành:\n" + "\n".join(lines)
+    return header
+
+
 async def send_msg(bot, cid, text, label=""):
     """Send message, handle >4096 char limit.
     Splits by newlines first, then by MAX chars if a single line is too long.
@@ -292,15 +333,18 @@ async def main():
             # Management rows: send compiled report (even if D is empty)
             msg = mgmt_report
         elif 75 <= sheet_row <= 87:
-            # Technical dept: D content + asset stats + search stats summary
+            # Technical dept: summary header + D content + asset/search stats
             parts = []
             if content:
-                parts.append(
-                    f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}\n"
+                summary = build_summary_header(content)
+                task_block = (
+                    f"📋 ကျန်ရှိသောလုပ်င်းများ သတိပေးချက် – {now_str}\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"{content}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━"
                 )
+                if summary:
+                    task_block += summary + "\n━━━━━━━━━━━━━━━━━━━━\n"
+                task_block += content + "\n━━━━━━━━━━━━━━━━━━━━"
+                parts.append(task_block)
             if asset_msg:
                 parts.append(f"\n{asset_msg}")
             if search_msg:
