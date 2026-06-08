@@ -744,3 +744,12 @@ function testDebugA1() {
   Logger.log("💾 TS_KEY_AW4 stored: " + storedAw4);
   Logger.log("❓ Sẽ gửi Tin2? " + (tsAw4 && tsAw4 !== storedAw4 ? "✅ Có" : "❌ Không"));
 }
+
+
+// ============================================================
+// DAT WEBHOOK - Chay ham nay 1 lan de ket noi Telegram -> Script
+// Web App URL da duoc dien san, chi can Run la xong
+// ============================================================
+function mySetWebhook() {
+  setWebhookDirect("https://script.google.com/macros/s/AKfycbzCQzz89Y-4xtAOWF-98csJNFk_93ibve_4P2e19JH-DPZvzeDAz8KMVsHunexZ5aAWIw/exec");
+}
