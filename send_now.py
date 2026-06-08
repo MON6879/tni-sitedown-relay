@@ -4,8 +4,9 @@
   2. Gửi tổng hợp team đến từng ĐỘI TRƯỞNG
 Chạy bởi GitHub Actions lúc 17:30 VN mỗi ngày.
 """
-import asyncio, logging, os
+import asyncio, logging, os, io
 import requests
+import pandas as pd
 from apps_script_client import call_apps_script
 from datetime import datetime, timezone, timedelta
 from telegram import Bot
@@ -85,33 +86,56 @@ def get_asset_stats() -> dict:
 
 def get_custom_messages() -> list:
     """
-    Đọc D75:E87 từ sheet gid=133591305.
-    Cột D = nội dung tin nhắn | Cột E = Chat ID Telegram
+    Đọc rows 75-87 từ sheet gid=133591305 bằng CSV export (KHÔNG dùng gviz/tq).
+    ⚠️ gviz/tq bỏ hàng trống rows 56-61 → offset bị lệch → đọc sai row!
+    Dùng /export?format=csv để giữ đúng số hàng (kể cả hàng trống).
+    Cột D (index 3) = nội dung | Cột E (index 4) = Chat ID Telegram
     Trả về list [{content, chat_id}, ...] chỉ những dòng có đủ cả 2 giá trị.
     """
+    HEADER_ROWS = 3  # rows 1-3 là header (giống cron_send.py)
+    ROW_START   = 75  # bắt đầu từ row 75 (1-indexed)
+    ROW_END     = 87  # đến row 87 (1-indexed, inclusive)
+    COL_D       = 3   # index 0-based
+    COL_E       = 4
+
     try:
-        # gviz/tq query: chọn cột D(col3) và E(col4), 13 dòng từ row 75
         url = (
             f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
-            f"/gviz/tq?tqx=out:csv&gid={GID_REPORT}"
-            f"&tq=select+D,E+limit+13+offset+74"
+            f"/export?format=csv&gid={GID_REPORT}"
         )
         resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
         resp.raise_for_status()
-        lines = resp.content.decode("utf-8", errors="replace").strip().splitlines()
+
+        df = pd.read_csv(
+            io.StringIO(resp.text),
+            header=None,
+            dtype=str,
+            on_bad_lines="skip",
+        )
 
         messages = []
-        for line in lines:
-            # Bỏ header/label dòng đầu nếu có
-            parts = line.strip().split(",", 1)
-            if len(parts) < 2:
+        for idx, row in df.iterrows():
+            sheet_row = idx + 1  # 1-indexed
+            if sheet_row < ROW_START or sheet_row > ROW_END:
                 continue
-            content  = parts[0].strip().strip('"')
-            chat_id  = parts[1].strip().strip('"').replace(".0", "")
-            if content and chat_id and chat_id.lstrip("-").isdigit():
-                messages.append({"content": content, "chat_id": chat_id})
 
-        logger.info(f"✅ get_custom_messages: đọc được {len(messages)} dòng hợp lệ (D75:E87)")
+            try:
+                content = str(row.iloc[COL_D]).strip()
+                chat_id = str(row.iloc[COL_E]).strip()
+            except Exception:
+                continue
+
+            if content.lower() in ("", "nan", "none"):
+                continue
+            chat_id = chat_id.replace(".0", "").strip()
+            if not chat_id or chat_id.lower() in ("nan", "none", ""):
+                continue
+            if not chat_id.lstrip("-").isdigit():
+                continue
+
+            messages.append({"content": content, "chat_id": chat_id})
+
+        logger.info(f"✅ get_custom_messages: đọc được {len(messages)} dòng hợp lệ (rows {ROW_START}-{ROW_END})")
         return messages
     except Exception as e:
         logger.error(f"❌ get_custom_messages error: {e}")
