@@ -346,8 +346,8 @@ function readAwAz(sheet) {
 function buildColCMessage(teamKey, ts, sites) {
   const label = teamKey === "T2" ? "Team 2 (T2+T5)" : teamKey.replace("T", "Team ");
   const lines = [];
-  lines.push("📋 *SITE DOWN — " + label + "*");
-  lines.push("📅 " + ts + "  |  Tổng: *" + sites.length + "* sites");
+  lines.push("📋 <b>SITE DOWN — " + label + "</b>");
+  lines.push("📅 " + escHtml(ts) + "  |  Tổng: <b>" + sites.length + "</b> sites");
   lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
   if (sites.length === 0) {
@@ -357,30 +357,42 @@ function buildColCMessage(teamKey, ts, sites) {
     sites.forEach((s, i) => {
       const num = i < nums.length ? nums[i] : (i + 1) + ".";
       lines.push("");
-      lines.push(num + " *" + s.tniCode + "* │ " + s.duration + "h │ " + s.owner + " │ " + s.power);
-      lines.push("   📍 " + s.township + "  👤 " + s.ftName);
-      if (s.eat) lines.push("   💬 _" + s.eat + "_");
+      lines.push(num + " <b>" + escHtml(s.tniCode) + "</b> │ " + escHtml(s.duration) + "h │ " + escHtml(s.owner) + " │ " + escHtml(s.power));
+      lines.push("   📍 " + escHtml(s.township) + "  👤 " + escHtml(s.ftName));
+      if (s.eat) lines.push("   💬 <i>" + escHtml(s.eat) + "</i>");
     });
   }
   return lines.join("\n");
 }
 
 
+
+
+// Escape HTML — tránh lỗi ký tự < > & trong dữ liệu
+function escHtml(str) {
+  return (str || "").toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 // ============================================================
-// BUILD Tin 2 — AW:AZ cho từng Team
+// BUILD Tin 2 — AW:AZ cho từng Team (HTML format)
 // ============================================================
 function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
   const label = teamKey === "T2" ? "Team 2 (T2+T5)" : teamKey.replace("T", "Team ");
   const lines = [];
-  lines.push("📊 *SUMMARY — " + label + "*");
-  lines.push("📅 " + ts);
-  lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  lines.push("📊 <b>SUMMARY — " + label + "</b>");
+  lines.push("📅 " + escHtml(ts));
+  lines.push("━".repeat(26));
 
   let hasData = false;
   for (let r = 0; r < 5; r++) {
     const txt = ((awaz[r] || [])[colIdx] || "").toString().trim();
     if (!txt || txt === "0") continue;
-    lines.push(AWAZ_LABELS[r].emoji + " *" + AWAZ_LABELS[r].name + ":* " + txt);
+    // Xóa markdown * _ ` rồi wrap HTML
+    const clean = escHtml(txt.replace(/[*_`]/g, ""));
+    lines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
     hasData = true;
   }
   if (!hasData) lines.push("✅ Không có sự cố");
@@ -459,7 +471,8 @@ function sendTelegram(chatId, text, tag) {
       const resp   = UrlFetchApp.fetch(url, {
         method:             "post",
         contentType:        "application/json",
-        payload:            JSON.stringify({ chat_id: chatId, text: chunk, parse_mode: "Markdown" }),
+        // Dùng HTML thay Markdown — tránh lỗi ký tự _ trong tên (OCK_MYTEL, PAT_POWER...)
+        payload:            JSON.stringify({ chat_id: chatId, text: chunk, parse_mode: "HTML" }),
         muteHttpExceptions: true,
       });
       const res = JSON.parse(resp.getContentText());
@@ -615,6 +628,29 @@ function testTin1Only() {
   PropertiesService.getScriptProperties().deleteProperty(TS_KEY_A1);
   checkColC(sheet);
   Logger.log("🧪 testTin1Only: xong — kiểm tra Telegram");
+}
+
+
+// ============================================================
+// PING TEST — Gửi tin thử vào CONTROL để kiểm tra bot hoạt động
+// Nếu nhận được tin “🤖 Bot hoạt động” thì bot đúng, lỗi ở chỗ khác
+// ============================================================
+function testPingBot() {
+  const controlId = SD_GROUPS["CONTROL"];
+  Logger.log("🤖 Gửi ping đến: " + controlId);
+  const url  = "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/sendMessage";
+  const resp = UrlFetchApp.fetch(url, {
+    method:             "post",
+    contentType:        "application/json",
+    payload:            JSON.stringify({
+      chat_id: controlId,
+      text:    "🤖 <b>Bot hoạt động bình thường</b>\n⏰ " + new Date().toLocaleString(),
+      parse_mode: "HTML"
+    }),
+    muteHttpExceptions: true,
+  });
+  const res = JSON.parse(resp.getContentText());
+  Logger.log(res.ok ? "✅ Ping OK" : "❌ Ping FAIL: " + res.description);
 }
 
 // Test chỉ Tin 2 (AW:AZ)
