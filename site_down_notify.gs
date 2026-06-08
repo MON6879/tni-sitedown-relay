@@ -27,8 +27,12 @@ const SD_SHEET_ID  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
 const SD_SHEET_GID = "0";
 
 // ── Timestamp keys (PropertiesService) ──────────────────────
-const TS_KEY_A1  = "SD_LAST_TS_A1";
-const TS_KEY_AW4 = "SD_LAST_TS_AW4";
+// Cả 2 tin đều dùng AW4 timestamp làm trigger.
+// TS_KEY_COLC và TS_KEY_AW4 lưu riêng để theo dõi độc lập.
+const TS_KEY_COLC = "SD_LAST_TS_COLC"; // Tin 1 (Cột C → từng Team)
+const TS_KEY_AW4  = "SD_LAST_TS_AW4";  // Tin 2 (AW:AZ → summary)
+// Legacy key — giữ để không break nếu đã set
+const TS_KEY_A1   = "SD_LAST_TS_A1";
 
 // ── AW:AZ column index (0-based) ────────────────────────────
 const AWAZ_COL = { T1: 0, T2: 1, T3: 2, T4: 3 };
@@ -138,8 +142,16 @@ function checkAndSend() {
     const sheet = getSheetByGid(ss, SD_SHEET_GID);
     if (!sheet) { Logger.log("❌ Không tìm thấy sheet"); return; }
 
-    checkColC(sheet);   // Tin 1: Cột C → từng Team
-    checkAwAz(sheet);   // Tin 2: AW:AZ → từng Team + Control
+    // Đọc AW4 timestamp 1 lần — dùng chung cho CẢ 2 luồng
+    const ts = parseAW4Timestamp(sheet);
+    if (!ts) {
+      Logger.log("⏭️ checkAndSend: AW4 không có timestamp — bỏ qua");
+      return;
+    }
+
+    // Chạy song song: Tin 1 (Cột C) + Tin 2 (AW:AZ)
+    checkColC(sheet, ts);   // ← truyền ts vào
+    checkAwAz(sheet, ts);   // ← truyền ts vào
 
   } catch (err) {
     Logger.log("❌ checkAndSend error: " + err.message);
@@ -148,22 +160,24 @@ function checkAndSend() {
 
 
 // ============================================================
-// TIN 1 — Cột C: site list chi tiết
-// Trigger: A1 timestamp thay đổi
+// TIN 1 — Cột C: site list chi tiết → từng Team + CONTROL
+// Trigger: AW4 timestamp thay đổi (dùng chung với Tin 2)
 // ============================================================
-function checkColC(sheet) {
-  const ts = parseA1Timestamp(sheet);
-  if (!ts) { Logger.log("[Tin1] Không có timestamp trong A1"); return; }
+function checkColC(sheet, ts) {
+  // Nếu không được truyền ts từ checkAndSend, tự đọc từ AW4
+  if (!ts) ts = parseAW4Timestamp(sheet);
+  if (!ts) { Logger.log("[Tin1] Không có timestamp trong AW4"); return; }
 
   const props  = PropertiesService.getScriptProperties();
-  const lastTs = props.getProperty(TS_KEY_A1) || "";
-  if (ts === lastTs) { Logger.log("[Tin1] A1 không đổi (" + ts + ") — bỏ qua"); return; }
+  const lastTs = props.getProperty(TS_KEY_COLC) || "";
+  if (ts === lastTs) { Logger.log("[Tin1] AW4 không đổi (" + ts + ") — bỏ qua"); return; }
 
-  Logger.log("[Tin1] 🆕 " + ts + " → gửi site list...");
+  Logger.log("[Tin1] 🆕 " + ts + " → gửi Cột C cho từng Team...");
 
   const colCData = readColC(sheet);
   const teams    = ["T1", "T2", "T3", "T4"];
 
+  // Gửi site list chi tiết đến từng Team
   for (const team of teams) {
     const chatId = SD_GROUPS[team];
     if (!chatId) continue;
@@ -171,14 +185,15 @@ function checkColC(sheet) {
     sendTelegram(chatId, msg, "[Tin1][" + team + "]");
   }
 
-  // Gửi Tin 1 tổng hợp vào Control (tất cả team)
+  // Gửi toàn bộ Cột C (nguyên văn) vào CONTROL — không format lại
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
-    const msg = buildColCControlMessage(ts, colCData);
-    sendTelegramPlain(controlId, msg, "[Tin1][CONTROL]");
+    const rawColC = readColCRaw(sheet);
+    const controlMsg = rawColC || buildColCControlMessage(ts, colCData);
+    sendTelegramPlain(controlId, controlMsg, "[Tin1][CONTROL]");
   }
 
-  props.setProperty(TS_KEY_A1, ts);
+  props.setProperty(TS_KEY_COLC, ts);
   Logger.log("[Tin1] ✅ Xong — lưu timestamp: " + ts);
 }
 
@@ -187,8 +202,9 @@ function checkColC(sheet) {
 // TIN 2 — AW:AZ: summary (Site/Cell/DG/Link)
 // Trigger: AW4 timestamp thay đổi
 // ============================================================
-function checkAwAz(sheet) {
-  const ts = parseAW4Timestamp(sheet);
+function checkAwAz(sheet, ts) {
+  // Nếu không được truyền ts từ checkAndSend, tự đọc từ AW4
+  if (!ts) ts = parseAW4Timestamp(sheet);
   if (!ts) { Logger.log("[Tin2] Không có timestamp trong AW4"); return; }
 
   const props  = PropertiesService.getScriptProperties();
@@ -245,6 +261,21 @@ function parseAW4Timestamp(sheet) {
   const raw = sheet.getRange("AW4").getValue().toString();
   const m   = raw.match(/Site down:\s*(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/i);
   return m ? m[1].trim() : null;
+}
+
+
+// ============================================================
+// ĐỌC CỘT C RAW — Trả về toàn bộ nội dung cột C (nguyên văn)
+// Dùng để gửi nguyên xi cho nhóm CONTROL (không format lại)
+// ============================================================
+function readColCRaw(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 1) return "";
+  const data = sheet.getRange(1, 3, lastRow, 1).getValues().flat();
+  const lines = data
+    .map(cell => (cell || "").toString().trim())
+    .filter(line => line.length > 0);
+  return lines.join("\n");
 }
 
 
@@ -554,8 +585,9 @@ function setupSdTrigger() {
 // Ép gửi cả 2 tin (bỏ qua timestamp)
 function testSendNow() {
   const props = PropertiesService.getScriptProperties();
-  props.deleteProperty(TS_KEY_A1);
+  props.deleteProperty(TS_KEY_COLC);
   props.deleteProperty(TS_KEY_AW4);
+  props.deleteProperty(TS_KEY_A1); // xóa cả legacy key
   Logger.log("🧪 Xóa timestamp → ép gửi cả 2 tin...");
   checkAndSend();
 }
@@ -564,7 +596,7 @@ function testSendNow() {
 function testTin1Only() {
   const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
   const sheet = getSheetByGid(ss, SD_SHEET_GID);
-  PropertiesService.getScriptProperties().deleteProperty(TS_KEY_A1);
+  PropertiesService.getScriptProperties().deleteProperty(TS_KEY_COLC);
   checkColC(sheet);
 }
 
@@ -579,6 +611,7 @@ function testTin2Only() {
 // Xem timestamp đang lưu
 function showTimestamps() {
   const p = PropertiesService.getScriptProperties();
-  Logger.log("📌 A1  last sent: " + (p.getProperty(TS_KEY_A1)  || "(chưa có)"));
-  Logger.log("📌 AW4 last sent: " + (p.getProperty(TS_KEY_AW4) || "(chưa có)"));
+  Logger.log("📌 Tin1(ColC) last sent: " + (p.getProperty(TS_KEY_COLC) || "(chưa có)"));
+  Logger.log("📌 Tin2(AW4)  last sent: " + (p.getProperty(TS_KEY_AW4)  || "(chưa có)"));
+  Logger.log("📌 Legacy A1  last sent: " + (p.getProperty(TS_KEY_A1)   || "(chưa có)"));
 }
