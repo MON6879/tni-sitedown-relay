@@ -289,45 +289,155 @@ def build_asset_progress_summary(content: str) -> str:
     return "\n".join(result)
 
 
+def format_employee_report(emp: dict, now_str: str, month_days: int) -> str:
+    """
+    Format báo cáo nhân viên:
+
+    Htoo Aung-myt_tharhtoo.aung11: 7-day results: 0  M: 0 /26 - Site: 11 :
+    <>Month 18day :0 /Close 7day: 0 <=> rank: 21 =Close: *0% <0/0/0>
+    WO remain : 34 + Assign: 30 => Task Close Month: 0: 0/0/0
+    Asset : 3/P: 0  CM : 5/P: 0  M&E : 11/P: 0
+    """
+    name       = emp.get("name", "")
+    sys_name   = emp.get("sys_name", "")
+    wo_remain  = emp.get("wo_remain", 0)
+    site_rem   = emp.get("site_remain", 0)
+    wo_total   = emp.get("wo_total", 0)
+    mo_close   = emp.get("wo_month_close", 0)
+    wk_close   = emp.get("wo_week_close", 0)
+    wo_d0      = emp.get("wo_d0", 0)     # hôm nay
+    wo_d1      = emp.get("wo_d1", 0)     # hôm qua
+    wo_d2      = emp.get("wo_d2", 0)     # hôm kia
+    assign_rem = emp.get("assign_remain", 0)
+    assign_mo  = emp.get("assign_month_close", 0)
+    close_pct  = emp.get("close_pct", 0)
+    rank       = emp.get("rank", 0)
+    dep_stats  = emp.get("dep_stats", {})
+
+    # Dòng tiêu đề
+    display_name = f"{name}-{sys_name}" if sys_name else name
+    line1 = (
+        f"*{display_name}*: 7-day results: {wk_close} "
+        f" M: {mo_close} /{wo_total} - Site: {site_rem} :"
+    )
+
+    # Dòng tháng + rank + close%
+    line2 = (
+        f"<>Month {month_days}day :{mo_close} /Close 7day: {wk_close} "
+        f"<=> rank: {rank} =Close: *{close_pct}% <{wo_d0}/{wo_d1}/{wo_d2}>"
+    )
+
+    # Dòng WO + Assign
+    # Task Close Month: assign_mo: wo_d0/wo_d1/wo_d2 (tổng close ngày)
+    line3 = (
+        f"WO remain : {wo_remain} + Assign: {assign_rem} "
+        f"=> Task Close Month: {assign_mo}: {wo_d0}/{wo_d1}/{wo_d2}"
+    )
+
+    # Dòng dep stats (NV format: "Asset : 3/P: 0")
+    dep_parts = []
+    for dep, st in dep_stats.items():
+        remain = st.get("remain", 0)
+        point  = st.get("point", 0)
+        dep_parts.append(f"{dep} : {remain}/P: {point}")
+    line4 = "  ".join(dep_parts) if dep_parts else ""
+
+    lines = [line1, line2, line3]
+    if line4:
+        lines.append(line4)
+    return "\n".join(lines)
+
+
+def format_leader_report(ld: dict, now_str: str, month_days: int) -> str:
+    """
+    Format báo cáo Team Leader:
+
+    Team leader 1: 3-Day Result: 11/0/0/0 <=> rank: 4 =Close: 36%
+    WO remain : Month 18day :77/Close 7day: 26 <:>  5/2/2/40 + Assign: *60
+    => Team leader task Close: 0  All Task Close: 1 : 0 : 0 : 0
+    Asset : TL:6 /13 P:0  CM : TL:0 /14 P:0  M&E : TL:0 /7 P:0
+    """
+    name          = ld.get("name", "")
+    team          = ld.get("team", "")
+    member_count  = ld.get("member_count", 0)
+    eod_today     = ld.get("eod_today", 0)     # số NV báo cáo hôm nay
+    eod_d1        = ld.get("eod_d1", 0)
+    eod_d2        = ld.get("eod_d2", 0)
+    rank          = ld.get("rank", 0)
+    close_pct     = ld.get("close_pct", 0)
+    wo_remain     = ld.get("wo_remain", 0)
+    mo_close      = ld.get("wo_month_close", 0)
+    wk_close      = ld.get("wo_week_close", 0)
+    wo_d0         = ld.get("wo_d0", 0)
+    wo_d1         = ld.get("wo_d1", 0)
+    wo_d2         = ld.get("wo_d2", 0)
+    wo_total      = ld.get("wo_total", 0)
+    assign_rem    = ld.get("assign_remain", 0)
+    tl_close      = ld.get("tl_task_close", 0)
+    all_close     = ld.get("all_task_close", [0, 0, 0, 0])
+    dep_stats     = ld.get("dep_stats", {})
+
+    # Dòng 1: tên team + EOD report + rank + close%
+    line1 = (
+        f"{name}: 3-Day Result: {member_count}/{eod_today}/{eod_d1}/{eod_d2} "
+        f"<=> rank: {rank} =Close: {close_pct}%"
+    )
+
+    # Dòng 2: WO remain + month/week close + daily WO + assign
+    all_close_str = " : ".join(str(x) for x in all_close)
+    line2 = (
+        f"WO remain : Month {month_days}day :{mo_close}/Close 7day: {wk_close} "
+        f"<:>  {wo_d0}/{wo_d1}/{wo_d2}/{wo_total} + Assign: *{assign_rem}"
+    )
+
+    # Dòng 3: TL task close + All Task Close (4 kỳ tháng)
+    line3 = (
+        f"=> Team leader task Close: {tl_close}  "
+        f"All Task Close: {all_close_str}*"
+    )
+
+    # Dòng dep stats (TL format: "Asset : TL:6 /13 P:0")
+    dep_parts = []
+    for dep, st in dep_stats.items():
+        tl_count = st.get("tl_count", 0)
+        total    = st.get("total", 0)
+        point    = st.get("point", 0)
+        dep_parts.append(f"{dep} : TL:{tl_count} /{total} P:{point}")
+    line4 = "  ".join(dep_parts) if dep_parts else ""
+
+    lines = [line1, line2, line3]
+    if line4:
+        lines.append(line4)
+    return "\n".join(lines)
+
+
 def build_summary_header(content: str) -> str:
     """
-    Phân tích nội dung cột D và tạo dòng tổng hợp đầu tin nhắn:
-    Mỗi nhân viên hiển thị: Tên | 3day | 7day | Month
-
-    Format mẫu trong content:
-      *Họ Tên-myt_username*: 7-day results: *X* M: X /26 ...
-      Month Xday :Y /Close 7day: Z <=> rank: *R* =Close: *P% <a/b/c>
+    (Legacy) Phân tích nội dung cột D và tạo dòng tổng hợp đầu tin nhắn.
+    Dùng khi không có dữ liệu từ Apps Script (fallback).
     """
     lines = []
-    # Mỗi nhân viên bắt đầu bằng *Tên-myt_...*:
-    # Tách block bằng pattern *<OTHER>*
     blocks = re.split(r'\*<OTHER>\*', content)
     for block in blocks:
-        # Tên: lấy phần trước dấu `-myt_` trong `*...-myt_...*:`
         name_m = re.search(r'\*([^*]+?)-myt_[^*]+\*:', block)
         if not name_m:
             continue
         name = name_m.group(1).strip()
-        # 7-day close: `Close 7day: X`
         d7_m = re.search(r'Close 7day:\s*(\d+)', block)
         d7 = d7_m.group(1) if d7_m else "?"
-        # Month close: `Month Xday :Y` -> Y là số trước `/Close`
         month_m = re.search(r'Month \d+day\s*:(\d+)\s*/Close', block)
         month = month_m.group(1) if month_m else "?"
-        # 3-day: `<a/b/c>` (3 số trong ngoặc nhọn sau Close%)
         d3_m = re.search(r'Close:\s*\*?\d+%?\*?\s*<(\d+)/(\d+)/(\d+)>', block)
         if d3_m:
             d3 = f"{d3_m.group(1)}/{d3_m.group(2)}/{d3_m.group(3)}"
         else:
-            # fallback: tìm bất kỳ <a/b/c>
             d3_fb = re.search(r'<(\d+)/(\d+)/(\d+)>', block)
             d3 = f"{d3_fb.group(1)}/{d3_fb.group(2)}/{d3_fb.group(3)}" if d3_fb else "?/?"
         lines.append(f"  • {name}: 3day:{d3} | 7day:{d7} | Month:{month}")
 
     if not lines:
         return ""
-    header = "📊 WO hoàn thành:\n" + "\n".join(lines)
-    return header
+    return "📊 WO hoàn thành:\n" + "\n".join(lines)
 
 
 async def send_msg(bot, cid, text, label=""):
@@ -431,8 +541,22 @@ async def main():
         mgmt_parts.append(search_msg)
         mgmt_parts.append("━━━━━━━━━━━━━━━━━━━━")
 
-    # Team leader reports
-    if team_leader_content:
+    # Team leader reports (dùng format mới nếu có month_days, fallback content)
+    month_days = report_data.get("month_days", 0)
+    leaders_data = report_data.get("leaders", [])
+    if leaders_data:
+        mgmt_parts.append("👑 Team Leader Reports:")
+        for ld in leaders_data:
+            if month_days:
+                ld_text = format_leader_report(ld, now_str, month_days)
+            else:
+                # Fallback: dùng content cột D gốc, truncate
+                raw = (ld.get("content") or "").strip()
+                ld_text = raw[:600] + "..." if len(raw) > 600 else raw
+            if ld_text:
+                mgmt_parts.append(f"\n🏷️ {ld.get('team','')}:\n{ld_text}")
+    elif team_leader_content:
+        # Fallback khi không có report_data
         mgmt_parts.append("👑 Team Leader Reports:")
         for tl in team_leader_content:
             short = tl["content"][:600] + "..." if len(tl["content"]) > 600 else tl["content"]
@@ -506,14 +630,34 @@ async def main():
             msg = "\n".join(parts)
 
         elif content:
-            # Normal rows: send task reminder
-            msg = (
-                f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"{content}\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
+            # Normal rows (nhân viên rows 4-32):
+            # Nếu có dữ liệu từ report_data.employees → dùng format mới
+            # Nếu không → fallback sang content cột D thô
+            month_days = report_data.get("month_days", 0)
+            employees_data = {e["name"]: e for e in report_data.get("employees", [])}
+            # Tìm employee match theo chat_id
+            emp_match = next(
+                (e for e in report_data.get("employees", []) if e.get("chat_id") == cid),
+                None
             )
+            if emp_match and month_days:
+                emp_text = format_employee_report(emp_match, now_str, month_days)
+                msg = (
+                    f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{emp_text}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
+                )
+            else:
+                # Fallback: nội dung cột D thô
+                msg = (
+                    f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{content}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
+                )
         else:
             continue  # skip rows with no content and not management
 

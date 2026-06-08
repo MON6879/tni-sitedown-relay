@@ -554,8 +554,9 @@ function fetchReportSheet() {
   const lastRow = reportSheet.getLastRow();
   if (lastRow < 3) return { employees: [], leaders: [] };
 
-  // Doc tu dong 1 den cuoi (giu nguyen index de biet vi tri)
-  const data = reportSheet.getRange(1, 1, lastRow, 5).getValues();
+  // Doc tu dong 1 den cuoi — doc toi 6 cot (A-F) de co them du lieu neu co
+  const maxCol = Math.max(reportSheet.getLastColumn(), 6);
+  const data = reportSheet.getRange(1, 1, lastRow, maxCol).getValues();
   const employees = [];
   const leaders   = [];
   const managers  = [];
@@ -567,6 +568,8 @@ function fetchReportSheet() {
     const colC = (row[2] || '').toString().trim();
     const cont = (row[3] || '').toString().trim();
     const colE = (row[4] || '').toString().trim();
+    // colF (index 5) dự phòng nếu có thêm cột (username hệ thống)
+    const colF = row.length > 5 ? (row[5] || '').toString().trim() : '';
 
     // Bo qua dong header
     if (team === 'Assign Site' || team.indexOf('Export time') >= 0) continue;
@@ -576,10 +579,10 @@ function fetchReportSheet() {
 
     if (/Team leader/i.test(colC)) {
       // Doi truong: co team, ten, noi dung
-      leaders.push({ team: team, name: name, content: cont, chat_id: colE });
+      leaders.push({ team: team, name: name, content: cont, chat_id: colE, sys_name: colF });
     } else if (team && name) {
       // Nhan vien: co ca team va ten - lay chat_id tu cot E
-      employees.push({ team: team, name: name, content: cont, chat_id: colE });
+      employees.push({ team: team, name: name, content: cont, chat_id: colE, sys_name: colF });
     } else if (colE && /^\d{5,}$/.test(colE.trim())) {
       // Quan ly: co ID cot E la so (Telegram ID dang so, khong phai "-")
       const mgName = name || team || colC || ('ID:' + colE);
@@ -612,7 +615,8 @@ function handleRefreshGeneral(ss) {
 }
 
 // ============================================================
-// ACTION: GET_REPORT_DATA — for send_now.py at 17:30
+// ACTION: GET_REPORT_DATA — for send_now.py / cron_send.py
+// Trả về đầy đủ: search stats + WO stats + assign task + dep breakdown
 // ============================================================
 function handleGetReportData(ss) {
   const statsMap = buildSearchStatsMap(ss);
@@ -626,10 +630,134 @@ function handleGetReportData(ss) {
       if (n && id) cfgIdMap[n] = id;
     }
   }
+
   const data = fetchReportSheet();
   const employees = data.employees;
   const leaders   = data.leaders;
   const managers  = data.managers;
+
+  // ── Tính số ngày trong kỳ tháng (từ 21 tháng trước đến hôm nay) ──
+  const tz = 'Asia/Rangoon';
+  const now = new Date();
+  const nowLocal = new Date(now.getTime() + 6.5 * 3600000);
+  const dayNow = nowLocal.getUTCDate();
+  let monthStart;
+  if (dayNow <= 20) {
+    monthStart = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth() - 1, 21) - 6.5 * 3600000);
+  } else {
+    monthStart = new Date(Date.UTC(nowLocal.getUTCFullYear(), nowLocal.getUTCMonth(), 21) - 6.5 * 3600000);
+  }
+  const monthDays = Math.floor((now - monthStart) / 86400000) + 1;
+
+  // ── Parse WO stats từ cột D (content) của mỗi nhân viên/TL ──
+  // Format cột D chứa sẵn báo cáo WO: ta parse ra các trường cần
+  function parseWoFromContent(content) {
+    const result = {
+      wo_remain:    0,   // WO còn lại tổng
+      site_remain:  0,   // Site còn lại
+      wo_total:     0,   // Tổng WO
+      wo_month_close: 0, // WO đóng trong kỳ tháng
+      wo_week_close:  0, // WO đóng 7 ngày
+      wo_d0: 0, wo_d1: 0, wo_d2: 0, // WO đóng hôm nay/qua/kia
+      assign_remain: 0,  // Assign task còn lại
+      assign_month_close: 0,
+      dep_stats: {},     // { Asset: {remain:N, point:P}, CM: {...}, ... }
+      eod_reported: 0,   // Số NV báo cáo cuối ngày (chỉ dùng cho TL)
+    };
+    if (!content) return result;
+
+    // WO remain: "WO remain : 34" hoặc "WO remain: 34"
+    const woRm = content.match(/WO\s*remain\s*[:\s]+?(\d+)/i);
+    if (woRm) result.wo_remain = parseInt(woRm[1]) || 0;
+
+    // Site remain: "Site: 11" hoặc "Site : 11"
+    const siteRm = content.match(/Site\s*:\s*(\d+)/i);
+    if (siteRm) result.site_remain = parseInt(siteRm[1]) || 0;
+
+    // Month close (kỳ tháng): "Month Xday :77" hoặc "Month 18day :77"
+    const moClose = content.match(/Month\s+\d+day\s*:\s*(\d+)/i);
+    if (moClose) result.wo_month_close = parseInt(moClose[1]) || 0;
+
+    // WO close 7 day: "/Close 7day: 26"
+    const wkClose = content.match(/Close\s+7day\s*:\s*(\d+)/i);
+    if (wkClose) result.wo_week_close = parseInt(wkClose[1]) || 0;
+
+    // WO total: "M: 0 /26" — 26 là tổng WO tháng
+    const mTotal = content.match(/M:\s*\d+\s*\/\s*(\d+)/i);
+    if (mTotal) result.wo_total = parseInt(mTotal[1]) || 0;
+
+    // Daily: "<:> 0/0/2/209" (TL: hôm nay/qua/kia/tổng team)
+    // hoặc "<0/0/0>" (NV: 3day hôm nay/qua/kia)
+    const dailyTL = content.match(/<:>\s*(\d+)\/(\d+)\/(\d+)\/(\d+)/);
+    if (dailyTL) {
+      result.wo_d0 = parseInt(dailyTL[1]) || 0;
+      result.wo_d1 = parseInt(dailyTL[2]) || 0;
+      result.wo_d2 = parseInt(dailyTL[3]) || 0;
+      result.wo_total = parseInt(dailyTL[4]) || result.wo_total;
+    } else {
+      const daily3 = content.match(/<(\d+)\/(\d+)\/(\d+)>/);
+      if (daily3) {
+        result.wo_d0 = parseInt(daily3[1]) || 0;
+        result.wo_d1 = parseInt(daily3[2]) || 0;
+        result.wo_d2 = parseInt(daily3[3]) || 0;
+      }
+    }
+
+    // Assign remain: "Assign: 30" hoặc "Assign: *60"
+    const assignRm = content.match(/Assign\s*:\s*\*?(\d+)/i);
+    if (assignRm) result.assign_remain = parseInt(assignRm[1]) || 0;
+
+    // Assign month close: "Task Close Month: 0: 0/0/0" — lấy số đầu
+    const assignMo = content.match(/Task\s*Close\s*Month\s*:\s*(\d+)/i);
+    if (assignMo) result.assign_month_close = parseInt(assignMo[1]) || 0;
+
+    // EOD (báo cáo cuối ngày): "3-Day Result: 11/0/0/0" — 11=tổng NV, 3 số sau là báo cáo hôm nay/qua/kia
+    const eod = content.match(/3-Day\s*Result\s*:\s*(\d+)\/(\d+)\/(\d+)\/(\d+)/i);
+    if (eod) result.eod_reported = parseInt(eod[2]) || 0; // số NV báo cáo hôm nay
+
+    // Dep stats: "Asset : 3/P: 0" hoặc "Asset : TL:6 /13 P:0"
+    // Pattern NV: "DepName : N/P: P_score"
+    // Pattern TL: "DepName : TL:tl_count /total P:score"
+    const depNV = /([A-Za-z&\s]+?)\s*:\s*(\d+)\/P:\s*(\d+)/g;
+    const depTL = /([A-Za-z&\s]+?)\s*:\s*TL:(\d+)\s*\/(\d+)\s*P:(\d+)/g;
+    let m;
+    while ((m = depTL.exec(content)) !== null) {
+      const dep = m[1].trim();
+      if (dep && !['WO remain', 'Assign', 'Task Close Month', 'All Task Close', 'Close'].includes(dep)) {
+        result.dep_stats[dep] = { tl_count: parseInt(m[2])||0, total: parseInt(m[3])||0, point: parseInt(m[4])||0, is_tl: true };
+      }
+    }
+    // Chỉ parse NV nếu không có TL pattern
+    if (Object.keys(result.dep_stats).length === 0) {
+      while ((m = depNV.exec(content)) !== null) {
+        const dep = m[1].trim();
+        if (dep && !['WO remain', 'Assign', 'Task Close Month', 'All Task Close', 'Close', 'M', 'Site'].includes(dep)) {
+          result.dep_stats[dep] = { remain: parseInt(m[2])||0, point: parseInt(m[3])||0, is_tl: false };
+        }
+      }
+    }
+
+    return result;
+  }
+
+  // ── Tính rank dựa trên % close WO theo tuần lũy kế ──
+  // Tuần trong tháng: tuần 1=25%, tuần 2=50%, tuần 3=75%, tuần 4=100%
+  function calcRank(wo_total, wo_month_close, month_days) {
+    if (!wo_total) return 0;
+    const weekNum = Math.min(4, Math.ceil(month_days / 7));  // tuần 1-4
+    const target_pct = weekNum * 25;                          // 25/50/75/100%
+    const actual_pct = Math.round(wo_month_close / wo_total * 100);
+    // rank = điểm delta so với target (>0 tốt, <0 trễ)
+    return actual_pct - target_pct;
+  }
+
+  // ── Tính % close ──
+  function calcClosePct(wo_total, wo_month_close) {
+    if (!wo_total) return 0;
+    return Math.round(wo_month_close / wo_total * 100);
+  }
+
+  // ── Search team stats ──
   const teamStats = {};
   for (const emp of employees) {
     const s = statsMap[emp.name.toLowerCase()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
@@ -637,18 +765,110 @@ function handleGetReportData(ss) {
     const t = teamStats[emp.team];
     t.today += s.today; t.d1 += s.d1; t.d2 += s.d2; t.week += s.week; t.month += s.month;
   }
-  const empResult = [];
+
+  // ── Team WO totals (tổng từ nhân viên trong team) ──
+  const teamWo = {}; // team -> { wo_remain, wo_total, wo_month_close, wo_week_close, wo_d0,d1,d2, assign_remain, member_count }
   for (const emp of employees) {
+    const wo = parseWoFromContent(emp.content);
+    if (!teamWo[emp.team]) teamWo[emp.team] = { wo_remain:0, wo_total:0, wo_month_close:0, wo_week_close:0, wo_d0:0, wo_d1:0, wo_d2:0, assign_remain:0, assign_month_close:0, member_count:0 };
+    const t = teamWo[emp.team];
+    t.wo_remain       += wo.wo_remain;
+    t.wo_total        += wo.wo_total;
+    t.wo_month_close  += wo.wo_month_close;
+    t.wo_week_close   += wo.wo_week_close;
+    t.wo_d0           += wo.wo_d0;
+    t.wo_d1           += wo.wo_d1;
+    t.wo_d2           += wo.wo_d2;
+    t.assign_remain   += wo.assign_remain;
+    t.assign_month_close += wo.assign_month_close;
+    t.member_count    += 1;
+  }
+
+  // ── Assign task stats từ Input task sheet ──
+  const INPUT_GID = '1755404595';
+  const inputSh = ss.getSheets().find(s => s.getSheetId().toString() === INPUT_GID);
+  const assignByDep = {}; // dep -> { total, done, remain }
+  if (inputSh && inputSh.getLastRow() >= 2) {
+    const rows = inputSh.getRange(2, 1, inputSh.getLastRow() - 1, 10).getValues();
+    for (const r of rows) {
+      const dep  = (r[1] || '').toString().trim();
+      const con  = (r[3] || '').toString().trim();
+      const done = (r[9] || '').toString().trim();
+      if (!dep || !con || ['nan','dep assign','sum'].includes(dep.toLowerCase())) continue;
+      if (!assignByDep[dep]) assignByDep[dep] = { total: 0, done: 0, remain: 0 };
+      assignByDep[dep].total++;
+      if (done) assignByDep[dep].done++; else assignByDep[dep].remain++;
+    }
+  }
+
+  // ── Build employee result ──
+  // Tính rank toàn bộ NV rồi sắp xếp để gán rank số thứ tự
+  const empWithWo = employees.map(emp => {
     const s = statsMap[emp.name.toLowerCase()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     const chatId = emp.chat_id || cfgIdMap[emp.name.toLowerCase()] || '';
-    empResult.push({ name: emp.name, team: emp.team, chat_id: chatId, today: s.today, d1: s.d1, d2: s.d2, week: s.week, month: s.month });
-  }
+    const wo = parseWoFromContent(emp.content);
+    const close_pct = calcClosePct(wo.wo_total, wo.wo_month_close);
+    return { name: emp.name, sys_name: emp.sys_name, team: emp.team, chat_id: chatId,
+             content: emp.content,
+             search_today: s.today, search_d1: s.d1, search_d2: s.d2, search_week: s.week, search_month: s.month,
+             wo_remain: wo.wo_remain, site_remain: wo.site_remain, wo_total: wo.wo_total,
+             wo_month_close: wo.wo_month_close, wo_week_close: wo.wo_week_close,
+             wo_d0: wo.wo_d0, wo_d1: wo.wo_d1, wo_d2: wo.wo_d2,
+             assign_remain: wo.assign_remain, assign_month_close: wo.assign_month_close,
+             dep_stats: wo.dep_stats,
+             close_pct: close_pct,
+             _rank_score: close_pct };
+  });
+  // Sắp xếp theo % close giảm dần để gán rank
+  const sorted = [...empWithWo].sort((a,b) => b._rank_score - a._rank_score);
+  const rankMap = {};
+  sorted.forEach((e, idx) => { rankMap[e.name] = idx + 1; });
+  const empResult = empWithWo.map(e => ({ ...e, rank: rankMap[e.name] || 0 }));
+
+  // ── Build leader result ──
   const ldResult = [];
-  for (const ld of leaders) {
-    const s = teamStats[ld.team] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+  let leaderRankIdx = 1;
+  // Sắp xếp leader theo % close để gán rank
+  const ldWithScore = leaders.map(ld => {
+    const wo = parseWoFromContent(ld.content);
+    // Đọc thêm từ TL content: "3-Day Result: 11/0/0/0" → member_count / eod_today / eod_d1 / eod_d2
+    const eodM = ld.content.match(/3-Day\s*Result\s*:\s*(\d+)\/(\d+)\/(\d+)\/(\d+)/i);
+    const member_count   = eodM ? parseInt(eodM[1]) || 0 : 0;
+    const eod_today      = eodM ? parseInt(eodM[2]) || 0 : 0;
+    const eod_d1         = eodM ? parseInt(eodM[3]) || 0 : 0;
+    const eod_d2         = eodM ? parseInt(eodM[4]) || 0 : 0;
+    // TL task close: "Team leader task Close: X"
+    const tlCloseM = ld.content.match(/Team\s*leader\s*task\s*Close\s*:\s*(\d+)/i);
+    const tl_task_close = tlCloseM ? parseInt(tlCloseM[1]) || 0 : 0;
+    // All Task Close: "All Task Close: 1 : 0 : 0 : 0" — 4 kỳ trong tháng
+    const allCloseM = ld.content.match(/All\s*Task\s*Close\s*:\s*(\d+)\s*:\s*(\d+)\s*:\s*(\d+)\s*:\s*(\d+)/i);
+    const all_task_close = allCloseM ? [parseInt(allCloseM[1])||0, parseInt(allCloseM[2])||0, parseInt(allCloseM[3])||0, parseInt(allCloseM[4])||0] : [0,0,0,0];
+    const close_pct = calcClosePct(wo.wo_total, wo.wo_month_close);
     const chatId = ld.chat_id || cfgIdMap[ld.name.toLowerCase()] || '';
-    ldResult.push({ name: ld.name, team: ld.team, chat_id: chatId, content: ld.content, today: s.today, d1: s.d1, d2: s.d2, week: s.week, month: s.month });
-  }
+    const twStats = teamWo[ld.team] || { wo_remain:0, wo_total:0, wo_month_close:0, wo_week_close:0, wo_d0:0, wo_d1:0, wo_d2:0, assign_remain:0, member_count:0 };
+    return {
+      name: ld.name, sys_name: ld.sys_name, team: ld.team, chat_id: chatId, content: ld.content,
+      member_count: member_count || twStats.member_count,
+      eod_today, eod_d1, eod_d2,
+      wo_remain: wo.wo_remain || twStats.wo_remain,
+      wo_total: wo.wo_total || twStats.wo_total,
+      wo_month_close: wo.wo_month_close || twStats.wo_month_close,
+      wo_week_close: wo.wo_week_close || twStats.wo_week_close,
+      wo_d0: wo.wo_d0 || twStats.wo_d0,
+      wo_d1: wo.wo_d1 || twStats.wo_d1,
+      wo_d2: wo.wo_d2 || twStats.wo_d2,
+      assign_remain: wo.assign_remain || twStats.assign_remain,
+      assign_month_close: wo.assign_month_close || twStats.assign_month_close,
+      dep_stats: wo.dep_stats,
+      tl_task_close, all_task_close,
+      close_pct: close_pct,
+      _rank_score: close_pct
+    };
+  });
+  const ldSorted = [...ldWithScore].sort((a,b) => b._rank_score - a._rank_score);
+  const ldRankMap = {};
+  ldSorted.forEach((e, idx) => { ldRankMap[e.name] = idx + 1; });
+  ldWithScore.forEach(ld => ldResult.push({ ...ld, rank: ldRankMap[ld.name] || 0 }));
 
   // --- Tổng toàn bộ (cho ban quản lý) ---
   const grandTotal = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
@@ -660,17 +880,21 @@ function handleGetReportData(ss) {
   // --- Team summary list (for management message) ---
   const teamSummary = [];
   for (const [team, s] of Object.entries(teamStats)) {
-    teamSummary.push({ team: team, today: s.today, d1: s.d1, d2: s.d2, week: s.week, month: s.month });
+    const tw = teamWo[team] || {};
+    teamSummary.push({ team, today: s.today, d1: s.d1, d2: s.d2, week: s.week, month: s.month,
+                       wo_remain: tw.wo_remain||0, assign_remain: tw.assign_remain||0 });
   }
 
   handleRefreshGeneral(ss);
   return json({
     status: 'ok',
+    month_days: monthDays,
     employees: empResult,
     leaders: ldResult,
     managers: managers,
     teamSummary: teamSummary,
-    grandTotal: grandTotal
+    grandTotal: grandTotal,
+    assignByDep: assignByDep
   });
 }
 
