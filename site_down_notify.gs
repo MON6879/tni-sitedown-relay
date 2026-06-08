@@ -157,14 +157,18 @@ function checkAndSend() {
 //   - Toàn bộ Col C (nguyên văn) → nhóm CONTROL
 // ============================================================
 function checkColC(sheet) {
-  const ts = parseA1Timestamp(sheet);
-  if (!ts) { Logger.log("[Tin1] Không có timestamp trong A1"); return; }
+  const raw = sheet.getRange("A1").getValue().toString().trim();
+  if (!raw) { Logger.log("[Tin1] A1 rỗng — bỏ qua"); return; }
 
-  const props  = PropertiesService.getScriptProperties();
-  const lastTs = props.getProperty(TS_KEY_A1) || "";
-  if (ts === lastTs) { Logger.log("[Tin1] A1 không đổi (" + ts + ") — bỏ qua"); return; }
+  // Dùng toàn bộ nội dung A1 để phát hiện thay đổi
+  // (không chỉ so timestamp — tránh bỏ sót khi same-minute update)
+  const props   = PropertiesService.getScriptProperties();
+  const lastKey = props.getProperty(TS_KEY_A1) || "";
+  if (raw === lastKey) { Logger.log("[Tin1] A1 không đổi — bỏ qua"); return; }
 
-  Logger.log("[Tin1] 🆕 " + ts + " → gửi site list...");
+  // Lấy timestamp để hiển thị trong tin nhắn
+  const ts = parseA1Timestamp(sheet) || raw.substring(0, 60);
+  Logger.log("[Tin1] 🆕 A1 thay đổi → ts=" + ts + " → gửi site list...");
 
   const colCData = readColC(sheet);
   const teams    = ["T1", "T2", "T3", "T4"];
@@ -190,7 +194,7 @@ function checkColC(sheet) {
     }
   }
 
-  props.setProperty(TS_KEY_A1, ts);
+  props.setProperty(TS_KEY_A1, raw);  // lưu toàn bộ A1, không chỉ timestamp
   Logger.log("[Tin1] ✅ Xong — lưu timestamp: " + ts);
 }
 
@@ -239,13 +243,18 @@ function checkAwAz(sheet) {
 // ============================================================
 // PARSE TIMESTAMP từ A1
 // "Site down ... in Tanintharyi Region - 08/06/2026 11:00:00"
+// NOTE: Bỏ anchor $ — tìm date ở BẤT KỲ đâu trong chuỗi, không yêu cầu ở cuối
+// (phòng trường hợp có * hoặc ký tự markdown sau ngày giờ)
 // ============================================================
 function parseA1Timestamp(sheet) {
   const raw = sheet.getRange("A1").getValue().toString();
-  const m   = raw.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2})\s*$/);
-  if (m) return m[1].trim();
-  const m2  = raw.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})\s*$/);
-  return m2 ? m2[1].trim() : null;
+  Logger.log("[A1 raw] " + raw.substring(0, 120));
+  // Ưu tiên HH:MM:SS
+  const m1 = raw.match(/(\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2}:\d{2})/);
+  if (m1) return m1[1].replace(/[\-T]/g, " ").trim();
+  // Fallback HH:MM
+  const m2 = raw.match(/(\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2})/);
+  return m2 ? m2[1].replace(/[\-T]/g, " ").trim() : null;
 }
 
 
@@ -608,4 +617,36 @@ function showTimestamps() {
   const p = PropertiesService.getScriptProperties();
   Logger.log("📌 Tin1 (A1)  last sent: " + (p.getProperty(TS_KEY_A1)  || "(chưa có)"));
   Logger.log("📌 Tin2 (AW4) last sent: " + (p.getProperty(TS_KEY_AW4) || "(chưa có)"));
+}
+
+
+// ============================================================
+// DEBUG — Kiểm tra A1 đang chứa gì + timestamp parse được gì
+// Chạy hàm này trong Apps Script Editor để debug
+// ============================================================
+function testDebugA1() {
+  const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
+  const sheet = getSheetByGid(ss, SD_SHEET_GID);
+  if (!sheet) { Logger.log("❌ Không tìm thấy sheet"); return; }
+
+  const raw = sheet.getRange("A1").getValue().toString();
+  Logger.log("🔍 A1 raw (120 chữ): " + raw.substring(0, 120));
+  Logger.log("🔍 A1 length: " + raw.length);
+
+  const ts = parseA1Timestamp(sheet);
+  Logger.log("⏱️ parseA1Timestamp: " + (ts || "(null — không match regex!)"));
+
+  const p = PropertiesService.getScriptProperties();
+  const stored = p.getProperty(TS_KEY_A1) || "(chưa có)";
+  Logger.log("💾 TS_KEY_A1 stored: " + stored.substring(0, 120));
+  Logger.log("❓ Sẽ gửi Tin1? " + (raw.trim() !== stored.trim() ? "✅ Có (A1 đã thay đổi)" : "❌ Không (A1 giống stored)"));
+
+  // Kiểm tra AW4
+  const aw4 = sheet.getRange("AW4").getValue().toString();
+  Logger.log("🔍 AW4 raw (100 chữ): " + aw4.substring(0, 100));
+  const tsAw4 = parseAW4Timestamp(sheet);
+  Logger.log("⏱️ parseAW4Timestamp: " + (tsAw4 || "(null)"));
+  const storedAw4 = p.getProperty(TS_KEY_AW4) || "(chưa có)";
+  Logger.log("💾 TS_KEY_AW4 stored: " + storedAw4);
+  Logger.log("❓ Sẽ gửi Tin2? " + (tsAw4 && tsAw4 !== storedAw4 ? "✅ Có" : "❌ Không"));
 }
