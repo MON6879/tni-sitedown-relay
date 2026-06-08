@@ -134,6 +134,12 @@ function writeToColumnA(sheet, text) {
 // (cũng được gọi từ doPost sau khi ghi Cột A)
 // ============================================================
 function checkAndSend() {
+  // Chống gửi 2 lần khi trigger 5phút và doPost cùng chạy
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) {
+    Logger.log("⏭️ checkAndSend: đang có execution khác chạy — bỏ qua");
+    return;
+  }
   try {
     const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
     const sheet = getSheetByGid(ss, SD_SHEET_GID);
@@ -143,8 +149,8 @@ function checkAndSend() {
     checkColC(sheet);   // Tin 1: A1 timestamp → Col C per-team + CONTROL
     checkAwAz(sheet);   // Tin 2: AW4 timestamp → AW:AZ summary per-team
 
-  } catch (err) {
-    Logger.log("❌ checkAndSend error: " + err.message);
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -596,12 +602,19 @@ function testSendNow() {
   checkAndSend();
 }
 
-// Test chỉ Tin 1 (Cột C)
+// Test chỉ Tin 1 (Cột C) — ép gửi ngay
 function testTin1Only() {
   const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
   const sheet = getSheetByGid(ss, SD_SHEET_GID);
+
+  // Flush để đảm bảo công thức Col C đã tính xong
+  SpreadsheetApp.flush();
+  Utilities.sleep(2000);
+
+  // Xóa stored key → ép detect là mới
   PropertiesService.getScriptProperties().deleteProperty(TS_KEY_A1);
   checkColC(sheet);
+  Logger.log("🧪 testTin1Only: xong — kiểm tra Telegram");
 }
 
 // Test chỉ Tin 2 (AW:AZ)
