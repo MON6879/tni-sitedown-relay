@@ -751,5 +751,5 @@ function testDebugA1() {
 // Web App URL da duoc dien san, chi can Run la xong
 // ============================================================
 function mySetWebhook() {
-  setWebhookDirect("https://script.google.com/macros/s/AKfycbymHq-f8StoSUfs_t5CtDhg1mVG6TUAo4IVIz4Nu4pahiR9yfJq1zeFPsRF7JCjyGmzxA/exec");
+  setWebhookDirect("https://script.google.com/macros/s/AKfycbyoRM8LVCebLzz8cRjjbfS9OUNQWyQ_o2xVg24lO9aFT6M-B_eazKUTxpquI6TEyVahZw/exec");
 }
