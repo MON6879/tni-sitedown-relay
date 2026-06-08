@@ -45,50 +45,88 @@ const AWAZ_LABELS = [
 
 
 // ============================================================
-// WEBHOOK ENTRY POINT — Telegram gọi khi có tin nhắn mới
+// POLLING — Trigger 5 phút tự lấy tin từ Telegram (thay webhook)
+// Không cần Web App deployment, không bị lỗi 302
+// ============================================================
+const LAST_UPDATE_KEY = "SD_LAST_UPDATE_ID";
+
+function fetchTelegramUpdates(sheet) {
+  const props        = PropertiesService.getScriptProperties();
+  const lastId       = parseInt(props.getProperty(LAST_UPDATE_KEY) || "0");
+  const url          = "https://api.telegram.org/bot" + SD_BOT_TOKEN
+                     + "/getUpdates?offset=" + (lastId + 1)
+                     + "&limit=100&allowed_updates=message,channel_post";
+
+  let data;
+  try {
+    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    data = JSON.parse(resp.getContentText());
+  } catch (e) {
+    Logger.log("[Poll] ❌ getUpdates lỗi: " + e.message);
+    return false;
+  }
+
+  if (!data.ok) {
+    Logger.log("[Poll] ❌ Telegram lỗi: " + data.description);
+    return false;
+  }
+
+  const updates = data.result || [];
+  if (updates.length === 0) {
+    Logger.log("[Poll] Không có tin mới");
+    return false;
+  }
+
+  let maxId       = lastId;
+  let latestReport = null;
+
+  for (const upd of updates) {
+    if (upd.update_id > maxId) maxId = upd.update_id;
+
+    const msg    = upd.message || upd.channel_post;
+    if (!msg) continue;
+
+    const chatId = msg.chat.id.toString();
+    if (chatId !== SD_GROUPS.CONTROL) continue;
+
+    const text = (msg.text || msg.caption || "").trim();
+    if (!isSiteDownReport(text)) continue;
+
+    latestReport = text;   // lấy báo cáo mới nhất
+    Logger.log("[Poll] ✅ Phát hiện báo cáo site down — " + text.substring(0, 60));
+  }
+
+  // Đánh dấu đã xử lý tất cả updates
+  props.setProperty(LAST_UPDATE_KEY, maxId.toString());
+  Logger.log("[Poll] Đã xử lý " + updates.length + " updates, lastId=" + maxId);
+
+  if (latestReport) {
+    writeToColumnA(sheet, latestReport);
+    Logger.log("[Poll] 📝 Đã ghi báo cáo mới vào Cột A");
+    SpreadsheetApp.flush();
+    Utilities.sleep(3000);  // chờ công thức Col C cập nhật
+    return true;   // có báo cáo mới
+  }
+  return false;
+}
+
+
+// ============================================================
+// doPost — Giữ lại để tương thích nếu webhook hoạt động sau này
 // ============================================================
 function doPost(e) {
   try {
     const update = JSON.parse(e.postData.contents);
     const msg    = update.message || update.channel_post;
     if (!msg) return okJson({ status: "no_message" });
-
     const chatId = msg.chat.id.toString();
     const text   = (msg.text || msg.caption || "").trim();
-
-    Logger.log("📨 Nhận tin từ chat: " + chatId + " | " + text.substring(0, 80));
-
-    // ── Chỉ xử lý tin từ Group CONTROL ──────────────────────
-    if (chatId !== SD_GROUPS.CONTROL) {
-      Logger.log("⏭️ Bỏ qua — không phải group CONTROL (" + chatId + ")");
+    if (chatId !== SD_GROUPS.CONTROL || !isSiteDownReport(text))
       return okJson({ status: "ignored" });
-    }
-
-    // ── Kiểm tra có phải báo cáo site down không ────────────
-    if (!isSiteDownReport(text)) {
-      Logger.log("⏭️ Tin nhắn không phải báo cáo site down — bỏ qua");
-      return okJson({ status: "not_report" });
-    }
-
-    Logger.log("✅ Phát hiện báo cáo site down mới — xử lý...");
-
-    // ── Ghi vào Cột A của Sheet ──────────────────────────────
     const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
     const sheet = getSheetByGid(ss, SD_SHEET_GID);
-    if (!sheet) return okJson({ status: "sheet_not_found" });
-
-    writeToColumnA(sheet, text);
-    Logger.log("📝 Đã ghi vào Cột A");
-
-    // ── Chờ Sheet tính toán xong rồi gửi ────────────────────
-    SpreadsheetApp.flush();
-    Utilities.sleep(3000); // Chờ 3 giây cho công thức cập nhật
-
-    // ── Kích hoạt gửi tin ────────────────────────────────────
-    checkAndSend();
-
+    if (sheet) { writeToColumnA(sheet, text); SpreadsheetApp.flush(); Utilities.sleep(3000); checkAndSend(); }
     return okJson({ status: "ok" });
-
   } catch (err) {
     Logger.log("❌ doPost error: " + err.message);
     return okJson({ status: "error", message: err.message });
@@ -134,10 +172,9 @@ function writeToColumnA(sheet, text) {
 // (cũng được gọi từ doPost sau khi ghi Cột A)
 // ============================================================
 function checkAndSend() {
-  // Chống gửi 2 lần khi trigger 5phút và doPost cùng chạy
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(3000)) {
-    Logger.log("⏭️ checkAndSend: đang có execution khác chạy — bỏ qua");
+    Logger.log("⏭️ checkAndSend: đang có execution khác — bỏ qua");
     return;
   }
   try {
@@ -145,9 +182,12 @@ function checkAndSend() {
     const sheet = getSheetByGid(ss, SD_SHEET_GID);
     if (!sheet) { Logger.log("❌ Không tìm thấy sheet"); return; }
 
-    // Hai luồng độc lập nhau — mỗi luồng tự kiểm tra timestamp riêng
-    checkColC(sheet);   // Tin 1: A1 timestamp → Col C per-team + CONTROL
-    checkAwAz(sheet);   // Tin 2: AW4 timestamp → AW:AZ summary per-team
+    // ── BƯỚC 1: Poll Telegram lấy báo cáo mới → ghi Cột A ──
+    fetchTelegramUpdates(sheet);
+
+    // ── BƯỚC 2: Kiểm tra và gửi tin ─────────────────────────
+    checkColC(sheet);   // Tin 1: A1 thay đổi → Col C per-team + CONTROL
+    checkAwAz(sheet);   // Tin 2: AW4 thay đổi → AW:AZ summary per-team
 
   } finally {
     lock.releaseLock();
