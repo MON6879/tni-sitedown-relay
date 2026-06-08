@@ -554,23 +554,68 @@ function okJson(obj) {
 
 
 // ============================================================
-// SETUP WEBHOOK — Chạy 1 lần sau khi Deploy as Web App
-// Điền Web App URL vào biến WEBAPP_URL bên dưới
+// KIỂM TRA WEBHOOK HIỆN TẠI
+// Chạy hàm này để xem webhook đang trỏ đến URL nào
+// ============================================================
+function checkWebhook() {
+  const resp = UrlFetchApp.fetch(
+    "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/getWebhookInfo"
+  );
+  const info = JSON.parse(resp.getContentText());
+  if (!info.ok) { Logger.log("❌ Bot lỗi: " + info.description); return; }
+  const r = info.result;
+  Logger.log("=== WEBHOOK STATUS ===");
+  Logger.log("📡 URL: " + (r.url || "(chưa set — webhook trống!)"));
+  Logger.log("⏳ Pending updates: " + (r.pending_update_count || 0));
+  Logger.log("❌ Last error: " + (r.last_error_message || "không có"));
+  Logger.log("📅 Last error date: " + (r.last_error_date ? new Date(r.last_error_date*1000).toLocaleString() : "—"));
+  if (!r.url) {
+    Logger.log("\n⚠️ WEBHOOK CHƯA ĐƯỢC SET!");
+    Logger.log("👉 Bước 1: Deploy script → Deploy > New deployment > Web app");
+    Logger.log("👉 Bước 2: Copy URL (dạng .../exec)");
+    Logger.log("👉 Bước 3: Chạy setWebhookDirect('<URL vừa copy>')");
+  }
+}
+
+
+// ============================================================
+// SET WEBHOOK TRỰC TIẾP (không cần PropertiesService)
+// Ví dụ: setWebhookDirect("https://script.google.com/macros/s/ABC.../exec")
+// ============================================================
+function setWebhookDirect(webAppUrl) {
+  if (!webAppUrl) {
+    // Thử lấy từ Properties
+    webAppUrl = PropertiesService.getScriptProperties().getProperty("WEBAPP_URL") || "";
+  }
+  if (!webAppUrl) {
+    Logger.log("❌ Cần truyền URL vào: setWebhookDirect('https://script.google.com/...')");
+    return;
+  }
+  const resp = UrlFetchApp.fetch(
+    "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/setWebhook", {
+    method:      "post",
+    contentType: "application/json",
+    payload:     JSON.stringify({ url: webAppUrl, allowed_updates: ["message","channel_post"] }),
+  });
+  const res = JSON.parse(resp.getContentText());
+  Logger.log(res.ok
+    ? "✅ Webhook đã set: " + webAppUrl
+    : "❌ Lỗi: " + res.description);
+  // Lưu lại để dùng sau
+  if (res.ok) PropertiesService.getScriptProperties().setProperty("WEBAPP_URL", webAppUrl);
+}
+
+
+// ============================================================
+// SETUP WEBHOOK — (legacy) Dùng URL từ PropertiesService
 // ============================================================
 function setWebhook() {
   const WEBAPP_URL = PropertiesService.getScriptProperties().getProperty("WEBAPP_URL") || "";
   if (!WEBAPP_URL) {
-    Logger.log("❌ Chưa có WEBAPP_URL — chạy lệnh sau:\n" +
-      "PropertiesService.getScriptProperties().setProperty('WEBAPP_URL','<URL của bạn>')");
+    Logger.log("❌ Chưa có WEBAPP_URL — dùng setWebhookDirect('<URL>') thay thế");
     return;
   }
-  const url  = "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/setWebhook";
-  const resp = UrlFetchApp.fetch(url, {
-    method:      "post",
-    contentType: "application/json",
-    payload:     JSON.stringify({ url: WEBAPP_URL }),
-  });
-  Logger.log("setWebhook → " + resp.getContentText());
+  setWebhookDirect(WEBAPP_URL);
 }
 
 // Xóa webhook (để test thủ công bằng getUpdates)
