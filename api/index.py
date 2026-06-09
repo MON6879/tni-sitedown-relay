@@ -13,6 +13,7 @@ SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
 BASE_URL       = (f"https://docs.google.com/spreadsheets/d/"
                   f"{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=")
 GID_SITE, GID_TASK, GID_WO = "1095689918", "1755404595", "1429089905"
+GID_INFO = "171059303"   # Tab: Name Site / Site / Cable / Gpon / DIA (col A=TNI, B=Site, C=Cable, D=Gpon, E=DIA)
 MAX_LEN = 4096
 TZ_MM   = timezone(timedelta(hours=6, minutes=30))
 
@@ -95,6 +96,40 @@ def get_wos(df, tni):
     except Exception as e:
         logger.error(f"wos: {e}")
     return out
+
+def get_info(tni):
+    """Tìm TNI trong cột A của sheet gid=171059303, trả về B-E."""
+    try:
+        df = fetch(GID_INFO)
+        # Hàng 0 = header (Name Site, Site, Cable, Gpon, DIA)
+        rows = df.iloc[1:] if len(df) > 1 else df
+        for _, row in rows.iterrows():
+            a = sv(row, 0)  # Col A = Name Site (TNI code)
+            if a.upper() == tni.upper():
+                b = sv(row, 1)  # Col B = Site
+                c = sv(row, 2)  # Col C = Cable
+                d = sv(row, 3)  # Col D = Gpon
+                e_ = sv(row, 4) # Col E = DIA
+                return {"site": b, "cable": c, "gpon": d, "dia": e_}
+        return None
+    except Exception as ex:
+        logger.error(f"get_info error: {ex}")
+        return None
+
+def build_info_reply(tni, info):
+    """Tạo tin nhắn đẹp từ kết quả Info."""
+    e = html.escape
+    lines = [f"📡 <b>Info: {e(tni)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
+    if info.get("site"):
+        lines.append(f"\n🏢 <b>Site</b>\n{e(info['site'])}")
+    if info.get("cable"):
+        lines.append(f"\n🔌 <b>Cable</b>\n{e(info['cable'])}")
+    if info.get("gpon"):
+        lines.append(f"\n📶 <b>Gpon</b>\n{e(info['gpon'])}")
+    if info.get("dia"):
+        lines.append(f"\n🌐 <b>DIA</b>\n{e(info['dia'])}")
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    return "\n".join(lines)
 
 def build_reply(tni):
     e  = html.escape
@@ -248,6 +283,25 @@ def handle(data):
         else:
             err = res.get("message", "unknown") if res else "no response"
             tg_send(chat_id, f"⚠️ Không thể update #{ref_id}: {html.escape(str(err))}")
+        return
+
+    # ── Info: TNIxxxx — tra cứu cột A→B:E từ sheet gid=171059303 ──────────
+    info_match = re.match(r"^info[:\s]+\s*(TNI\w+)", text, re.IGNORECASE)
+    if info_match:
+        tni = info_match.group(1).upper()
+        logger.info(f"Info lookup: {tni} | chat={chat_id}")
+        tg_send(chat_id, f"⏳ Đang tìm thông tin <b>{html.escape(tni)}</b>...")
+        try:
+            info = get_info(tni)
+            if info and any(info.values()):
+                tg_send(chat_id, build_info_reply(tni, info))
+            else:
+                tg_send(chat_id,
+                    f"❌ Không tìm thấy <b>{html.escape(tni)}</b> trong danh sách Site Info."
+                )
+        except Exception as err:
+            logger.error(f"Info error [{tni}]: {err}")
+            tg_send(chat_id, f"❌ Lỗi tra cứu: {html.escape(str(err))}")
         return
 
     # ── Collector: Order/Revoke/Export/Move ───────────────────────────────
