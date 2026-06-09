@@ -388,29 +388,64 @@ function readAwAz(sheet) {
 
 
 // ============================================================
-// BUILD Tin 1 — Cột C cho từng Team
+// BUILD Tin 1 — Cột C cho từng Team (bảng monospace)
 // ============================================================
 function buildColCMessage(teamKey, ts, sites) {
   const label = teamKey === "T2" ? "Team 2 (T2+T5)" : teamKey.replace("T", "Team ");
-  const lines = [];
-  lines.push("📋 <b>SITE DOWN — " + label + "</b>");
-  lines.push("📅 " + escHtml(ts) + "  |  Tổng: <b>" + sites.length + "</b> sites");
-  lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+  const header = [
+    "📋 <b>SITE DOWN — " + label + "</b>",
+    "📅 " + escHtml(ts) + "  │  Tổng: <b>" + sites.length + "</b> sites"
+  ];
 
   if (sites.length === 0) {
-    lines.push("✅ Không có site down");
-  } else {
-    const nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
-    sites.forEach((s, i) => {
-      const num = i < nums.length ? nums[i] : (i + 1) + ".";
-      lines.push("");
-      lines.push(num + " <b>" + escHtml(s.tniCode) + "</b> │ " + escHtml(s.duration) + "h │ " + escHtml(s.owner) + " │ " + escHtml(s.power));
-      lines.push("   📍 " + escHtml(s.township) + "  👤 " + escHtml(s.ftName));
-      if (s.eat) lines.push("   💬 <i>" + escHtml(s.eat) + "</i>");
-    });
+    header.push("✅ Không có site down");
+    return header.join("\n");
   }
-  return lines.join("\n");
+
+  // ── Tính độ rộng cột tự động ──────────────────────────────
+  const pad  = (s, n) => String(s || "").padEnd(n);
+  const padL = (s, n) => String(s || "").padStart(n);
+
+  let maxOwner = 5, maxPower = 5;
+  sites.forEach(s => {
+    if ((s.owner || "").length > maxOwner) maxOwner = s.owner.length;
+    if ((s.power || "").length > maxPower) maxPower = s.power.length;
+  });
+
+  // ── Build header row ──────────────────────────────────────
+  const HR = "─".repeat(7) + "─┼─" + "─".repeat(8) + "─┼─"
+           + "─".repeat(maxOwner) + "─┼─" + "─".repeat(maxPower);
+  const tableRows = [
+    pad("STATION", 7) + " │ " + pad("TIME(h)", 8) + " │ "
+    + pad("OWNER", maxOwner) + " │ POWER",
+    HR
+  ];
+
+  // ── Build mỗi site 1 dòng ────────────────────────────────
+  sites.forEach(s => {
+    const dur = parseFloat(s.duration || "0").toFixed(2);
+    tableRows.push(
+      pad(s.tniCode, 7) + " │ " +
+      padL(dur, 7) + "h │ " +
+      pad(s.owner,  maxOwner) + " │ " +
+      (s.power || "")
+    );
+  });
+
+  // EAT summary (chỉ những site có EAT, gộp ngắn gọn)
+  const eatLines = sites
+    .filter(s => s.eat)
+    .map(s => "  " + s.tniCode + ": " + s.eat);
+
+  const parts = [...header, "<pre>" + escHtml(tableRows.join("\n")) + "</pre>"];
+  if (eatLines.length) {
+    parts.push("💬 <b>EAT:</b>\n" + escHtml(eatLines.join("\n")));
+  }
+
+  return parts.join("\n");
 }
+
 
 
 
