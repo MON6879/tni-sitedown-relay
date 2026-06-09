@@ -1,0 +1,42 @@
+name: Botlookup TNI Relay (mỗi 30 phút)
+
+# Khung giờ hoạt động: 04:30 – 21:30 Myanmar (UTC+6:30)
+# 04:30 Myanmar = 22:00 UTC | 21:30 Myanmar = 15:00 UTC
+# → Cron chạy UTC 22:00–23:30 và 00:00–15:00
+
+on:
+  schedule:
+    # UTC 22:00 – 23:30  →  Myanmar 04:30 – 06:00
+    - cron: "0,30 22,23 * * *"
+    # UTC 00:00 – 15:00  →  Myanmar 06:30 – 21:30
+    - cron: "0,30 0-14 * * *"
+    # UTC 15:00          →  Myanmar 21:30 (lần cuối trong ngày)
+    - cron: "0 15 * * *"
+  workflow_dispatch:        # Cho phép chạy tay để test
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55    # timeout 55 phút (đủ cho delay 25p + xử lý)
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install telethon
+
+      - name: Run Botlookup Relay
+        env:
+          TELEGRAM_API_ID:   ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION:  ${{ secrets.TELEGRAM_SESSION }}
+        run: |
+          cd "Task and WO"
+          python botlookup_relay.py
