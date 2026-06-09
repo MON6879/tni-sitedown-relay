@@ -97,9 +97,9 @@
 
 | Workflow | File | Schedule | Script |
 |---|---|---|---|
-| Daily Task Reminder (17:30 Myanmar) | `daily_task.yml` | `0 11 * * *` (UTC) | `cron_send.py` |
-| Gửi thông báo task lúc 17:30 VN | `send_task.yml` | `0 11 * * *` (UTC) | `send_now.py` |
-| **Telegram Daily Send** | `telegram_send.yml` | `30 17 * * *` (UTC+7→10:30 UTC) | `cron_send.py` |
+| **Daily Task Reminder (17:30 Myanmar)** | `daily_task.yml` | `0 11 * * *` UTC = 17:30 Myanmar | `cron_send.py` |
+| Gửi thông báo task | `daily_send.yml` | `30 10 * * *` UTC = 17:00 Myanmar | `send_now.py` |
+| ~~Telegram Daily Send~~ | `telegram_send.yml` | **⚠️ ĐÃ TẮT** — cron cũ `30 17` UTC = 00:00 Myanmar (SAI) | ~~`cron_send.py`~~ |
 
 - **Secrets trên GitHub:**
   - `SEND_BOT_TOKEN`
@@ -151,3 +151,44 @@
 | Bug | Nguyên nhân | Fix |
 |---|---|---|
 | **Technical Dept (rows 75-87) không nhận nội dung đúng** | `send_now.py` → `get_custom_messages()` dùng `gviz/tq` với `offset=74` — gviz/tq bỏ 6 hàng trống (rows 56-61) nên offset bị lệch, thực ra đang đọc rows 80-87 thay vì 75-87 | Đổi sang `/export?format=csv` + đọc theo `sheet_row` chính xác (giống `cron_send.py`) |
+
+---
+
+## 🐛 Lịch sử bugs đã fix (09/06/2026)
+
+| Bug | Nguyên nhân | Fix |
+|---|---|---|
+| **Gửi 3 lần (17:32 / 02:08 / 05:24 Myanmar)** | `telegram_send.yml` có cron `30 17 * * *` UTC = 00:00 Myanmar (comment sai: viết 10:30 UTC) → chạy lúc nửa đêm, delay thành 02-05h sáng | Tắt cron của `telegram_send.yml`, chỉ giữ `workflow_dispatch` |
+| **Bot không nhận tin từ CONTROL group** | Telegram Privacy Mode BẬT → bot chỉ nhận tin bắt đầu `/` | Tắt Privacy Mode qua @BotFather hoặc cấp Admin cho bot trong group |
+| **Webhook 302** | Web App deployment "Who has access" = Anyone with Google account thay vì Anyone | Đổi sang polling `getUpdates` — không cần webhook |
+
+---
+
+## 🤖 Site Down Auto-Notify (09/06/2026)
+
+**File:** [`site_down_notify.gs`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/site_down_notify.gs) — trong cùng repo `phonghdpxd-cmd/tni-bot`
+
+### Flow hoạt động
+```
+Báo cáo site down → Gửi vào nhóm CONTROL (-5251698940)
+         ↓
+Apps Script trigger 5 phút → fetchTelegramUpdates() (polling getUpdates)
+         ↓
+Ghi vào Col A của Sheet: 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow (tab GID=0)
+         ↓
+checkColC() → Col C công thức tự tính per-team → Gửi Tin 1 cho T1/T2/T3/T4 + CONTROL
+         ↓
+checkAwAz() → AW4:AZ8 summary → Gửi Tin 2 cho T1/T2/T3/T4
+```
+
+### Bot & Groups
+| Bot Token | Nhóm nhận |
+|---|---|
+| `8647102342:AAGwI95-...` | T1(-5180992881), T2(-5188855349), T3(-5183480727), T4(-5238696719), CONTROL(-5251698940) |
+
+### Apps Script trigger
+- **Script ID:** `1rvgWwrAMDbqtmqwOfqzguXB7m9snA5UZeOs9iGu64VJbejlNAkH2m6uR`
+- **Trigger:** `checkAndSend()` mỗi 5 phút (cài bằng `setupSdTrigger()`)
+- **Polling key:** `SD_LAST_UPDATE_ID` trong PropertiesService
+- **Không dùng webhook** (đã thử nhưng lỗi 302 do Privacy Mode)
+

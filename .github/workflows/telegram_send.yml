@@ -1,9 +1,10 @@
 name: Telegram Daily Send
 
+# ⚠️ ĐÃ TẮT cron — trùng với daily_task.yml, gây gửi 3 lần
+# Cron cũ: 30 17 * * * UTC = 00:00 Myanmar (SAI)
 on:
-  schedule:
-    - cron: "30 17 * * *"   # 17:30 VN (UTC+7) => 10:30 UTC
-  workflow_dispatch:
+  workflow_dispatch:  # Chỉ chạy tay, không auto
+
 
 jobs:
   send-messages:
