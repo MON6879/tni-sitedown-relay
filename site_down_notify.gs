@@ -108,6 +108,8 @@ function fetchTelegramUpdates(sheet) {
   if (latestReport) {
     writeToColumnA(sheet, latestReport);
     Logger.log("[Poll] 📝 Đã ghi báo cáo mới vào Cột A");
+    // Xóa key cũ → checkColC() sẽ luôn gửi dù timestamp A1 giống cũ
+    PropertiesService.getScriptProperties().deleteProperty(TS_KEY_A1);
     SpreadsheetApp.flush();
     Utilities.sleep(3000);  // chờ công thức Col C cập nhật
     return true;   // có báo cáo mới
