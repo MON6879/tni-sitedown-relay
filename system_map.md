@@ -99,6 +99,7 @@
 |---|---|---|---|
 | **Daily Task Reminder (17:30 Myanmar)** | `daily_task.yml` | `0 11 * * *` UTC = 17:30 Myanmar | `cron_send.py` |
 | Gửi thông báo task | `daily_send.yml` | `30 10 * * *` UTC = 17:00 Myanmar | `send_now.py` |
+| **Botlookup TNI Relay** | `botlookup_relay.yml` | `0,30 22,23 * * *` + `0,30 0-14 * * *` + `0 15 * * *` UTC = 04:30–21:30 Myanmar mỗi 30p | `botlookup_relay.py` |
 | ~~Telegram Daily Send~~ | `telegram_send.yml` | **⚠️ ĐÃ TẮT** — cron cũ `30 17` UTC = 00:00 Myanmar (SAI) | ~~`cron_send.py`~~ |
 
 - **Secrets trên GitHub:**
@@ -106,6 +107,9 @@
   - `REPORT_TASK_BOT_TOKEN`
   - `TECHNICAL_DEP_BOT_TOKEN`
   - `APPS_SCRIPT_URL`
+  - `TELEGRAM_API_ID` *(dùng cho botlookup_relay)*
+  - `TELEGRAM_API_HASH` *(dùng cho botlookup_relay)*
+  - `TELEGRAM_SESSION` *(dùng cho botlookup_relay)*
 
 ### Apps Script
 - **URL:** `https://script.google.com/macros/s/AKfycbxJF4FJHHI93bMELdm6YgFN-Tz8tUKrwl3QXWyrQn_WzDsaoqWjZEO41TvudGyMBKo7wg/exec`
@@ -219,4 +223,49 @@ Team 1: Total Site down: 11...
 | **CONTROL không nhận full** | Chỉ gửi per-team | CONTROL riêng → nhận toàn bộ Col C |
 | **getUpdates rỗng sau testGetUpdatesRaw** | `offset=0` consume updates sớm hơn | Thêm log offset + raw, fix `lastId=0 → offset=0` |
 | **Polling không nhận tin dù bot active** | Privacy Mode BẬT trên Telegram | Tắt qua @BotFather → bot nhận tất cả tin group |
+
+---
+
+## 🐛 Lịch sử thay đổi (09/06/2026 — phần 3)
+
+| Thay đổi | Chi tiết |
+|---|---|
+| **botlookup_relay.py delay: 1–25p → 3–21p** | `MIN_DELAY_SEC = 3*60`, `MAX_DELAY_SEC = 21*60` — khoảng delay hẹp hơn, phân bố đều hơn trong 30p |
+
+---
+
+## ⚡ Lỗi thường gặp & Xử lý nhanh
+
+### Gửi tin trùng nhiều lần
+- **Nguyên nhân:** Có ≥2 workflow cùng cron chạy cùng script
+- **Fix:** Tắt cron của workflow thừa → chỉ giữ `workflow_dispatch`
+- **Kiểm tra:** UTC↔Myanmar: Myanmar = UTC+6:30 (cẩn thận `30 17 UTC` = 00:00 Myanmar sáng hôm sau)
+
+### BOD/Manager không nhận tin
+- **Nguyên nhân:** Dùng `gviz/tq` đọc sheet → cắt hàng trống 56-61 → lệch row
+- **Fix:** Dùng `/export?format=csv` + `HEADER_ROWS=3`
+
+### Bot không nhận tin trong group
+- **Nguyên nhân:** Privacy Mode BẬT → bot chỉ nhận tin `/command`
+- **Fix:** @BotFather → `/mybots` → Bot Settings → Group Privacy → **Turn off**
+
+### Webhook 302
+- **Nguyên nhân:** Web App Google Apps Script deploy "Anyone with Google account"
+- **Fix:** Redeploy → "Anyone" (không cần tài khoản)
+
+### botlookup_relay job timeout
+- **Nguyên nhân:** `timeout-minutes` nhỏ hơn delay + xử lý
+- **Fix:** `timeout-minutes: 55` trong `botlookup_relay.yml`
+
+### botlookup_relay không lấy được phản hồi
+- **Nguyên nhân:** `WAIT_REPLY_SEC` quá ngắn (bot chậm)
+- **Fix:** Tăng `WAIT_REPLY_SEC` lên 20-30s trong `botlookup_relay.py`
+
+### Message is too long
+- **Nguyên nhân:** Content 1 dòng siêu dài, split theo `\n` không cắt được
+- **Fix:** Split thêm theo số ký tự, mỗi chunk ≤ 4000 chars
+
+### Nhân viên không nhận tin
+- **Nguyên nhân:** Dùng `@TNIREPORTTASK_BOT` cho rows 4-32 nhưng họ chưa `/start`
+- **Fix:** Rows 4-32 phải dùng `SEND_BOT`
 

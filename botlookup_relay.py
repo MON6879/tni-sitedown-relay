@@ -6,7 +6,7 @@ Gửi lệnh /down_tni@auto_nocpro_bot vào nhóm Botlookup,
 
 Chạy tự động qua GitHub Actions mỗi 30 phút.
 Chỉ hoạt động trong khung giờ 04:30 – 21:30 Myanmar (UTC+6:30).
-Thêm delay ngẫu nhiên 1–25 phút để trông tự nhiên.
+Thêm delay ngẫu nhiên 3–21 phút để trông tự nhiên.
 """
 
 import asyncio
@@ -34,10 +34,10 @@ WAIT_REPLY_SEC = 20                                        # chờ bot phản h�
 ACTIVE_START   = (4, 30)    # 04:30
 ACTIVE_END     = (21, 30)   # 21:30
 
-# Delay ngẫu nhiên 1–25 phút (tính bằng giây)
+# Delay ngẫu nhiên 3–21 phút (tính bằng giây)
 # Đặt env SKIP_DELAY=1 để bỏ qua delay (dùng khi test)
-MIN_DELAY_SEC  = 1  * 60    #  1 phút
-MAX_DELAY_SEC  = 25 * 60    # 25 phút
+MIN_DELAY_SEC  = 3  * 60    #  3 phút
+MAX_DELAY_SEC  = 21 * 60    # 21 phút
 SKIP_DELAY     = os.environ.get("SKIP_DELAY", "0") == "1"
 # ──────────────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ async def main():
         print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ ({now_str} Myanmar). Hoạt động 04:30–21:30. Kết thúc.")
         return
 
-    # ── 1. Delay ngẫu nhiên 1–25 phút ────────────────────────────
+    # ── 1. Delay ngẫu nhiên 3–21 phút ────────────────────────────
     if SKIP_DELAY:
         print(f"[{myanmar_now()}] ⚡ Chế độ TEST — bỏ qua delay!")
     else:
