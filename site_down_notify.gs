@@ -393,57 +393,31 @@ function readAwAz(sheet) {
 function buildColCMessage(teamKey, ts, sites) {
   const label = teamKey === "T2" ? "Team 2 (T2+T5)" : teamKey.replace("T", "Team ");
 
-  const header = [
-    "📋 <b>SITE DOWN — " + label + "</b>",
-    "📅 " + escHtml(ts) + "  │  Tổng: <b>" + sites.length + "</b> sites"
-  ];
-
   if (sites.length === 0) {
-    header.push("✅ Không có site down");
-    return header.join("\n");
+    return label + " | " + ts + "\nKhông có site down";
   }
 
-  // ── Tính độ rộng cột tự động ──────────────────────────────
+  // Tính độ rộng cột OWNER rộng nhất
   const pad  = (s, n) => String(s || "").padEnd(n);
   const padL = (s, n) => String(s || "").padStart(n);
 
-  let maxOwner = 5, maxPower = 5;
+  let maxOwner = 5;
   sites.forEach(s => {
     if ((s.owner || "").length > maxOwner) maxOwner = s.owner.length;
-    if ((s.power || "").length > maxPower) maxPower = s.power.length;
   });
 
-  // ── Build header row ──────────────────────────────────────
-  const HR = "─".repeat(7) + "─┼─" + "─".repeat(8) + "─┼─"
-           + "─".repeat(maxOwner) + "─┼─" + "─".repeat(maxPower);
-  const tableRows = [
-    pad("STATION", 7) + " │ " + pad("TIME(h)", 8) + " │ "
-    + pad("OWNER", maxOwner) + " │ POWER",
-    HR
-  ];
-
-  // ── Build mỗi site 1 dòng ────────────────────────────────
-  sites.forEach(s => {
+  // Mỗi site 1 dòng: STATION | TIME h | OWNER | POWER
+  const rows = sites.map(s => {
     const dur = parseFloat(s.duration || "0").toFixed(2);
-    tableRows.push(
-      pad(s.tniCode, 7) + " │ " +
-      padL(dur, 7) + "h │ " +
-      pad(s.owner,  maxOwner) + " │ " +
-      (s.power || "")
-    );
+    return pad(s.tniCode, 7) + " | " +
+           padL(dur, 7) + " h | " +
+           pad(s.owner, maxOwner) + " | " +
+           (s.power || "");
   });
 
-  // EAT summary (chỉ những site có EAT, gộp ngắn gọn)
-  const eatLines = sites
-    .filter(s => s.eat)
-    .map(s => "  " + s.tniCode + ": " + s.eat);
-
-  const parts = [...header, "<pre>" + escHtml(tableRows.join("\n")) + "</pre>"];
-  if (eatLines.length) {
-    parts.push("💬 <b>EAT:</b>\n" + escHtml(eatLines.join("\n")));
-  }
-
-  return parts.join("\n");
+  // Header ngắn gọn + bảng
+  const headerLine = label + " | " + ts + " | " + sites.length + " sites";
+  return headerLine + "\n<pre>" + escHtml(rows.join("\n")) + "</pre>";
 }
 
 
