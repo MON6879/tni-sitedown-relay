@@ -53,14 +53,19 @@ const LAST_UPDATE_KEY = "SD_LAST_UPDATE_ID";
 function fetchTelegramUpdates(sheet) {
   const props        = PropertiesService.getScriptProperties();
   const lastId       = parseInt(props.getProperty(LAST_UPDATE_KEY) || "0");
+  const offsetToUse  = lastId === 0 ? 0 : lastId + 1;
   const url          = "https://api.telegram.org/bot" + SD_BOT_TOKEN
-                     + "/getUpdates?offset=" + (lastId + 1)
+                     + "/getUpdates?offset=" + offsetToUse
                      + "&limit=100&allowed_updates=message,channel_post";
+
+  Logger.log("[Poll] lastId=" + lastId + " → offset=" + offsetToUse);
 
   let data;
   try {
     const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    data = JSON.parse(resp.getContentText());
+    const raw  = resp.getContentText();
+    Logger.log("[Poll] raw (200): " + raw.substring(0, 200));
+    data = JSON.parse(raw);
   } catch (e) {
     Logger.log("[Poll] ❌ getUpdates lỗi: " + e.message);
     return false;
