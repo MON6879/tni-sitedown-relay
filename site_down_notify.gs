@@ -213,43 +213,29 @@ function checkColC(sheet) {
   const raw = sheet.getRange("A1").getValue().toString().trim();
   if (!raw) { Logger.log("[Tin1] A1 rỗng — bỏ qua"); return; }
 
-  // Dùng toàn bộ nội dung A1 để phát hiện thay đổi
-  // (không chỉ so timestamp — tránh bỏ sót khi same-minute update)
   const props   = PropertiesService.getScriptProperties();
   const lastKey = props.getProperty(TS_KEY_A1) || "";
   if (raw === lastKey) { Logger.log("[Tin1] A1 không đổi — bỏ qua"); return; }
 
-  // Lấy timestamp để hiển thị trong tin nhắn
-  const ts = parseA1Timestamp(sheet) || raw.substring(0, 60);
-  Logger.log("[Tin1] 🆕 A1 thay đổi → ts=" + ts + " → gửi site list...");
+  Logger.log("[Tin1] 🆕 A1 thay đổi → gửi Col C...");
 
-  const colCData = readColC(sheet);
-  const teams    = ["T1", "T2", "T3", "T4"];
+  // Lấy nguyên nội dung Col C → bọc <pre> → màu xanh monospace
+  const colCRaw = readColCRaw(sheet);
+  if (!colCRaw) { Logger.log("[Tin1] Col C trống — bỏ qua"); return; }
 
-  // ① Gửi tin per-team (format đẹp) → từng nhóm Team
-  for (const team of teams) {
-    const chatId = SD_GROUPS[team];
-    if (!chatId) continue;
-    const msg = buildColCMessage(team, ts, colCData[team] || []);
-    sendTelegram(chatId, msg, "[Tin1][" + team + "]");
+  const msg = "<pre>" + escHtml(colCRaw) + "</pre>";
+
+  // Gửi tất cả groups
+  const allGroups = ["T1", "T2", "T3", "T4", "CONTROL"];
+  for (const key of allGroups) {
+    const chatId = SD_GROUPS[key];
+    if (chatId) sendTelegram(chatId, msg, "[Tin1][" + key + "]");
   }
 
-  // ② Gửi toàn bộ Col C (nguyên văn, không đổi gì) → nhóm CONTROL
-  const controlId = SD_GROUPS["CONTROL"];
-  if (controlId) {
-    const rawColC = readColCRaw(sheet);
-    if (rawColC) {
-      sendTelegramPlain(controlId, rawColC, "[Tin1][CONTROL-RAW]");
-    } else {
-      // Fallback nếu raw rỗng: dùng format tổng hợp
-      const msg = buildColCControlMessage(ts, colCData);
-      sendTelegramPlain(controlId, msg, "[Tin1][CONTROL-FMT]");
-    }
-  }
-
-  props.setProperty(TS_KEY_A1, raw);  // lưu toàn bộ A1, không chỉ timestamp
-  Logger.log("[Tin1] ✅ Xong — lưu timestamp: " + ts);
+  props.setProperty(TS_KEY_A1, raw);
+  Logger.log("[Tin1] ✅ Xong");
 }
+
 
 
 // ============================================================
