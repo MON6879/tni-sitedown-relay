@@ -37,5 +37,8 @@ jobs:
           TELEGRAM_API_ID:   ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           TELEGRAM_SESSION:  ${{ secrets.TELEGRAM_SESSION }}
+          # Khi chạy tay (workflow_dispatch): bỏ qua delay để test nhanh
+          # Khi chạy tự động (schedule): có delay ngẫu nhiên 1–25 phút
+          SKIP_DELAY: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
         run: |
           python botlookup_relay.py

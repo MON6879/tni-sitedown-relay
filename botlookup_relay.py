@@ -35,8 +35,10 @@ ACTIVE_START   = (4, 30)    # 04:30
 ACTIVE_END     = (21, 30)   # 21:30
 
 # Delay ngẫu nhiên 1–25 phút (tính bằng giây)
+# Đặt env SKIP_DELAY=1 để bỏ qua delay (dùng khi test)
 MIN_DELAY_SEC  = 1  * 60    #  1 phút
 MAX_DELAY_SEC  = 25 * 60    # 25 phút
+SKIP_DELAY     = os.environ.get("SKIP_DELAY", "0") == "1"
 # ──────────────────────────────────────────────────────────────────
 
 def myanmar_now() -> str:
@@ -63,12 +65,15 @@ async def main():
         return
 
     # ── 1. Delay ngẫu nhiên 1–25 phút ────────────────────────────
-    delay_sec = random.randint(MIN_DELAY_SEC, MAX_DELAY_SEC)
-    delay_min = delay_sec // 60
-    delay_rem = delay_sec % 60
-    print(f"[{myanmar_now()}] ⏳ Đợi ngẫu nhiên {delay_min} phút {delay_rem} giây trước khi gửi...")
-    await asyncio.sleep(delay_sec)
-    print(f"[{myanmar_now()}] ✅ Hết delay — bắt đầu relay!")
+    if SKIP_DELAY:
+        print(f"[{myanmar_now()}] ⚡ Chế độ TEST — bỏ qua delay!")
+    else:
+        delay_sec = random.randint(MIN_DELAY_SEC, MAX_DELAY_SEC)
+        delay_min = delay_sec // 60
+        delay_rem = delay_sec % 60
+        print(f"[{myanmar_now()}] ⏳ Đợi ngẫu nhiên {delay_min} phút {delay_rem} giây trước khi gửi...")
+        await asyncio.sleep(delay_sec)
+        print(f"[{myanmar_now()}] ✅ Hết delay — bắt đầu relay!")
 
     # ── 2. Kết nối Telegram bằng tài khoản cá nhân ───────────────
     from telethon.sessions import StringSession
