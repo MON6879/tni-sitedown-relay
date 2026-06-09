@@ -793,3 +793,31 @@ function testDebugA1() {
 function mySetWebhook() {
   setWebhookDirect("https://script.google.com/macros/s/AKfycbyoRM8LVCebLzz8cRjjbfS9OUNQWyQ_o2xVg24lO9aFT6M-B_eazKUTxpquI6TEyVahZw/exec");
 }
+
+
+// ============================================================
+// DEBUG POLLING — Xem raw getUpdates Telegram trả về gì
+// ============================================================
+function testGetUpdatesRaw() {
+  const props  = PropertiesService.getScriptProperties();
+  const lastId = parseInt(props.getProperty("SD_LAST_UPDATE_ID") || "0");
+  // offset=0 để lấy TẤT CẢ updates còn trong queue
+  const url    = "https://api.telegram.org/bot" + SD_BOT_TOKEN
+               + "/getUpdates?offset=0&limit=10&allowed_updates=message,channel_post";
+  const resp   = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  const raw    = resp.getContentText();
+  Logger.log("[RAW] lastId stored = " + lastId);
+  Logger.log("[RAW] getUpdates response (500 chars):");
+  Logger.log(raw.substring(0, 500));
+
+  const data = JSON.parse(raw);
+  if (!data.ok) { Logger.log("Telegram error: " + data.description); return; }
+  Logger.log("[RAW] Total updates: " + data.result.length);
+  data.result.forEach((u, i) => {
+    const msg = u.message || u.channel_post;
+    const chatId = msg ? msg.chat.id.toString() : "(no msg)";
+    const txt = msg ? (msg.text || msg.caption || "").substring(0, 80) : "";
+    Logger.log("#" + i + " update_id=" + u.update_id + " | chat=" + chatId + " | " + txt);
+  });
+  Logger.log("CONTROL group ID cần match: " + SD_GROUPS.CONTROL);
+}
