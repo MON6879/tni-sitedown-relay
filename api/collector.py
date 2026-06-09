@@ -76,17 +76,37 @@ def is_collector_msg(text: str) -> bool:
 async def handle(data: dict):
     async with Bot(token=COLLECTOR_BOT_TOKEN) as bot:
         update = Update.de_json(data, bot)
-        if not update.message or not update.message.text:
+        if not update.message:
             return
 
         msg     = update.message
         user    = msg.from_user
-        text    = msg.text.strip()
         chat_id = msg.chat_id
         now     = datetime.now(TZ_VN)
-
         sender_name = (user.full_name if user else "") or ""
         username    = (f"@{user.username}" if user and user.username else str(user.id)) if user else ""
+
+        # ── Photo messages ─────────────────────────────────────────────
+        if msg.photo:
+            largest   = msg.photo[-1]          # highest resolution
+            file_info = await bot.get_file(largest.file_id)
+            tg_url    = (
+                f"https://api.telegram.org/file/bot{COLLECTOR_BOT_TOKEN}/"
+                f"{file_info.file_path}"
+            )
+            post_sheet({
+                "action":  "add_photo",
+                "user_id": str(user.id if user else ""),
+                "tg_url":  tg_url,
+                "date":    now.strftime("%d/%m/%Y %H:%M"),
+            })
+            return
+
+        # ── Text only from here ────────────────────────────────────────
+        if not msg.text:
+            return
+
+        text    = msg.text.strip()
 
         # ── /start ────────────────────────────────────────────────────────
         if text.startswith("/start"):

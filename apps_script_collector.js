@@ -39,6 +39,7 @@ function doPost(e) {
     if (body.action === "add")              return handleAdd(sheet, body);
     if (body.action === "done")             return handleDone(sheet, ss, body);
     if (body.action === "find")             return handleFind(sheet, body);
+    if (body.action === "add_photo")        return handleAddPhoto(sheet, body);
     if (body.action === "register_chat")    return handleRegisterChat(ss, body);
     if (body.action === "register_user")    return handleRegisterUser(ss, body);
     if (body.action === "get_users")        return handleGetUsers(ss);
@@ -91,16 +92,106 @@ function handleAdd(sheet, body) {
   sheet.appendRow(row);
 
   const rowNum = sheet.getLastRow();
-  const seqId  = rowNum - 1;   // sequential ID (1-based)
+  const seqId  = rowNum - 1;
 
-  // Ghi REF vào cột A — dùng để tìm hàng khi Done, không phụ thuộc vị trí hàng
+  // Ghi REF vào cột A
   sheet.getRange(rowNum, 1).setValue(seqId);
 
+  // Gắn ảnh pending (nếu user đã gửi ảnh trước khi gửi text)
+  const props   = PropertiesService.getScriptProperties();
+  const pKey    = "PENDING_PHOTO_" + chatId;
+  const pending = JSON.parse(props.getProperty(pKey) || "[]");
+  if (pending.length > 0) {
+    pending.forEach(function(link, idx) {
+      if (idx < 6) {
+        sheet.getRange(rowNum, 6 + idx).setValue(link); // F=6, G=7 ... K=11
+      }
+    });
+    props.deleteProperty(pKey);
+  }
+
   const bg = seqId % 2 === 0 ? "#EBF3FB" : "#FFFFFF";
-  sheet.getRange(rowNum, 1, 1, 5).setBackground(bg);
+  sheet.getRange(rowNum, 1, 1, 11).setBackground(bg); // A–K
 
   return json({ status: "ok", message: "Row added", row: seqId });
 }
+
+// ============================================================
+// ACTION: ADD_PHOTO — ảnh Telegram → Google Drive → link vào cột F–K
+// Payload: { action, user_id, tg_url, date }
+// Cột F=6, G=7, H=8, I=9, J=10, K=11 (tối đa 6 ảnh)
+// ============================================================
+function handleAddPhoto(sheet, body) {
+  const userId = String(body.user_id || "").trim();
+  const tgUrl  = body.tg_url || "";
+  if (!userId || !tgUrl) {
+    return json({ status: "error", message: "Missing user_id or tg_url" });
+  }
+
+  // 1. Download ảnh từ Telegram
+  let blob;
+  try {
+    blob = UrlFetchApp.fetch(tgUrl, { muteHttpExceptions: true }).getBlob();
+  } catch(e) {
+    return json({ status: "error", message: "Download failed: " + e.message });
+  }
+
+  // 2. Upload lên Google Drive folder 'TNI_Asset_Photos'
+  const folder   = getOrCreatePhotoFolder_();
+  const file     = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const driveLink = "https://drive.google.com/file/d/" + file.getId() + "/view";
+
+  // 3. Tìm dòng gần nhất của user này trong 30 phút
+  const data   = sheet.getDataRange().getValues();
+  const WIN_MS = 30 * 60 * 1000;
+  const nowMs  = new Date().getTime();
+  let attached = false;
+
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (String(data[i][2] || "").trim() !== userId) continue;  // Col C = user_id
+    const rowTime = parseSheetDate_(String(data[i][1] || ""));
+    if (!rowTime || (nowMs - rowTime.getTime()) > WIN_MS) break; // quá cũ
+
+    // Tìm cột ảnh trống (F=col5 → K=col10, index 0-based)
+    for (let c = 5; c <= 10; c++) {
+      if (!data[i][c]) {
+        sheet.getRange(i + 1, c + 1).setValue(driveLink);
+        attached = true;
+        break;
+      }
+    }
+    break;
+  }
+
+  // 4. Nếu chưa có dòng → lưu tạm (chờ text gửi sau)
+  if (!attached) {
+    const props = PropertiesService.getScriptProperties();
+    const key   = "PENDING_PHOTO_" + userId;
+    const arr   = JSON.parse(props.getProperty(key) || "[]");
+    if (arr.length < 6) {
+      arr.push(driveLink);
+      props.setProperty(key, JSON.stringify(arr));
+    }
+  }
+
+  return json({ status: "ok", attached: attached, link: driveLink });
+}
+
+// Tạo hoặc lấy folder 'TNI_Asset_Photos' trên Google Drive
+function getOrCreatePhotoFolder_() {
+  const NAME    = "TNI_Asset_Photos";
+  const folders = DriveApp.getFoldersByName(NAME);
+  return folders.hasNext() ? folders.next() : DriveApp.createFolder(NAME);
+}
+
+// Parse date string "dd/MM/yyyy HH:mm" → Date object
+function parseSheetDate_(str) {
+  const m = str.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+  if (!m) return null;
+  return new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]);
+}
+
 
 // ============================================================
 // ACTION: DONE — fill column D for a specific row
