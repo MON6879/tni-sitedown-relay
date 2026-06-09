@@ -175,11 +175,26 @@ Báo cáo site down → Gửi vào nhóm CONTROL (-5251698940)
 Apps Script trigger 5 phút → fetchTelegramUpdates() (polling getUpdates)
          ↓
 Ghi vào Col A của Sheet: 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow (tab GID=0)
-         ↓
-checkColC() → Col C công thức tự tính per-team → Gửi Tin 1 cho T1/T2/T3/T4 + CONTROL
+         ↓ Col C công thức tự tính
+checkColC() → readColCRaw() → bọc <pre>...monospace...</pre>
+  ├── CONTROL  → Toàn bộ Col C (full)
+  ├── Team 1   → Header + summary T1 + site | T1 |
+  ├── Team 2   → Header + summary T2/T5 + site | T2 | | T5 |
+  ├── Team 3   → Header + summary T3 + site | T3 |
+  └── Team 4   → Header + summary T4 + site | T4 |
          ↓
 checkAwAz() → AW4:AZ8 summary → Gửi Tin 2 cho T1/T2/T3/T4
 ```
+
+### Format Tin 1 (monospace `<pre>`)
+```
+TNI Site down | DG+Solar+BB    Time down *<7day*
+Total Site down: 21, IGT: 4...
+Team 1: Total Site down: 11...
+...
+1: TNI0185 | T1 | 0.36 | MyTel | DG+Solar+BB | Yebyu | Thu Rain Niang | 1 | EAT: ...
+```
+→ Hiển thị dạng bảng monospace xanh trong Telegram (`<pre>` + `parse_mode: HTML`)
 
 ### Bot & Groups
 | Bot Token | Nhóm nhận |
@@ -191,4 +206,17 @@ checkAwAz() → AW4:AZ8 summary → Gửi Tin 2 cho T1/T2/T3/T4
 - **Trigger:** `checkAndSend()` mỗi 5 phút (cài bằng `setupSdTrigger()`)
 - **Polling key:** `SD_LAST_UPDATE_ID` trong PropertiesService
 - **Không dùng webhook** (đã thử nhưng lỗi 302 do Privacy Mode)
+- **Parse mode:** `HTML` (`<pre>` cho monospace xanh)
+
+---
+
+## 🐛 Lịch sử bugs đã fix (09/06/2026 — phần 2)
+
+| Bug | Nguyên nhân | Fix |
+|---|---|---|
+| **Tin 1 quá dài, khó đọc** | Format cũ: 4 dòng/site (số thứ tự, địa chỉ, EAT...) | Đổi sang `<pre>` monospace, mỗi site 1 dòng |
+| **Teams nhận tin của tất cả teams** | Gửi full Col C cho mọi group | Lọc theo `\| T1 \|`, `\| T2 \|`... gửi đúng team |
+| **CONTROL không nhận full** | Chỉ gửi per-team | CONTROL riêng → nhận toàn bộ Col C |
+| **getUpdates rỗng sau testGetUpdatesRaw** | `offset=0` consume updates sớm hơn | Thêm log offset + raw, fix `lastId=0 → offset=0` |
+| **Polling không nhận tin dù bot active** | Privacy Mode BẬT trên Telegram | Tắt qua @BotFather → bot nhận tất cả tin group |
 
