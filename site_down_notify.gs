@@ -219,22 +219,59 @@ function checkColC(sheet) {
 
   Logger.log("[Tin1] 🆕 A1 thay đổi → gửi Col C...");
 
-  // Lấy nguyên nội dung Col C → bọc <pre> → màu xanh monospace
   const colCRaw = readColCRaw(sheet);
   if (!colCRaw) { Logger.log("[Tin1] Col C trống — bỏ qua"); return; }
 
-  const msg = "<pre>" + escHtml(colCRaw) + "</pre>";
+  const lines = colCRaw.split("\n");
 
-  // Gửi tất cả groups
-  const allGroups = ["T1", "T2", "T3", "T4", "CONTROL"];
-  for (const key of allGroups) {
-    const chatId = SD_GROUPS[key];
-    if (chatId) sendTelegram(chatId, msg, "[Tin1][" + key + "]");
+  // ① CONTROL: nhận TOÀN BỘ Col C
+  const controlId = SD_GROUPS["CONTROL"];
+  if (controlId) {
+    sendTelegram(controlId, "<pre>" + escHtml(colCRaw) + "</pre>", "[Tin1][CONTROL]");
+  }
+
+  // ② Mỗi Team: header chung + summary team đó + site của team đó
+  const sitePattern = {
+    T1: /\|\s*T1\s*\|/i,
+    T2: /\|\s*T[25]\s*\|/i,   // T2 + T5 gộp
+    T3: /\|\s*T3\s*\|/i,
+    T4: /\|\s*T4\s*\|/i,
+  };
+  const summaryPattern = {
+    T1: /^Team\s*1\s*:/i,
+    T2: /^Team\s*[25]\s*:/i,
+    T3: /^Team\s*3\s*:/i,
+    T4: /^Team\s*4\s*:/i,
+  };
+
+  for (const team of ["T1", "T2", "T3", "T4"]) {
+    const chatId = SD_GROUPS[team];
+    if (!chatId) continue;
+
+    // Lấy header chung (không phải site, không phải "Team X:" của team khác)
+    const headerLines = lines.filter(line => {
+      if (!line.trim()) return false;
+      if (/^\d+:/.test(line)) return false;                     // site line → bỏ
+      if (/^Team\s*\d+\s*:/i.test(line)) {
+        return summaryPattern[team].test(line);                  // chỉ giữ summary của team này
+      }
+      return true;                                               // header chung → giữ
+    });
+
+    // Lấy site lines của team này
+    const siteLines = lines.filter(line => sitePattern[team].test(line));
+
+    const teamContent = siteLines.length > 0
+      ? [...headerLines, "...", ...siteLines].join("\n")
+      : [...headerLines, "Không có site down"].join("\n");
+
+    sendTelegram(chatId, "<pre>" + escHtml(teamContent) + "</pre>", "[Tin1][" + team + "]");
   }
 
   props.setProperty(TS_KEY_A1, raw);
   Logger.log("[Tin1] ✅ Xong");
 }
+
 
 
 
