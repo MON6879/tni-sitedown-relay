@@ -178,12 +178,20 @@ function handleAddPhoto(sheet, body) {
   return json({ status: "ok", attached: attached, link: driveLink });
 }
 
-// Tạo hoặc lấy folder 'TNI_Asset_Photos' trên Google Drive
+// Tạo hoặc lấy folder '2.2 TNIASSET TELEGRAM' bên trong '1 VCM BRANCH TNI'
 function getOrCreatePhotoFolder_() {
-  const NAME    = "TNI_Asset_Photos";
-  const folders = DriveApp.getFoldersByName(NAME);
-  return folders.hasNext() ? folders.next() : DriveApp.createFolder(NAME);
+  const PARENT_NAME = "1 VCM BRANCH TNI";
+  const CHILD_NAME  = "2.2 TNIASSET TELEGRAM";
+
+  // Tìm folder cha
+  const parents = DriveApp.getFoldersByName(PARENT_NAME);
+  const parent  = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+
+  // Tìm hoặc tạo folder con bên trong
+  const children = parent.getFoldersByName(CHILD_NAME);
+  return children.hasNext() ? children.next() : parent.createFolder(CHILD_NAME);
 }
+
 
 // Parse date string "dd/MM/yyyy HH:mm" → Date object
 function parseSheetDate_(str) {
