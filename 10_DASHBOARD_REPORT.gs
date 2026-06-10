@@ -18,10 +18,11 @@ const DR_CFG_TAB    = "Config";
 const DR_SEARCH_LOG = "Search Log";
 const DR_TZ         = "Asia/Rangoon";
 
-// ─── MENU ─────────────────────────────────────────────────────
-function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu("📊 Dashboard")
+// ─── MENU — gọi từ onOpen() chung trong apps_script_collector.js ────────────
+// ⚠️ KHÔNG để function onOpen() ở đây — sẽ bị trùng với apps_script_collector.js
+// Các menu item được đăng ký trong hàm onOpen() của apps_script_collector.js
+function drRegisterMenu_(ui) {
+  ui.createMenu("📊 Dashboard")
     .addItem("▶ BƯỚC 1: Tạo bảng dữ liệu (~30s)",  "drStep1_BuildTables")
     .addItem("▶ BƯỚC 2: Vẽ biểu đồ (~60s)",        "drStep2_BuildCharts")
     .addSeparator()
@@ -185,7 +186,12 @@ function drGatherData(ss) {
       const s=assetStats[team][at]; s.total++; if(doneV) s.done++;
       let rd=null;
       if (r[1] instanceof Date) rd=r[1];
-      else if (r[1]) { const p=r[1].toString().split("/"); if(p.length===3) rd=new Date(+p[2],+p[1]-1,+p[0]); }
+      else if (r[1]) {
+        // Tách date từ "DD/MM/YYYY HH:MM" (collector lưu cả giờ)
+        const dateStr = r[1].toString().split(' ')[0];
+        const p = dateStr.split('/');
+        if (p.length === 3) rd = new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+      }
       if (!rd) continue;
       const ds=Utilities.formatDate(rd,DR_TZ,"dd/MM/yyyy"), df=todayMs-rd.getTime();
       if(ds===todayStr)  s.d0++;   if(ds===d1Str)   s.d1++;  if(ds===d2Str) s.d2++;

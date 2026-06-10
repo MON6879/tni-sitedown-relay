@@ -28,7 +28,7 @@ COMMAND        = "/down_tni@auto_nocpro_bot"
 TARGET_CHAT_ID = -5251698940                               # 5 TNI TECHNICA DEP CONTROL SITE
 
 BOT_USERNAME   = "auto_nocpro_bot"                        # bot phản hồi trong Botlookup
-WAIT_REPLY_SEC = 20                                        # chờ bot phản hồi (giây)
+WAIT_REPLY_SEC = 35                                        # chờ bot phản hồi (giây) — tăng từ 20s → 35s
 
 # Khung giờ hoạt động (giờ Myanmar UTC+6:30)
 ACTIVE_START   = (4, 30)    # 04:30
@@ -129,7 +129,13 @@ async def main():
                 print(f"[{myanmar_now()}] ✅ Tìm thấy tin nhắn từ @{BOT_USERNAME} ({len(msg.message)} ký tự)")
 
         if not bot_messages:
-            print(f"[{myanmar_now()}] ⚠️  Không tìm thấy phản hồi từ @{BOT_USERNAME}. Kết thúc.")
+            err_msg = (
+                f"⚠️ [{myanmar_now()}] Botlookup relay chạy nhưng không lấy được dữ liệu từ @{BOT_USERNAME}\n"
+                f"(Bot không phản hồi trong {WAIT_REPLY_SEC}s — có thể bot đang bận hoặc đã gửi rồi)"
+            )
+            print(f"[{myanmar_now()}] {err_msg}")
+            # Gửi thông báo lỗi vào CONTROL để user biết relay đang chạy
+            await client.send_message(TARGET_CHAT_ID, err_msg)
             return
 
         # ── 9. Gửi sang nhóm CONTROL ─────────────────────────────
