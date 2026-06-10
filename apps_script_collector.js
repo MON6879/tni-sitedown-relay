@@ -36,6 +36,9 @@ function doPost(e) {
     const ss    = SpreadsheetApp.openById(SHEET_ID);
     const sheet = getDataSheet(ss);
 
+    // Route Telegram webhook format (site down bot) → doPostSiteDown
+    if (body.message || body.channel_post) return doPostSiteDown(e);
+
     if (body.action === "add")              return handleAdd(sheet, body);
     if (body.action === "done")             return handleDone(sheet, ss, body);
     if (body.action === "find")             return handleFind(sheet, body);

@@ -127,7 +127,7 @@ function fetchTelegramUpdates(sheet) {
 // ============================================================
 // doPost — Giữ lại để tương thích nếu webhook hoạt động sau này
 // ============================================================
-function doPost(e) {
+function doPostSiteDown(e) {
   try {
     const update = JSON.parse(e.postData.contents);
     const msg    = update.message || update.channel_post;
@@ -141,7 +141,7 @@ function doPost(e) {
     if (sheet) { writeToColumnA(sheet, text); SpreadsheetApp.flush(); Utilities.sleep(3000); checkAndSend(); }
     return okJson({ status: "ok" });
   } catch (err) {
-    Logger.log("❌ doPost error: " + err.message);
+    Logger.log("\u274c doPost error: " + err.message);
     return okJson({ status: "error", message: err.message });
   }
 }
