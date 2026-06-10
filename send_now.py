@@ -337,15 +337,14 @@ async def main():
             f"  Quản lý:    ✅{mg_ok}  | ❌{mg_fail}  | ⚠️{mg_skip} không có ID"
         )
 
-        # ── 4. Gửi thống kê Asset đến Config col C ──
-        logger.info("--- Gửi thống kê Asset ---")
+        # ── 4. Gửi thống kê Asset đến Technical Dept (rows 75-87) ──
+        logger.info("--- Gửi thống kê Asset → Technical Dept (rows 75-87) ---")
         asset_data = get_asset_stats()
         if asset_data.get("actionTypes"):
             action_types = asset_data.get("actionTypes", [])
             teams        = asset_data.get("teams", [])
             stats        = asset_data.get("stats", {})
             grand        = asset_data.get("grandTotal", {})
-            recipients   = asset_data.get("recipients", [])
 
             TEAM_SHORT = {
                 "MYT_TNI_TEAM01_Dawei":      "Team1(Dawei)",
@@ -355,7 +354,6 @@ async def main():
             }
 
             def fmt_stat(s):
-                """Format: Total T | Today:X/Y/Z/W/M (Done:a/b/c/d/e)"""
                 return (
                     f"T:{s.get('total',0)} Done:{s.get('done',0)} | "
                     f"Day:{s.get('d0',0)}/{s.get('d1',0)}/{s.get('d2',0)} "
@@ -385,12 +383,19 @@ async def main():
 
             asset_msg = "\n".join(lines)
 
-            # Dùng bot 2.1 TNI DEP REPORT DAILY để gửi Asset stats
+            # Lấy chat_ids Technical Dept từ rows 75-87 col E (giống get_custom_messages)
+            tech_dept_ids = list({
+                item["chat_id"] for item in get_custom_messages()
+                if item.get("chat_id")
+            })
+            logger.info(f"  Technical Dept IDs: {tech_dept_ids}")
+
+            # Gửi qua TECHNICAL_DEP_BOT (@TNITECHINICALDEPREPORT_BOT)
             asset_ok = asset_fail = 0
-            if TECHNICAL_DEP_TOKEN:
+            if TECHNICAL_DEP_TOKEN and tech_dept_ids:
                 dep_bot = Bot(token=TECHNICAL_DEP_TOKEN, request=trequest)
                 await dep_bot.initialize()
-                for rcpt_id in recipients:
+                for rcpt_id in tech_dept_ids:
                     try:
                         await dep_bot.send_message(chat_id=rcpt_id, text=asset_msg)
                         logger.info(f"✅ Asset(DEP_BOT) → {rcpt_id}")
@@ -401,16 +406,7 @@ async def main():
                     await asyncio.sleep(0.3)
                 await dep_bot.shutdown()
             else:
-                logger.warning("⚠️ Không có TECHNICAL_DEP_BOT_TOKEN — dùng SEND_BOT_TOKEN thay thế")
-                for rcpt_id in recipients:
-                    try:
-                        await bot.send_message(chat_id=rcpt_id, text=asset_msg)
-                        logger.info(f"✅ Asset(fallback) → {rcpt_id}")
-                        asset_ok += 1
-                    except TelegramError as e:
-                        logger.error(f"❌ Asset(fallback) → {rcpt_id}: {e}")
-                        asset_fail += 1
-                    await asyncio.sleep(0.3)
+                logger.warning("⚠️ Không có TECHNICAL_DEP_BOT_TOKEN hoặc không có Technical Dept IDs")
 
             logger.info(f"  Asset stats: ✅{asset_ok} | ❌{asset_fail}")
         else:
