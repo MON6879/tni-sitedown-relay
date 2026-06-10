@@ -34,8 +34,8 @@ WAIT_REPLY_SEC = 35
 ACTIVE_START   = (4, 30)
 ACTIVE_END     = (21, 30)
 
-MIN_DELAY_SEC  = 3  * 60   # 3 phút
-MAX_DELAY_SEC  = 12 * 60   # 12 phút — ngẫu nhiên trong 30p
+MIN_DELAY_SEC  = 3  * 60   # 3 phút  (tối thiểu)
+MAX_DELAY_SEC  = 8  * 60   # 8 phút  (tối đa) — setup~4p + 8p = 12p, an toàn trong timeout 28p
 SKIP_DELAY     = os.environ.get("SKIP_DELAY", "0") == "1"
 # ──────────────────────────────────────────────────────────────────
 
