@@ -142,39 +142,17 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 9. POST raw text → Apps Script → ghi vào SD Sheet (im lặng) ──
-        # site_down_notify.gs trigger 5p sẽ đọc Col A và phân phối đến teams
-        APPS_SCRIPT_URL = os.environ.get("APPS_SCRIPT_URL", "")
-        raw_text = "\n".join(bot_messages)
-
-        if APPS_SCRIPT_URL:
-            try:
-                resp = requests.post(
-                    APPS_SCRIPT_URL,
-                    json={"action": "store_site_down", "raw_text": raw_text},
-                    timeout=60,
-                    allow_redirects=True,
-                )
-                result = resp.json() if resp.ok else {"status": "http_error", "code": resp.status_code}
-                if result.get("status") == "ok":
-                    print(f"[{myanmar_now()}] ✅ Đã ghi {result.get('lines','?')} dòng vào SD Sheet")
-                else:
-                    print(f"[{myanmar_now()}] ⚠️ store_site_down: {result}")
-                    # Fallback: gửi CONTROL nếu lỗi
-                    await client.send_message(TARGET_CHAT_ID,
-                        f"⚠️ store_site_down lỗi — fallback gửi raw\n{raw_text[:2000]}")
-            except Exception as post_err:
-                print(f"[{myanmar_now()}] ❌ POST lỗi: {post_err}")
-                await client.send_message(TARGET_CHAT_ID,
-                    f"❌ Relay lỗi POST: {post_err}")
+        # ── 9. Relay chỉ TRIGGER lệnh — không gửi gì thêm ──────────
+        # Company bot tự gửi formatted report (có | T1 |, | T2 |...) sang CONTROL
+        # site_down_notify.gs polling CONTROL mỗi 5p → ghi Col A → gửi đúng team
+        # KHÔNG gửi raw data vào CONTROL (sẽ overwrite correct formatted data)
+        if bot_messages:
+            total_chars = sum(len(m) for m in bot_messages)
+            print(f"[{myanmar_now()}] ✅ Bot đã phản hồi ({len(bot_messages)} phần, {total_chars} ký tự)")
+            print(f"[{myanmar_now()}] 🎉 Trigger xong! Company bot sẽ gửi formatted report sang CONTROL.")
+            print(f"[{myanmar_now()}] ⏳ site_down_notify.gs sẽ xử lý trong vòng 5 phút tiếp theo.")
         else:
-            print(f"[{myanmar_now()}] ⚠️ APPS_SCRIPT_URL chưa set — gửi CONTROL trực tiếp")
-            chunks = split_message(f"📊 Dữ liệu TNI — {myanmar_now()}\n{'─'*30}\n\n{raw_text}", 4000)
-            for chunk in chunks:
-                await client.send_message(TARGET_CHAT_ID, chunk)
-                await asyncio.sleep(0.5)
-
-        print(f"[{myanmar_now()}] 🎉 Hoàn thành!")
+            print(f"[{myanmar_now()}] ⚠️ Bot không phản hồi — có thể company bot chưa sẵn sàng.")
 
 
 if __name__ == "__main__":
