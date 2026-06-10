@@ -1130,8 +1130,20 @@ function handleGetAssetStats(ss) {
       const actionType = content.split(':')[0].trim();
       if (!actionTypes.includes(actionType)) continue;
 
-      const team = idToTeam[chatId] || null;
-      if (!team) continue;
+      let team = idToTeam[chatId] || null;
+
+      // Fallback: nếu không tìm được team từ chat_id (VD: BOD gửi hộ),
+      // thử parse team từ nội dung tin nhắn
+      if (!team) {
+        const c = content.toLowerCase();
+        if      (/\bteam\s*0?1\b|t\s*0?1\b|dawei/i.test(content))     team = 'MYT_TNI_TEAM01_Dawei';
+        else if (/\bteam\s*0?2\b|t\s*0?2\b|myeik|sub\s*team\s*2/i.test(content)) team = 'MYT_TNI_TEAM02_Myeik';
+        else if (/\bteam\s*0?3\b|t\s*0?3\b|bokpyin/i.test(content))   team = 'MYT_TNI_TEAM03_Bokpyin';
+        else if (/\bteam\s*0?4\b|t\s*0?4\b|kawthoung/i.test(content)) team = 'MYT_TNI_TEAM04_Kawthoung';
+        else if (/\bteam\s*0?5\b|t\s*0?5\b/i.test(content))           team = 'MYT_TNI_TEAM02_Myeik'; // T5 gộp với T2
+      }
+
+      if (!team) continue;  // vẫn không xác định được team → bỏ qua
 
       // Parse ngày
       let rowDate = null;
