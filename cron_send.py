@@ -119,16 +119,16 @@ def build_asset_msg(now_str, asset_data):
     }
 
     def fmt(s):
-        """Total/<code>Done</code> — done highlighted xanh (Telegram code tag)"""
-        return f"{s.get('total',0)}/<code>{s.get('done',0)}</code>"
+        """Total /Done — space trước / để Telegram tự highlight xanh"""
+        return f"{s.get('total',0)} /{s.get('done',0)}"
 
     def fmt_period(s):
         return (
-            f"3Day: {s.get('d2',0)}/{s.get('done_d2',0)}"
-            f" | {s.get('d1',0)}/{s.get('done_d1',0)}"
-            f" | {s.get('d0',0)}/{s.get('done_d0',0)}"
-            f"  7Day: {s.get('d6',0)}/{s.get('done_d6',0)}"
-            f"  Month: {s.get('d15',0)}/{s.get('done_d15',0)}"
+            f"3Day: {s.get('d2',0)} /{s.get('done_d2',0)}"
+            f" | {s.get('d1',0)} /{s.get('done_d1',0)}"
+            f" | {s.get('d0',0)} /{s.get('done_d0',0)}"
+            f"  7Day: {s.get('d6',0)} /{s.get('done_d6',0)}"
+            f"  Month: {s.get('d15',0)} /{s.get('done_d15',0)}"
         )
 
     PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15"]
@@ -573,10 +573,10 @@ async def main():
         for tl in team_leader_content:
             short = tl["content"][:600] + "..." if len(tl["content"]) > 600 else tl["content"]
             mgmt_parts.append(f"\n🏷️ {tl['team']}:\n{short}")
-    # Technical Dept Tasks KHÔNG đưa vào mgmt_report
-    # → sẽ gửi riêng đến rows 75-87 (2.1 TNI DEP REPORT DAILY) bên dưới
-    # asset_msg KHÔNG đưa vào mgmt_report (plain text)
-    # → gửi RIÊNG với parse_mode=HTML để tô màu xanh số Done
+    # asset_msg gửi KÈM với mgmt_report (plain text, không cần parse_mode)
+    if asset_msg:
+        mgmt_parts.append("━" * 20)
+        mgmt_parts.append(asset_msg)
     mgmt_report = "\n".join(mgmt_parts)
 
     # Chat ID nhóm "5 TNI TECHNICA DEP CONTROL SITE"
