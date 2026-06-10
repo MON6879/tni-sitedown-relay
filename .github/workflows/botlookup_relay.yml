@@ -17,7 +17,7 @@ on:
 jobs:
   relay:
     runs-on: ubuntu-latest
-    timeout-minutes: 50    # delay 3-21p + reply 35s + gửi + chờ 15p read = tối đa ~37p
+    timeout-minutes: 15    # delay 1-5p + reply 35s + gửi = tối đa ~8p
 
     steps:
       - name: Checkout code

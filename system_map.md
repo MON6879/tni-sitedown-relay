@@ -34,6 +34,14 @@
 | 70+ | Departments... | Finance/M&E/PM... | — | — | — |
 | **75-87** | **Technical Dept** | Department names | Nội dung từ Input task | **Telegram ID** | `@TNITECHINICALDEPREPORT_BOT` |
 
+### Cá nhân nhận báo cáo DM trực tiếp (site_down_notify.gs)
+
+| Người | Telegram | Chat ID cá nhân | Nhận gì |
+|---|---|---|---|
+| **TNI** (Ha Duc Phong) | @Phongha79 | `6859790680` | Tin1 + Tin2 FULL (giống CONTROL) — qua DM cá nhân |
+
+> **Ghi chú**: `SD_PERSONAL_IDS` trong `site_down_notify.gs` — danh sách Chat ID nhận DM cá nhân, độc lập với group. Thêm/xóa người ở đây để điều chỉnh.
+
 ### Row 60-74 (Management) nhận:
 1. 📦 Asset stats (Order/Revoke/Export... per team) + 3Day/7Day/Month
 2. 🔍 Search stats per team + 3Day/7Day/Month  
@@ -230,7 +238,7 @@ Team 1: Total Site down: 11...
 
 | Thay đổi | Chi tiết |
 |---|---|
-| **botlookup_relay.py delay: 1–25p → 3–21p** | `MIN_DELAY_SEC = 3*60`, `MAX_DELAY_SEC = 21*60` — khoảng delay hẹp hơn, phân bố đều hơn trong 30p |
+| **botlookup_relay.py delay: 3–21p → 1–5p** | `MIN_DELAY_SEC = 1*60`, `MAX_DELAY_SEC = 5*60` — delay ngắn hơn vì công ty đã update TRƯỚC trigger, không cần đợi lâu. Timeout workflow: 50p → 15p |
 
 ---
 

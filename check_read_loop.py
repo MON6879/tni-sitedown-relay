@@ -70,7 +70,8 @@ async def build_status_text(client, entity, team_name, my_msgs, updated_at, team
                 peer   = entity,
                 msg_id = msg.id
             ))
-            reader_ids = {u.id for u in readers}
+            # ReadParticipantDate chỉ có .user_id và .date — không có first_name
+            reader_ids = {u.user_id for u in readers}
 
             # Lọc theo team members (không tính CONTROL)
             read_members   = [u for uid, u in member_map.items() if uid in reader_ids]

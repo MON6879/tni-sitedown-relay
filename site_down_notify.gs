@@ -22,6 +22,12 @@ const SD_GROUPS = {
   CONTROL: "-5251698940",   // TNI TECHNICA DEP CONTROL SITE
 };
 
+// ── Cá nhân nhận báo cáo tổng hợp (DM trực tiếp) ────────────
+// TNI = Ha Duc Phong _070756_TNI (@Phongha79)
+const SD_PERSONAL_IDS = [
+  "6859790680",   // TNI (Ha Duc Phong) — nhận FULL báo cáo giống CONTROL
+];
+
 // ── Sheet ────────────────────────────────────────────────────
 const SD_SHEET_ID  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
 const SD_SHEET_GID = "0";
@@ -271,6 +277,8 @@ function checkColC(sheet) {
     sendTelegram(chatId, "<pre>" + escHtml(coloredContent) + "</pre>", "[Tin1][" + team + "]");
   }
 
+  // ③ TNI cá nhân → KHÔNG nhận Tin1 (site list), chỉ nhận Tin2 (summary)
+
   props.setProperty(TS_KEY_A1, raw);
   Logger.log("[Tin1] ✅ Xong");
 }
@@ -312,6 +320,17 @@ function checkAwAz(sheet) {
     } catch(e) {
       Logger.log("[Tin2][CONTROL] ❌ Lỗi: " + e.message);
     }
+  }
+
+  // Gửi Tin 2 cho cá nhân (TNI) — giống CONTROL, nhận qua DM
+  for (const pid of SD_PERSONAL_IDS) {
+    try {
+      const msgPersonal = buildAwAzControlMessage(ts, awaz);
+      sendTelegram(pid, msgPersonal, "[Tin2][TNI]");
+    } catch(e) {
+      Logger.log("[Tin2][TNI] ❌ Lỗi: " + e.message);
+    }
+    Utilities.sleep(300);
   }
 
   props.setProperty(TS_KEY_AW4, ts);

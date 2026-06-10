@@ -34,8 +34,8 @@ WAIT_REPLY_SEC = 35
 ACTIVE_START   = (4, 30)
 ACTIVE_END     = (21, 30)
 
-MIN_DELAY_SEC  = 3  * 60
-MAX_DELAY_SEC  = 21 * 60
+MIN_DELAY_SEC  = 1  * 60   # 1 phút — công ty đã update trước trigger, không cần đợi lâu
+MAX_DELAY_SEC  = 5  * 60   # 5 phút — đủ để tránh gửi trùng nếu nhiều instance
 SKIP_DELAY     = os.environ.get("SKIP_DELAY", "0") == "1"
 # ──────────────────────────────────────────────────────────────────
 
