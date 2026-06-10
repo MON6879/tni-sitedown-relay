@@ -34,8 +34,8 @@ WAIT_REPLY_SEC = 35
 ACTIVE_START   = (4, 30)
 ACTIVE_END     = (21, 30)
 
-MIN_DELAY_SEC  = 3  * 60   # 3 phút — đợi ít nhất sau khi công ty vừa update
-MAX_DELAY_SEC  = 21 * 60   # 21 phút — ngẫu nhiên trong 30p để trông tự nhiên
+MIN_DELAY_SEC  = 3  * 60   # 3 phút
+MAX_DELAY_SEC  = 12 * 60   # 12 phút — ngẫu nhiên trong 30p
 SKIP_DELAY     = os.environ.get("SKIP_DELAY", "0") == "1"
 # ──────────────────────────────────────────────────────────────────
 
