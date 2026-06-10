@@ -1525,3 +1525,11 @@ function authorizeNow() {
   UrlFetchApp.fetch('https://api.telegram.org');
   SpreadsheetApp.getUi().alert('✅ Cấp quyền thành công!');
 }
+
+// ════════════════════════════════════════════════════════════
+// ALIAS — Trigger cũ "relayBotlookupToTNI" (mỗi 30 phút)
+// Gọi checkAndSend() trong site_down_notify.gs
+// ════════════════════════════════════════════════════════════
+function relayBotlookupToTNI() {
+  checkAndSend();
+}
