@@ -119,8 +119,8 @@ def build_asset_msg(now_str, asset_data):
     }
 
     def fmt(s):
-        """Total/<b>Done</b> — done in bold blue for HTML parse_mode"""
-        return f"{s.get('total',0)}/<b>{s.get('done',0)}</b>"
+        """Total/<code>Done</code> — done highlighted xanh (Telegram code tag)"""
+        return f"{s.get('total',0)}/<code>{s.get('done',0)}</code>"
 
     def fmt_period(s):
         return (
