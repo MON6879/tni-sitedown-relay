@@ -57,15 +57,61 @@ function doPost(e) {
 
 function doGet(e) {
   try {
+    const action = (e && e.parameter && e.parameter.action) || "";
+
+    // ── Site Down data endpoint (cho Python Telethon sender) ──
+    if (action === "get_site_down_data") return getSiteDownData();
+
+    // ── Default: status check ─────────────────────────────────
     const ss = SpreadsheetApp.openById(SHEET_ID);
-    getDataSheet(ss);           // ensure data tab exists
-    setupConfigHeaders(ss);     // ensure Config has B & C headers
+    getDataSheet(ss);
+    setupConfigHeaders(ss);
     const ids = getAllowedIds(ss);
     return json({ status: "ok", message: "TNI Collector running", allowed: ids.size });
   } catch (err) {
     return json({ status: "error", message: err.message });
   }
 }
+
+// ============================================================
+// GET_SITE_DOWN_DATA — đọc Sheet site down, trả JSON cho Python
+// Sheet: 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow (GID=0)
+// ============================================================
+function getSiteDownData() {
+  try {
+    const SD_SHEET_ID  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
+    const SD_SHEET_GID = "0";
+
+    const ss = SpreadsheetApp.openById(SD_SHEET_ID);
+    let sheet = null;
+    for (const s of ss.getSheets()) {
+      if (s.getSheetId().toString() === SD_SHEET_GID) { sheet = s; break; }
+    }
+    if (!sheet) return json({ status: "error", message: "Sheet not found" });
+
+    // A1: timestamp/nội dung báo cáo mới nhất
+    const a1 = sheet.getRange("A1").getValue().toString().trim();
+
+    // Col C: toàn bộ dữ liệu đã tính bằng formula
+    const lastRow = sheet.getLastRow();
+    const colC = lastRow > 0
+      ? sheet.getRange(1, 3, lastRow, 1).getValues().flat()
+              .map(c => (c || "").toString().trim())
+              .filter(c => c.length > 0)
+      : [];
+
+    // AW4:AZ8 (5 rows × 4 cols) — summary per team
+    const awaz = sheet.getRange(4, 49, 5, 4).getValues();
+
+    // AW4 timestamp
+    const aw4 = sheet.getRange("AW4").getValue().toString().trim();
+
+    return json({ status: "ok", a1, colC, awaz, aw4 });
+  } catch (err) {
+    return json({ status: "error", message: err.message });
+  }
+}
+
 
 // ============================================================
 // ACTION: ADD — write new row to data sheet
