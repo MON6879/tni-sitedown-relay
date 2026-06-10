@@ -518,58 +518,56 @@ async def main():
         if not cid or cid == "-" or not cid.lstrip("-").isdigit():
             continue
 
-        all_rows.append((sheet_row, content, cid, col_c))
+        all_rows.append((sheet_row, content, cid, col_c, safe(row, COL_A)))
 
-    # ── 3. Get asset stats for management report ──
+    # ── 3. Get asset stats ──
     asset_data = get_asset_stats()
     asset_msg = build_asset_msg(now_str, asset_data)
 
-    # ── 4. Get search stats for summaries ──
+    # ── 4. Get search/report stats ──
     report_data = get_report_data()
     search_msg = build_search_summary(now_str, report_data)
-
-    # ── 5. Build management report ──
-    mgmt_parts = [f"📊 Báo cáo tổng hợp – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
-
-    # Asset stats
-    if asset_msg:
-        mgmt_parts.append(asset_msg)
-        mgmt_parts.append("━━━━━━━━━━━━━━━━━━━━")
-
-    # Search stats
-    if search_msg:
-        mgmt_parts.append(search_msg)
-        mgmt_parts.append("━━━━━━━━━━━━━━━━━━━━")
-
-    # Team leader reports (dùng format mới nếu có month_days, fallback content)
     month_days = report_data.get("month_days", 0)
     leaders_data = report_data.get("leaders", [])
+
+    # ── 5. Fetch Input Task summary ──
+    input_task_summary = get_input_task_summary()
+    logger.info("Input task summary: OK" if input_task_summary else "Input task summary: empty")
+
+    # ── 5.5 Team→employees mapping (dùng khi gửi riêng lẻ cho TL) ──
+    TEAM_BY_NUMBER = {
+        1: "MYT_TNI_TEAM01_Dawei",
+        2: "MYT_TNI_TEAM02_Myeik",
+        3: "MYT_TNI_TEAM03_Bokpyin",
+        4: "MYT_TNI_TEAM04_Kawthoung",
+    }
+    team_to_employees: dict = {}
+    for _e in report_data.get("employees", []):
+        team_to_employees.setdefault(_e.get("team", ""), []).append(_e)
+
+    # ── 6. Build management report: TL summaries + Technical Dept only ──
+    # BOD/Manager chỉ nhận TL Reports + Technical Dept
+    mgmt_parts = [f"📊 Báo cáo tổng hợp – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
     if leaders_data:
         mgmt_parts.append("👑 Team Leader Reports:")
         for ld in leaders_data:
             if month_days:
                 ld_text = format_leader_report(ld, now_str, month_days)
             else:
-                # Fallback: dùng content cột D gốc, truncate
                 raw = (ld.get("content") or "").strip()
                 ld_text = raw[:600] + "..." if len(raw) > 600 else raw
             if ld_text:
                 mgmt_parts.append(f"\n🏷️ {ld.get('team','')}:\n{ld_text}")
     elif team_leader_content:
-        # Fallback khi không có report_data
         mgmt_parts.append("👑 Team Leader Reports:")
         for tl in team_leader_content:
             short = tl["content"][:600] + "..." if len(tl["content"]) > 600 else tl["content"]
             mgmt_parts.append(f"\n🏷️ {tl['team']}:\n{short}")
-
-    mgmt_report = "\n".join(mgmt_parts)
-
-    # ── 6. Fetch Input Task summary (for Technical Dept header) ──
-    input_task_summary = get_input_task_summary()
     if input_task_summary:
-        logger.info("Input task summary: OK")
-    else:
-        logger.warning("Input task summary: empty or failed")
+        mgmt_parts.append("━━━━━━━━━━━━━━━━━━━━")
+        mgmt_parts.append("🔧 Technical Dept Tasks:")
+        mgmt_parts.append(input_task_summary)
+    mgmt_report = "\n".join(mgmt_parts)
 
     # ── 7. Send messages ──
     ok = fail = 0
@@ -577,7 +575,7 @@ async def main():
     # Group by bot token
     groups = {}  # token -> [(sheet_row, message, cid, label)]
 
-    for sheet_row, content, cid, col_c in all_rows:
+    for sheet_row, content, cid, col_c, col_a_val in all_rows:
         # Determine bot token
         # NOTE: Rows 4-32 (nhân viên) dùng SEND_BOT vì nhân viên đã start SEND_BOT,
         #       không phải @TNIREPORTTASK. Dùng cùng bot với gửi thủ công.
@@ -629,12 +627,40 @@ async def main():
                 continue
             msg = "\n".join(parts)
 
+        elif col_c and "team leader" in col_c.lower() and 33 <= sheet_row <= 59:
+            # ── Team Leader rows: gửi TL report + từng NV riêng lẻ ──
+            m_tl = re.search(r'team\s*leader\s*(\d+)', col_c, re.IGNORECASE)
+            tl_num = int(m_tl.group(1)) if m_tl else 0
+            tl_team = TEAM_BY_NUMBER.get(tl_num, col_a_val)
+
+            ld_match = next(
+                (ld for ld in leaders_data if ld.get("team", "") == tl_team), None
+            )
+            if ld_match and month_days:
+                tl_body = format_leader_report(ld_match, now_str, month_days)
+            elif content:
+                tl_body = content
+            else:
+                continue
+
+            # Gửi báo cáo TL của chính TL
+            tl_msg = f"Team Leader Report – {now_str}\n{'━'*20}\n{tl_body}\n{'━'*20}"
+            groups.setdefault(token, []).append(
+                (sheet_row, tl_msg, cid, f"{bot_label}-TL")
+            )
+
+            # Gửi từng NV trong đội cho TL riêng lẻ (không gộp)
+            for _emp in team_to_employees.get(tl_team, []):
+                _emp_text = format_employee_report(_emp, now_str, month_days) if month_days else ""
+                if _emp_text:
+                    _emp_msg = f"[{_emp.get('name', '')}]\n{'━'*20}\n{_emp_text}"
+                    groups.setdefault(token, []).append(
+                        (sheet_row, _emp_msg, cid, f"{bot_label}-emp")
+                    )
+            continue  # bỏ qua groups.append cuối vòng lặp
+
         elif content:
-            # Normal rows (nhân viên rows 4-32):
-            # Nếu có dữ liệu từ report_data.employees → dùng format mới
-            # Nếu không → fallback sang content cột D thô
-            month_days = report_data.get("month_days", 0)
-            employees_data = {e["name"]: e for e in report_data.get("employees", [])}
+            # ── Employee rows (4-32) ──
             # Tìm employee match theo chat_id
             emp_match = next(
                 (e for e in report_data.get("employees", []) if e.get("chat_id") == cid),
