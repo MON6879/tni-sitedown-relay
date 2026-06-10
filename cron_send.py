@@ -593,39 +593,16 @@ async def main():
             # Management rows: send compiled report (even if D is empty)
             msg = mgmt_report
         elif 75 <= sheet_row <= 87:
-            # Technical dept:
-            # 1. Input Task summary (theo Dep: Done/Total/Remain) ở đầu
-            # 2. Col D content (đã chèn dòng tổng sau mỗi section header)
-            # 3. Asset/search stats
-            parts = []
-
-            # ── Header cố định ──
-            header_lines = [
-                f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}",
-                "━━━━━━━━━━━━━━━━━━━━",
-            ]
-
-            # ── Input task summary (Admin/Asset/CM... Done/Total/Remain) ──
-            if input_task_summary:
-                header_lines.append(input_task_summary)
-                header_lines.append("━━━━━━━━━━━━━━━━━━━━")
-
-            parts.append("\n".join(header_lines))
-
-            # ── Col D content: chèn dòng tổng ngay sau mỗi section header ──
-            if content:
-                transformed = build_asset_progress_summary(content)
-                parts.append(transformed)
-                parts.append("━━━━━━━━━━━━━━━━━━━━")
-
-            if asset_msg:
-                parts.append(asset_msg)
-            if search_msg:
-                parts.append(search_msg)
-
-            if len(parts) <= 1 and not content:
+            # Technical Dept: gửi RIÊNG từng người (Col C = tên, Col E = Telegram ID)
+            if not content:
                 continue
-            msg = "\n".join(parts)
+            msg = (
+                f"Technical Dept Report – {now_str}\n"
+                f"{'━'*20}\n"
+                f"{content}\n"
+                f"{'━'*20}"
+            )
+
 
         elif col_c and "team leader" in col_c.lower() and 33 <= sheet_row <= 59:
             # ── Team Leader rows: gửi TL report + từng NV riêng lẻ ──

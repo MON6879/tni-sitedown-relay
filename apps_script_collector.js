@@ -1138,8 +1138,12 @@ function handleGetAssetStats(ss) {
       if (rawDate instanceof Date) {
         rowDate = rawDate;
       } else if (rawDate) {
-        const parts = rawDate.toString().split('/');
-        if (parts.length === 3) rowDate = new Date(parts[2], parts[1]-1, parts[0]);
+        // Tách chỉ phần date từ "DD/MM/YYYY HH:MM" (collector lưu cả giờ)
+        const dateStr = rawDate.toString().split(' ')[0]; // "10/06/2026"
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          rowDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        }
       }
 
       const isDone = doneVal.length > 0;
