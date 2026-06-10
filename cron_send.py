@@ -119,7 +119,8 @@ def build_asset_msg(now_str, asset_data):
     }
 
     def fmt(s):
-        return f"{s.get('total',0)}/{s.get('done',0)}"
+        """Total/<b>Done</b> — done in bold blue for HTML parse_mode"""
+        return f"{s.get('total',0)}/<b>{s.get('done',0)}</b>"
 
     def fmt_period(s):
         return (
@@ -442,7 +443,7 @@ def build_summary_header(content: str) -> str:
     return "📊 WO hoàn thành:\n" + "\n".join(lines)
 
 
-async def send_msg(bot, cid, text, label=""):
+async def send_msg(bot, cid, text, label="", parse_mode=None):
     """Send message, handle >4096 char limit.
     Splits by newlines first, then by MAX chars if a single line is too long.
     """
@@ -470,13 +471,20 @@ async def send_msg(bot, cid, text, label=""):
             parts.append(current)
         return parts
 
+    kwargs = {"chat_id": cid, "text": text}
+    if parse_mode:
+        kwargs["parse_mode"] = parse_mode
+
     try:
         if len(text) <= MAX:
-            await bot.send_message(chat_id=cid, text=text)
+            await bot.send_message(**kwargs)
         else:
             for p in chunk_text(text):
                 if p.strip():
-                    await bot.send_message(chat_id=cid, text=p)
+                    kw = {"chat_id": cid, "text": p}
+                    if parse_mode:
+                        kw["parse_mode"] = parse_mode
+                    await bot.send_message(**kw)
                     await asyncio.sleep(0.3)
         logger.info(f"✅ {label} → {cid}")
         return True
@@ -567,13 +575,13 @@ async def main():
             mgmt_parts.append(f"\n🏷️ {tl['team']}:\n{short}")
     # Technical Dept Tasks KHÔNG đưa vào mgmt_report
     # → sẽ gửi riêng đến rows 75-87 (2.1 TNI DEP REPORT DAILY) bên dưới
-    if asset_msg:
-        mgmt_parts.append("━━━━━━━━━━━━━━━━━━━━")
-        mgmt_parts.append(asset_msg)
+    # asset_msg KHÔNG đưa vào mgmt_report (plain text)
+    # → gửi RIÊNG với parse_mode=HTML để tô màu xanh số Done
     mgmt_report = "\n".join(mgmt_parts)
 
     # Chat ID nhóm "5 TNI TECHNICA DEP CONTROL SITE"
     CONTROL_CHAT_ID = "-5251698940"
+    mgmt_cids = []   # sẽ thu thập khi duyệt rows 60-74
 
     # ── 7. Send messages ──
     ok = fail = 0
@@ -598,6 +606,8 @@ async def main():
         if 60 <= sheet_row <= 74:
             # Management rows: send compiled report (even if D is empty)
             msg = mgmt_report
+            if cid and cid not in mgmt_cids:   # thu thập để gửi asset HTML sau
+                mgmt_cids.append(cid)
         elif 75 <= sheet_row <= 87:
             # Technical Dept: gửi RIÊNG từng người (Col C = tên, Col E = Telegram ID)
             if not content:
@@ -695,12 +705,19 @@ async def main():
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
 
-    # ── 8. Gửi asset_msg đến nhóm CONTROL SITE ──
+    # ── 8. Gửi asset_msg (HTML) đến rows 60-74 + CONTROL SITE ──
+    if asset_msg and SEND_BOT_TOKEN:
+        logger.info(f"--- Gửi Asset Stats (HTML) → {len(mgmt_cids)} mgmt CIDs ---")
+        async with Bot(token=SEND_BOT_TOKEN) as asset_bot:
+            for cid in mgmt_cids:
+                await send_msg(asset_bot, cid, asset_msg, "Asset(MGMT)", parse_mode="HTML")
+                await asyncio.sleep(0.4)
+
     if asset_msg and TECHNICAL_DEP_BOT_TOKEN:
-        logger.info("--- Gửi Asset Stats → CONTROL SITE (-5251698940) ---")
+        logger.info("--- Gửi Asset Stats (HTML) → CONTROL SITE (-5251698940) ---")
         try:
             async with Bot(token=TECHNICAL_DEP_BOT_TOKEN) as ctrl_bot:
-                await send_msg(ctrl_bot, CONTROL_CHAT_ID, asset_msg, "CONTROL")
+                await send_msg(ctrl_bot, CONTROL_CHAT_ID, asset_msg, "CONTROL", parse_mode="HTML")
             logger.info("✅ Asset stats → CONTROL SITE")
         except Exception as e:
             logger.error(f"❌ Asset stats → CONTROL SITE: {e}")
