@@ -1,19 +1,20 @@
 """
 botlookup_relay.py
 ==================
-Gửi lệnh /down_tni@auto_nocpro_bot vào nhóm Botlookup,
-đọc phản hồi rồi forward sang nhóm CONTROL (-5251698940).
-
-Báo cáo ai đã đọc: chạy riêng lúc 21:00 Myanmar qua daily_read_report.py
+Gửi lệnh /down_tni@auto_nocpro_bot vào nhóm BOT LOOKUP,
+đọc phản hồi rồi:
+  1. Forward toàn bộ sang nhóm CONTROL (-5251698940)
+  2. Lọc theo team → gửi tin riêng cho từng nhóm T1/T2/T3/T4
 
 Chạy tự động qua GitHub Actions mỗi 30 phút.
 Chỉ hoạt động trong khung giờ 04:30 – 21:30 Myanmar (UTC+6:30).
-Thêm delay ngẫu nhiên 3–21 phút để trông tự nhiên.
+Thêm delay ngẫu nhiên 3–8 phút để trông tự nhiên.
 """
 
 import asyncio
 import os
 import random
+import re
 from datetime import datetime, timezone, timedelta
 
 from telethon import TelegramClient
@@ -26,7 +27,16 @@ SESSION_STRING = os.environ["TELEGRAM_SESSION"]
 
 SOURCE_GROUP   = "Botlookup"
 COMMAND        = "/down_tni@auto_nocpro_bot"
-TARGET_CHAT_ID = -5251698940                 # 5 TNI TECHNICA DEP CONTROL SITE
+TARGET_CHAT_ID = -5251698940           # 5 TNI TECHNICA DEP CONTROL SITE
+
+# Nhóm Team để gửi tin lọc theo team
+TEAMS = {
+    "T1": {"id": -5180992881, "name": "Team 1 (Dawei)",       "pats": [r"\|\s*T1\s*\|"]},
+    "T2": {"id": -5188855349, "name": "Team 2 (Myeik/T2+T5)", "pats": [r"\|\s*T[25]\s*\|"]},
+    "T3": {"id": -5183480727, "name": "Team 3 (Bokpyin)",      "pats": [r"\|\s*T3\s*\|"]},
+    "T4": {"id": -5238696719, "name": "Team 4 (Kawthoung)",    "pats": [r"\|\s*T4\s*\|"]},
+}
+TEAM_EMOJI = {"T1": "🔵", "T2": "🟡", "T3": "🟢", "T4": "🔴"}
 
 BOT_USERNAME   = "auto_nocpro_bot"
 WAIT_REPLY_SEC = 35
@@ -34,8 +44,8 @@ WAIT_REPLY_SEC = 35
 ACTIVE_START   = (4, 30)
 ACTIVE_END     = (21, 30)
 
-MIN_DELAY_SEC  = 3  * 60   # 3 phút  (tối thiểu)
-MAX_DELAY_SEC  = 8  * 60   # 8 phút  (tối đa) — setup~4p + 8p = 12p, an toàn trong timeout 28p
+MIN_DELAY_SEC  = 3 * 60   # 3 phút  (tối thiểu)
+MAX_DELAY_SEC  = 8 * 60   # 8 phút  (tối đa)
 SKIP_DELAY     = os.environ.get("SKIP_DELAY", "0") == "1"
 # ──────────────────────────────────────────────────────────────────
 
@@ -48,6 +58,63 @@ def in_active_window() -> bool:
     tz  = timezone(timedelta(hours=6, minutes=30))
     now = datetime.now(tz)
     return ACTIVE_START <= (now.hour, now.minute) <= ACTIVE_END
+
+
+def build_team_msg(team_key: str, raw_text: str, ts: str) -> str:
+    """Lọc header + dòng summary team + các site của team từ raw_text."""
+    info = TEAMS[team_key]
+    pats = info["pats"]
+    lines = raw_text.splitlines()
+
+    headers = []   # dòng header/tổng (không phải dòng site số thứ tự)
+    sites   = []   # dòng site thuộc team này
+
+    for line in lines:
+        s = line.strip()
+        if not s:
+            continue
+        if re.match(r"^\d+\s*[:.]", s):
+            # Dòng site: chỉ lấy nếu khớp team
+            if any(re.search(p, s, re.IGNORECASE) for p in pats):
+                sites.append(s)
+        else:
+            # Dòng header/tổng: lấy tất cả (Total, Team X:, TNI Site...)
+            headers.append(s)
+
+    emoji = TEAM_EMOJI.get(team_key, "")
+    title = f"{emoji} TNI Site Down — {info['name']} — {ts}"
+    sep   = "─" * 32
+
+    if sites:
+        body = "\n".join(headers) + f"\n{sep}\n" + "\n".join(sites)
+    else:
+        body = "\n".join(headers) + f"\n{sep}\nKhông có site down."
+
+    return f"{title}\n{sep}\n{body}"
+
+
+def split_message(text: str, max_len: int) -> list[str]:
+    if len(text) <= max_len:
+        return [text]
+    parts = []
+    while text:
+        if len(text) <= max_len:
+            parts.append(text)
+            break
+        cut = text.rfind("\n", 0, max_len)
+        if cut == -1:
+            cut = max_len
+        parts.append(text[:cut])
+        text = text[cut:].lstrip("\n")
+    return parts
+
+
+async def send_chunks(client, target, text, label):
+    chunks = split_message(text, 4000)
+    for chunk in chunks:
+        await client.send_message(target, chunk)
+        await asyncio.sleep(0.5)
+    print(f"[{myanmar_now()}] ✅ Gửi {label} ({len(chunks)} phần)")
 
 
 async def main():
@@ -125,32 +192,25 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 9. Gửi sang CONTROL ───────────────────────────────────
-        header = f"📊 Dữ liệu TNI — {myanmar_now()}\n{'─'*30}\n\n"
+        ts = myanmar_now()
+
+        # ── 9. Gửi toàn bộ sang CONTROL ──────────────────────────
+        header = f"📊 Dữ liệu TNI — {ts}\n{'─'*30}\n\n"
         for text in bot_messages:
-            chunks = split_message(header + text, 4000)
-            for chunk in chunks:
-                await client.send_message(TARGET_CHAT_ID, chunk)
-                await asyncio.sleep(0.5)
-            print(f"[{myanmar_now()}] ✅ Đã gửi sang CONTROL ({len(chunks)} phần)")
+            await send_chunks(client, TARGET_CHAT_ID, header + text, "→ CONTROL")
+
+        # ── 10. Lọc và gửi từng Team ─────────────────────────────
+        print(f"[{myanmar_now()}] 📨 Phân phát theo Team...")
+        raw = "\n".join(bot_messages)
+        for key, info in TEAMS.items():
+            try:
+                team_text = build_team_msg(key, raw, ts)
+                await send_chunks(client, info["id"], team_text, f"→ {key} {info['name']}")
+                await asyncio.sleep(1)
+            except Exception as e:
+                print(f"[{myanmar_now()}] ❌ Lỗi gửi {key}: {e}")
 
         print(f"[{myanmar_now()}] 🎉 Hoàn thành!")
-
-
-def split_message(text: str, max_len: int) -> list[str]:
-    if len(text) <= max_len:
-        return [text]
-    parts = []
-    while text:
-        if len(text) <= max_len:
-            parts.append(text)
-            break
-        cut = text.rfind("\n", 0, max_len)
-        if cut == -1:
-            cut = max_len
-        parts.append(text[:cut])
-        text = text[cut:].lstrip("\n")
-    return parts
 
 
 if __name__ == "__main__":
