@@ -18,11 +18,12 @@ load_dotenv()
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-SEND_BOT_TOKEN  = os.getenv("SEND_BOT_TOKEN")
-APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL")
-TZ_MM           = timezone(timedelta(hours=6, minutes=30))
-SPREADSHEET_ID  = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
-GID_REPORT      = "133591305"   # sheet có D75:E87
+SEND_BOT_TOKEN       = os.getenv("SEND_BOT_TOKEN")
+TECHNICAL_DEP_TOKEN  = os.getenv("TECHNICAL_DEP_BOT_TOKEN")   # bot 2.1 TNI DEP REPORT DAILY
+APPS_SCRIPT_URL      = os.getenv("APPS_SCRIPT_URL")
+TZ_MM                = timezone(timedelta(hours=6, minutes=30))
+SPREADSHEET_ID       = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
+GID_REPORT           = "133591305"   # sheet có D75:E87
 
 
 def get_report_data() -> dict:
@@ -384,20 +385,34 @@ async def main():
 
             asset_msg = "\n".join(lines)
 
+            # Dùng bot 2.1 TNI DEP REPORT DAILY để gửi Asset stats
             asset_ok = asset_fail = 0
-            for rcpt_id in recipients:
-                try:
-                    await bot.send_message(chat_id=rcpt_id, text=asset_msg)
-                    logger.info(f"✅ Asset → {rcpt_id}")
-                    asset_ok += 1
-                except TelegramError as e:
-                    logger.error(f"❌ Asset → {rcpt_id}: {e}")
-                    asset_fail += 1
-                await asyncio.sleep(0.3)
+            if TECHNICAL_DEP_TOKEN:
+                dep_bot = Bot(token=TECHNICAL_DEP_TOKEN, request=trequest)
+                await dep_bot.initialize()
+                for rcpt_id in recipients:
+                    try:
+                        await dep_bot.send_message(chat_id=rcpt_id, text=asset_msg)
+                        logger.info(f"✅ Asset(DEP_BOT) → {rcpt_id}")
+                        asset_ok += 1
+                    except TelegramError as e:
+                        logger.error(f"❌ Asset(DEP_BOT) → {rcpt_id}: {e}")
+                        asset_fail += 1
+                    await asyncio.sleep(0.3)
+                await dep_bot.shutdown()
+            else:
+                logger.warning("⚠️ Không có TECHNICAL_DEP_BOT_TOKEN — dùng SEND_BOT_TOKEN thay thế")
+                for rcpt_id in recipients:
+                    try:
+                        await bot.send_message(chat_id=rcpt_id, text=asset_msg)
+                        logger.info(f"✅ Asset(fallback) → {rcpt_id}")
+                        asset_ok += 1
+                    except TelegramError as e:
+                        logger.error(f"❌ Asset(fallback) → {rcpt_id}: {e}")
+                        asset_fail += 1
+                    await asyncio.sleep(0.3)
 
-            logger.info(
-            f"  Asset stats: ✅{asset_ok} | ❌{asset_fail}"
-        )
+            logger.info(f"  Asset stats: ✅{asset_ok} | ❌{asset_fail}")
         else:
             logger.warning("⚠️ Không lấy được asset stats (bỏ qua)")
 

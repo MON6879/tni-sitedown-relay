@@ -29,5 +29,7 @@ jobs:
 
       - name: "🚀 Gửi thông báo"
         env:
-          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+          SEND_BOT_TOKEN:             ${{ secrets.SEND_BOT_TOKEN }}
+          TECHNICAL_DEP_BOT_TOKEN:    ${{ secrets.TECHNICAL_DEP_BOT_TOKEN }}
+          APPS_SCRIPT_URL:            ${{ secrets.APPS_SCRIPT_URL }}
         run: python send_now.py
