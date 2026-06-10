@@ -5,30 +5,17 @@
 //   Execute as: Me | Who has access: Anyone
 // ============================================================
 
-const SHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8";
-
-// Sheet site_down_notify.gs sử dụng (viết dữ liệu thô vào đây)
-const SD_SHEET_ID  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
-const SD_SHEET_GID = 0;  // Tab GID=0
-
-// Tab where collected data is stored (gid = 199426270)
-const DATA_TAB        = "Asset order and request";
-
-// Tab where authorised users are listed (gid = 1236389870)
-// Layout: Col A = Field Name (existing)  |  Col B = Name  |  Col C = Telegram ID
-const CFG_TAB         = "Config";
-
-// Tab for search activity log
-const SEARCH_LOG_TAB  = "Search Log";
-
-// Tab for aggregated search stats (one row per user)
-const SEARCH_STATS_TAB = "Search Stats";
-
-// Tab for general combined report (Name + ID + Content + Search stats)
-const GENERAL_TAB      = "General";
-
-// GID of the daily report sheet (gid=133591305)
-const REPORT_GID       = "133591305";
+// ⚠️ CÁC HẰNG SỐ SAU ĐÃ ĐƯỢC KHAI BÁO TRONG 00_CONFIG.gs
+// Comment out ở đây để tránh lỗi "Identifier already been declared"
+// const SHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8";
+// const SD_SHEET_ID  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
+// const SD_SHEET_GID = 0;
+// const DATA_TAB        = "Asset order and request";
+// const CFG_TAB         = "Config";
+// const SEARCH_LOG_TAB  = "Search Log";
+// const SEARCH_STATS_TAB = "Search Stats";
+// const GENERAL_TAB      = "General";
+// const REPORT_GID       = "133591305";
 
 // ============================================================
 // ENTRY POINTS
