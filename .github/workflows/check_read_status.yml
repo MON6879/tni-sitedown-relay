@@ -1,0 +1,26 @@
+name: Check Read Status
+
+on:
+  workflow_dispatch:   # Chạy tay bất cứ lúc nào
+
+jobs:
+  check-read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install telethon
+
+      - name: Check who read messages
+        env:
+          TELEGRAM_API_ID:   ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION:  ${{ secrets.TELEGRAM_SESSION }}
+        run: python check_read_status.py
