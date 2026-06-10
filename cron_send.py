@@ -563,10 +563,8 @@ async def main():
         for tl in team_leader_content:
             short = tl["content"][:600] + "..." if len(tl["content"]) > 600 else tl["content"]
             mgmt_parts.append(f"\n🏷️ {tl['team']}:\n{short}")
-    if input_task_summary:
-        mgmt_parts.append("━━━━━━━━━━━━━━━━━━━━")
-        mgmt_parts.append("🔧 Technical Dept Tasks:")
-        mgmt_parts.append(input_task_summary)
+    # Technical Dept Tasks KHÔNG đưa vào mgmt_report
+    # → sẽ gửi riêng đến rows 75-87 (2.1 TNI DEP REPORT DAILY) bên dưới
     mgmt_report = "\n".join(mgmt_parts)
 
     # ── 7. Send messages ──
@@ -596,7 +594,16 @@ async def main():
             # Technical Dept: gửi RIÊNG từng người (Col C = tên, Col E = Telegram ID)
             if not content:
                 continue
+            # Thêm input_task_summary vào đầu mỗi tin Technical Dept
+            task_header = ""
+            if input_task_summary:
+                task_header = (
+                    f"🔧 Technical Dept Tasks:\n"
+                    f"{input_task_summary}\n"
+                    f"{'━'*20}\n"
+                )
             msg = (
+                f"{task_header}"
                 f"Technical Dept Report – {now_str}\n"
                 f"{'━'*20}\n"
                 f"{content}\n"
