@@ -1186,6 +1186,10 @@ function handleGetAssetStats(ss) {
     }
   }
 
+
+  // Ghi log vào sheet "Asset Stats Log" để làm báo cáo
+  writeAssetStatsLog(ss, stats, grandTotal, actionTypes, TEAMS);
+
   return json({
     status:      'ok',
     actionTypes: actionTypes,
@@ -1197,7 +1201,95 @@ function handleGetAssetStats(ss) {
 }
 
 // ============================================================
-// GỬI TELEGRAM HÀNG LOẠT — Thêm vào cuối file, không đụng code cũ
+// ASSET STATS LOG — Ghi số liệu hàng ngày vào sheet báo cáo
+// Sheet: "Asset Stats Log"
+// Cột: Date | Time | Team | Action | Total | Done | Today | Yesterday | 2DayAgo | Week | Month
+// ============================================================
+
+function writeAssetStatsLog(ss, stats, grandTotal, actionTypes, teams) {
+  try {
+    const LOG_TAB = 'Asset Stats Log';
+    let logSheet = ss.getSheetByName(LOG_TAB);
+
+    // Tạo sheet mới nếu chưa có
+    if (!logSheet) {
+      logSheet = ss.insertSheet(LOG_TAB);
+      // Header row
+      const headers = [
+        'Date', 'Time', 'Team', 'Team Short', 'Action',
+        'Total', 'Done',
+        'Today', 'Yesterday', '2 Days Ago', 'Week(7d)', 'Month(15d)',
+        'Done Today', 'Done Yesterday', 'Done 2Days', 'Done Week', 'Done Month'
+      ];
+      logSheet.getRange(1, 1, 1, headers.length).setValues([headers])
+        .setBackground('#1565C0').setFontColor('#FFFFFF')
+        .setFontWeight('bold').setHorizontalAlignment('center');
+      logSheet.setFrozenRows(1);
+      logSheet.setColumnWidth(1, 100);  // Date
+      logSheet.setColumnWidth(2, 70);   // Time
+      logSheet.setColumnWidth(3, 220);  // Team
+      logSheet.setColumnWidth(4, 120);  // Team Short
+      logSheet.setColumnWidth(5, 120);  // Action
+      for (let c = 6; c <= headers.length; c++) logSheet.setColumnWidth(c, 75);
+    }
+
+    const TEAM_SHORT = {
+      'MYT_TNI_TEAM01_Dawei':     'Team1(Dawei)',
+      'MYT_TNI_TEAM02_Myeik':     'Team2(Myeik)',
+      'MYT_TNI_TEAM03_Bokpyin':   'Team3(Bokpyin)',
+      'MYT_TNI_TEAM04_Kawthoung': 'Team4(Kawthoung)',
+    };
+
+    const now     = new Date();
+    const dateStr = Utilities.formatDate(now, 'Asia/Yangon', 'dd/MM/yyyy');
+    const timeStr = Utilities.formatDate(now, 'Asia/Yangon', 'HH:mm');
+
+    const rows = [];
+
+    // Ghi từng team × từng action type
+    for (const team of teams) {
+      for (const at of actionTypes) {
+        const s = (stats[at] || {})[team] || {};
+        rows.push([
+          dateStr, timeStr,
+          team, TEAM_SHORT[team] || team, at,
+          s.total || 0, s.done || 0,
+          s.d0 || 0, s.d1 || 0, s.d2 || 0, s.d6 || 0, s.d15 || 0,
+          s.done_d0 || 0, s.done_d1 || 0, s.done_d2 || 0, s.done_d6 || 0, s.done_d15 || 0
+        ]);
+      }
+    }
+
+    // Ghi dòng Grand Total cho mỗi action type
+    for (const at of actionTypes) {
+      const g = grandTotal[at] || {};
+      rows.push([
+        dateStr, timeStr,
+        'GRAND TOTAL', 'Total', at,
+        g.total || 0, g.done || 0,
+        g.d0 || 0, g.d1 || 0, g.d2 || 0, g.d6 || 0, g.d15 || 0,
+        g.done_d0 || 0, g.done_d1 || 0, g.done_d2 || 0, g.done_d6 || 0, g.done_d15 || 0
+      ]);
+    }
+
+    if (rows.length > 0) {
+      const lastRow = logSheet.getLastRow();
+      logSheet.getRange(lastRow + 1, 1, rows.length, rows[0].length).setValues(rows);
+      // Tô màu xen kẽ
+      for (let i = 0; i < rows.length; i++) {
+        const r = lastRow + 1 + i;
+        const bg = rows[i][2] === 'GRAND TOTAL' ? '#FFF9C4' :
+                   (r % 2 === 0 ? '#F8F9FA' : '#FFFFFF');
+        logSheet.getRange(r, 1, 1, rows[i].length).setBackground(bg);
+      }
+    }
+
+    Logger.log(`✅ writeAssetStatsLog: ${rows.length} rows written to "${LOG_TAB}"`);
+  } catch (e) {
+    Logger.log(`❌ writeAssetStatsLog error: ${e.message}`);
+  }
+}
+
 // Sheet: SEND_TELEGRAM | Cột B=Tên | C=Nội dung | D=Chat ID | E=Kết quả
 // ============================================================
 

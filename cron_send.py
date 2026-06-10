@@ -570,6 +570,9 @@ async def main():
         mgmt_parts.append(asset_msg)
     mgmt_report = "\n".join(mgmt_parts)
 
+    # Chat ID nhóm "5 TNI TECHNICA DEP CONTROL SITE"
+    CONTROL_CHAT_ID = "-5251698940"
+
     # ── 7. Send messages ──
     ok = fail = 0
 
@@ -689,6 +692,16 @@ async def main():
                 await asyncio.sleep(0.4)
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
+
+    # ── 8. Gửi asset_msg đến nhóm CONTROL SITE ──
+    if asset_msg and TECHNICAL_DEP_BOT_TOKEN:
+        logger.info("--- Gửi Asset Stats → CONTROL SITE (-5251698940) ---")
+        try:
+            async with Bot(token=TECHNICAL_DEP_BOT_TOKEN) as ctrl_bot:
+                await send_msg(ctrl_bot, CONTROL_CHAT_ID, asset_msg, "CONTROL")
+            logger.info("✅ Asset stats → CONTROL SITE")
+        except Exception as e:
+            logger.error(f"❌ Asset stats → CONTROL SITE: {e}")
 
 
 if __name__ == "__main__":
