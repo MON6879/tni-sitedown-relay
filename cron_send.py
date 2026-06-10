@@ -119,15 +119,18 @@ def build_asset_msg(now_str, asset_data):
     }
 
     def fmt(s):
-        total = s.get("total", 0)
-        done = s.get("done", 0)
-        return f"{total} Done {done}"
+        return f"{s.get('total',0)}/{s.get('done',0)}"
 
     def fmt_period(s):
         return (
-            f"3Day:{s.get('d0',0)}/{s.get('d1',0)}/{s.get('d2',0)} "
-            f"7Day:{s.get('d6',0)} Month:{s.get('d15',0)}"
+            f"3Day: {s.get('d2',0)}/{s.get('done_d2',0)}"
+            f" | {s.get('d1',0)}/{s.get('done_d1',0)}"
+            f" | {s.get('d0',0)}/{s.get('done_d0',0)}"
+            f"  7Day: {s.get('d6',0)}/{s.get('done_d6',0)}"
+            f"  Month: {s.get('d15',0)}/{s.get('done_d15',0)}"
         )
+
+    PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15"]
 
     lines = [f"📦 Thống kê Asset – {now_str}"]
 
@@ -135,11 +138,10 @@ def build_asset_msg(now_str, asset_data):
         tm_short = TEAM_SHORT.get(tm, tm)
         parts = [f"{at}: {fmt(stats.get(at,{}).get(tm,{}))}" for at in action_types]
         lines.append(f"🏷️ {tm_short}: " + " | ".join(parts))
-        # Period summary per team
-        team_total = {"d0":0,"d1":0,"d2":0,"d6":0,"d15":0}
+        team_total = {k: 0 for k in PERIOD_KEYS}
         for at in action_types:
             s = stats.get(at, {}).get(tm, {})
-            for k in team_total:
+            for k in PERIOD_KEYS:
                 team_total[k] += s.get(k, 0)
         lines.append(f"   📅 {fmt_period(team_total)}")
 
@@ -148,12 +150,12 @@ def build_asset_msg(now_str, asset_data):
     lines.append(f"📊 Total: " + " | ".join(parts))
 
     # Grand period
-    g_period = {"d0":0,"d1":0,"d2":0,"d6":0,"d15":0}
+    g_period = {k: 0 for k in PERIOD_KEYS}
     for at in action_types:
         g = grand.get(at, {})
-        for k in g_period:
+        for k in PERIOD_KEYS:
             g_period[k] += g.get(k, 0)
-    lines.append(f"📅 Total {fmt_period(g_period)}")
+    lines.append(f"📅 Total  {fmt_period(g_period)}")
 
     return "\n".join(lines)
 
