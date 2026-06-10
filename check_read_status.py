@@ -1,8 +1,8 @@
 """
 check_read_status.py
 ====================
-Kiểm tra ai đã đọc tin nhắn gần nhất do tài khoản cá nhân gửi
-vào các nhóm T1/T2/T3/T4/CONTROL.
+Kiểm tra ai đã đọc tin nhắn gần nhất → gửi kết quả vào nhóm đó
+để mọi người cùng thấy.
 
 Chạy: python check_read_status.py
 Hoặc: GitHub Actions → workflow_dispatch
@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import GetMessageReadParticipantsRequest
-from telethon.errors import ChatAdminRequiredError, PeerIdInvalidError
+from telethon.errors import ChatAdminRequiredError
 
 # ── Cấu hình ──────────────────────────────────────────────────
 API_ID         = int(os.environ["TELEGRAM_API_ID"])
@@ -25,19 +25,19 @@ SESSION_STRING = os.environ["TELEGRAM_SESSION"]
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
 GROUPS = {
-    "CONTROL (5 TNI TECHNICA DEP)": -5251698940,
-    "Team 1":                        -5180992881,
-    "Team 2 (T2+T5)":               -5188855349,
-    "Team 3":                        -5183480727,
-    "Team 4":                        -5238696719,
+    "CONTROL": { "name": "5 TNI TECHNICA DEP CONTROL", "id": -5251698940 },
+    "T1":      { "name": "Team 1",                      "id": -5180992881 },
+    "T2":      { "name": "Team 2 (T2+T5)",              "id": -5188855349 },
+    "T3":      { "name": "Team 3",                      "id": -5183480727 },
+    "T4":      { "name": "Team 4",                      "id": -5238696719 },
 }
 
-# Số tin nhắn gần nhất cần kiểm tra (do tài khoản mình gửi)
+# Kiểm tra N tin nhắn gần nhất do tài khoản cá nhân gửi
 CHECK_LAST_N = 3
 # ──────────────────────────────────────────────────────────────
 
 def myanmar_now():
-    return datetime.now(MYANMAR_TZ).strftime("%H:%M:%S %d/%m/%Y")
+    return datetime.now(MYANMAR_TZ).strftime("%H:%M %d/%m/%Y")
 
 def fmt_time(dt):
     if dt is None:
@@ -47,10 +47,11 @@ def fmt_time(dt):
     return dt.astimezone(MYANMAR_TZ).strftime("%H:%M %d/%m")
 
 
-async def check_group(client, name, chat_id):
-    print(f"\n{'='*50}")
-    print(f"📋 {name}")
-    print(f"{'='*50}")
+async def check_and_report(client, key, group_info):
+    gname  = group_info["name"]
+    chat_id = group_info["id"]
+
+    print(f"\n{'='*50}\n📋 {gname}\n{'='*50}")
 
     try:
         entity = await client.get_entity(chat_id)
@@ -58,9 +59,9 @@ async def check_group(client, name, chat_id):
         print(f"  ❌ Không lấy được entity: {e}")
         return
 
-    # Lấy tin nhắn do mình gửi (out=True)
+    # Lấy tin nhắn do tài khoản mình gửi
     try:
-        messages = await client.get_messages(entity, limit=20)
+        messages = await client.get_messages(entity, limit=30)
     except Exception as e:
         print(f"  ❌ Lỗi get_messages: {e}")
         return
@@ -68,33 +69,54 @@ async def check_group(client, name, chat_id):
     my_msgs = [m for m in messages if m.out and m.text][:CHECK_LAST_N]
 
     if not my_msgs:
-        print("  ⚠️  Không tìm thấy tin nhắn nào do tài khoản này gửi gần đây")
+        print("  ⚠️  Không có tin nhắn nào do tài khoản này gửi")
         return
+
+    # ── Xây dựng báo cáo ──────────────────────────────────────
+    report_lines = []
+    report_lines.append(f"👁 <b>READ STATUS — {gname}</b>")
+    report_lines.append(f"⏰ {myanmar_now()}")
+    report_lines.append("━" * 26)
 
     for msg in my_msgs:
         send_time = fmt_time(msg.date)
-        preview   = (msg.text or "")[:60].replace("\n", " ")
-        print(f"\n  📨 [{send_time}] {preview}...")
+        preview   = (msg.text or "")[:50].replace("\n", " ")
+        report_lines.append(f"\n📨 <b>[{send_time}]</b> {preview}...")
 
         try:
-            result = await client(GetMessageReadParticipantsRequest(
+            readers = await client(GetMessageReadParticipantsRequest(
                 peer   = entity,
                 msg_id = msg.id
             ))
 
-            if not result:
-                print("  👁️  Chưa có ai đọc")
+            if not readers:
+                report_lines.append("  ❌ Chưa có ai đọc")
+                print(f"  [{send_time}] Chưa có ai đọc")
             else:
-                print(f"  👁️  Đã đọc: {len(result)} người")
-                for user in result:
-                    name_str = (user.first_name or "") + " " + (user.last_name or "")
-                    username = f"@{user.username}" if user.username else ""
-                    print(f"    ✅ {name_str.strip()} {username}")
+                report_lines.append(f"  ✅ Đã đọc: <b>{len(readers)} người</b>")
+                for user in readers:
+                    full_name = (user.first_name or "") + (" " + user.last_name if user.last_name else "")
+                    uname     = f" (@{user.username})" if user.username else ""
+                    report_lines.append(f"  • {full_name.strip()}{uname}")
+                print(f"  [{send_time}] Đã đọc: {len(readers)} người")
 
         except ChatAdminRequiredError:
-            print("  ⚠️  Cần quyền admin để xem (supergroup lớn)")
+            report_lines.append("  ⚠️ Cần quyền admin để xem")
         except Exception as e:
+            report_lines.append(f"  ⚠️ Không lấy được: {e}")
             print(f"  ❌ Lỗi: {e}")
+
+    # ── Gửi báo cáo vào nhóm ──────────────────────────────────
+    report_text = "\n".join(report_lines)
+    try:
+        await client.send_message(
+            entity,
+            report_text,
+            parse_mode="html"
+        )
+        print(f"  📤 Đã gửi báo cáo vào nhóm {gname}")
+    except Exception as e:
+        print(f"  ❌ Gửi báo cáo thất bại: {e}")
 
 
 async def main():
@@ -105,12 +127,13 @@ async def main():
     async with client:
         me = await client.get_me()
         print(f"🔑 Tài khoản: @{me.username} ({me.first_name})")
-        print(f"📊 Kiểm tra {CHECK_LAST_N} tin nhắn gần nhất do bạn gửi mỗi nhóm\n")
+        print(f"📊 Kiểm tra {CHECK_LAST_N} tin gần nhất → gửi kết quả vào từng nhóm\n")
 
-        for group_name, chat_id in GROUPS.items():
-            await check_group(client, group_name, chat_id)
+        for key, info in GROUPS.items():
+            await check_and_report(client, key, info)
+            await asyncio.sleep(1)   # tránh rate limit
 
-    print(f"\n\n✅ Xong — {myanmar_now()}")
+    print(f"\n✅ Xong — {myanmar_now()}")
 
 
 if __name__ == "__main__":
