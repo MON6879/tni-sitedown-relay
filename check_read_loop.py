@@ -48,12 +48,15 @@ def fmt_time(dt):
     return dt.astimezone(MYANMAR_TZ).strftime("%H:%M %d/%m")
 
 
-async def build_status_text(client, entity, group_name, my_msgs, updated_at):
-    """Tạo nội dung báo cáo read status."""
+async def build_status_text(client, entity, group_name, my_msgs, updated_at, all_members):
+    """Tạo nội dung báo cáo — chỉ hiện ai CHƯA đọc."""
     lines = []
-    lines.append(f"👁 <b>READ STATUS — {group_name}</b>")
+    lines.append(f"👁 <b>CHƯA ĐỌC — {group_name}</b>")
     lines.append(f"🔄 Cập nhật: <b>{updated_at}</b>")
     lines.append("━" * 26)
+
+    # Map user_id → tên để tra nhanh
+    member_map = {u.id: u for u in all_members}
 
     for msg in my_msgs:
         send_time = fmt_time(msg.date)
@@ -65,12 +68,17 @@ async def build_status_text(client, entity, group_name, my_msgs, updated_at):
                 peer   = entity,
                 msg_id = msg.id
             ))
-            if not readers:
-                lines.append("  ❌ Chưa có ai đọc")
+            reader_ids = {u.id for u in readers}
+
+            # Ai chưa đọc = tất cả thành viên trừ người đã đọc
+            unread = [u for uid, u in member_map.items() if uid not in reader_ids]
+
+            if not unread:
+                lines.append("  ✅ Tất cả đã đọc!")
             else:
-                lines.append(f"  ✅ Đã đọc: <b>{len(readers)} người</b>")
-                for user in readers:
-                    full = (user.first_name or "") + (" " + user.last_name if user.last_name else "")
+                lines.append(f"  ❌ Chưa đọc: <b>{len(unread)}/{len(all_members)} người</b>")
+                for user in unread:
+                    full  = (user.first_name or "") + (" " + user.last_name if user.last_name else "")
                     uname = f" (@{user.username})" if user.username else ""
                     lines.append(f"  • {full.strip()}{uname}")
 
@@ -82,17 +90,19 @@ async def build_status_text(client, entity, group_name, my_msgs, updated_at):
     return "\n".join(lines)
 
 
+
 async def monitor_group(client, key, info, sent_msg_ids, is_first):
     """Gửi tin mới (lần đầu) hoặc edit tin cũ (các lần sau)."""
-    entity     = info["_entity"]
-    group_name = info["name"]
-    my_msgs    = info["_my_msgs"]
+    entity      = info["_entity"]
+    group_name  = info["name"]
+    my_msgs     = info["_my_msgs"]
+    all_members = info.get("_members", [])
 
     if not my_msgs:
         return
 
     now_str  = myanmar_now()
-    text     = await build_status_text(client, entity, group_name, my_msgs, now_str)
+    text     = await build_status_text(client, entity, group_name, my_msgs, now_str, all_members)
 
     if is_first:
         # Gửi tin mới
@@ -135,7 +145,12 @@ async def main():
                 info["_entity"] = entity
                 msgs = await client.get_messages(entity, limit=30)
                 info["_my_msgs"] = [m for m in msgs if m.out and m.text][:CHECK_LAST_N]
-                print(f"  [{key}] ✅ {info['name']}: {len(info['_my_msgs'])} tin của bạn")
+                # Lấy danh sách thành viên để tính ai chưa đọc
+                members = await client.get_participants(entity)
+                # Bỏ qua bot và tài khoản mình
+                me_id = (await client.get_me()).id
+                info["_members"] = [u for u in members if not u.bot and u.id != me_id]
+                print(f"  [{key}] ✅ {info['name']}: {len(info['_my_msgs'])} tin | {len(info['_members'])} thành viên")
             except Exception as e:
                 info["_entity"]  = None
                 info["_my_msgs"] = []
