@@ -565,6 +565,9 @@ async def main():
             mgmt_parts.append(f"\n🏷️ {tl['team']}:\n{short}")
     # Technical Dept Tasks KHÔNG đưa vào mgmt_report
     # → sẽ gửi riêng đến rows 75-87 (2.1 TNI DEP REPORT DAILY) bên dưới
+    if asset_msg:
+        mgmt_parts.append("━━━━━━━━━━━━━━━━━━━━")
+        mgmt_parts.append(asset_msg)
     mgmt_report = "\n".join(mgmt_parts)
 
     # ── 7. Send messages ──
