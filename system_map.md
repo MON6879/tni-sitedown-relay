@@ -277,3 +277,74 @@ Team 1: Total Site down: 11...
 - **Nguyên nhân:** Dùng `@TNIREPORTTASK_BOT` cho rows 4-32 nhưng họ chưa `/start`
 - **Fix:** Rows 4-32 phải dùng `SEND_BOT`
 
+---
+
+## 🐛 Lịch sử thay đổi (10/06/2026)
+
+| Thay đổi | Chi tiết |
+|---|---|
+| **Relay gửi trực tiếp T1/T2/T3/T4** | ❌ SAI — relay chỉ trigger bot + gửi CONTROL, site_down_notify.gs lo phân phối |
+| **Relay store_site_down → GAS** | ❌ Bỏ — raw data từ BOT LOOKUP thiếu `\| T1 \|` markers |
+| **Relay trigger-only** | ❌ Bỏ — CONTROL không nhận gì → Col A trống |
+| **Relay gửi raw → CONTROL (sạch)** | ✅ HIỆN TẠI — raw data → CONTROL → site_down_notify.gs ghi Col A |
+| **Active window mở rộng** | 04:30–21:30 → 04:30–23:00 Myanmar (để test tối) |
+| **Cron schedule** | Đổi từ `*/30` (48/ngày, GitHub throttle) → explicit crons (active window) |
+
+---
+
+## 🔄 Flow Botlookup Relay (HIỆN TẠI — 10/06/2026)
+
+```
+GitHub Actions (mỗi 30p, 04:30–23:00 Myanmar)
+    ↓
+botlookup_relay.py
+    ├─ Đăng nhập @Phongha79 (Telethon session)
+    ├─ Gửi /down_tni@auto_nocpro_bot vào BOT LOOKUP
+    ├─ Chờ 35s → đọc phản hồi từ @auto_nocpro_bot
+    └─ Gửi raw text (sạch, không prefix) vào CONTROL (-5251698940)
+              ↓
+site_down_notify.gs trigger mỗi 5 phút
+    ├─ fetchTelegramUpdates() → đọc tin từ CONTROL qua SD_BOT getUpdates
+    ├─ isSiteDownMessage() → check "tanintharyi" + date dd/mm/yyyy
+    ├─ writeToColumnA() → ghi vào Col A của SD Sheet
+    └─ checkColC() → đọc Col C formula → gửi T1/T2/T3/T4 + CONTROL
+```
+
+> **⚠️ Giới hạn:** Raw data từ BOT LOOKUP (`STATION | DURATION | OWNER | POWER`) thiếu
+> `| T1 |` markers → Col C formula có thể không lọc đúng team nếu không có lookup table.
+> Nếu Col C không phân tích được từ raw → dùng phương pháp thủ công bên dưới.
+
+---
+
+## 📋 Hướng dẫn thao tác thủ công
+
+### Khi cần gửi ngay (không chờ tự động)
+
+**Bước 1 — Lấy dữ liệu đầy đủ** (format có `| T1 |`):
+- Vào nhóm **CONTROL** → copy tin site down đầy đủ (có emoji team 🟡T2, 🟠T5...)
+- Hoặc: Ai đó forward tin gốc màu xanh vào CONTROL → site_down_notify.gs tự đọc
+
+**Bước 2 — Paste vào Sheet** (nếu chưa auto):
+- Mở [Sheet "Input Site down Telegram"](https://docs.google.com/spreadsheets/d/1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow/edit?gid=0#gid=0)
+- Click **A1** → Paste toàn bộ nội dung (mỗi dòng = 1 ô Col A)
+- Col C formula tự tính ngay
+
+**Bước 3 — Gửi ngay** (không chờ trigger 5p):
+- Vào GAS Editor → Script `1rvgWwrAMDbqtmqwOfqzguXB7m9snA5UZeOs9iGu64VJbejlNAkH2m6uR`
+- Chọn function **`checkAndSend`** → ▶ Run
+
+### Kiểm tra trigger có chạy không
+- GAS Editor → **Triggers** (icon đồng hồ) → phải có `checkAndSend` mỗi 5 phút
+- Nếu không có → chạy `setupSdTrigger()` một lần để tạo lại
+
+---
+
+## 📁 File quan trọng (10/06/2026)
+
+| File | Mô tả |
+|---|---|
+| [botlookup_relay.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/botlookup_relay.py) | Relay: trigger bot → gửi raw data → CONTROL. Active 04:30–23:00 Myanmar |
+| [.github/workflows/botlookup_relay.yml](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/.github/workflows/botlookup_relay.yml) | Workflow: 3 crons explicit trong active window, pip install telethon requests |
+| [apps_script_collector.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_collector.js) | GAS collector: thêm action `store_site_down` (chưa deploy, để dành) |
+| [site_down_notify.gs](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/site_down_notify.gs) | GAS site down: polling CONTROL 5p → ghi Col A → gửi T1/T2/T3/T4 |
+
