@@ -225,12 +225,11 @@ function checkColC(sheet) {
   const lines = colCRaw.split("\n");
 
   // ① CONTROL: nhận TOÀN BỘ Col C (có tô màu team)
-  // ⚠️ GAS không gửi nữa — Python Telethon sender sẽ gửi (send_teams_telethon.py)
-  // const controlId = SD_GROUPS["CONTROL"];
-  // if (controlId) {
-  //   const coloredRaw = colorizeTeams(colCRaw);
-  //   sendTelegram(controlId, "<pre>" + escHtml(coloredRaw) + "</pre>", "[Tin1][CONTROL]");
-  // }
+  const controlId = SD_GROUPS["CONTROL"];
+  if (controlId) {
+    const coloredRaw = colorizeTeams(colCRaw);
+    sendTelegram(controlId, "<pre>" + escHtml(coloredRaw) + "</pre>", "[Tin1][CONTROL]");
+  }
 
   // ② Mỗi Team: header chung + summary team đó + site của team đó
   const sitePattern = {
@@ -268,10 +267,8 @@ function checkColC(sheet) {
       : [...headerLines, "Không có site down"].join("\n");
 
     // Tô màu team code trong tin nhắn
-    // ⚠️ GAS không gửi nữa — Python Telethon sender sẽ gửi
     const coloredContent = colorizeTeams(teamContent);
-    Logger.log("[Tin1][" + team + "] ready: " + coloredContent.substring(0, 60));
-    // sendTelegram(chatId, "<pre>" + escHtml(coloredContent) + "</pre>", "[Tin1][" + team + "]");
+    sendTelegram(chatId, "<pre>" + escHtml(coloredContent) + "</pre>", "[Tin1][" + team + "]");
   }
 
   props.setProperty(TS_KEY_A1, raw);
@@ -299,26 +296,23 @@ function checkAwAz(sheet) {
   const teams = ["T1", "T2", "T3", "T4"];
 
   // Gửi từng team
-  // ⚠️ GAS không gửi nữa — Python Telethon sender sẽ gửi (send_teams_telethon.py)
   for (const team of teams) {
     const chatId = SD_GROUPS[team];
     if (!chatId) continue;
     const msg = buildAwAzTeamMessage(team, ts, awaz, AWAZ_COL[team]);
-    Logger.log("[Tin2][" + team + "] ready: " + msg.substring(0, 60));
-    // sendTelegram(chatId, msg, "[Tin2][" + team + "]");  // tắt — Python gửi
+    sendTelegram(chatId, msg, "[Tin2][" + team + "]");
   }
 
   // Gửi Tin 2 tổng hợp vào Control (HTML + emoji)
-  // ⚠️ GAS không gửi nữa — Python Telethon sender sẽ gửi
-  // const controlId = SD_GROUPS["CONTROL"];
-  // if (controlId) {
-  //   try {
-  //     const msg = buildAwAzControlMessage(ts, awaz);
-  //     sendTelegram(controlId, msg, "[Tin2][CONTROL]");
-  //   } catch(e) {
-  //     Logger.log("[Tin2][CONTROL] ❌ Lỗi: " + e.message);
-  //   }
-  // }
+  const controlId2 = SD_GROUPS["CONTROL"];
+  if (controlId2) {
+    try {
+      const msg = buildAwAzControlMessage(ts, awaz);
+      sendTelegram(controlId2, msg, "[Tin2][CONTROL]");
+    } catch(e) {
+      Logger.log("[Tin2][CONTROL] ❌ Lỗi: " + e.message);
+    }
+  }
 
   props.setProperty(TS_KEY_AW4, ts);
   Logger.log("[Tin2] ✅ Xong — lưu timestamp: " + ts);
