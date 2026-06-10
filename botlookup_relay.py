@@ -33,7 +33,7 @@ BOT_USERNAME   = "auto_nocpro_bot"
 WAIT_REPLY_SEC = 35
 
 ACTIVE_START   = (4, 30)
-ACTIVE_END     = (23, 0)
+ACTIVE_END     = (21, 30)
 
 MIN_DELAY_SEC  = 3 * 60   # 3 phút
 MAX_DELAY_SEC  = 8 * 60   # 8 phút
