@@ -142,17 +142,16 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 9. Relay chỉ TRIGGER lệnh — không gửi gì thêm ──────────
-        # Company bot tự gửi formatted report (có | T1 |, | T2 |...) sang CONTROL
-        # site_down_notify.gs polling CONTROL mỗi 5p → ghi Col A → gửi đúng team
-        # KHÔNG gửi raw data vào CONTROL (sẽ overwrite correct formatted data)
-        if bot_messages:
-            total_chars = sum(len(m) for m in bot_messages)
-            print(f"[{myanmar_now()}] ✅ Bot đã phản hồi ({len(bot_messages)} phần, {total_chars} ký tự)")
-            print(f"[{myanmar_now()}] 🎉 Trigger xong! Company bot sẽ gửi formatted report sang CONTROL.")
-            print(f"[{myanmar_now()}] ⏳ site_down_notify.gs sẽ xử lý trong vòng 5 phút tiếp theo.")
-        else:
-            print(f"[{myanmar_now()}] ⚠️ Bot không phản hồi — có thể company bot chưa sẵn sàng.")
+        # ── 9. Gửi raw data vào CONTROL ─────────────────────────────
+        # site_down_notify.gs polling CONTROL mỗi 5p → ghi Col A
+        # Col C formula tự phân tích theo team → gửi T1/T2/T3/T4
+        raw_text = "\n".join(bot_messages)
+        chunks = split_message(raw_text, 4000)
+        for chunk in chunks:
+            await client.send_message(TARGET_CHAT_ID, chunk)
+            await asyncio.sleep(0.5)
+        print(f"[{myanmar_now()}] ✅ Đã gửi sang CONTROL ({len(chunks)} phần)")
+        print(f"[{myanmar_now()}] ⏳ site_down_notify.gs sẽ xử lý trong vòng 5 phút.")
 
 
 if __name__ == "__main__":
