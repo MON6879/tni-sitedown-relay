@@ -303,12 +303,12 @@ function checkAwAz(sheet) {
     sendTelegram(chatId, msg, "[Tin2][" + team + "]");
   }
 
-  // Gửi Tin 2 tổng hợp vào Control (plain text để tránh lỗi ký tự)
+  // Gửi Tin 2 tổng hợp vào Control (HTML + emoji)
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
       const msg = buildAwAzControlMessage(ts, awaz);
-      sendTelegramPlain(controlId, msg, "[Tin2][CONTROL]");
+      sendTelegram(controlId, msg, "[Tin2][CONTROL]");
     } catch(e) {
       Logger.log("[Tin2][CONTROL] ❌ Lỗi: " + e.message);
     }
@@ -534,30 +534,38 @@ function buildColCControlMessage(ts, colCData) {
 
 
 // ============================================================
-// BUILD Tin 2 — AW:AZ tổng hợp cho Control (4 team, plain text)
+// BUILD Tin 2 — AW:AZ tổng hợp cho Control (4 team, có emoji + format đẹp)
 // ============================================================
 function buildAwAzControlMessage(ts, awaz) {
-  const teamLabels = ["Team 1", "Team 2 (T2+T5)", "Team 3", "Team 4"];
+  const teamLabels = [
+    { key: "T1", label: "Team 1",          emoji: "🔵" },
+    { key: "T2", label: "Team 2 (T2+T5)",  emoji: "🟡" },
+    { key: "T3", label: "Team 3",          emoji: "🟢" },
+    { key: "T4", label: "Team 4",          emoji: "🔴" },
+  ];
   const lines = [];
-  lines.push("SUMMARY TONG HOP - TAT CA TEAM");
-  lines.push("Thoi gian: " + ts);
+  lines.push("📊 <b>SUMMARY TỔNG HỢP — TẤT CẢ TEAM</b>");
+  lines.push("📅 " + escHtml(ts));
+  lines.push("━".repeat(26));
 
   for (let col = 0; col < 4; col++) {
+    const t = teamLabels[col];
     lines.push("");
-    lines.push("--- " + teamLabels[col] + " ---");
+    lines.push(t.emoji + " <b>" + t.label + "</b>");
+    lines.push("─".repeat(20));
     let hasData = false;
     for (let r = 0; r < 5; r++) {
       const txt = ((awaz[r] || [])[col] || "").toString().trim();
       if (!txt || txt === "0") continue;
-      // Xóa ký tự markdown (* _ `) để tránh lỗi
-      const clean = txt.replace(/[*_`]/g, "");
-      lines.push(AWAZ_LABELS[r].name + ": " + clean);
+      const clean = escHtml(txt.replace(/[*_`]/g, ""));
+      lines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
       hasData = true;
     }
-    if (!hasData) lines.push("Khong co su co");
+    if (!hasData) lines.push("✅ Không có sự cố");
   }
   return lines.join("\n");
 }
+
 
 
 // ============================================================
