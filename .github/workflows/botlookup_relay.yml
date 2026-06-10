@@ -6,8 +6,11 @@ name: Botlookup TNI Relay (mỗi 30 phút)
 
 on:
   schedule:
-    # Chạy mỗi 30 phút, 24/7 — Python tự lọc khung giờ 04:30–21:30 Myanmar
-    - cron: "*/30 * * * *"
+    # Khung giờ hoạt động: 04:30–21:30 Myanmar (UTC+6:30)
+    # 04:30 Myanmar = 22:00 UTC | 21:30 Myanmar = 15:00 UTC
+    - cron: "0,30 22,23 * * *"   # 04:30–06:00 Myanmar
+    - cron: "0,30 0-14 * * *"    # 06:30–21:00 Myanmar
+    - cron: "0 15 * * *"         # 21:30 Myanmar (run cuối)
   workflow_dispatch:        # Cho phép chạy tay để test
 
 jobs:
