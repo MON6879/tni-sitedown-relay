@@ -224,10 +224,11 @@ function checkColC(sheet) {
 
   const lines = colCRaw.split("\n");
 
-  // ① CONTROL: nhận TOÀN BỘ Col C
+  // ① CONTROL: nhận TOÀN BỘ Col C (có tô màu team)
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
-    sendTelegram(controlId, "<pre>" + escHtml(colCRaw) + "</pre>", "[Tin1][CONTROL]");
+    const coloredRaw = colorizeTeams(colCRaw);
+    sendTelegram(controlId, "<pre>" + escHtml(coloredRaw) + "</pre>", "[Tin1][CONTROL]");
   }
 
   // ② Mỗi Team: header chung + summary team đó + site của team đó
@@ -265,7 +266,9 @@ function checkColC(sheet) {
       ? [...headerLines, "...", ...siteLines].join("\n")
       : [...headerLines, "Không có site down"].join("\n");
 
-    sendTelegram(chatId, "<pre>" + escHtml(teamContent) + "</pre>", "[Tin1][" + team + "]");
+    // Tô màu team code trong tin nhắn
+    const coloredContent = colorizeTeams(teamContent);
+    sendTelegram(chatId, "<pre>" + escHtml(coloredContent) + "</pre>", "[Tin1][" + team + "]");
   }
 
   props.setProperty(TS_KEY_A1, raw);
@@ -453,6 +456,24 @@ function escHtml(str) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+}
+
+
+// ============================================================
+// TÔ MÀU TEAM CODES — thêm emoji màu trước T1/T2/T3/T4/T5
+// 🔵 T1 | 🟡 T2 | 🟢 T3 | 🔴 T4 | 🟠 T5
+// Hoạt động cả trong <pre> block (emoji hiển thị bình thường)
+// ============================================================
+const TEAM_COLORS = {
+  T1: "🔵", T2: "🟡", T3: "🟢", T4: "🔴", T5: "🟠"
+};
+
+function colorizeTeams(text) {
+  // Thay | T1 | → | 🔵T1 | trong các dòng site (dạng: số: TNIxxxx | Tx | ...)
+  return (text || "").replace(/\|\s*(T[1-5])\s*\|/gi, function(match, team) {
+    const emoji = TEAM_COLORS[team.toUpperCase()] || "";
+    return "| " + emoji + team + " |";
+  });
 }
 
 // ============================================================
