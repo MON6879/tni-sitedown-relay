@@ -120,7 +120,7 @@
   - `TELEGRAM_SESSION` *(dùng cho botlookup_relay)*
 
 ### Apps Script
-- **URL:** `https://script.google.com/macros/s/AKfycbxJF4FJHHI93bMELdm6YgFN-Tz8tUKrwl3QXWyrQn_WzDsaoqWjZEO41TvudGyMBKo7wg/exec`
+- **URL:** `https://script.google.com/macros/s/AKfycbwQ4N44xZ92HyiYEOxHgA0VHMrCzKXYSCY32nh0pFgFuFavcUkjxp3h1Z1VkvvO94a9cw/exec`
 - **Actions:** `collect`, `done`, `get_asset_stats`, `get_report_data`, `refresh_general`
 
 ---
