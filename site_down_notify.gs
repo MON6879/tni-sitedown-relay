@@ -209,6 +209,16 @@ function checkAndSend() {
 
 
 // ============================================================
+// ALIAS — Trigger cũ "relayBotlookupToTNI" (mỗi 30 phút)
+// Hàm này bị xóa nhầm — giờ restore lại để trigger không fail
+// ============================================================
+function relayBotlookupToTNI() {
+  Logger.log("[relayBotlookupToTNI] Gọi checkAndSend() từ trigger 30p");
+  checkAndSend();
+}
+
+
+// ============================================================
 // TIN 1 — Cột C: site list chi tiết
 // Trigger: A1 timestamp thay đổi
 // Gửi:
