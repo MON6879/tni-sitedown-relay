@@ -7,6 +7,10 @@
 
 const SHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8";
 
+// Sheet site_down_notify.gs sử dụng (viết dữ liệu thô vào đây)
+const SD_SHEET_ID  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
+const SD_SHEET_GID = 0;  // Tab GID=0
+
 // Tab where collected data is stored (gid = 199426270)
 const DATA_TAB        = "Asset order and request";
 
@@ -51,9 +55,55 @@ function doPost(e) {
     if (body.action === "get_general")      return handleGetGeneral(ss);
     if (body.action === "get_report_data")   return handleGetReportData(ss);
     if (body.action === "get_asset_stats")   return handleGetAssetStats(ss);
+    if (body.action === "store_site_down")   return handleStoreSiteDown(body);
 
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
+    return json({ status: "error", message: err.message });
+  }
+}
+
+// ============================================================
+// STORE SITE DOWN — Nhận raw text từ botlookup_relay.py
+// Ghi im lặng vào SD Sheet Col A
+// site_down_notify.gs trigger 5p sẽ đọc & phân phối đến teams
+// ============================================================
+function handleStoreSiteDown(body) {
+  const rawText = (body.raw_text || "").trim();
+  if (!rawText) {
+    return json({ status: "error", message: "raw_text is empty" });
+  }
+
+  try {
+    const ssSd = SpreadsheetApp.openById(SD_SHEET_ID);
+
+    // Lấy sheet tab GID=0
+    let sdSheet = null;
+    const sheets = ssSd.getSheets();
+    for (const sh of sheets) {
+      if (sh.getSheetId() === SD_SHEET_GID) { sdSheet = sh; break; }
+    }
+    if (!sdSheet) sdSheet = ssSd.getSheets()[0];  // fallback tab đầu tiên
+
+    // Xóa Col A cũ, ghi dữ liệu mới từng dòng
+    const lastRow = sdSheet.getLastRow();
+    if (lastRow > 0) sdSheet.getRange(1, 1, lastRow, 1).clearContent();
+
+    const lines = rawText.split("\n");
+    const writeData = lines.map(l => [l]);
+    if (writeData.length > 0) {
+      sdSheet.getRange(1, 1, writeData.length, 1).setValues(writeData);
+    }
+
+    Logger.log("📝 store_site_down: ghi " + writeData.length + " dòng vào SD Sheet");
+    return json({
+      status: "ok",
+      message: "Đã ghi " + writeData.length + " dòng vào SD Sheet. Trigger 5p sẽ phân phối.",
+      lines: writeData.length
+    });
+
+  } catch (err) {
+    Logger.log("❌ store_site_down error: " + err.message);
     return json({ status: "error", message: err.message });
   }
 }

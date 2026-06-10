@@ -14,6 +14,7 @@ Thêm delay ngẫu nhiên 3–8 phút để trông tự nhiên.
 import asyncio
 import os
 import random
+import requests
 from datetime import datetime, timezone, timedelta
 
 from telethon import TelegramClient
@@ -141,15 +142,37 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 9. Forward sang CONTROL ────────────────────────────────
-        # Apps Script (site_down_notify.gs) đọc CONTROL và phân phối T1/T2/T3/T4
-        header = f"📊 Dữ liệu TNI — {myanmar_now()}\n{'─'*30}\n\n"
-        for text in bot_messages:
-            chunks = split_message(header + text, 4000)
+        # ── 9. POST raw text → Apps Script → ghi vào SD Sheet (im lặng) ──
+        # site_down_notify.gs trigger 5p sẽ đọc Col A và phân phối đến teams
+        APPS_SCRIPT_URL = os.environ.get("APPS_SCRIPT_URL", "")
+        raw_text = "\n".join(bot_messages)
+
+        if APPS_SCRIPT_URL:
+            try:
+                resp = requests.post(
+                    APPS_SCRIPT_URL,
+                    json={"action": "store_site_down", "raw_text": raw_text},
+                    timeout=60,
+                    allow_redirects=True,
+                )
+                result = resp.json() if resp.ok else {"status": "http_error", "code": resp.status_code}
+                if result.get("status") == "ok":
+                    print(f"[{myanmar_now()}] ✅ Đã ghi {result.get('lines','?')} dòng vào SD Sheet")
+                else:
+                    print(f"[{myanmar_now()}] ⚠️ store_site_down: {result}")
+                    # Fallback: gửi CONTROL nếu lỗi
+                    await client.send_message(TARGET_CHAT_ID,
+                        f"⚠️ store_site_down lỗi — fallback gửi raw\n{raw_text[:2000]}")
+            except Exception as post_err:
+                print(f"[{myanmar_now()}] ❌ POST lỗi: {post_err}")
+                await client.send_message(TARGET_CHAT_ID,
+                    f"❌ Relay lỗi POST: {post_err}")
+        else:
+            print(f"[{myanmar_now()}] ⚠️ APPS_SCRIPT_URL chưa set — gửi CONTROL trực tiếp")
+            chunks = split_message(f"📊 Dữ liệu TNI — {myanmar_now()}\n{'─'*30}\n\n{raw_text}", 4000)
             for chunk in chunks:
                 await client.send_message(TARGET_CHAT_ID, chunk)
                 await asyncio.sleep(0.5)
-            print(f"[{myanmar_now()}] ✅ Đã gửi sang CONTROL ({len(chunks)} phần)")
 
         print(f"[{myanmar_now()}] 🎉 Hoàn thành!")
 
