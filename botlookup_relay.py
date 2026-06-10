@@ -4,7 +4,7 @@ botlookup_relay.py
 Gửi lệnh /down_tni@auto_nocpro_bot vào nhóm Botlookup,
 đọc phản hồi rồi forward sang nhóm CONTROL (-5251698940).
 
-Sau 15 phút → gửi báo cáo ai đã đọc / chưa đọc vào CONTROL.
+Báo cáo ai đã đọc: chạy riêng lúc 21:00 Myanmar qua daily_read_report.py
 
 Chạy tự động qua GitHub Actions mỗi 30 phút.
 Chỉ hoạt động trong khung giờ 04:30 – 21:30 Myanmar (UTC+6:30).
@@ -17,10 +17,7 @@ import random
 from datetime import datetime, timezone, timedelta
 
 from telethon import TelegramClient
-from telethon.tl.functions.messages import (
-    GetHistoryRequest,
-    GetMessageReadParticipantsRequest,
-)
+from telethon.tl.functions.messages import GetHistoryRequest
 
 # ── Cấu hình ──────────────────────────────────────────────────────
 API_ID         = int(os.environ["TELEGRAM_API_ID"])
@@ -32,10 +29,8 @@ COMMAND        = "/down_tni@auto_nocpro_bot"
 TARGET_CHAT_ID = -5251698940                 # 5 TNI TECHNICA DEP CONTROL SITE
 
 BOT_USERNAME   = "auto_nocpro_bot"
-WAIT_REPLY_SEC = 35                          # chờ bot phản hồi
-READ_WAIT_MIN  = 15                          # chờ 15 phút rồi check ai đã đọc
+WAIT_REPLY_SEC = 35
 
-# Khung giờ hoạt động (Myanmar UTC+6:30)
 ACTIVE_START   = (4, 30)
 ACTIVE_END     = (21, 30)
 
@@ -55,88 +50,10 @@ def in_active_window() -> bool:
     return ACTIVE_START <= (now.hour, now.minute) <= ACTIVE_END
 
 
-async def send_read_report(client, me_id: int, msg_id: int, sent_at: str):
-    """
-    Đợi READ_WAIT_MIN phút → kiểm tra ai đã đọc tin msg_id trong CONTROL
-    → gửi báo cáo "Đã đọc / Chưa đọc" vào CONTROL.
-    """
-    print(f"[{myanmar_now()}] ⏳ Đợi {READ_WAIT_MIN} phút để check ai đã đọc...")
-    await asyncio.sleep(READ_WAIT_MIN * 60)
-    print(f"[{myanmar_now()}] 🔍 Đang lấy danh sách người đọc...")
-
-    # ── Lấy danh sách người đã đọc ───────────────────────────────
-    reader_ids = set()
-    try:
-        readers = await client(GetMessageReadParticipantsRequest(
-            peer   = TARGET_CHAT_ID,
-            msg_id = msg_id,
-        ))
-        for r in readers:
-            uid = getattr(r, "user_id", None)
-            if uid:
-                reader_ids.add(uid)
-        print(f"[{myanmar_now()}] 👁 Số người đã đọc: {len(reader_ids)}")
-    except Exception as e:
-        print(f"[{myanmar_now()}] ❌ Lỗi GetMessageReadParticipants: {e}")
-        return
-
-    # ── Lấy tất cả thành viên group (trừ bot và mình) ────────────
-    all_members = []
-    try:
-        participants = await client.get_participants(TARGET_CHAT_ID)
-        for p in participants:
-            if getattr(p, "bot", False):
-                continue
-            if p.id == me_id:
-                continue
-            name = (getattr(p, "first_name", "") or "").strip()
-            last = (getattr(p, "last_name", "") or "").strip()
-            if last:
-                name = f"{name} {last}".strip()
-            all_members.append({"id": p.id, "name": name or str(p.id)})
-        print(f"[{myanmar_now()}] 👥 Tổng thành viên (trừ bot/mình): {len(all_members)}")
-    except Exception as e:
-        print(f"[{myanmar_now()}] ❌ Lỗi get_participants: {e}")
-        # Nếu không lấy được members, chỉ gửi danh sách đã đọc
-        all_members = []
-
-    # ── Phân loại đã đọc / chưa đọc ──────────────────────────────
-    read_names   = [m["name"] for m in all_members if m["id"] in reader_ids]
-    unread_names = [m["name"] for m in all_members if m["id"] not in reader_ids]
-
-    # ── Tạo báo cáo ───────────────────────────────────────────────
-    divider = "─" * 28
-    if all_members:
-        report = (
-            f"👁 BÁO CÁO ĐÃ XEM — {myanmar_now()}\n"
-            f"📨 Tin gửi lúc: {sent_at}\n"
-            f"{divider}\n"
-            f"✅ Đã đọc ({len(read_names)}): "
-            f"{', '.join(read_names) if read_names else 'Chưa có ai'}\n"
-            f"❌ Chưa đọc ({len(unread_names)}): "
-            f"{', '.join(unread_names) if unread_names else 'Tất cả đã đọc ✅'}\n"
-            f"{divider}"
-        )
-    else:
-        # Fallback: chỉ có danh sách người đọc
-        report = (
-            f"👁 BÁO CÁO ĐÃ XEM — {myanmar_now()}\n"
-            f"📨 Tin gửi lúc: {sent_at}\n"
-            f"{divider}\n"
-            f"✅ Đã đọc ({len(reader_ids)}): "
-            f"{', '.join([str(uid) for uid in reader_ids]) if reader_ids else 'Chưa có ai'}"
-        )
-
-    await client.send_message(TARGET_CHAT_ID, report)
-    print(f"[{myanmar_now()}] ✅ Đã gửi báo cáo đọc tin!")
-
-
 async def main():
-    tz = timezone(timedelta(hours=6, minutes=30))
-
     # ── 0. Kiểm tra khung giờ ────────────────────────────────────
     if not in_active_window():
-        print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ. Hoạt động 04:30–21:30. Kết thúc.")
+        print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ 04:30–21:30. Kết thúc.")
         return
 
     # ── 1. Delay ngẫu nhiên ───────────────────────────────────────
@@ -168,7 +85,6 @@ async def main():
 
         # ── 4. Ghi nhớ thời điểm gửi lệnh ───────────────────────
         send_time = datetime.now(timezone.utc)
-        sent_str  = myanmar_now()
 
         # ── 5. Gửi lệnh ──────────────────────────────────────────
         print(f"[{myanmar_now()}] 📤 Gửi: {COMMAND}")
@@ -204,32 +120,21 @@ async def main():
                 print(f"[{myanmar_now()}] ✅ Tin từ @{BOT_USERNAME} ({len(msg.message)} ký tự)")
 
         if not bot_messages:
-            err = (
-                f"⚠️ [{myanmar_now()}] @{BOT_USERNAME} không phản hồi "
-                f"trong {WAIT_REPLY_SEC}s"
-            )
+            err = f"⚠️ [{myanmar_now()}] @{BOT_USERNAME} không phản hồi trong {WAIT_REPLY_SEC}s"
             print(err)
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 9. Gửi sang CONTROL, lấy msg_id tin đầu tiên ─────────
-        header = f"📊 Dữ liệu TNI — {sent_str}\n{'─'*30}\n\n"
-        first_msg_id = None
-
+        # ── 9. Gửi sang CONTROL ───────────────────────────────────
+        header = f"📊 Dữ liệu TNI — {myanmar_now()}\n{'─'*30}\n\n"
         for text in bot_messages:
             chunks = split_message(header + text, 4000)
-            for i, chunk in enumerate(chunks):
-                sent_msg = await client.send_message(TARGET_CHAT_ID, chunk)
-                if first_msg_id is None:
-                    first_msg_id = sent_msg.id   # lưu ID tin đầu để check read
+            for chunk in chunks:
+                await client.send_message(TARGET_CHAT_ID, chunk)
                 await asyncio.sleep(0.5)
             print(f"[{myanmar_now()}] ✅ Đã gửi sang CONTROL ({len(chunks)} phần)")
 
-        print(f"[{myanmar_now()}] 🎉 Gửi xong! msg_id={first_msg_id}")
-
-        # ── 10. Sau 15 phút → báo cáo ai đã đọc ─────────────────
-        if first_msg_id:
-            await send_read_report(client, me.id, first_msg_id, sent_str)
+        print(f"[{myanmar_now()}] 🎉 Hoàn thành!")
 
 
 def split_message(text: str, max_len: int) -> list[str]:
