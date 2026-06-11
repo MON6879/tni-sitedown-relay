@@ -228,9 +228,9 @@ function relayBotlookupToTNI() {
   // Bước 2: Chạy checkAndSend để gửi nếu Cột A đã có data
   checkAndSend();
 
-  // Bước 3: Nếu đang trong giờ 17 Myanmar → dispatch check_read_status (1 lần/ngày)
+  // Bước 3: Nếu đang trong giờ 18 Myanmar (6:30 PM) → dispatch check_read_status (1 lần/ngày)
   const myanmarHour = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "H"), 10);
-  if (myanmarHour === 17) {
+  if (myanmarHour === 18) {
     const todayKey = "READ_CHECK_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
     const props    = PropertiesService.getScriptProperties();
     if (!props.getProperty(todayKey)) {
