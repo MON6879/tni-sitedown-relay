@@ -228,12 +228,10 @@ function relayBotlookupToTNI() {
   // Bước 2: Chạy checkAndSend để gửi nếu Cột A đã có data
   checkAndSend();
 
-  // Bước 3: Khoảng 17:50 Myanmar → dispatch check_read_status (1 lần/ngày)
-  // Window 17:45–18:05 để bắt trigger 30p gần nhất với 17:50
+  // Bước 3: 20:00–20:30 Myanmar (~20:01) → dispatch check_read_status (1 lần/ngày)
   const myanmarHour = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "H"), 10);
   const myanmarMin  = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "m"), 10);
-  const isReadTime  = (myanmarHour === 17 && myanmarMin >= 45) ||
-                      (myanmarHour === 18 && myanmarMin <= 5);
+  const isReadTime  = (myanmarHour === 20 && myanmarMin <= 30);
   if (isReadTime) {
     const todayKey = "READ_CHECK_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
     const props    = PropertiesService.getScriptProperties();
