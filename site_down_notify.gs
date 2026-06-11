@@ -209,13 +209,70 @@ function checkAndSend() {
 
 
 // ============================================================
-// ALIAS — Trigger cũ "relayBotlookupToTNI" (mỗi 30 phút)
-// Hàm này bị xóa nhầm — giờ restore lại để trigger không fail
+// RELAY — Trigger mỗi 30 phút
+// Bước 1: Gọi GitHub API dispatch botlookup_relay.yml
+//         → botlookup_relay.py chạy → lấy data bot → gọi GAS → ghi Cột A
+// Bước 2: checkAndSend() để gửi nếu Cột A đã có data
 // ============================================================
 function relayBotlookupToTNI() {
-  Logger.log("[relayBotlookupToTNI] Gọi checkAndSend() từ trigger 30p");
+  Logger.log("[relayBotlookupToTNI] Bắt đầu trigger 30p");
+
+  // Bước 1: Dispatch GitHub Actions workflow
+  const dispatched = triggerBotlookupRelay();
+  if (dispatched) {
+    Logger.log("[relayBotlookupToTNI] ✅ GitHub Actions đã dispatch — botlookup_relay.py sẽ gọi GAS sau ~2-3p");
+  } else {
+    Logger.log("[relayBotlookupToTNI] ⚠️ Không dispatch được GitHub Actions (thiếu GITHUB_PAT?)");
+  }
+
+  // Bước 2: Chạy checkAndSend để gửi nếu Cột A đã có data
   checkAndSend();
 }
+
+
+// ============================================================
+// HELPER — Dispatch GitHub Actions workflow botlookup_relay.yml
+// Yêu cầu: Script Property "GITHUB_PAT" = Personal Access Token
+//   có scope: repo + workflow
+// Cách tạo PAT: github.com/settings/tokens → Generate new token (classic)
+//   → chọn scope "repo" và "workflow"
+// Cách lưu: GAS Editor → Project Settings → Script Properties
+//   → thêm key "GITHUB_PAT" = token value
+// ============================================================
+function triggerBotlookupRelay() {
+  try {
+    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
+    if (!pat) {
+      Logger.log("[triggerBotlookupRelay] ⚠️ GITHUB_PAT chưa set trong Script Properties");
+      return false;
+    }
+
+    const owner    = "phonghdpxd-cmd";
+    const repo     = "tni-bot";
+    const workflow = "botlookup_relay.yml";
+    const url      = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow}/dispatches`;
+
+    const resp = UrlFetchApp.fetch(url, {
+      method: "post",
+      headers: {
+        "Authorization": "Bearer " + pat,
+        "Accept":        "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type":  "application/json"
+      },
+      payload: JSON.stringify({ ref: "main", inputs: { skip_delay: "1" } }),
+      muteHttpExceptions: true
+    });
+
+    const code = resp.getResponseCode();
+    Logger.log("[triggerBotlookupRelay] GitHub API response: " + code);
+    return code === 204;   // 204 No Content = thành công
+  } catch(e) {
+    Logger.log("[triggerBotlookupRelay] ❌ Lỗi: " + e.message);
+    return false;
+  }
+}
+
 
 
 // ============================================================

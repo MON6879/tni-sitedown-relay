@@ -1,23 +1,19 @@
-name: Botlookup TNI Relay (mỗi 30 phút)
+name: Botlookup TNI Relay
 
-# Khung giờ hoạt động: 04:30 – 21:30 Myanmar (UTC+6:30)
-# 04:30 Myanmar = 22:00 UTC | 21:30 Myanmar = 15:00 UTC
-# → Cron chạy UTC 22:00–23:30 và 00:00–15:00
-
+# Chỉ chạy qua workflow_dispatch (được gọi bởi GAS trigger mỗi 30p)
+# KHÔNG dùng schedule cron (GitHub cron không đáng tin cậy)
 on:
-  schedule:
-    # Khung giờ hoạt động: 04:00–21:30 Myanmar (UTC+6:30)
-    # 04:00 Myanmar = 21:30 UTC | 21:30 Myanmar = 15:00 UTC
-    - cron: "30 21 * * *"          # 04:00 Myanmar (run đầu tiên buổi sáng)
-    - cron: "0,30 22,23 * * *"     # 04:30–06:00 Myanmar
-    - cron: "0,30 0-14 * * *"      # 06:30–21:00 Myanmar
-    - cron: "0 15 * * *"           # 21:30 Myanmar (run cuối ngày)
-  workflow_dispatch:        # Cho phép chạy tay để test
+  workflow_dispatch:        # Gọi từ GAS relayBotlookupToTNI() hoặc tay
+    inputs:
+      skip_delay:
+        description: 'Skip random delay (1=yes, 0=no)'
+        required: false
+        default: '1'
 
 jobs:
   relay:
     runs-on: ubuntu-latest
-    timeout-minutes: 28    # setup~4p + delay max 8p + reply 35s + gửi~1p = ~14p tối đa
+    timeout-minutes: 10    # SKIP_DELAY=1 → không có delay → tổng ~2-3p
 
     steps:
       - name: Checkout code
@@ -38,6 +34,6 @@ jobs:
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           TELEGRAM_SESSION:  ${{ secrets.TELEGRAM_SESSION }}
           APPS_SCRIPT_URL:   ${{ secrets.APPS_SCRIPT_URL }}
-          SKIP_DELAY: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+          SKIP_DELAY: ${{ github.event.inputs.skip_delay || '1' }}
         run: |
           python botlookup_relay.py
