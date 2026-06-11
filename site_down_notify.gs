@@ -227,6 +227,55 @@ function relayBotlookupToTNI() {
 
   // Bước 2: Chạy checkAndSend để gửi nếu Cột A đã có data
   checkAndSend();
+
+  // Bước 3: Nếu đang trong giờ 17 Myanmar → dispatch check_read_status (1 lần/ngày)
+  const myanmarHour = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "H"), 10);
+  if (myanmarHour === 17) {
+    const todayKey = "READ_CHECK_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+    const props    = PropertiesService.getScriptProperties();
+    if (!props.getProperty(todayKey)) {
+      const ok = triggerReadStatusCheck();
+      if (ok) {
+        props.setProperty(todayKey, "done");
+        Logger.log("[relayBotlookupToTNI] ✅ Dispatch check_read_status lúc 17:xx Myanmar");
+      }
+    } else {
+      Logger.log("[relayBotlookupToTNI] ℹ️ check_read_status đã chạy hôm nay rồi — bỏ qua");
+    }
+  }
+}
+
+
+// ============================================================
+// HELPER — Dispatch GitHub Actions workflow check_read_status.yml
+// Chạy 1 lần/ngày lúc 17:xx Myanmar → báo cáo ai đọc Note
+// ============================================================
+function triggerReadStatusCheck() {
+  try {
+    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
+    if (!pat) {
+      Logger.log("[triggerReadStatusCheck] ⚠️ GITHUB_PAT chưa set");
+      return false;
+    }
+    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/check_read_status.yml/dispatches";
+    const resp = UrlFetchApp.fetch(url, {
+      method: "post",
+      headers: {
+        "Authorization": "Bearer " + pat,
+        "Accept":        "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type":  "application/json"
+      },
+      payload: JSON.stringify({ ref: "main" }),
+      muteHttpExceptions: true
+    });
+    const code = resp.getResponseCode();
+    Logger.log("[triggerReadStatusCheck] GitHub API response: " + code);
+    return code === 204;
+  } catch(e) {
+    Logger.log("[triggerReadStatusCheck] ❌ Lỗi: " + e.message);
+    return false;
+  }
 }
 
 
