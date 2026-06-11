@@ -142,17 +142,19 @@ async def main():
                 bot_messages.append(msg.message)
                 print(f"[{myanmar_now()}] ✅ Tin từ @{BOT_USERNAME} ({len(msg.message)} ký tự)")
 
+        gas_url = os.environ.get("APPS_SCRIPT_URL", "")
+
         if not bot_messages:
             err = f"⚠️ [{myanmar_now()}] @{BOT_USERNAME} không phản hồi trong {WAIT_REPLY_SEC}s"
             print(err)
             await client.send_message(TARGET_CHAT_ID, err)
-            return
+            # Không return sớm! Vẫn gửi Note B2:B5 bên dưới
 
-        raw_text = "\n".join(bot_messages)
+        raw_text = "\n".join(bot_messages) if bot_messages else ""
 
         # ── 9. Gọi GAS webhook → ghi Cột A → checkAndSend() gửi tổng hợp ──
-        gas_url = os.environ.get("APPS_SCRIPT_URL", "")
-        if gas_url:
+        # Chỉ gọi nếu có data (bot phản hồi)
+        if raw_text and gas_url:
             try:
                 resp = requests.post(
                     gas_url,
@@ -162,8 +164,9 @@ async def main():
                 print(f"[{myanmar_now()}] ✅ GAS webhook: {resp.status_code} — {resp.text[:200]}")
             except Exception as ex:
                 print(f"[{myanmar_now()}] ⚠️ GAS webhook lỗi: {ex}")
-        else:
-            print(f"[{myanmar_now()}] ⚠️ APPS_SCRIPT_URL chưa cấu hình")
+        elif not raw_text:
+            print(f"[{myanmar_now()}] ℹ️ Không có data bot — bỏ qua ghi Cột A")
+
 
         # ── 10. Đọc Note (B2:B5) từ GAS ─────────────────────────
         note_text = ""
