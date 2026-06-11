@@ -152,7 +152,7 @@ function doPostSiteDown(e) {
 // ============================================================
 function isSiteDownReport(text) {
   return /site down/i.test(text) &&
-         /tanintharyi/i.test(text) &&
+         (/tanintharyi/i.test(text) || /\bTNI\b/.test(text) || /TNI\d{4}/.test(text)) &&
          /\d{2}\/\d{2}\/\d{4}/i.test(text);
 }
 

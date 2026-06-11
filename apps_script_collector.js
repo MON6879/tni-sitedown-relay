@@ -5,17 +5,26 @@
 //   Execute as: Me | Who has access: Anyone
 // ============================================================
 
-// ⚠️ CÁC HẰNG SỐ SAU ĐÃ ĐƯỢC KHAI BÁO TRONG 00_CONFIG.gs
-// Comment out ở đây để tránh lỗi "Identifier already been declared"
-// const SHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8";
-// const SD_SHEET_ID  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
-// const SD_SHEET_GID = 0;
-// const DATA_TAB        = "Asset order and request";
-// const CFG_TAB         = "Config";
-// const SEARCH_LOG_TAB  = "Search Log";
-// const SEARCH_STATS_TAB = "Search Stats";
-// const GENERAL_TAB      = "General";
-// const REPORT_GID       = "133591305";
+const SHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8";
+
+// Tab where collected data is stored (gid = 199426270)
+const DATA_TAB        = "Asset order and request";
+
+// Tab where authorised users are listed (gid = 1236389870)
+// Layout: Col A = Field Name (existing)  |  Col B = Name  |  Col C = Telegram ID
+const CFG_TAB         = "Config";
+
+// Tab for search activity log
+const SEARCH_LOG_TAB  = "Search Log";
+
+// Tab for aggregated search stats (one row per user)
+const SEARCH_STATS_TAB = "Search Stats";
+
+// Tab for general combined report (Name + ID + Content + Search stats)
+const GENERAL_TAB      = "General";
+
+// GID of the daily report sheet (gid=133591305)
+const REPORT_GID       = "133591305";
 
 // ============================================================
 // ENTRY POINTS
@@ -42,55 +51,9 @@ function doPost(e) {
     if (body.action === "get_general")      return handleGetGeneral(ss);
     if (body.action === "get_report_data")   return handleGetReportData(ss);
     if (body.action === "get_asset_stats")   return handleGetAssetStats(ss);
-    if (body.action === "store_site_down")   return handleStoreSiteDown(body);
 
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
-    return json({ status: "error", message: err.message });
-  }
-}
-
-// ============================================================
-// STORE SITE DOWN — Nhận raw text từ botlookup_relay.py
-// Ghi im lặng vào SD Sheet Col A
-// site_down_notify.gs trigger 5p sẽ đọc & phân phối đến teams
-// ============================================================
-function handleStoreSiteDown(body) {
-  const rawText = (body.raw_text || "").trim();
-  if (!rawText) {
-    return json({ status: "error", message: "raw_text is empty" });
-  }
-
-  try {
-    const ssSd = SpreadsheetApp.openById(SD_SHEET_ID);
-
-    // Lấy sheet tab GID=0
-    let sdSheet = null;
-    const sheets = ssSd.getSheets();
-    for (const sh of sheets) {
-      if (sh.getSheetId() === SD_SHEET_GID) { sdSheet = sh; break; }
-    }
-    if (!sdSheet) sdSheet = ssSd.getSheets()[0];  // fallback tab đầu tiên
-
-    // Xóa Col A cũ, ghi dữ liệu mới từng dòng
-    const lastRow = sdSheet.getLastRow();
-    if (lastRow > 0) sdSheet.getRange(1, 1, lastRow, 1).clearContent();
-
-    const lines = rawText.split("\n");
-    const writeData = lines.map(l => [l]);
-    if (writeData.length > 0) {
-      sdSheet.getRange(1, 1, writeData.length, 1).setValues(writeData);
-    }
-
-    Logger.log("📝 store_site_down: ghi " + writeData.length + " dòng vào SD Sheet");
-    return json({
-      status: "ok",
-      message: "Đã ghi " + writeData.length + " dòng vào SD Sheet. Trigger 5p sẽ phân phối.",
-      lines: writeData.length
-    });
-
-  } catch (err) {
-    Logger.log("❌ store_site_down error: " + err.message);
     return json({ status: "error", message: err.message });
   }
 }
@@ -1524,12 +1487,4 @@ function _tgSendMsg(chatId, text) {
 function authorizeNow() {
   UrlFetchApp.fetch('https://api.telegram.org');
   SpreadsheetApp.getUi().alert('✅ Cấp quyền thành công!');
-}
-
-// ════════════════════════════════════════════════════════════
-// ALIAS — Trigger cũ "relayBotlookupToTNI" (mỗi 30 phút)
-// Gọi checkAndSend() trong site_down_notify.gs
-// ════════════════════════════════════════════════════════════
-function relayBotlookupToTNI() {
-  checkAndSend();
 }
