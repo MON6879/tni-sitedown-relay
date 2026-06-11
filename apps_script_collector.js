@@ -51,6 +51,7 @@ function doPost(e) {
     if (body.action === "get_general")      return handleGetGeneral(ss);
     if (body.action === "get_report_data")   return handleGetReportData(ss);
     if (body.action === "get_asset_stats")   return handleGetAssetStats(ss);
+    if (body.action === "store_site_down")   return handleStoreSiteDownDirect(body);
 
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
@@ -1487,4 +1488,40 @@ function _tgSendMsg(chatId, text) {
 function authorizeNow() {
   UrlFetchApp.fetch('https://api.telegram.org');
   SpreadsheetApp.getUi().alert('✅ Cấp quyền thành công!');
+}
+
+// ════════════════════════════════════════════════════════════
+// ACTION: store_site_down
+// Nhận raw text từ botlookup_relay.py → ghi Cột A → checkAndSend()
+// Payload: { action: "store_site_down", text: "..." }
+// Bypass Telegram bot privacy mode — gọi thẳng GAS webhook
+// ════════════════════════════════════════════════════════════
+function handleStoreSiteDownDirect(body) {
+  try {
+    const text = (body.text || "").trim();
+    if (!text) return json({ status: "error", message: "No text provided" });
+
+    const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
+    const sheet = getSheetByGid(ss, SD_SHEET_GID);
+    if (!sheet) return json({ status: "error", message: "SD sheet not found GID=" + SD_SHEET_GID });
+
+    writeToColumnA(sheet, text);
+    Logger.log("[store_site_down] ✅ Đã ghi " + text.split("\n").length + " dòng vào Cột A");
+    SpreadsheetApp.flush();
+    Utilities.sleep(3000);   // chờ công thức Cột C cập nhật
+    checkAndSend();
+    Logger.log("[store_site_down] ✅ checkAndSend() xong");
+    return json({ status: "ok", lines: text.split("\n").length });
+  } catch(err) {
+    Logger.log("[store_site_down] ❌ " + err.message);
+    return json({ status: "error", message: err.message });
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// ALIAS — Trigger cũ "relayBotlookupToTNI" (mỗi 30 phút)
+// Gọi checkAndSend() trong site_down_notify.gs
+// ════════════════════════════════════════════════════════════
+function relayBotlookupToTNI() {
+  checkAndSend();
 }

@@ -142,16 +142,32 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 9. Gửi raw data vào CONTROL ─────────────────────────────
-        # site_down_notify.gs polling CONTROL mỗi 5p → ghi Col A
-        # Col C formula tự phân tích theo team → gửi T1/T2/T3/T4
+        # ── 9. Gửi raw data vào CONTROL (để audit/log) ──────────────
+        # NOTE: SD Bot không đọc được tin nhắn user trong group (privacy mode)
+        # → Gọi GAS webhook trực tiếp ở bước 10 để ghi Cột A
         raw_text = "\n".join(bot_messages)
         chunks = split_message(raw_text, 4000)
         for chunk in chunks:
             await client.send_message(TARGET_CHAT_ID, chunk)
             await asyncio.sleep(0.5)
         print(f"[{myanmar_now()}] ✅ Đã gửi sang CONTROL ({len(chunks)} phần)")
-        print(f"[{myanmar_now()}] ⏳ site_down_notify.gs sẽ xử lý trong vòng 5 phút.")
+
+        # ── 10. Gọi GAS webhook trực tiếp → ghi Cột A → checkAndSend() ──
+        gas_url = os.environ.get("APPS_SCRIPT_URL", "")
+        if gas_url:
+            try:
+                resp = requests.post(
+                    gas_url,
+                    json={"action": "store_site_down", "text": raw_text},
+                    timeout=120
+                )
+                print(f"[{myanmar_now()}] ✅ GAS webhook: {resp.status_code} — {resp.text[:200]}")
+            except Exception as ex:
+                print(f"[{myanmar_now()}] ⚠️ GAS webhook lỗi: {ex}")
+        else:
+            print(f"[{myanmar_now()}] ⚠️ APPS_SCRIPT_URL chưa cấu hình — bỏ qua gọi GAS")
+        print(f"[{myanmar_now()}] ⏳ Xong. Dữ liệu đã ghi vào Cột A qua GAS.")
+
 
 
 if __name__ == "__main__":
