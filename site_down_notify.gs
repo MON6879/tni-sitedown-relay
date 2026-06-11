@@ -239,11 +239,112 @@ function relayBotlookupToTNI() {
       const ok = triggerReadStatusCheck();
       if (ok) {
         props.setProperty(todayKey, "done");
-        Logger.log("[relayBotlookupToTNI] ✅ Dispatch check_read_status lúc 17:xx Myanmar");
+        Logger.log("[relayBotlookupToTNI] ✅ Dispatch check_read_status lúc 20:xx Myanmar");
       }
     } else {
       Logger.log("[relayBotlookupToTNI] ℹ️ check_read_status đã chạy hôm nay rồi — bỏ qua");
     }
+  }
+
+  // Bước 4: 17:25–17:55 Myanmar → gửi Task Remain (1 lần/ngày)
+  const isTaskTime = (myanmarHour === 17 && myanmarMin >= 25 && myanmarMin <= 55);
+  if (isTaskTime) {
+    const taskKey = "TASK_REMAIN_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+    const props2  = PropertiesService.getScriptProperties();
+    if (!props2.getProperty(taskKey)) {
+      sendTaskRemain();
+      props2.setProperty(taskKey, "done");
+      Logger.log("[relayBotlookupToTNI] ✅ sendTaskRemain đã gửi lúc 17:xx Myanmar");
+    } else {
+      Logger.log("[relayBotlookupToTNI] ℹ️ sendTaskRemain đã chạy hôm nay rồi — bỏ qua");
+    }
+  }
+}
+
+
+
+// ============================================================
+// TASK REMAIN — Gửi từng task riêng lẻ đến từng Team lúc 17:30
+// Sheet: Task Remain (GID 133591305)
+// Col A: Team | Col D: Nội dung task | Col E: Telegram ID cá nhân
+// ============================================================
+const TASK_SHEET_ID  = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8";
+const TASK_SHEET_GID = 133591305;
+
+// Map tên team trong cột A → Chat ID group
+const TASK_TEAM_MAP = {
+  "team 1": "-5180992881",
+  "team 2": "-5188855349",
+  "team 3": "-5183480727",
+  "team 4": "-5238696719",
+  "team 5": "-5188855349",   // T2+T5 cùng group
+  "t1":     "-5180992881",
+  "t2":     "-5188855349",
+  "t3":     "-5183480727",
+  "t4":     "-5238696719",
+  "t5":     "-5188855349",
+};
+
+function sendTaskRemain() {
+  try {
+    const ss = SpreadsheetApp.openById(TASK_SHEET_ID);
+
+    // Tìm sheet theo GID
+    const sheets    = ss.getSheets();
+    const taskSheet = sheets.find(s => s.getSheetId() === TASK_SHEET_GID);
+    if (!taskSheet) {
+      Logger.log("[TaskRemain] ❌ Không tìm thấy sheet GID " + TASK_SHEET_GID);
+      return;
+    }
+
+    // Đọc dữ liệu từ hàng 4 đến 61, cột A:E
+    const data = taskSheet.getRange("A4:E61").getValues();
+
+    // Nhóm task theo chatId
+    const teamTasks = {};   // { chatId: [ {content, teleId, teamRaw} ] }
+
+    for (const row of data) {
+      const teamRaw = row[0].toString().trim();
+      const content = row[3].toString().trim();   // Cột D (index 3)
+      const teleId  = row[4].toString().trim();   // Cột E (index 4)
+
+      if (!teamRaw || !content) continue;
+
+      const chatId = TASK_TEAM_MAP[teamRaw.toLowerCase()];
+      if (!chatId) {
+        Logger.log("[TaskRemain] ⚠️ Không tìm thấy group cho team: " + teamRaw);
+        continue;
+      }
+
+      if (!teamTasks[chatId]) teamTasks[chatId] = [];
+      teamTasks[chatId].push({ content, teleId, teamRaw });
+    }
+
+    // Gửi từng task riêng lẻ đến group team (tách biệt để dễ đọc)
+    for (const [chatId, tasks] of Object.entries(teamTasks)) {
+      Logger.log("[TaskRemain] Gửi " + tasks.length + " task đến group " + chatId);
+      for (const task of tasks) {
+        sendTelegram(chatId, task.content, "[Task][" + task.teamRaw + "]");
+        Utilities.sleep(800);   // tránh rate limit
+      }
+    }
+
+    // Gửi DM cá nhân nếu có Telegram ID ở cột E
+    for (const [chatId, tasks] of Object.entries(teamTasks)) {
+      for (const task of tasks) {
+        if (!task.teleId) continue;
+        const uid = task.teleId.startsWith("@")
+          ? task.teleId
+          : task.teleId.replace(/\D/g, "");
+        if (!uid) continue;
+        sendTelegram(uid, "📋 Task của bạn:\n\n" + task.content, "[Task][DM]");
+        Utilities.sleep(500);
+      }
+    }
+
+    Logger.log("[TaskRemain] ✅ Đã gửi xong Task Remain");
+  } catch(e) {
+    Logger.log("[TaskRemain] ❌ Lỗi: " + e.message);
   }
 }
 
