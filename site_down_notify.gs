@@ -348,9 +348,43 @@ function checkColC(sheet) {
 
   props.setProperty(TS_KEY_A1, raw);
   Logger.log("[Tin1] ✅ Xong");
+
+  // ④ Gửi Note từ B2:B5 sau khi tin tổng hợp đã gửi xong
+  sendNoteB2B5(sheet);
 }
 
 
+
+
+// ============================================================
+// NOTE — Gửi nội dung B2:B5 từ SD Sheet đến TẤT CẢ groups
+// Gửi SAU tin tổng hợp (checkColC)
+// B2:B5 = ghi chú tay cho Team leaders & Staff
+// ============================================================
+function sendNoteB2B5(sheet) {
+  try {
+    const values = sheet.getRange("B2:B5").getValues();
+    const noteLines = values
+      .map(row => row[0].toString().trim())
+      .filter(line => line.length > 0);
+
+    if (noteLines.length === 0) {
+      Logger.log("[Note B2:B5] Không có nội dung — bỏ qua");
+      return;
+    }
+
+    const noteText = noteLines.join("\n");
+    Logger.log("[Note B2:B5] Gửi note: " + noteText.substring(0, 100));
+
+    // Gửi đến TẤT CẢ groups: CONTROL + T1/T2/T3/T4
+    for (const [key, chatId] of Object.entries(SD_GROUPS)) {
+      sendTelegram(chatId, noteText, "[Note][" + key + "]");
+    }
+    Logger.log("[Note B2:B5] ✅ Đã gửi đến " + Object.keys(SD_GROUPS).length + " groups");
+  } catch(e) {
+    Logger.log("[Note B2:B5] ❌ Lỗi: " + e.message);
+  }
+}
 
 
 // ============================================================
