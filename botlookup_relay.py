@@ -174,10 +174,17 @@ async def main():
                     params={"action": "get_note_b2b5"},
                     timeout=30
                 )
-                note_text = note_resp.text.strip()
-                print(f"[{myanmar_now()}] 📝 Note B2:B5: {note_text[:100]}")
+                raw_note = note_resp.text.strip()
+                # Guard: bỏ qua nếu GAS trả về JSON (error/status response)
+                # Xảy ra khi GAS chưa redeploy hoặc action không tồn tại
+                if raw_note and not raw_note.startswith("{") and not raw_note.startswith("["):
+                    note_text = raw_note
+                    print(f"[{myanmar_now()}] 📝 Note B2:B5: {note_text[:100]}")
+                else:
+                    print(f"[{myanmar_now()}] ⚠️ Note response không hợp lệ (JSON/trống) — bỏ qua. GAS cần redeploy!")
             except Exception as ex:
                 print(f"[{myanmar_now()}] ⚠️ Lấy Note lỗi: {ex}")
+
 
         # ── 11. @Phongha79 gửi Note đến TẤT CẢ groups ───────────
         # Gửi từ tài khoản cá nhân → Telegram cho phép xem ai đã đọc
