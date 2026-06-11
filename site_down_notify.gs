@@ -348,9 +348,8 @@ function checkColC(sheet) {
 
   props.setProperty(TS_KEY_A1, raw);
   Logger.log("[Tin1] ✅ Xong");
-
-  // ④ Gửi Note từ B2:B5 sau khi tin tổng hợp đã gửi xong
-  sendNoteB2B5(sheet);
+  // NOTE: sendNoteB2B5 đã chuyển sang gửi từ @Phongha79 (Telethon) trong botlookup_relay.py
+  //       để hỗ trợ theo dõi ai đã đọc (GetMessageReadParticipantsRequest)
 }
 
 

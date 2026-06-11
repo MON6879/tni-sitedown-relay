@@ -66,6 +66,9 @@ function doGet(e) {
     // ── Site Down data endpoint (cho Python Telethon sender) ──
     if (action === "get_site_down_data") return getSiteDownData();
 
+    // ── Note B2:B5 từ SD Sheet (cho botlookup_relay.py gửi từ @Phongha79) ──
+    if (action === "get_note_b2b5")     return getNoteB2B5();
+
     // ── Default: status check ─────────────────────────────────
     const ss = SpreadsheetApp.openById(SHEET_ID);
     getDataSheet(ss);
@@ -1524,4 +1527,28 @@ function handleStoreSiteDownDirect(body) {
 // ════════════════════════════════════════════════════════════
 function relayBotlookupToTNI() {
   checkAndSend();
+}
+
+// ════════════════════════════════════════════════════════════
+// GET NOTE B2:B5 — Đọc nội dung B2:B5 từ SD Sheet
+// Trả về plain text để botlookup_relay.py gửi từ @Phongha79
+// URL: APPS_SCRIPT_URL?action=get_note_b2b5
+// ════════════════════════════════════════════════════════════
+function getNoteB2B5() {
+  try {
+    const ss     = SpreadsheetApp.openById(SD_SHEET_ID);
+    const sheet  = getSheetByGid(ss, SD_SHEET_GID);
+    if (!sheet) return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
+
+    const values = sheet.getRange("B2:B5").getValues();
+    const lines  = values
+      .map(row => row[0].toString().trim())
+      .filter(line => line.length > 0);
+
+    return ContentService
+      .createTextOutput(lines.join("\n"))
+      .setMimeType(ContentService.MimeType.TEXT);
+  } catch(e) {
+    return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
+  }
 }

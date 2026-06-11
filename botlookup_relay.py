@@ -2,13 +2,10 @@
 botlookup_relay.py
 ==================
 Gửi lệnh /down_tni@auto_nocpro_bot vào nhóm BOT LOOKUP,
-đọc phản hồi rồi forward sang nhóm CONTROL (-5251698940).
+đọc phản hồi → gọi GAS webhook ghi Cột A → checkAndSend() gửi tổng hợp.
+Sau đó @Phongha79 gửi Note (B2:B5) đến tất cả groups để theo dõi ai đọc.
 
-Apps Script (site_down_notify.gs) sẽ đọc từ CONTROL và phân phối
-theo từng Team (T1/T2/T3/T4) sau khi lọc và phân tích.
-
-Chạy tự động qua GitHub Actions trong khung giờ 04:30–21:30 Myanmar.
-Thêm delay ngẫu nhiên 3–8 phút để trông tự nhiên.
+Chạy qua GitHub Actions (triggered bởi GAS trigger mỗi 30p).
 """
 
 import asyncio
@@ -27,7 +24,16 @@ SESSION_STRING = os.environ["TELEGRAM_SESSION"]
 
 SOURCE_GROUP   = "Botlookup"
 COMMAND        = "/down_tni@auto_nocpro_bot"
-TARGET_CHAT_ID = -5251698940           # 5 TNI TECHNICA DEP CONTROL SITE
+
+# Nhóm nhận Note từ @Phongha79 (để theo dõi ai đọc)
+ALL_GROUPS = {
+    "CONTROL": -5251698940,
+    "T1":      -5180992881,
+    "T2":      -5188855349,
+    "T3":      -5183480727,
+    "T4":      -5238696719,
+}
+TARGET_CHAT_ID = ALL_GROUPS["CONTROL"]   # fallback error messages
 
 BOT_USERNAME   = "auto_nocpro_bot"
 WAIT_REPLY_SEC = 35
@@ -142,17 +148,9 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 9. Gửi raw data vào CONTROL (để audit/log) ──────────────
-        # NOTE: SD Bot không đọc được tin nhắn user trong group (privacy mode)
-        # → Gọi GAS webhook trực tiếp ở bước 10 để ghi Cột A
         raw_text = "\n".join(bot_messages)
-        chunks = split_message(raw_text, 4000)
-        for chunk in chunks:
-            await client.send_message(TARGET_CHAT_ID, chunk)
-            await asyncio.sleep(0.5)
-        print(f"[{myanmar_now()}] ✅ Đã gửi sang CONTROL ({len(chunks)} phần)")
 
-        # ── 10. Gọi GAS webhook trực tiếp → ghi Cột A → checkAndSend() ──
+        # ── 9. Gọi GAS webhook → ghi Cột A → checkAndSend() gửi tổng hợp ──
         gas_url = os.environ.get("APPS_SCRIPT_URL", "")
         if gas_url:
             try:
@@ -165,9 +163,37 @@ async def main():
             except Exception as ex:
                 print(f"[{myanmar_now()}] ⚠️ GAS webhook lỗi: {ex}")
         else:
-            print(f"[{myanmar_now()}] ⚠️ APPS_SCRIPT_URL chưa cấu hình — bỏ qua gọi GAS")
-        print(f"[{myanmar_now()}] ⏳ Xong. Dữ liệu đã ghi vào Cột A qua GAS.")
+            print(f"[{myanmar_now()}] ⚠️ APPS_SCRIPT_URL chưa cấu hình")
 
+        # ── 10. Đọc Note (B2:B5) từ GAS ─────────────────────────
+        note_text = ""
+        if gas_url:
+            try:
+                note_resp = requests.get(
+                    gas_url,
+                    params={"action": "get_note_b2b5"},
+                    timeout=30
+                )
+                note_text = note_resp.text.strip()
+                print(f"[{myanmar_now()}] 📝 Note B2:B5: {note_text[:100]}")
+            except Exception as ex:
+                print(f"[{myanmar_now()}] ⚠️ Lấy Note lỗi: {ex}")
+
+        # ── 11. @Phongha79 gửi Note đến TẤT CẢ groups ───────────
+        # Gửi từ tài khoản cá nhân → Telegram cho phép xem ai đã đọc
+        if note_text:
+            print(f"[{myanmar_now()}] 📨 Gửi Note từ @{me.username} đến {len(ALL_GROUPS)} nhóm...")
+            for gname, gid in ALL_GROUPS.items():
+                try:
+                    await client.send_message(gid, note_text)
+                    print(f"[{myanmar_now()}] ✅ Note → {gname} ({gid})")
+                    await asyncio.sleep(1)
+                except Exception as ex:
+                    print(f"[{myanmar_now()}] ⚠️ Note → {gname} lỗi: {ex}")
+        else:
+            print(f"[{myanmar_now()}] ℹ️ B2:B5 trống — bỏ qua gửi Note")
+
+        print(f"[{myanmar_now()}] ✅ Xong tất cả.")
 
 
 if __name__ == "__main__":
