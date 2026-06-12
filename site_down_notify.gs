@@ -259,6 +259,21 @@ function relayBotlookupToTNI() {
       Logger.log("[relayBotlookupToTNI] ℹ️ sendTaskRemain đã chạy hôm nay rồi — bỏ qua");
     }
   }
+
+  // Bước 5: 17:25–17:55 Myanmar → dispatch daily_task.yml (1 lần/ngày)
+  if (isTaskTime) {
+    const dailyKey = "DAILY_TASK_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+    const props3   = PropertiesService.getScriptProperties();
+    if (!props3.getProperty(dailyKey)) {
+      const okDaily = triggerDailyTask();
+      if (okDaily) {
+        props3.setProperty(dailyKey, "done");
+        Logger.log("[relayBotlookupToTNI] ✅ Dispatch daily_task.yml lúc 17:xx Myanmar");
+      }
+    } else {
+      Logger.log("[relayBotlookupToTNI] ℹ️ daily_task.yml đã dispatch hôm nay rồi — bỏ qua");
+    }
+  }
 }
 
 
@@ -377,6 +392,35 @@ function triggerReadStatusCheck() {
     return code === 204;
   } catch(e) {
     Logger.log("[triggerReadStatusCheck] ❌ Lỗi: " + e.message);
+    return false;
+  }
+}
+
+// ── Dispatch daily_task.yml — báo cáo 17:30 Myanmar (chạy từ GAS thay vì GitHub cron)
+function triggerDailyTask() {
+  try {
+    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
+    if (!pat) {
+      Logger.log("[triggerDailyTask] ⚠️ GITHUB_PAT chưa set");
+      return false;
+    }
+    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_task.yml/dispatches";
+    const resp = UrlFetchApp.fetch(url, {
+      method: "post",
+      headers: {
+        "Authorization": "Bearer " + pat,
+        "Accept":        "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type":  "application/json"
+      },
+      payload: JSON.stringify({ ref: "main" }),
+      muteHttpExceptions: true
+    });
+    const code = resp.getResponseCode();
+    Logger.log("[triggerDailyTask] GitHub API response: " + code);
+    return code === 204;
+  } catch(e) {
+    Logger.log("[triggerDailyTask] ❌ Lỗi: " + e.message);
     return false;
   }
 }

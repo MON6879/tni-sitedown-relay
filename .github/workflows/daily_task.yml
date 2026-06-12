@@ -1,10 +1,9 @@
 name: Daily Task Reminder (17:30 Myanmar)
 
 on:
-  schedule:
-    # 17:30 Myanmar (UTC+6:30) = 11:00 UTC
-    - cron: '0 11 * * *'
-  workflow_dispatch:  # cho phép chạy tay
+  # ⚠️ KHÔNG dùng GitHub cron — bị delay 5-9 tiếng do queue overload
+  # Trigger từ GAS relayBotlookupToTNI() lúc 17:30 Myanmar chính xác
+  workflow_dispatch:
 
 jobs:
   send-tasks:
