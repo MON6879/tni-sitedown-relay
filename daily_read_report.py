@@ -1,11 +1,12 @@
 """
 daily_read_report.py
 ====================
-Chạy lúc 21:00 Myanmar — kiểm tra ai đã đọc / chưa đọc
-tin nhắn hôm nay (gửi bằng tài khoản cá nhân) trong:
-  T1 / T2 / T3 / T4 / CONTROL
+Chạy lúc 17:30 Myanmar — kiểm tra ai đã đọc / chưa đọc
+Note (B2:B5): "Team leader and Staff control Site down make plan..."
+trong T1 / T2 / T3 / T4 / CONTROL từ sáng sớm đến 17:30.
 
-Gửi báo cáo riêng vào từng group.
+Logic "đã đọc": đọc ít nhất 1 lần bất kỳ tin hôm nay.
+Gửi báo cáo tổng kết vào từng group.
 """
 
 import asyncio
@@ -27,22 +28,36 @@ SESSION_STRING = os.environ["TELEGRAM_SESSION"]
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
 GROUPS = {
-    "CONTROL": -5251698940,   # 5 TNI TECHNICA DEP CONTROL SITE
-    "T1":      -5180992881,   # TNI TEAM 1
-    "T2":      -5188855349,   # TNI TEAM 2 (T2+T5)
-    "T3":      -5183480727,   # TNI TEAM 3
-    "T4":      -5238696719,   # TNI TEAM 4
+    "T1": -5180992881,   # TNI TEAM 1
+    "T2": -5188855349,   # TNI TEAM 2 (T2+T5)
+    "T3": -5183480727,   # TNI TEAM 3
+    "T4": -5238696719,   # TNI TEAM 4
 }
+
+# Từ khóa nhận biết Note B2:B5 (tin nhắn cần theo dõi)
+NOTE_KEYWORDS = ["team leader", "site down make plan", "rescue", "mdg", "mbb"]
 # ──────────────────────────────────────────────────────────────────
 
 def myanmar_now() -> str:
     return datetime.now(MYANMAR_TZ).strftime("%H:%M %d/%m/%Y")
+
+def fmt_time(dt: datetime) -> str:
+    if dt is None:
+        return "?"
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(MYANMAR_TZ).strftime("%H:%M")
 
 def today_start_utc() -> datetime:
     """Midnight hôm nay theo giờ Myanmar → UTC."""
     now_mm = datetime.now(MYANMAR_TZ)
     midnight_mm = now_mm.replace(hour=0, minute=0, second=0, microsecond=0)
     return midnight_mm.astimezone(timezone.utc)
+
+def is_note_msg(text: str) -> bool:
+    """Kiểm tra có phải tin Note B2:B5 không."""
+    t = (text or "").lower()
+    return any(kw in t for kw in NOTE_KEYWORDS)
 
 
 async def get_members(client, chat_id: int, me_id: int) -> list[dict]:
@@ -65,9 +80,12 @@ async def get_members(client, chat_id: int, me_id: int) -> list[dict]:
 
 
 async def get_my_msgs_today(client, chat_id: int, me_id: int,
-                            since_utc: datetime) -> list:
-    """Lấy danh sách tin nhắn của mình trong group hôm nay."""
-    msgs = []
+                            since_utc: datetime) -> tuple[list, list]:
+    """
+    Lấy tin nhắn của mình hôm nay.
+    Trả về: (note_msgs, other_msgs)
+    """
+    notes, others = [], []
     try:
         history = await client(GetHistoryRequest(
             peer=chat_id, limit=100,
@@ -76,13 +94,16 @@ async def get_my_msgs_today(client, chat_id: int, me_id: int,
         ))
         for msg in history.messages:
             if msg.date < since_utc:
-                break                # tin cũ hơn → dừng
+                break
             sender_id = getattr(msg.from_id, "user_id", None)
             if sender_id == me_id and msg.message:
-                msgs.append(msg)
+                if is_note_msg(msg.message):
+                    notes.append(msg)
+                else:
+                    others.append(msg)
     except Exception as e:
         print(f"    ⚠️  get_my_msgs_today lỗi: {e}")
-    return msgs
+    return notes, others
 
 
 async def get_reader_ids(client, chat_id: int, msg_id: int) -> set:
@@ -99,41 +120,52 @@ async def get_reader_ids(client, chat_id: int, msg_id: int) -> set:
 
 async def process_group(client, name: str, chat_id: int,
                         me_id: int, since_utc: datetime):
-    """Xử lý 1 group: lấy tin, kiểm tra read, gửi báo cáo."""
+    """Xử lý 1 group: lấy tin Note, kiểm tra read, gửi báo cáo."""
     print(f"\n[{name}] chat_id={chat_id}")
 
-    # Lấy thành viên và tin nhắn hôm nay
-    members, msgs = await asyncio.gather(
+    members, (note_msgs, other_msgs) = await asyncio.gather(
         get_members(client, chat_id, me_id),
         get_my_msgs_today(client, chat_id, me_id, since_utc),
     )
 
-    if not msgs:
+    all_msgs = note_msgs + other_msgs
+    if not all_msgs:
         print(f"  ℹ️  Không có tin nào gửi hôm nay — bỏ qua")
         return
 
-    print(f"  📨 Tin hôm nay: {len(msgs)} | 👥 Thành viên: {len(members)}")
+    print(f"  📨 Note: {len(note_msgs)} | Tin khác: {len(other_msgs)} | 👥 TV: {len(members)}")
 
-    # Gộp tất cả reader_ids từ mọi tin trong ngày
+    # Gộp reader_ids từ tất cả tin hôm nay
     all_reader_ids: set = set()
-    for msg in msgs:
+    # Ưu tiên check Note trước, sau đó other
+    for msg in all_msgs:
         rids = await get_reader_ids(client, chat_id, msg.id)
         all_reader_ids |= rids
         await asyncio.sleep(0.3)
 
-    # Phân loại
+    # Phân loại đã đọc / chưa đọc
     read_members   = [m for m in members if m["id"] in all_reader_ids]
     unread_members = [m for m in members if m["id"] not in all_reader_ids]
 
     read_names   = [m["name"] for m in read_members]
     unread_names = [m["name"] for m in unread_members]
 
-    # Tạo tin báo cáo
+    # Preview Note B2:B5
+    note_preview = ""
+    if note_msgs:
+        preview_text = (note_msgs[0].message or "")[:80].replace("\n", " ")
+        note_preview = f"📝 Note: {preview_text}...\n"
+
+    # Tạo báo cáo
     date_str = datetime.now(MYANMAR_TZ).strftime("%d/%m/%Y")
+    now_str  = myanmar_now()
     divider  = "─" * 30
+
     report = (
         f"👁 BÁO CÁO ĐÃ XEM — {name}\n"
-        f"📅 {date_str}  |  📨 {len(msgs)} tin đã gửi hôm nay\n"
+        f"📅 {date_str}  |  🕐 {now_str}\n"
+        f"📨 {len(all_msgs)} tin gửi hôm nay\n"
+        f"{note_preview}"
         f"{divider}\n"
         f"✅ Đã đọc ({len(read_names)}):  "
         f"{', '.join(read_names)  if read_names   else 'Chưa có ai'}\n"
@@ -148,9 +180,9 @@ async def process_group(client, name: str, chat_id: int,
 
 
 async def main():
-    print(f"[{myanmar_now()}] 🚀 Daily Read Report bắt đầu...")
+    print(f"[{myanmar_now()}] 🚀 Daily Read Report (17:30) bắt đầu...")
     since_utc = today_start_utc()
-    print(f"[{myanmar_now()}] 📅 Kiểm tra tin từ: {since_utc.strftime('%H:%M %d/%m/%Y')} UTC")
+    print(f"[{myanmar_now()}] 📅 Kiểm tra tin từ midnight Myanmar → {myanmar_now()}")
 
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
