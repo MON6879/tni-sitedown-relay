@@ -1,7 +1,11 @@
 """
 Vercel webhook handler for Collector Bot (TNIAsset_BO).
-Receives Order/Revoke/Export/Move commands → writes to Google Sheet.
-Webhook URL: https://<your-app>.vercel.app/api/collector
+
+Routing:
+  - TNI CABLE ROUTE group (CABLE_CHAT_ID) → handle_cable()
+  - All other chats                        → existing Asset handler
+
+Webhook URL: https://tni-bot.vercel.app/api/collector
 """
 import os, re, json, asyncio, logging, requests, html
 from http.server import BaseHTTPRequestHandler
@@ -11,11 +15,22 @@ from datetime import datetime, timezone, timedelta
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-COLLECTOR_BOT_TOKEN = os.environ.get("COLLECTOR_BOT_TOKEN", "").strip().strip("\ufeff")
-APPS_SCRIPT_URL     = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
+COLLECTOR_BOT_TOKEN   = os.environ.get("COLLECTOR_BOT_TOKEN", "").strip().strip("\ufeff")
+APPS_SCRIPT_URL        = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
+CABLE_APPS_SCRIPT_URL  = os.environ.get("CABLE_APPS_SCRIPT_URL", "").strip()
+CABLE_CHAT_ID          = int(os.environ.get("CABLE_CHAT_ID", "-5531350787"))
 TZ_VN = timezone(timedelta(hours=7))
+TZ_MM = timezone(timedelta(hours=6, minutes=30))   # Myanmar UTC+6:30
 
 KEYWORDS_DEFAULT = ["order", "revoke", "export", "move", "asset sent", "destroys"]
+
+# ── Cable constants ──────────────────────────────────────────────────────
+CABLE_TYPE_KEYWORDS = ["request change", "rescue", "maintenance", "deploy"]
+CABLE_FIELDS_LIST   = [
+    "incident name", "physical route", "total cable length",
+    "cable owner", "responsible branch", "rca",
+    "team name", "wo", "materials list",
+]
 _keywords_cache = None
 
 def get_keywords() -> list:
@@ -50,9 +65,9 @@ def get_keywords() -> list:
 
 
 
-# ── Send data to Google Sheet via Apps Script ─────────────────────────────
+# ── Send data to Asset Google Sheet via Apps Script ──────────────────────
 def post_sheet(payload: dict):
-    """POST JSON to Apps Script Web App."""
+    """POST JSON to Asset Apps Script Web App."""
     if not APPS_SCRIPT_URL:
         logger.error("APPS_SCRIPT_URL not set.")
         return {"status": "error", "message": "APPS_SCRIPT_URL not configured"}
@@ -66,6 +81,44 @@ def post_sheet(payload: dict):
         return {"status": "error", "message": str(e)}
 
 
+# ── Send data to Cable Google Sheet via Apps Script ───────────────────────
+def post_cable_sheet(payload: dict):
+    """POST JSON to Cable Apps Script Web App."""
+    if not CABLE_APPS_SCRIPT_URL:
+        logger.error("CABLE_APPS_SCRIPT_URL not set.")
+        return {"status": "error", "message": "CABLE_APPS_SCRIPT_URL not configured"}
+    try:
+        resp = requests.post(CABLE_APPS_SCRIPT_URL, json=payload, timeout=30)
+        resp.raise_for_status()
+        logger.info(f"Cable Apps Script response: {resp.text[:300]}")
+        return resp.json()
+    except Exception as e:
+        logger.error(f"Cable Apps Script POST error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+# ── Cable: detect type keyword ────────────────────────────────────────────
+def parse_cable_type(text: str) -> str:
+    """Return Rescue / Request Change / Maintenance / Deploy (or empty)."""
+    lower = text.lower()
+    for kw in CABLE_TYPE_KEYWORDS:
+        if kw in lower:
+            return kw.title()
+    return ""
+
+
+# ── Cable: parse 9 structured fields ─────────────────────────────────────
+def parse_cable_fields(text: str) -> dict:
+    """Extract field values from lines like 'Incident Name : ...'."""
+    result = {}
+    for field in CABLE_FIELDS_LIST:
+        pattern = rf"(?i){re.escape(field)}\s*:\s*(.+?)(?=\n|$)"
+        m = re.search(pattern, text)
+        if m:
+            result[field] = m.group(1).strip()
+    return result
+
+
 # ── Detect collector keyword in message ───────────────────────────────────
 def is_collector_msg(text: str) -> bool:
     lower = text.lower()
@@ -73,18 +126,204 @@ def is_collector_msg(text: str) -> bool:
 
 
 # ── Main async handler ────────────────────────────────────────────────────
+# ============================================================
+# CABLE GROUP HANDLER
+# ============================================================
+async def handle_cable(msg, bot, now, user, sender_name, sender_id):
+    """Handle all messages from the TNI CABLE ROUTE group."""
+    chat_id = msg.chat_id
+
+    # ── Photos ──────────────────────────────────────────────────────────
+    if msg.photo:
+        photos = msg.photo  # list of sizes, take largest
+        largest = photos[-1]
+        try:
+            file_info = await bot.get_file(largest.file_id)
+            tg_url = (
+                f"https://api.telegram.org/file/bot{COLLECTOR_BOT_TOKEN}/"
+                f"{file_info.file_path}"
+            )
+        except Exception as e:
+            logger.error(f"Cable get_file error: {e}")
+            tg_url = ""
+
+        # Try to find REF from caption or reply
+        ref_id = None
+        caption = msg.caption or ""
+        ref_m = re.search(r"REF[:\s#]*(\d+)", caption, re.IGNORECASE)
+        if ref_m:
+            ref_id = ref_m.group(1)
+        elif msg.reply_to_message:
+            reply_text = msg.reply_to_message.text or ""
+            ref_m = re.search(r"REF[:\s#]*(\d+)", reply_text, re.IGNORECASE)
+            if ref_m:
+                ref_id = ref_m.group(1)
+
+        result = post_cable_sheet({
+            "action":      "cable_add_photo",
+            "ref_id":      ref_id,
+            "tg_url":      tg_url,
+            "sender_name": sender_name,
+            "sender_id":   sender_id,
+            "date":        now.strftime("%d/%m/%Y %H:%M"),
+        })
+        ocr_text = result.get("ocr", "")
+        if ocr_text:
+            await bot.send_message(
+                chat_id,
+                f"📷 <b>Photo received</b> (REF:{str(ref_id or '?').zfill(5)})\n"
+                f"📝 <b>OCR Text:</b>\n<code>{html.escape(ocr_text[:500])}</code>",
+                parse_mode="HTML",
+            )
+        # If no OCR text, stay silent to avoid spam
+        return
+
+    if not msg.text:
+        return
+
+    text = msg.text.strip()
+
+    # ── /start ──────────────────────────────────────────────────────────
+    if text.lower().startswith("/start"):
+        await bot.send_message(
+            chat_id,
+            "🔌 <b>TNI Cable Route Bot</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n"
+            "📌 <b>Send incident in this format:</b>\n\n"
+            "<code>Rescue:\n"
+            "Incident Name : TNI0146-TNI0147 link down\n"
+            "Physical route : TNI0146-TNI0147\n"
+            "Total cable length : 16.5KM\n"
+            "Cable Owner : Mytel\n"
+            "Responsible Branch : TNI\n"
+            "RCA : people cut at 10.6KM from TNI0146\n"
+            "Team Name : TNI Team01\n"
+            "WO : Need\n"
+            "Materials List : 48 FO M100 and JB 2pcs</code>\n\n"
+            "🏷️ <b>Types:</b> Rescue | Request Change | Maintenance | Deploy\n"
+            "✅ <b>Confirm:</b> Reply bot message with <code>Confirm</code>\n"
+            "📷 <b>Photo:</b> Send photo (reply to bot msg with REF) — OCR enabled",
+            parse_mode="HTML",
+        )
+        return
+
+    # ── Confirm Complete ─────────────────────────────────────────────────
+    if re.match(r"^confirm\b", text, re.IGNORECASE):
+        ref_id = None
+        # Extract REF from reply-to message
+        if msg.reply_to_message:
+            reply_text = msg.reply_to_message.text or ""
+            ref_m = re.search(r"REF[:\s#]*(\d+)", reply_text, re.IGNORECASE)
+            if ref_m:
+                ref_id = ref_m.group(1)
+        # Also try from text itself: "Confirm REF:00001"
+        if not ref_id:
+            ref_m = re.search(r"REF[:\s#]*(\d+)", text, re.IGNORECASE)
+            if ref_m:
+                ref_id = ref_m.group(1)
+
+        if not ref_id:
+            await bot.send_message(
+                chat_id,
+                "⚠️ Please <b>reply</b> to the bot confirmation message to confirm.\n"
+                "Or use: <code>Confirm REF:00001</code>",
+                parse_mode="HTML",
+            )
+            return
+
+        confirm_detail = re.sub(r"^confirm\s*:?\s*(?:REF[:\s#]*\d+)?\s*", "",
+                                text, flags=re.IGNORECASE).strip()
+        result = post_cable_sheet({
+            "action":         "cable_confirm",
+            "ref_id":         ref_id,
+            "confirmed_by":   sender_name,
+            "sender_id":      sender_id,
+            "confirm_detail": confirm_detail,
+            "date":           now.strftime("%d/%m/%Y"),
+            "time":           now.strftime("%H:%M"),
+        })
+
+        if result.get("status") == "ok":
+            ref_pad = str(ref_id).zfill(5)
+            await bot.send_message(
+                chat_id,
+                f"✅ <b>REF #{ref_pad} — Confirmed</b>\n"
+                f"👤 {html.escape(sender_name)}\n"
+                f"📅 {now.strftime('%d/%m/%Y %H:%M')}" +
+                (f"\n📝 {html.escape(confirm_detail)}" if confirm_detail else ""),
+                parse_mode="HTML",
+            )
+        else:
+            err = html.escape(result.get("message", "unknown error"))
+            await bot.send_message(chat_id, f"⚠️ Confirm failed: {err}", parse_mode="HTML")
+        return
+
+    # ── Cable incident message ────────────────────────────────────────────
+    cable_type = parse_cable_type(text)
+    fields     = parse_cable_fields(text)
+
+    payload = {
+        "action":      "cable_add",
+        "date":        now.strftime("%d/%m/%Y"),
+        "time":        now.strftime("%H:%M"),
+        "type":        cable_type or "Unknown",
+        "sender_name": sender_name,
+        "sender_id":   sender_id,
+        "fields":      fields,
+        "raw":         text if not fields else "",
+    }
+
+    result = post_cable_sheet(payload)
+
+    if result.get("status") == "ok":
+        ref  = result.get("ref") or str(result.get("row", "???")).zfill(5)
+        flds = []
+        if fields.get("incident name"):   flds.append(f"📍 {fields['incident name']}")
+        if fields.get("team name"):        flds.append(f"👷 {fields['team name']}")
+        if fields.get("total cable length"): flds.append(f"📏 {fields['total cable length']}")
+        detail_lines = "\n".join(flds)
+
+        type_emoji = {"rescue": "🚨", "request change": "🔄",
+                      "maintenance": "🔧", "deploy": "🚀"}
+        t_emoji = type_emoji.get((cable_type or "").lower(), "🔌")
+
+        await bot.send_message(
+            chat_id,
+            f"{t_emoji} <b>CABLE BOT</b> ✅ Recorded — <b>REF:{ref}</b>\n"
+            f"🏷️ Type: {html.escape(cable_type or 'Unknown')}\n"
+            f"📅 {now.strftime('%d/%m/%Y %H:%M')}\n"
+            + (detail_lines + "\n" if detail_lines else "") +
+            f"\n💬 Reply with <code>Confirm</code> to mark complete\n"
+            f"📷 Send photo as reply to attach (OCR will read text)",
+            parse_mode="HTML",
+        )
+    else:
+        err = html.escape(result.get("message", "Apps Script error"))
+        await bot.send_message(chat_id, f"⚠️ Failed to record: {err}", parse_mode="HTML")
+
+
+# ============================================================
+# MAIN HANDLER
+# ============================================================
 async def handle(data: dict):
     async with Bot(token=COLLECTOR_BOT_TOKEN) as bot:
         update = Update.de_json(data, bot)
         if not update.message:
             return
 
-        msg     = update.message
-        user    = msg.from_user
-        chat_id = msg.chat_id
-        now     = datetime.now(TZ_VN)
+        msg         = update.message
+        user        = msg.from_user
+        chat_id     = msg.chat_id
+        now         = datetime.now(TZ_MM)          # Myanmar time for all groups
         sender_name = (user.full_name if user else "") or ""
+        sender_id   = str(user.id) if user else ""
         username    = (f"@{user.username}" if user and user.username else str(user.id)) if user else ""
+
+        # ── Route: Cable group ─────────────────────────────────────────
+        if chat_id == CABLE_CHAT_ID:
+            logger.info(f"[Cable] msg from {sender_name} ({sender_id})")
+            await handle_cable(msg, bot, now, user, sender_name, sender_id)
+            return
 
         # ── Photo messages ─────────────────────────────────────────────
         if msg.photo:
