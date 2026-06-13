@@ -30,6 +30,28 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))
 HEADER_ROWS = 3  # rows 1-3 là header (row 3 có 'export sms')
 COL_A, COL_B, COL_C, COL_D, COL_E = 0, 1, 2, 3, 4
 
+# ── Group Chat IDs của 4 team (từ botlookup_relay.py) ───────────
+TEAM_GROUPS = {
+    "MYT_TNI_TEAM01_Dawei":     -5180992881,
+    "MYT_TNI_TEAM02_Myeik":     -5188855349,
+    "MYT_TNI_TEAM03_Bokpyin":   -5183480727,
+    "MYT_TNI_TEAM04_Kawthoung": -5238696719,
+}
+TEAM_ICON = {
+    "MYT_TNI_TEAM01_Dawei":     "1️⃣",
+    "MYT_TNI_TEAM02_Myeik":     "2️⃣",
+    "MYT_TNI_TEAM03_Bokpyin":   "3️⃣",
+    "MYT_TNI_TEAM04_Kawthoung": "4️⃣",
+}
+TEAM_SHORT = {
+    "MYT_TNI_TEAM01_Dawei":     "Team1 Dawei",
+    "MYT_TNI_TEAM02_Myeik":     "Team2 Myeik",
+    "MYT_TNI_TEAM03_Bokpyin":   "Team3 Bokpyin",
+    "MYT_TNI_TEAM04_Kawthoung": "Team4 Kawthoung",
+}
+# Icon theo số thứ tự nhân viên trong team
+EMP_ICONS = ["🔵","🟢","🟡","🟠","🔴","🟣","⚪","🔶","🔷","🔸","🔹","💠"]
+
 
 def safe(row, idx):
     try:
@@ -590,6 +612,11 @@ async def main():
     groups = {}  # token -> [(sheet_row, message, cid, label)]
 
     for sheet_row, content, cid, col_c, col_a_val in all_rows:
+        # ── Kiểm tra Cột A: rows 4-59 phải có Team, nếu trống thì bỏ qua ──
+        if sheet_row <= 59 and not col_a_val:
+            logger.debug(f"  Skip row{sheet_row}: Cột A trống (không có team)")
+            continue
+
         # Determine bot token
         # NOTE: Rows 4-32 (nhân viên) dùng SEND_BOT vì nhân viên đã start SEND_BOT,
         #       không phải @TNIREPORTTASK. Dùng cùng bot với gửi thủ công.
@@ -721,6 +748,57 @@ async def main():
             logger.info("✅ Asset stats → CONTROL SITE")
         except Exception as e:
             logger.error(f"❌ Asset stats → CONTROL SITE: {e}")
+
+    # ── 9. Gửi tin gộp theo Team lên Group Telegram (T1–T4) ──────
+    # Đọc lại sheet, thu thập rows 4-59, nhóm theo Cột A (team)
+    import html as _html
+    team_members: dict[str, list[tuple]] = {}  # team -> [(col_b, col_c, content)]
+    for idx2, row2 in df.iterrows():
+        srow2 = idx2 + 1
+        if srow2 <= HEADER_ROWS:
+            continue
+        if srow2 > 59:
+            break
+        col_a2 = safe(row2, COL_A)
+        if not col_a2 or col_a2 not in TEAM_GROUPS:
+            continue
+        content2 = safe(row2, COL_D)
+        if not content2:
+            continue
+        col_b2 = safe(row2, COL_B)
+        col_c2 = safe(row2, COL_C)
+        team_members.setdefault(col_a2, []).append((col_b2, col_c2, content2))
+
+    if team_members and SEND_BOT_TOKEN:
+        logger.info(f"--- Gửi Team Group: {list(team_members.keys())} ---")
+        async with Bot(token=SEND_BOT_TOKEN) as grp_bot:
+            for team, members in team_members.items():
+                grp_cid  = TEAM_GROUPS[team]
+                t_icon   = TEAM_ICON.get(team, "🏷️")
+                t_short  = TEAM_SHORT.get(team, team)
+
+                # Header
+                lines = [
+                    f"{t_icon} <b>{t_short} – {now_str}</b>",
+                    "━" * 22,
+                ]
+
+                for i, (name, role, content3) in enumerate(members):
+                    emp_icon = EMP_ICONS[i % len(EMP_ICONS)]
+                    # Tên nhân viên (ưu tiên col_b, fallback col_c)
+                    display = name or role or f"NV {i+1}"
+                    # Escape HTML đặc biệt trong nội dung
+                    safe_content = _html.escape(content3)
+                    lines.append(f"\n{emp_icon} <b>{_html.escape(display)}</b>")
+                    lines.append(f"<code>{safe_content}</code>")
+
+                lines.append("\n" + "━" * 22)
+                lines.append(f"👥 Tổng: {len(members)} nhân viên")
+
+                grp_msg = "\n".join(lines)
+                await send_msg(grp_bot, grp_cid, grp_msg, f"Group-{t_short}", parse_mode="HTML")
+                await asyncio.sleep(0.5)
+                logger.info(f"✅ Group {t_short} → {grp_cid}")
 
 
 if __name__ == "__main__":
