@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 COLLECTOR_BOT_TOKEN   = os.environ.get("COLLECTOR_BOT_TOKEN", "").strip().strip("\ufeff")
 APPS_SCRIPT_URL        = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 CABLE_APPS_SCRIPT_URL  = os.environ.get("CABLE_APPS_SCRIPT_URL", "").strip()
-CABLE_CHAT_ID          = int(os.environ.get("CABLE_CHAT_ID", "-5531350787"))
+try:
+    CABLE_CHAT_ID = int(os.environ.get("CABLE_CHAT_ID", "-5531350787").strip())
+except ValueError:
+    CABLE_CHAT_ID = -5531350787
 TZ_VN = timezone(timedelta(hours=7))
 TZ_MM = timezone(timedelta(hours=6, minutes=30))   # Myanmar UTC+6:30
 
@@ -167,15 +170,16 @@ async def handle_cable(msg, bot, now, user, sender_name, sender_id):
             "sender_id":   sender_id,
             "date":        now.strftime("%d/%m/%Y %H:%M"),
         })
-        ocr_text = result.get("ocr", "")
-        if ocr_text:
+        drive_link = result.get("link", "")
+        if drive_link:
+            ref_show = str(ref_id or "?").zfill(5)
             await bot.send_message(
                 chat_id,
-                f"📷 <b>Photo received</b> (REF:{str(ref_id or '?').zfill(5)})\n"
-                f"📝 <b>OCR Text:</b>\n<code>{html.escape(ocr_text[:500])}</code>",
+                f"📷 <b>Photo saved</b> — REF:{ref_show}\n"
+                f"🔗 <a href='{drive_link}'>View on Google Drive</a>\n"
+                f"📁 Folder: 2.3 CABLE PHOTO TELEGRAM",
                 parse_mode="HTML",
             )
-        # If no OCR text, stay silent to avoid spam
         return
 
     if not msg.text:

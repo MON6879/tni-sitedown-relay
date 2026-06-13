@@ -5,9 +5,10 @@
 // ============================================================
 // SETUP:
 //   1. Open Script Editor from the Cable Google Sheet
-//   2. Enable Drive API: Extensions → Apps Script → Services → Drive API v2
-//   3. Deploy as Web App: Execute as Me | Who has access: Anyone
-//   4. Copy Web App URL → add to GitHub Secrets as CABLE_APPS_SCRIPT_URL
+//   2. Deploy as Web App: Execute as Me | Who has access: Anyone
+//   3. Copy Web App URL → add to GitHub Secrets as CABLE_APPS_SCRIPT_URL
+//   ⚠️ Drive API v2 KHÔNG cần thiết — dùng DriveApp thay thế
+// Drive folder: My Drive → 1 VCM BRANCH TNI → 2.3 CABLE PHOTO TELEGRAM
 // ============================================================
 
 const CABLE_SHEET_ID  = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y";
@@ -211,7 +212,9 @@ function cableConfirm(body) {
 }
 
 // ============================================================
-// ACTION: cable_add_photo — Add photo + OCR to existing record
+// ACTION: cable_add_photo — Upload ảnh lên Drive, lưu link vào Sheet
+// Folder: My Drive / 1 VCM BRANCH TNI / 2.3 CABLE PHOTO TELEGRAM
+// Tối đa 6 ảnh mỗi REF, lưu link vào cột R (Photos)
 // ============================================================
 function cableAddPhoto(body) {
   try {
@@ -220,84 +223,101 @@ function cableAddPhoto(body) {
     const refId = String(body.ref_id || "").trim();
     const tgUrl = body.tg_url || "";
 
-    // ── OCR ─────────────────────────────────────────────────────────
-    let ocrText = "";
-    if (tgUrl) {
-      ocrText = ocrFromUrl_(tgUrl);
-      Logger.log("OCR result (" + ocrText.length + " chars): " + ocrText.substring(0, 100));
+    if (!tgUrl) return json_({ status: "error", message: "Missing tg_url" });
+
+    // ── 1. Download ảnh từ Telegram ──────────────────────────────────
+    let blob;
+    try {
+      const resp = UrlFetchApp.fetch(tgUrl, { muteHttpExceptions: true, deadline: 30 });
+      if (resp.getResponseCode() !== 200) {
+        return json_({ status: "error", message: "Download failed: HTTP " + resp.getResponseCode() });
+      }
+      const ts   = Utilities.formatDate(new Date(), TZ_CABLE, "yyyyMMdd_HHmmss");
+      const name = "cable_" + (refId || "noref") + "_" + ts + ".jpg";
+      blob = resp.getBlob().setName(name);
+    } catch (e) {
+      return json_({ status: "error", message: "Download error: " + e.message });
     }
 
-    const photoLabel = ocrText
-      ? "📷 OCR: " + ocrText.substring(0, 300).replace(/\n/g, " ")
-      : "📷 [Photo " + Utilities.formatDate(new Date(), TZ_CABLE, "HH:mm dd/MM") + "]";
+    // ── 2. Upload lên Drive folder 2.3 CABLE PHOTO TELEGRAM ──────────
+    const folder    = getCablePhotoFolder_();
+    const file      = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const driveLink = "https://drive.google.com/file/d/" + file.getId() + "/view";
+    Logger.log("✅ Photo uploaded: " + driveLink);
 
-    // ── Find target row ──────────────────────────────────────────────
+    // ── 3. Tìm dòng REF trong sheet ──────────────────────────────────
     let targetRow = -1;
     const lastRow = sheet.getLastRow();
 
-    if (refId && lastRow >= 2) {
+    if (lastRow >= 2) {
       const refCol = sheet.getRange(2, COL.REF, lastRow - 1, 1).getValues();
-      for (let i = 0; i < refCol.length; i++) {
-        if (String(refCol[i][0] || "").replace(/^0+/, "") === refId.replace(/^0+/, "")) {
+
+      if (refId) {
+        // Tìm theo REF ID
+        for (let i = 0; i < refCol.length; i++) {
+          if (String(refCol[i][0] || "").replace(/^0+/, "") === refId.replace(/^0+/, "")) {
+            targetRow = i + 2; break;
+          }
+        }
+      }
+
+      // Fallback: dòng mới nhất trong 30 phút từ cùng sender
+      if (targetRow < 0 && body.sender_id) {
+        const WIN_MS = 30 * 60 * 1000;
+        const nowMs  = new Date().getTime();
+        const data   = sheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
+        for (let i = data.length - 1; i >= 0; i--) {
+          if (String(data[i][COL.SENDERID - 1] || "") !== String(body.sender_id)) continue;
+          // Parse date+time
+          const dtStr = (data[i][COL.DATE - 1] || "") + " " + (data[i][COL.TIME - 1] || "");
+          const m = dtStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+          if (!m) break;
+          const rowMs = new Date(m[3], m[2]-1, m[1], m[4], m[5]).getTime();
+          if (nowMs - rowMs > WIN_MS) break;
           targetRow = i + 2; break;
         }
       }
+
+      // Fallback cuối: dòng cuối cùng
+      if (targetRow < 0) targetRow = lastRow;
     }
 
-    // Fallback: append to last data row
-    if (targetRow < 0 && lastRow >= 2) targetRow = lastRow;
-
+    // ── 4. Ghi link vào cột R (Photos), tối đa 6 ảnh ─────────────────
+    let attached = false;
     if (targetRow > 0) {
       const cell     = sheet.getRange(targetRow, COL.PHOTOS);
       const existing = cell.getValue().toString().trim();
-      const photos   = existing ? existing.split(" || ") : [];
+      const photos   = existing ? existing.split(" | ") : [];
 
-      if (photos.length < 6) {          // max 6 photos
-        photos.push(photoLabel);
-        cell.setValue(photos.join(" || "));
+      if (photos.length < 6) {
+        photos.push(driveLink);
+        cell.setValue(photos.join(" | "));
+        attached = true;
+        Logger.log("✅ Link saved at row " + targetRow + " (" + photos.length + "/6)");
       } else {
         Logger.log("⚠️ Max 6 photos reached for row " + targetRow);
       }
     }
 
-    return json_({ status: "ok", ocr: ocrText, ref: refId || null });
+    return json_({ status: "ok", link: driveLink, attached: attached, ref: refId || null });
   } catch (err) {
     Logger.log("❌ cable_add_photo error: " + err.message);
     return json_({ status: "error", message: err.message });
   }
 }
 
-// ── Google Drive OCR ─────────────────────────────────────────────────────
-// ⚠️ Requires Drive API v2 enabled in Advanced Services
-function ocrFromUrl_(url) {
-  try {
-    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, deadline: 30 });
-    if (resp.getResponseCode() !== 200) {
-      Logger.log("OCR fetch failed: HTTP " + resp.getResponseCode());
-      return "";
-    }
+// ── Lấy hoặc tạo folder '2.3 CABLE PHOTO TELEGRAM' ──────────────────────
+// Nằm bên trong folder '1 VCM BRANCH TNI'
+function getCablePhotoFolder_() {
+  const PARENT_NAME = "1 VCM BRANCH TNI";
+  const CHILD_NAME  = "2.3 CABLE PHOTO TELEGRAM";
 
-    const blob = resp.getBlob().setName("cable_ocr_" + new Date().getTime() + ".jpg");
+  const parents = DriveApp.getFoldersByName(PARENT_NAME);
+  const parent  = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
 
-    // Upload to Drive and convert → Google Doc (triggers OCR)
-    const fileResource = {
-      title: "cable_ocr_temp_" + new Date().getTime(),
-      mimeType: "application/vnd.google-apps.document"
-    };
-    const uploaded = Drive.Files.insert(fileResource, blob, { ocr: true, ocrLanguage: "en" });
-
-    // Read text from the temporary Google Doc
-    const doc  = DocumentApp.openById(uploaded.id);
-    const text = doc.getBody().getText().trim();
-
-    // Delete temp file
-    Drive.Files.remove(uploaded.id);
-
-    return text;
-  } catch (err) {
-    Logger.log("OCR error: " + err.message);
-    return "";
-  }
+  const children = parent.getFoldersByName(CHILD_NAME);
+  return children.hasNext() ? children.next() : parent.createFolder(CHILD_NAME);
 }
 
 // ============================================================
