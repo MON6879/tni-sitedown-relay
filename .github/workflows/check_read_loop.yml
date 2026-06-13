@@ -1,5 +1,7 @@
-name: Check Read Status (Live - Edit mỗi 5 phút)
+name: Check Read Status (DISABLED)
 
+# ⛔ ĐÃ TẮT — không tự chạy nữa
+# Để bật lại: đổi 'if: false' thành 'if: true'
 on:
   workflow_dispatch:
     inputs:
@@ -10,6 +12,7 @@ on:
 
 jobs:
   read-status-live:
+    if: false   # ⛔ ĐÃ TẮT
     runs-on: ubuntu-latest
     timeout-minutes: 130   # tối đa 2 giờ 10 phút
 
