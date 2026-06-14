@@ -1,6 +1,7 @@
 ﻿// ============================================================
-// APPS SCRIPT — MDG RUN DATA COLLECTOR  v1.0
+// APPS SCRIPT — MDG RUN DATA COLLECTOR  v2.0
 // Sheet  : MDG Detail  |  Folder : 2.4 Run MDG
+// Photos : 6 separate columns U-Z with =HYPERLINK() formula
 // ============================================================
 
 const MDG_SHEET_ID  = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y";
@@ -29,16 +30,23 @@ const MCOL = {
   SENDER:   18,   // R — Sender Name
   SENDER_ID:19,   // S — Sender ID
   RAW:      20,   // T — Raw content
-  PHOTOS:   21,   // U — Drive links (max 6)
+  PHOTO_1:  21,   // U — Photo 1 HYPERLINK
+  PHOTO_2:  22,   // V — Photo 2 HYPERLINK
+  PHOTO_3:  23,   // W — Photo 3 HYPERLINK
+  PHOTO_4:  24,   // X — Photo 4 HYPERLINK
+  PHOTO_5:  25,   // Y — Photo 5 HYPERLINK
+  PHOTO_6:  26,   // Z — Photo 6 HYPERLINK
 };
-const MTOTAL_COLS = 21;
+const PHOTO_COLS  = [21,22,23,24,25,26];  // U → Z
+const MTOTAL_COLS = 26;
 const MHEADERS = [
   "REF","Confirm Complete","Recorded Date","Recorded Time",
   "Report Date","Site ID","Branch","Team",
   "MDG Code","MDG Capacity","MDG Serial",
   "DG Start Time","DG End Time","Total Hours",
   "Staff Name","Staff Code","Remark",
-  "Sender Name","Sender ID","Raw Content","Photos"
+  "Sender Name","Sender ID","Raw Content",
+  "Photo 1","Photo 2","Photo 3","Photo 4","Photo 5","Photo 6"
 ];
 
 // ============================================================
@@ -79,7 +87,7 @@ function doGet(e) {
     }
     const ss = SpreadsheetApp.openById(MDG_SHEET_ID);
     ensureMdgHeaders_(ss);
-    return json_({ status:"ok", version:"mdg-v1.0", message:"MDG Collector running ✅" });
+    return json_({ status:"ok", version:"mdg-v2.0", message:"MDG Collector running ✅" });
   } catch(err) { return json_({ status:"error", message:err.message }); }
 }
 
@@ -92,21 +100,15 @@ function getMdgSheet_(ss) {
   return sh;
 }
 function ensureMdgHeaders_(ss) {
-  const sh  = getMdgSheet_(ss);
-  const fv  = sh.getRange(1,1).getValue();
+  const sh = getMdgSheet_(ss);
+  const fv = sh.getRange(1,1).getValue();
   if (!fv || fv.toString().trim()==="") {
     const hdr = sh.getRange(1,1,1,MTOTAL_COLS);
     hdr.setValues([MHEADERS]);
     hdr.setFontWeight("bold").setBackground("#1565C0").setFontColor("#FFFFFF");
     sh.setFrozenRows(1);
     sh.setColumnWidth(MCOL.RAW,300);
-    sh.setColumnWidth(MCOL.PHOTOS,250);
-  } else {
-    const ex = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0];
-    MHEADERS.forEach((h,i)=>{
-      if (!ex.includes(h)) sh.getRange(1,i+1).setValue(h)
-        .setFontWeight("bold").setBackground("#1565C0").setFontColor("#FFFFFF");
-    });
+    PHOTO_COLS.forEach(c => sh.setColumnWidth(c,120));
   }
 }
 
@@ -143,10 +145,12 @@ function mdgAdd(body) {
     rd[MCOL.SENDER   -1] = body.sender_name  || "";
     rd[MCOL.SENDER_ID-1] = body.sender_id    || "";
     rd[MCOL.RAW      -1] = body.raw          || "";
-    rd[MCOL.PHOTOS   -1] = "";
     sh.getRange(nr,1,1,MTOTAL_COLS).setValues([rd]);
-    // Force RPT_DATE (col E) luu text, khong bi Sheets convert sang Date
-    if (rd[MCOL.RPT_DATE-1]) { const dc=sh.getRange(nr,MCOL.RPT_DATE); dc.setNumberFormat("@"); dc.setValue(rd[MCOL.RPT_DATE-1]); }
+    // Force RPT_DATE as text
+    if (rd[MCOL.RPT_DATE-1]) {
+      const dc=sh.getRange(nr,MCOL.RPT_DATE);
+      dc.setNumberFormat("@"); dc.setValue(rd[MCOL.RPT_DATE-1]);
+    }
     if (nr%2===0) sh.getRange(nr,1,1,MTOTAL_COLS).setBackground("#EFF3FB");
     Logger.log("✅ MDG added REF="+ref+" row="+nr);
     return json_({ status:"ok", ref:ref, row:last });
@@ -178,58 +182,81 @@ function mdgConfirm(body) {
 }
 
 // ============================================================
-// MDG ADD PHOTO
+// MDG ADD PHOTO  (nhận base64 từ Python, ghi =HYPERLINK() vào sheet)
 // ============================================================
 function mdgAddPhoto(body) {
   try {
     const ss      = SpreadsheetApp.openById(MDG_SHEET_ID);
     const sh      = getMdgSheet_(ss);
     const refId   = String(body.ref_id   ||"").trim();
-    const tgUrl   = body.tg_url          ||"";
     const senderId= String(body.sender_id||"").trim();
-    if (!tgUrl) return json_({ status:"error", message:"tg_url required" });
-    const imgR = UrlFetchApp.fetch(tgUrl,{muteHttpExceptions:true});
-    if (imgR.getResponseCode()!==200)
-      return json_({ status:"error", message:"Download fail: "+imgR.getResponseCode() });
-    const blob = imgR.getBlob();
-    const ts   = Utilities.formatDate(new Date(),"Asia/Yangon","yyyyMMdd_HHmmss");
-    blob.setName("MDG_"+(refId||senderId)+"_"+ts+".jpg");
+
+    // ── 1. Tạo blob từ base64 (Python đã tải về) ─────────────
+    let blob;
+    if (body.photo_b64) {
+      const bytes = Utilities.base64Decode(body.photo_b64);
+      blob = Utilities.newBlob(bytes, "image/jpeg", body.filename || "photo.jpg");
+    } else if (body.tg_url) {
+      // fallback
+      const imgR = UrlFetchApp.fetch(body.tg_url, {muteHttpExceptions:true});
+      if (imgR.getResponseCode()!==200)
+        return json_({ status:"error", message:"Download fail: "+imgR.getResponseCode() });
+      blob = imgR.getBlob();
+    } else {
+      return json_({ status:"error", message:"photo_b64 or tg_url required" });
+    }
+
+    // ── 2. Upload lên Drive ───────────────────────────────────
     const folder = getMdgFolder_();
     const df     = folder.createFile(blob);
-    df.setSharing(DriveApp.Access.ANYONE_WITH_LINK,DriveApp.Permission.VIEW);
+    df.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     const link   = df.getUrl();
-    // Find target row
+    Logger.log("✅ Photo uploaded: "+link);
+
+    // ── 3. Tìm target row ─────────────────────────────────────
     const lr = sh.getLastRow();
     let tRow = -1, mRef = refId||null;
-    if (refId) {
+    if (refId && lr>1) {
       const rc = sh.getRange(2,MCOL.REF,lr-1,1).getValues();
       for (let i=0;i<rc.length;i++)
         if (String(rc[i][0]||"").replace(/^0+/,"")===refId.replace(/^0+/,"")) { tRow=i+2; break; }
     }
-    if (tRow<0 && senderId) {
+    // Fallback: sender_id trong 30 phút
+    if (tRow<0 && senderId && lr>1) {
       const now=new Date();
       const sc=sh.getRange(2,MCOL.SENDER_ID,lr-1,1).getValues();
       const dc=sh.getRange(2,MCOL.REC_DATE, lr-1,1).getValues();
       const tc=sh.getRange(2,MCOL.REC_TIME, lr-1,1).getValues();
       for (let i=sc.length-1;i>=0;i--) {
         if (String(sc[i][0]||"")===senderId) {
-          try { const d=new Date(dc[i][0]+" "+tc[i][0]); if ((now-d)<30*60*1000){tRow=i+2;break;} }
+          try { const d=new Date(dc[i][0]+" "+tc[i][0]); if((now-d)<30*60*1000){tRow=i+2;break;} }
           catch(_){tRow=i+2;break;}
         }
       }
     }
     if (tRow<0) tRow=lr;
-    let attached=false;
+
+    // ── 4. Ghi =HYPERLINK() vào cột Photo trống đầu tiên ─────
     if (tRow>0) {
-      const rv=sh.getRange(tRow,MCOL.REF).getValue();
-      if (rv) mRef=String(rv).trim();
-      const cell=sh.getRange(tRow,MCOL.PHOTOS);
-      const ex=cell.getValue().toString().trim();
-      const ps=ex?ex.split(" | "):[];
-      if (ps.length<6) { ps.push(link); cell.setValue(ps.join(" | ")); attached=true; }
+      const rv = sh.getRange(tRow,MCOL.REF).getValue();
+      if (rv) mRef = String(rv).trim();
+
+      let photoNum = 0;
+      for (let i=0;i<PHOTO_COLS.length;i++) {
+        const cell = sh.getRange(tRow, PHOTO_COLS[i]);
+        if (!cell.getValue()) {
+          photoNum = i+1;
+          cell.setFormula('=HYPERLINK("'+link+'","Photo '+photoNum+'")');
+          cell.setFontColor("#1155CC").setFontLine("underline");
+          Logger.log("✅ HYPERLINK at col "+PHOTO_COLS[i]+" (Photo "+photoNum+") REF:"+mRef);
+          break;
+        }
+      }
+      if (photoNum===0) return json_({ status:"error", message:"Max 6 photos reached for REF:"+mRef });
+      return json_({ status:"ok", link:link, attached:true, ref:mRef, photoNum:photoNum });
     }
-    return json_({ status:"ok", link:link, attached:attached, ref:mRef });
-  } catch(err) { return json_({ status:"error", message:err.message }); }
+    return json_({ status:"ok", link:link, attached:false, ref:mRef });
+  } catch(err) { Logger.log("❌ mdg_add_photo: "+err.message); return json_({ status:"error", message:err.message }); }
 }
 
 // ============================================================
@@ -263,4 +290,3 @@ function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
-

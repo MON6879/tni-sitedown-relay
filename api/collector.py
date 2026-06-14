@@ -8,7 +8,7 @@ Routing:
 
 Webhook URL: https://tni-bot.vercel.app/api/collector
 """
-import os, re, json, asyncio, logging, requests, html
+import os, re, json, asyncio, logging, requests, html, base64
 from http.server import BaseHTTPRequestHandler
 from telegram import Bot, Update
 from datetime import datetime, timezone, timedelta
@@ -381,25 +381,38 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
             if ref_m:
                 ref_id = ref_m.group(1)
 
+        # ── Download photo in Python → send base64 to Apps Script ────
+        photo_b64 = ""
+        filename  = f"MDG_{sender_id}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
+        if tg_url:
+            try:
+                photo_resp = requests.get(tg_url, timeout=15)
+                if photo_resp.status_code == 200:
+                    photo_b64 = base64.b64encode(photo_resp.content).decode("utf-8")
+                else:
+                    logger.warning(f"MDG photo download {photo_resp.status_code}")
+            except Exception as e:
+                logger.error(f"MDG photo download error: {e}")
+
         result     = post_mdg_sheet({
             "action":      "mdg_add_photo",
             "ref_id":      ref_id,
-            "tg_url":      tg_url,
+            "photo_b64":   photo_b64,
+            "filename":    filename,
             "sender_name": sender_name,
             "sender_id":   sender_id,
             "date":        now.strftime("%d/%m/%Y %H:%M"),
         })
         drive_link = result.get("link", "")
         actual_ref = result.get("ref") or ref_id
+        photo_num  = result.get("photoNum", "")
         ref_show   = str(actual_ref).zfill(5) if actual_ref else "?????"
 
         if result.get("status") == "ok" and drive_link:
             await bot.send_message(
                 chat_id,
-                f"📷 <b>REF:{ref_show}</b> | Photo saved\n"
-                f"🔗 <a href='{drive_link}'>View on Drive</a>",
+                f"📷 <b>REF:{ref_show}</b> | Photo {photo_num}/6 saved",
                 parse_mode="HTML",
-                disable_web_page_preview=True,
             )
         else:
             err = html.escape(result.get("message", "Upload failed"))
