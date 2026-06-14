@@ -145,6 +145,8 @@ function mdgAdd(body) {
     rd[MCOL.RAW      -1] = body.raw          || "";
     rd[MCOL.PHOTOS   -1] = "";
     sh.getRange(nr,1,1,MTOTAL_COLS).setValues([rd]);
+    // Force RPT_DATE (col E) luu text, khong bi Sheets convert sang Date
+    if (rd[MCOL.RPT_DATE-1]) { const dc=sh.getRange(nr,MCOL.RPT_DATE); dc.setNumberFormat("@"); dc.setValue(rd[MCOL.RPT_DATE-1]); }
     if (nr%2===0) sh.getRange(nr,1,1,MTOTAL_COLS).setBackground("#EFF3FB");
     Logger.log("✅ MDG added REF="+ref+" row="+nr);
     return json_({ status:"ok", ref:ref, row:last });
@@ -261,3 +263,4 @@ function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
