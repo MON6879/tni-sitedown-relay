@@ -20,7 +20,7 @@ const TZ_CABLE        = "Asia/Yangon"; // UTC+6:30
 const COL = {
   REF:       1,  // A — REF ID
   CONFIRM:   2,  // B — Confirm Complete
-  DATE:      3,  // C — Date
+  DATE:      3,  // C — Date (recorded date)
   TIME:      4,  // D — Time
   TYPE:      5,  // E — Type (Rescue/RC/Maint/Deploy)
   SENDER:    6,  // F — Sender Name
@@ -35,7 +35,8 @@ const COL = {
   WO:       15,  // O — WO
   MATERIALS:16,  // P — Materials List
   RAW:      17,  // Q — Raw Content (unformatted messages)
-  PHOTOS:   18,  // R — Photos / OCR Text (max 6)
+  PHOTOS:   18,  // R — Photos (max 6 Drive links)
+  INC_DATE: 19,  // S — Incident Date (extracted from Incident Name)
 };
 
 const HEADERS = [
@@ -44,10 +45,10 @@ const HEADERS = [
   "Incident Name", "Physical Route", "Total Cable Length",
   "Cable Owner", "Responsible Branch", "RCA",
   "Team Name", "WO", "Materials List",
-  "Raw Content", "Photos/OCR"
+  "Raw Content", "Photos", "Incident Date"
 ];
 
-const TOTAL_COLS = HEADERS.length; // 18
+const TOTAL_COLS = HEADERS.length; // 19
 
 // ── JSON helper ─────────────────────────────────────────────────────────
 function json_(obj) {
@@ -150,6 +151,7 @@ function cableAdd(body) {
     rowData[COL.MATERIALS - 1] = fields["materials list"]       || "";
     rowData[COL.RAW       - 1] = body.raw         || "";
     rowData[COL.PHOTOS    - 1] = "";
+    rowData[COL.INC_DATE  - 1] = extractIncidentDate_(fields["incident name"] || body.raw || "");
 
     sheet.getRange(newRow, 1, 1, TOTAL_COLS).setValues([rowData]);
 
@@ -164,6 +166,22 @@ function cableAdd(body) {
     Logger.log("❌ cable_add error: " + err.message);
     return json_({ status: "error", message: err.message });
   }
+}
+
+// ============================================================
+// HELPER: Extract date from Incident Name text
+// Supports: 6.6.2026 | 06/06/2026 | 6/6/2026 | 06.06.2026
+// Returns: "06/06/2026"  or "" if not found
+// ============================================================
+function extractIncidentDate_(text) {
+  if (!text) return "";
+  const m = text.match(/(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{4})/);
+  if (!m) return "";
+  const day   = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10);
+  const year  = parseInt(m[3], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return "";
+  return String(day).padStart(2,"0") + "/" + String(month).padStart(2,"0") + "/" + year;
 }
 
 // ============================================================

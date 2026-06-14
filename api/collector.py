@@ -290,15 +290,12 @@ async def handle_cable(msg, bot, now, user, sender_name, sender_id):
         type_emoji = {"rescue": "🚨", "request change": "🔄",
                       "maintenance": "🔧", "deploy": "🚀"}
         t_emoji = type_emoji.get((cable_type or "").lower(), "🔌")
+        type_label = html.escape(cable_type or "Unknown")
 
         await bot.send_message(
             chat_id,
-            f"{t_emoji} <b>CABLE BOT</b> ✅ Recorded — <b>REF:{ref}</b>\n"
-            f"🏷️ Type: {html.escape(cable_type or 'Unknown')}\n"
-            f"📅 {now.strftime('%d/%m/%Y %H:%M')}\n"
-            + (detail_lines + "\n" if detail_lines else "") +
-            f"\n💬 Reply with <code>Confirm</code> to mark complete\n"
-            f"📷 Send photo as reply to attach (OCR will read text)",
+            f"{t_emoji} <b>REF:{ref}</b> | {type_label} | {now.strftime('%d/%m/%Y %H:%M')}\n"
+            f"✅ Reply <code>Confirm</code> to close | 📷 Photo → reply this msg",
             parse_mode="HTML",
         )
     else:
