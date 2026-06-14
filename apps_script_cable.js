@@ -25,30 +25,32 @@ const COL = {
   TYPE:      5,  // E — Type (Rescue/RC/Maint/Deploy)
   SENDER:    6,  // F — Sender Name
   SENDERID:  7,  // G — Sender ID (Telegram user ID)
-  INCIDENT:  8,  // H — Incident Name
-  PHYROUTE:  9,  // I — Physical Route
-  CABLELEN: 10,  // J — Total Cable Length
-  OWNER:    11,  // K — Cable Owner
-  BRANCH:   12,  // L — Responsible Branch
-  RCA:      13,  // M — RCA
-  TEAM:     14,  // N — Team Name
-  WO:       15,  // O — WO
-  MATERIALS:16,  // P — Materials List
-  RAW:      17,  // Q — Raw Content (unformatted messages)
-  PHOTOS:   18,  // R — Photos (max 6 Drive links)
-  INC_DATE: 19,  // S — Incident Date (extracted from Incident Name)
+  INC_DATE:  8,  // H — Incident Date (extracted from Incident Name)
+  INCIDENT:  9,  // I — Incident Name
+  PHYROUTE: 10,  // J — Physical Route
+  CABLELEN: 11,  // K — Total Cable Length
+  OWNER:    12,  // L — Cable Owner
+  BRANCH:   13,  // M — Responsible Branch
+  RCA:      14,  // N — RCA
+  TEAM:     15,  // O — Team Name
+  WO:       16,  // P — WO
+  MATERIALS:17,  // Q — Materials List
+  RAW:      18,  // R — Raw Content (unformatted messages)
+  PHOTOS:   19,  // S — Photos (max 6 Drive links)
 };
 
 const HEADERS = [
   "REF", "Confirm Complete", "Date", "Time", "Type",
   "Sender Name", "Sender ID",
+  "Incident Date",
   "Incident Name", "Physical Route", "Total Cable Length",
   "Cable Owner", "Responsible Branch", "RCA",
   "Team Name", "WO", "Materials List",
-  "Raw Content", "Photos", "Incident Date"
+  "Raw Content", "Photos"
 ];
 
 const TOTAL_COLS = HEADERS.length; // 19
+
 
 // ── JSON helper ─────────────────────────────────────────────────────────
 function json_(obj) {
@@ -114,9 +116,9 @@ function ensureHeaders_(ss) {
     sheet.setFrozenRows(1);
     sheet.setColumnWidth(COL.REF,       60);
     sheet.setColumnWidth(COL.CONFIRM,  160);
+    sheet.setColumnWidth(COL.INC_DATE, 110);
     sheet.setColumnWidth(COL.INCIDENT, 220);
     sheet.setColumnWidth(COL.PHOTOS,   200);
-    sheet.setColumnWidth(COL.INC_DATE, 110);
   } else {
     // Sheet đã có data: thêm các cột còn thiếu vào cuối
     const existingCols = sheet.getLastColumn();
