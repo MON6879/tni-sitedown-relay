@@ -107,7 +107,7 @@ function doGet(e) {
 
     const ss = SpreadsheetApp.openById(CABLE_SHEET_ID);
     ensureHeaders_(ss);
-    return json_({ status: "ok", message: "Cable Collector running ✅" });
+    return json_({ status: "ok", version: "v3.0-INC_DATE_H8", message: "Cable Collector running ✅" });
   } catch (err) {
     return json_({ status: "error", message: err.message });
   }
