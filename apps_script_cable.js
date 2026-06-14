@@ -83,6 +83,27 @@ function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || "";
     if (action === "cable_get_stats") return cableGetStats(e.parameter || {});
+    if (action === "cable_check_row") {
+      const ref = (e.parameter && e.parameter.ref) || "";
+      const ss  = SpreadsheetApp.openById(CABLE_SHEET_ID);
+      const sheet = getDataSheet_(ss);
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) return json_({ status: "error", message: "No data" });
+      const refCol = sheet.getRange(2, COL.REF, lastRow - 1, 1).getValues();
+      for (let i = 0; i < refCol.length; i++) {
+        if (String(refCol[i][0] || "").replace(/^0+/, "") === ref.replace(/^0+/, "")) {
+          const row = sheet.getRange(i + 2, 1, 1, TOTAL_COLS).getValues()[0];
+          return json_({
+            status: "ok", ref: ref, sheetRow: i + 2,
+            H_INC_DATE:  row[COL.INC_DATE  - 1],
+            I_INCIDENT:  row[COL.INCIDENT  - 1],
+            E_TYPE:      row[COL.TYPE      - 1],
+            C_DATE:      row[COL.DATE      - 1],
+          });
+        }
+      }
+      return json_({ status: "error", message: "REF not found: " + ref });
+    }
 
     const ss = SpreadsheetApp.openById(CABLE_SHEET_ID);
     ensureHeaders_(ss);
