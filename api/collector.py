@@ -162,7 +162,7 @@ async def handle_cable(msg, bot, now, user, sender_name, sender_id):
             if ref_m:
                 ref_id = ref_m.group(1)
 
-        result = post_cable_sheet({
+        result    = post_cable_sheet({
             "action":      "cable_add_photo",
             "ref_id":      ref_id,
             "tg_url":      tg_url,
@@ -170,15 +170,17 @@ async def handle_cable(msg, bot, now, user, sender_name, sender_id):
             "sender_id":   sender_id,
             "date":        now.strftime("%d/%m/%Y %H:%M"),
         })
-        drive_link = result.get("link", "")
+        drive_link  = result.get("link", "")
+        # Ưu tiên REF trả về từ Apps Script (đã match qua sender_id nếu không có caption REF)
+        actual_ref  = result.get("ref") or ref_id
+        ref_show    = str(actual_ref).zfill(5) if actual_ref else "?????"
         if drive_link:
-            ref_show = str(ref_id or "?").zfill(5)
             await bot.send_message(
                 chat_id,
-                f"📷 <b>Photo saved</b> — REF:{ref_show}\n"
-                f"🔗 <a href='{drive_link}'>View on Google Drive</a>\n"
-                f"📁 Folder: 2.3 CABLE PHOTO TELEGRAM",
+                f"📷 <b>REF:{ref_show}</b> | Photo saved\n"
+                f"🔗 <a href='{drive_link}'>View on Drive</a>",
                 parse_mode="HTML",
+                disable_web_page_preview=True,
             )
         return
 

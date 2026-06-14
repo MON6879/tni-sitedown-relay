@@ -317,9 +317,15 @@ function cableAddPhoto(body) {
       if (targetRow < 0) targetRow = lastRow;
     }
 
-    // ── 4. Ghi link vào cột R (Photos), tối đa 6 ảnh ─────────────────
-    let attached = false;
+    // ── 4. Ghi link vào cột S (Photos), tối đa 6 ảnh ─────────────────
+    let attached  = false;
+    let matchedRef = refId || null;   // sẽ cập nhật sau khi tìm được dòng
+
     if (targetRow > 0) {
+      // Đọc REF thực tế của dòng (dùng khi fallback bằng sender_id)
+      const refVal = sheet.getRange(targetRow, COL.REF).getValue();
+      if (refVal) matchedRef = String(refVal).trim();
+
       const cell     = sheet.getRange(targetRow, COL.PHOTOS);
       const existing = cell.getValue().toString().trim();
       const photos   = existing ? existing.split(" | ") : [];
@@ -328,13 +334,13 @@ function cableAddPhoto(body) {
         photos.push(driveLink);
         cell.setValue(photos.join(" | "));
         attached = true;
-        Logger.log("✅ Link saved at row " + targetRow + " (" + photos.length + "/6)");
+        Logger.log("✅ Link saved at row " + targetRow + " REF:" + matchedRef + " (" + photos.length + "/6)");
       } else {
         Logger.log("⚠️ Max 6 photos reached for row " + targetRow);
       }
     }
 
-    return json_({ status: "ok", link: driveLink, attached: attached, ref: refId || null });
+    return json_({ status: "ok", link: driveLink, attached: attached, ref: matchedRef });
   } catch (err) {
     Logger.log("❌ cable_add_photo error: " + err.message);
     return json_({ status: "error", message: err.message });
