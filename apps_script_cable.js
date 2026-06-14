@@ -192,6 +192,13 @@ function cableAdd(body) {
 
     sheet.getRange(newRow, 1, 1, TOTAL_COLS).setValues([rowData]);
 
+    // Force cột H (INC_DATE) lưu dạng text, không bị Sheets convert sang Date
+    if (rowData[COL.INC_DATE - 1]) {
+      const dateCell = sheet.getRange(newRow, COL.INC_DATE);
+      dateCell.setNumberFormat("@");
+      dateCell.setValue(rowData[COL.INC_DATE - 1]);
+    }
+
     // Alternate row shading
     if (newRow % 2 === 0) {
       sheet.getRange(newRow, 1, 1, TOTAL_COLS).setBackground("#EFF3FB");
