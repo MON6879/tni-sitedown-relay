@@ -392,13 +392,21 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
         drive_link = result.get("link", "")
         actual_ref = result.get("ref") or ref_id
         ref_show   = str(actual_ref).zfill(5) if actual_ref else "?????"
-        if drive_link:
+
+        if result.get("status") == "ok" and drive_link:
             await bot.send_message(
                 chat_id,
                 f"📷 <b>REF:{ref_show}</b> | Photo saved\n"
                 f"🔗 <a href='{drive_link}'>View on Drive</a>",
                 parse_mode="HTML",
                 disable_web_page_preview=True,
+            )
+        else:
+            err = html.escape(result.get("message", "Upload failed"))
+            await bot.send_message(
+                chat_id,
+                f"⚠️ Photo error (REF:{ref_show}): {err}",
+                parse_mode="HTML",
             )
         return
 
