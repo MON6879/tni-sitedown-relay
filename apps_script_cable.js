@@ -105,16 +105,30 @@ function getDataSheet_(ss) {
 function ensureHeaders_(ss) {
   const sheet    = getDataSheet_(ss);
   const firstVal = sheet.getRange(1, 1).getValue();
+
   if (!firstVal || firstVal.toString().trim() === "") {
+    // Sheet trống: tạo mới toàn bộ header
     const hdr = sheet.getRange(1, 1, 1, TOTAL_COLS);
     hdr.setValues([HEADERS]);
     hdr.setBackground("#1565C0").setFontColor("#FFFFFF").setFontWeight("bold");
     sheet.setFrozenRows(1);
-    // Column widths
     sheet.setColumnWidth(COL.REF,       60);
     sheet.setColumnWidth(COL.CONFIRM,  160);
     sheet.setColumnWidth(COL.INCIDENT, 220);
     sheet.setColumnWidth(COL.PHOTOS,   200);
+    sheet.setColumnWidth(COL.INC_DATE, 110);
+  } else {
+    // Sheet đã có data: thêm các cột còn thiếu vào cuối
+    const existingCols = sheet.getLastColumn();
+    if (existingCols < TOTAL_COLS) {
+      for (let c = existingCols + 1; c <= TOTAL_COLS; c++) {
+        const cell = sheet.getRange(1, c);
+        cell.setValue(HEADERS[c - 1]);
+        cell.setBackground("#1565C0").setFontColor("#FFFFFF").setFontWeight("bold");
+        if (c === COL.INC_DATE) sheet.setColumnWidth(c, 110);
+      }
+      Logger.log("Added " + (TOTAL_COLS - existingCols) + " missing column(s)");
+    }
   }
 }
 
