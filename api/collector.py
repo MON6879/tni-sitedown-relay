@@ -2,8 +2,9 @@
 Vercel webhook handler for Collector Bot (TNIAsset_BO).
 
 Routing:
-  - TNI CABLE ROUTE group (CABLE_CHAT_ID) → handle_cable()
-  - All other chats                        → existing Asset handler
+  - TNI CABLE ROUTE group  (CABLE_CHAT_ID) → handle_cable()
+  - TNI COLLECT MDG RUN    (MDG_CHAT_ID)   → handle_mdg()
+  - All other chats                         → existing Asset handler
 
 Webhook URL: https://tni-bot.vercel.app/api/collector
 """
@@ -22,6 +23,13 @@ try:
     CABLE_CHAT_ID = int(os.environ.get("CABLE_CHAT_ID", "-5531350787").strip())
 except ValueError:
     CABLE_CHAT_ID = -5531350787
+
+MDG_APPS_SCRIPT_URL = os.environ.get("MDG_APPS_SCRIPT_URL", "").strip().lstrip('\ufeff')
+try:
+    MDG_CHAT_ID = int(os.environ.get("MDG_CHAT_ID", "-5412512982").strip())
+except ValueError:
+    MDG_CHAT_ID = -5412512982
+
 TZ_VN = timezone(timedelta(hours=7))
 TZ_MM = timezone(timedelta(hours=6, minutes=30))   # Myanmar UTC+6:30
 
@@ -98,6 +106,42 @@ def post_cable_sheet(payload: dict):
     except Exception as e:
         logger.error(f"Cable Apps Script POST error: {e}")
         return {"status": "error", "message": str(e)}
+
+
+# ── Send data to MDG Google Sheet via Apps Script ─────────────────────────
+def post_mdg_sheet(payload: dict):
+    """POST JSON to MDG Apps Script Web App."""
+    if not MDG_APPS_SCRIPT_URL:
+        logger.error("MDG_APPS_SCRIPT_URL not set.")
+        return {"status": "error", "message": "MDG_APPS_SCRIPT_URL not configured"}
+    try:
+        resp = requests.post(MDG_APPS_SCRIPT_URL, json=payload, timeout=30)
+        resp.raise_for_status()
+        logger.info(f"MDG Apps Script response: {resp.text[:300]}")
+        return resp.json()
+    except Exception as e:
+        logger.error(f"MDG Apps Script POST error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+# ── MDG: field list ───────────────────────────────────────────────────────
+MDG_FIELDS_LIST = [
+    "date", "site id", "branch", "team",
+    "mdg code", "mdg capacity", "mdg serial",
+    "dg start time", "dg end time", "total hours",
+    "staff name", "staff code", "remark",
+]
+
+
+def parse_mdg_fields(text: str) -> dict:
+    """Extract MDG field values from lines like 'Site ID: TNI00305'."""
+    result = {}
+    for field in MDG_FIELDS_LIST:
+        pattern = rf"(?i){re.escape(field)}\s*:\s*(.+?)(?=\n|$)"
+        m = re.search(pattern, text)
+        if m:
+            result[field] = m.group(1).strip()
+    return result
 
 
 # ── Cable: detect type keyword ────────────────────────────────────────────
@@ -305,6 +349,148 @@ async def handle_cable(msg, bot, now, user, sender_name, sender_id):
         await bot.send_message(chat_id, f"⚠️ Failed to record: {err}", parse_mode="HTML")
 
 
+
+# ============================================================
+# MDG GROUP HANDLER
+# ============================================================
+async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
+    """Handle all messages from the TNI COLLECT MDG RUN group."""
+    chat_id = msg.chat_id
+
+    # ── Photos ──────────────────────────────────────────────────────────
+    if msg.photo:
+        largest = msg.photo[-1]
+        try:
+            file_info = await bot.get_file(largest.file_id)
+            tg_url = (
+                f"https://api.telegram.org/file/bot{COLLECTOR_BOT_TOKEN}/"
+                f"{file_info.file_path}"
+            )
+        except Exception as e:
+            logger.error(f"MDG get_file error: {e}")
+            tg_url = ""
+
+        ref_id = None
+        caption = msg.caption or ""
+        ref_m = re.search(r"REF[:\s#]*(\d+)", caption, re.IGNORECASE)
+        if ref_m:
+            ref_id = ref_m.group(1)
+        elif msg.reply_to_message:
+            reply_text = msg.reply_to_message.text or ""
+            ref_m = re.search(r"REF[:\s#]*(\d+)", reply_text, re.IGNORECASE)
+            if ref_m:
+                ref_id = ref_m.group(1)
+
+        result     = post_mdg_sheet({
+            "action":      "mdg_add_photo",
+            "ref_id":      ref_id,
+            "tg_url":      tg_url,
+            "sender_name": sender_name,
+            "sender_id":   sender_id,
+            "date":        now.strftime("%d/%m/%Y %H:%M"),
+        })
+        drive_link = result.get("link", "")
+        actual_ref = result.get("ref") or ref_id
+        ref_show   = str(actual_ref).zfill(5) if actual_ref else "?????"
+        if drive_link:
+            await bot.send_message(
+                chat_id,
+                f"📷 <b>REF:{ref_show}</b> | Photo saved\n"
+                f"🔗 <a href='{drive_link}'>View on Drive</a>",
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+        return
+
+    if not msg.text:
+        return
+
+    text = msg.text.strip()
+
+    # ── /start ──────────────────────────────────────────────────────────
+    if text.lower().startswith("/start"):
+        await bot.send_message(
+            chat_id,
+            "⚡ <b>TNI MDG Run Collector Bot</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n"
+            "📌 <b>Send MDG report in this format:</b>\n\n"
+            "<code>MDG ::Report\n"
+            "Date: 9/6/2026\n"
+            "Site ID: TNI00305\n"
+            "Branch : TNI\n"
+            "TEAM: Team01\n"
+            "MDG CODE: HYNUDAI\n"
+            "MDG Capacity: 5.5KVA\n"
+            "MDG Serial: DH420/070954324\n"
+            "DG start time: 6:00AM\n"
+            "DG end Time: 7:30AM\n"
+            "Total hours : 1.5\n"
+            "Staff Name: Bhone Htet Aung\n"
+            "Staff code: VCM855517\n"
+            "Remark: Main DG broken</code>\n\n"
+            "✅ <b>Confirm:</b> Reply bot message with <code>Confirm</code>\n"
+            "📷 <b>Photo:</b> Send photo (reply to bot msg with REF) — max 6",
+            parse_mode="HTML",
+        )
+        return
+
+    # ── Confirm reply ────────────────────────────────────────────────────
+    if text.lower() == "confirm" and msg.reply_to_message:
+        reply_text = msg.reply_to_message.text or ""
+        ref_m = re.search(r"REF:(\d+)", reply_text)
+        if ref_m:
+            ref_id = ref_m.group(1)
+            result = post_mdg_sheet({
+                "action":       "mdg_confirm",
+                "ref_id":       ref_id,
+                "confirmed_by": sender_name,
+                "date":         now.strftime("%d/%m/%Y %H:%M"),
+            })
+            if result.get("status") == "ok":
+                await bot.send_message(
+                    chat_id,
+                    f"✅ <b>REF:{str(ref_id).zfill(5)}</b> — Confirmed by {html.escape(sender_name)}",
+                    parse_mode="HTML",
+                )
+            else:
+                err = html.escape(result.get("message", "unknown error"))
+                await bot.send_message(chat_id, f"⚠️ Confirm failed: {err}", parse_mode="HTML")
+        return
+
+    # ── MDG Report message ───────────────────────────────────────────────
+    # Trigger: text contains "MDG" (case-insensitive)
+    if "mdg" not in text.lower():
+        return
+
+    fields = parse_mdg_fields(text)
+    site_id = fields.get("site id", "")
+
+    payload = {
+        "action":      "mdg_add",
+        "date":        now.strftime("%d/%m/%Y"),
+        "time":        now.strftime("%H:%M"),
+        "sender_name": sender_name,
+        "sender_id":   sender_id,
+        "fields":      fields,
+        "raw":         text,
+    }
+
+    result = post_mdg_sheet(payload)
+
+    if result.get("status") == "ok":
+        ref = result.get("ref") or str(result.get("row", "???")).zfill(5)
+        site_show = html.escape(site_id) if site_id else "—"
+        await bot.send_message(
+            chat_id,
+            f"⚡ <b>REF:{ref}</b> | MDG | {site_show} | {now.strftime('%d/%m/%Y %H:%M')}\n"
+            f"✅ Reply <code>Confirm</code> to close | 📷 Photo → reply this msg",
+            parse_mode="HTML",
+        )
+    else:
+        err = html.escape(result.get("message", "Apps Script error"))
+        await bot.send_message(chat_id, f"⚠️ Failed to record: {err}", parse_mode="HTML")
+
+
 # ============================================================
 # MAIN HANDLER
 # ============================================================
@@ -326,6 +512,12 @@ async def handle(data: dict):
         if chat_id == CABLE_CHAT_ID:
             logger.info(f"[Cable] msg from {sender_name} ({sender_id})")
             await handle_cable(msg, bot, now, user, sender_name, sender_id)
+            return
+
+        # ── Route: MDG group ───────────────────────────────────────────
+        if chat_id == MDG_CHAT_ID:
+            logger.info(f"[MDG] msg from {sender_name} ({sender_id})")
+            await handle_mdg(msg, bot, now, user, sender_name, sender_id)
             return
 
         # ── Photo messages ─────────────────────────────────────────────
