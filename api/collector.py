@@ -124,6 +124,29 @@ def post_mdg_sheet(payload: dict):
         return {"status": "error", "message": str(e)}
 
 
+def post_mdg_photo(payload: dict):
+    """Fire-and-forget: send photo data to GAS then return immediately.
+    GAS (6-min limit on Google servers) handles download+upload independently.
+    Python only waits 8s for read — if GAS hasn't replied, treat as 'processing'.
+    """
+    if not MDG_APPS_SCRIPT_URL:
+        return {"status": "error", "message": "MDG_APPS_SCRIPT_URL not configured"}
+    try:
+        # connect_timeout=10s, read_timeout=8s — just enough to deliver payload
+        resp = requests.post(MDG_APPS_SCRIPT_URL, json=payload, timeout=(10, 8))
+        resp.raise_for_status()
+        logger.info(f"MDG photo GAS response: {resp.text[:200]}")
+        return resp.json()
+    except requests.exceptions.ReadTimeout:
+        # GAS received data and is processing (download Telegram + upload Drive)
+        # GAS runs for up to 6 minutes on Google servers — this is NORMAL
+        logger.info("GAS processing photo in background (up to 3 min) — OK")
+        return {"status": "processing"}
+    except Exception as e:
+        logger.error(f"MDG photo error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 # ── MDG: field list ───────────────────────────────────────────────────────
 MDG_FIELDS_LIST = [
     "date", "site id", "branch", "team",
@@ -391,25 +414,32 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
         # ── Send file_id + tg_url to Apps Script (GAS downloads — no timeout) ──
         # Vercel only has 10s; let Apps Script (6 min limit) handle the download
         filename = f"MDG_{sender_id}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
-        result   = post_mdg_sheet({
+        result   = post_mdg_photo({
             "action":      "mdg_add_photo",
             "ref_id":      ref_id,
-            "tg_url":      tg_url,              # direct Telegram file URL
-            "tg_file_id":  largest.file_id,     # fallback: GAS calls getFile API
+            "tg_url":      tg_url,
+            "tg_file_id":  largest.file_id,
             "filename":    filename,
             "sender_name": sender_name,
             "sender_id":   sender_id,
             "date":        now.strftime("%d/%m/%Y %H:%M"),
         })
-        drive_link = result.get("link", "")
         actual_ref = result.get("ref") or ref_id
-        photo_num  = result.get("photoNum", "")
         ref_show   = str(actual_ref).zfill(5) if actual_ref else "?????"
+        status     = result.get("status", "error")
 
-        if result.get("status") == "ok" and drive_link:
+        if status == "ok":
+            photo_num = result.get("photoNum", "")
             await bot.send_message(
                 chat_id,
                 f"📷 <b>REF:{ref_show}</b> | Photo {photo_num}/6 saved",
+                parse_mode="HTML",
+            )
+        elif status == "processing":
+            # GAS is processing in background — normal for large photos
+            await bot.send_message(
+                chat_id,
+                f"📷 <b>REF:{ref_show}</b> | Photo submitted ⏳ (uploading to Drive...)",
                 parse_mode="HTML",
             )
         else:
