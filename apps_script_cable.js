@@ -15,6 +15,8 @@ const CABLE_SHEET_ID  = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y";
 const CABLE_DATA_TAB  = "Detail cable";
 const CABLE_PERMIT_TAB = "Cable permit ID";
 const TZ_CABLE        = "Asia/Yangon"; // UTC+6:30
+// Telegram bot token — for Method B (getFile API fallback)
+const TG_BOT_TOKEN    = "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM";
 
 // ── Column index (1-based) ──────────────────────────────────────────────
 const COL = {
@@ -285,21 +287,51 @@ function cableAddPhoto(body) {
     const refId = String(body.ref_id || "").trim();
     const tgUrl = body.tg_url || "";
 
-    if (!tgUrl) return json_({ status: "error", message: "Missing tg_url" });
+    if (!tgUrl && !body.tg_file_id)
+      return json_({ status: "error", message: "Missing tg_url and tg_file_id" });
 
-    // ── 1. Download ảnh từ Telegram ──────────────────────────────────
+    // ── 1. Download ảnh (Method A: tg_url; Method B: tg_file_id) ─────────
     let blob;
-    try {
-      const resp = UrlFetchApp.fetch(tgUrl, { muteHttpExceptions: true, deadline: 30 });
-      if (resp.getResponseCode() !== 200) {
-        return json_({ status: "error", message: "Download failed: HTTP " + resp.getResponseCode() });
-      }
-      const ts   = Utilities.formatDate(new Date(), TZ_CABLE, "yyyyMMdd_HHmmss");
-      const name = "cable_" + (refId || "noref") + "_" + ts + ".jpg";
-      blob = resp.getBlob().setName(name);
-    } catch (e) {
-      return json_({ status: "error", message: "Download error: " + e.message });
+    let errA = "skipped", errB = "skipped";
+
+    // Method A: tg_url trực tiếp
+    if (!blob && tgUrl) {
+      try {
+        const r = UrlFetchApp.fetch(tgUrl, { muteHttpExceptions: true, deadline: 30 });
+        if (r.getResponseCode() === 200) {
+          blob = r.getBlob();
+          errA = "ok";
+        } else {
+          errA = "HTTP " + r.getResponseCode();
+        }
+      } catch(e) { errA = e.message; }
     }
+
+    // Method B: tg_file_id → gọi Telegram getFile API
+    if (!blob && body.tg_file_id) {
+      try {
+        const apiUrl = `https://api.telegram.org/bot${TG_BOT_TOKEN}/getFile?file_id=${encodeURIComponent(body.tg_file_id)}`;
+        const apiR   = UrlFetchApp.fetch(apiUrl, { muteHttpExceptions: true, deadline: 15 });
+        const apiJ   = JSON.parse(apiR.getContentText());
+        if (apiJ.ok) {
+          const filePath   = apiJ.result.file_path;
+          const fileUrl    = `https://api.telegram.org/file/bot${TG_BOT_TOKEN}/${filePath}`;
+          const dlR        = UrlFetchApp.fetch(fileUrl, { muteHttpExceptions: true, deadline: 30 });
+          if (dlR.getResponseCode() === 200) {
+            blob = dlR.getBlob();
+            errB = "ok";
+          } else { errB = "dl HTTP " + dlR.getResponseCode(); }
+        } else { errB = "API err: " + apiJ.description; }
+      } catch(e) { errB = e.message; }
+    }
+
+    if (!blob) {
+      return json_({ status: "error", message: `A=${errA} | B=${errB}` });
+    }
+
+    const ts   = Utilities.formatDate(new Date(), TZ_CABLE, "yyyyMMdd_HHmmss");
+    const name = "cable_" + (refId || "noref") + "_" + ts + ".jpg";
+    blob.setName(name);
 
     // ── 2. Upload lên Drive folder 2.3 CABLE PHOTO TELEGRAM ──────────
     const folder    = getCablePhotoFolder_();

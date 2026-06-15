@@ -109,6 +109,25 @@ def post_cable_sheet(payload: dict):
 
 
 # ── Send data to MDG Google Sheet via Apps Script ─────────────────────────
+def post_cable_photo(payload: dict):
+    """Fire-and-forget: send cable photo data to GAS then return immediately.
+    GAS handles download+upload independently (up to 6 minutes).
+    """
+    if not CABLE_APPS_SCRIPT_URL:
+        return {"status": "error", "message": "CABLE_APPS_SCRIPT_URL not configured"}
+    try:
+        resp = requests.post(CABLE_APPS_SCRIPT_URL, json=payload, timeout=(10, 8))
+        resp.raise_for_status()
+        logger.info(f"Cable photo GAS response: {resp.text[:200]}")
+        return resp.json()
+    except requests.exceptions.ReadTimeout:
+        logger.info("GAS processing cable photo in background — OK")
+        return {"status": "processing"}
+    except Exception as e:
+        logger.error(f"Cable photo error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 def post_mdg_sheet(payload: dict):
     """POST JSON to MDG Apps Script Web App."""
     if not MDG_APPS_SCRIPT_URL:
@@ -236,25 +255,40 @@ async def handle_cable(msg, bot, now, user, sender_name, sender_id):
             if ref_m:
                 ref_id = ref_m.group(1)
 
-        result    = post_cable_sheet({
+        result    = post_cable_photo({
             "action":      "cable_add_photo",
             "ref_id":      ref_id,
             "tg_url":      tg_url,
+            "tg_file_id":  largest.file_id,
             "sender_name": sender_name,
             "sender_id":   sender_id,
             "date":        now.strftime("%d/%m/%Y %H:%M"),
         })
-        drive_link  = result.get("link", "")
-        # Ưu tiên REF trả về từ Apps Script (đã match qua sender_id nếu không có caption REF)
-        actual_ref  = result.get("ref") or ref_id
-        ref_show    = str(actual_ref).zfill(5) if actual_ref else "?????"
-        if drive_link:
+        actual_ref = result.get("ref") or ref_id
+        ref_show   = str(actual_ref).zfill(5) if actual_ref else "?????"
+        status     = result.get("status", "error")
+
+        if status == "ok":
+            drive_link = result.get("link", "")
+            link_html  = f"\n🔗 <a href='{drive_link}'>View on Drive</a>" if drive_link else ""
             await bot.send_message(
                 chat_id,
-                f"📷 <b>REF:{ref_show}</b> | Photo saved\n"
-                f"🔗 <a href='{drive_link}'>View on Drive</a>",
+                f"📷 <b>REF:{ref_show}</b> | Photo saved{link_html}",
                 parse_mode="HTML",
                 disable_web_page_preview=True,
+            )
+        elif status == "processing":
+            await bot.send_message(
+                chat_id,
+                f"📷 <b>REF:{ref_show}</b> | Photo submitted ⏳ (uploading to Drive...)",
+                parse_mode="HTML",
+            )
+        else:
+            err = html.escape(result.get("message", "Upload failed"))
+            await bot.send_message(
+                chat_id,
+                f"⚠️ Photo error (REF:{ref_show}): {err}",
+                parse_mode="HTML",
             )
         return
 
