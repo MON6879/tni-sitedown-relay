@@ -392,7 +392,23 @@ function cableAddPhoto(body) {
 
       if (photos.length < 6) {
         photos.push(driveLink);
-        cell.setValue(photos.join(" | "));
+        // Tạo RichText với link clickable: "Photo 1 | Photo 2 | ..."
+        let fullText = "";
+        const segments = [];
+        for (let i = 0; i < photos.length; i++) {
+          if (i > 0) { fullText += " | "; segments.push({ url: null }); }
+          const label = "Photo " + (i + 1);
+          segments.push({ url: photos[i], label: label });
+          fullText += label;
+        }
+        const rtb = SpreadsheetApp.newRichTextValue().setText(fullText);
+        let pos = 0;
+        for (const seg of segments) {
+          const len = (seg.label || " | ").length;
+          if (seg.url) rtb.setLinkUrl(pos, pos + len, seg.url);
+          pos += len;
+        }
+        cell.setRichTextValue(rtb.build());
         attached = true;
         Logger.log("✅ Link saved at row " + targetRow + " REF:" + matchedRef + " (" + photos.length + "/6)");
       } else {
