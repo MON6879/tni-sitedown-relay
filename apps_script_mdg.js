@@ -1,5 +1,5 @@
 // ============================================================
-// APPS SCRIPT — MDG RUN DATA COLLECTOR  v2.0
+// APPS SCRIPT — MDG RUN DATA COLLECTOR  v2.2
 // Sheet  : MDG Detail  |  Folder : 2.4 Run MDG
 // Photos : 6 separate columns U-Z with =HYPERLINK() formula
 // ============================================================
@@ -7,6 +7,17 @@
 const MDG_SHEET_ID  = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y";
 const MDG_DATA_TAB  = "MDG Detail";
 const MDG_PHOTO_DIR = "2.4 Run MDG";
+// Telegram bot token — used by Method B to call getFile API
+// Priority: Script Properties → fallback to hardcoded
+const TG_BOT_TOKEN  = (function(){
+  try {
+    return PropertiesService.getScriptProperties()
+           .getProperty("COLLECTOR_BOT_TOKEN")
+           || "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM";
+  } catch(e) {
+    return "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM";
+  }
+})();
 
 // ── Column index (1-based) ──────────────────────────────────
 const MCOL = {
@@ -87,7 +98,7 @@ function doGet(e) {
     }
     const ss = SpreadsheetApp.openById(MDG_SHEET_ID);
     ensureMdgHeaders_(ss);
-    return json_({ status:"ok", version:"mdg-v2.0", message:"MDG Collector running ✅" });
+    return json_({ status:"ok", version:"mdg-v2.2", message:"MDG Collector running ✅" });
   } catch(err) { return json_({ status:"error", message:err.message }); }
 }
 
@@ -281,8 +292,7 @@ function mdgAddPhoto(body) {
     // Method B: Gọi Telegram getFile API → fresh URL (nếu A bị 404)
     if (!blob && body.tg_file_id) {
       try {
-        const botToken = PropertiesService.getScriptProperties()
-                         .getProperty("COLLECTOR_BOT_TOKEN") || "";
+        const botToken = TG_BOT_TOKEN;  // Script Properties or hardcoded fallback
         if (botToken) {
           const apiUrl  = "https://api.telegram.org/bot" + botToken
                         + "/getFile?file_id=" + encodeURIComponent(body.tg_file_id);
@@ -302,7 +312,7 @@ function mdgAddPhoto(body) {
             Logger.log("⚠️ Method B: getFile API failed: " + apiResp.getContentText());
           }
         } else {
-          Logger.log("⚠️ Method B: COLLECTOR_BOT_TOKEN not set in Script Properties");
+          Logger.log("⚠️ Method B: no bot token available");
         }
       } catch(e) { Logger.log("⚠️ Method B error: "+e.message); }
     }
