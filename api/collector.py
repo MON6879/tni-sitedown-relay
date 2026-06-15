@@ -134,13 +134,20 @@ MDG_FIELDS_LIST = [
 
 
 def parse_mdg_fields(text: str) -> dict:
-    """Extract MDG field values from lines like 'Site ID: TNI00305'."""
+    """Extract MDG field values - allows multiple spaces between words
+    (e.g. 'DG end  Time' with double space).
+    """
     result = {}
     for field in MDG_FIELDS_LIST:
-        pattern = rf"(?i){re.escape(field)}\s*:\s*(.+?)(?=\n|$)"
+        # Build regex allowing \s+ between each word of the field name
+        word_pattern = r"\s+".join(re.escape(w) for w in field.split())
+        pattern = rf"(?i){word_pattern}\s*:\s*(.+?)(?=\n|$)"
         m = re.search(pattern, text)
         if m:
-            result[field] = m.group(1).strip()
+            val = m.group(1).strip()
+            # Strip stray leading colons e.g. ": 10hrs" → "10hrs"
+            val = re.sub(r"^[:\s]+", "", val).strip()
+            result[field] = val
     return result
 
 

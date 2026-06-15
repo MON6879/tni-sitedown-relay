@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // APPS SCRIPT — MDG RUN DATA COLLECTOR  v2.0
 // Sheet  : MDG Detail  |  Folder : 2.4 Run MDG
 // Photos : 6 separate columns U-Z with =HYPERLINK() formula
@@ -113,6 +113,38 @@ function ensureMdgHeaders_(ss) {
 }
 
 // ============================================================
+// HELPERS — Time parser
+// Converts any time string to Google Sheets day-fraction (0..1)
+// Accepts: "6:00AM", "6:00 PM", "6:00 pm", "14:00", "6am", "4:30PM"
+// ============================================================
+function parseTimeToDayFraction(str) {
+  if (!str) return null;
+  str = str.toString().trim().replace(/\s+/g, "");
+  if (!str) return null;
+
+  // Match 12-hour: 6:00AM, 6AM, 4:30PM
+  const m12 = str.match(/^(\d{1,2})(?::(\d{2}))?(AM|PM)$/i);
+  if (m12) {
+    let h = parseInt(m12[1], 10);
+    const mn = parseInt(m12[2] || "0", 10);
+    const pm = m12[3].toUpperCase() === "PM";
+    if (pm && h !== 12) h += 12;
+    if (!pm && h === 12) h = 0;
+    return (h * 60 + mn) / 1440;
+  }
+
+  // Match 24-hour: 14:00, 06:00
+  const m24 = str.match(/^(\d{1,2}):(\d{2})$/);
+  if (m24) {
+    const h = parseInt(m24[1], 10);
+    const mn = parseInt(m24[2], 10);
+    return (h * 60 + mn) / 1440;
+  }
+
+  return null;
+}
+
+// ============================================================
 // MDG ADD
 // ============================================================
 function mdgAdd(body) {
@@ -136,9 +168,10 @@ function mdgAdd(body) {
     rd[MCOL.MDG_CODE -1] = f["mdg code"]     || "";
     rd[MCOL.MDG_CAP  -1] = f["mdg capacity"] || "";
     rd[MCOL.MDG_SER  -1] = f["mdg serial"]   || "";
+    // L and M: store raw text first (will be overwritten as time below)
     rd[MCOL.DG_START -1] = f["dg start time"]|| "";
     rd[MCOL.DG_END   -1] = f["dg end time"]  || "";
-    rd[MCOL.TOTAL_HRS-1] = f["total hours"]  || "";
+    rd[MCOL.TOTAL_HRS-1] = "";               // N: auto-calculated below
     rd[MCOL.STAFF_NM -1] = f["staff name"]   || "";
     rd[MCOL.STAFF_CD -1] = f["staff code"]   || "";
     rd[MCOL.REMARK   -1] = f["remark"]       || "";
@@ -146,16 +179,54 @@ function mdgAdd(body) {
     rd[MCOL.SENDER_ID-1] = body.sender_id    || "";
     rd[MCOL.RAW      -1] = body.raw          || "";
     sh.getRange(nr,1,1,MTOTAL_COLS).setValues([rd]);
+
     // Force RPT_DATE as text
     if (rd[MCOL.RPT_DATE-1]) {
-      const dc=sh.getRange(nr,MCOL.RPT_DATE);
+      const dc = sh.getRange(nr, MCOL.RPT_DATE);
       dc.setNumberFormat("@"); dc.setValue(rd[MCOL.RPT_DATE-1]);
     }
+
+    // ── Col L: DG Start Time → time format ──────────────────
+    const startFrac = parseTimeToDayFraction(f["dg start time"]);
+    const endFrac   = parseTimeToDayFraction(f["dg end time"]);
+
+    if (startFrac !== null) {
+      const lCell = sh.getRange(nr, MCOL.DG_START);
+      lCell.setValue(startFrac);
+      lCell.setNumberFormat("hh:mm AM/PM");
+    }
+
+    // ── Col M: DG End Time → time format ────────────────────
+    if (endFrac !== null) {
+      const mCell = sh.getRange(nr, MCOL.DG_END);
+      mCell.setValue(endFrac);
+      mCell.setNumberFormat("hh:mm AM/PM");
+    }
+
+    // ── Col N: Total Hours = (M - L) × 24 ───────────────────
+    if (startFrac !== null && endFrac !== null) {
+      let diffHours = (endFrac - startFrac) * 24;
+      if (diffHours < 0) diffHours += 24;           // overnight run
+      diffHours = Math.round(diffHours * 100) / 100; // 2 decimal places
+      const nCell = sh.getRange(nr, MCOL.TOTAL_HRS);
+      nCell.setValue(diffHours);
+      nCell.setNumberFormat("0.0#");
+    } else if (f["total hours"]) {
+      // Fallback: parse raw "10hrs" / "10" / "10.5"
+      const rawHrs = f["total hours"].replace(/[^\d.]/g, "");
+      if (rawHrs) {
+        const nCell = sh.getRange(nr, MCOL.TOTAL_HRS);
+        nCell.setValue(parseFloat(rawHrs));
+        nCell.setNumberFormat("0.0#");
+      }
+    }
+
     if (nr%2===0) sh.getRange(nr,1,1,MTOTAL_COLS).setBackground("#EFF3FB");
     Logger.log("✅ MDG added REF="+ref+" row="+nr);
     return json_({ status:"ok", ref:ref, row:last });
   } catch(err) { Logger.log("❌ mdg_add: "+err.message); return json_({ status:"error", message:err.message }); }
 }
+
 
 // ============================================================
 // MDG CONFIRM
