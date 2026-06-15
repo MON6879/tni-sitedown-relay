@@ -7,17 +7,9 @@
 const MDG_SHEET_ID  = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y";
 const MDG_DATA_TAB  = "MDG Detail";
 const MDG_PHOTO_DIR = "2.4 Run MDG";
-// Telegram bot token — used by Method B to call getFile API
-// Priority: Script Properties → fallback to hardcoded
-const TG_BOT_TOKEN  = (function(){
-  try {
-    return PropertiesService.getScriptProperties()
-           .getProperty("COLLECTOR_BOT_TOKEN")
-           || "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM";
-  } catch(e) {
-    return "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM";
-  }
-})();
+// Telegram bot token — hardcoded for reliability
+// (Script Properties was returning wrong value → 401 Unauthorized)
+const TG_BOT_TOKEN  = "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM";
 
 // ── Column index (1-based) ──────────────────────────────────
 const MCOL = {
