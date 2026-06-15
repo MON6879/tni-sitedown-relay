@@ -388,23 +388,14 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
             if ref_m:
                 ref_id = ref_m.group(1)
 
-        # ── Download photo in Python → send base64 to Apps Script ────
-        photo_b64 = ""
-        filename  = f"MDG_{sender_id}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
-        if tg_url:
-            try:
-                photo_resp = requests.get(tg_url, timeout=15)
-                if photo_resp.status_code == 200:
-                    photo_b64 = base64.b64encode(photo_resp.content).decode("utf-8")
-                else:
-                    logger.warning(f"MDG photo download {photo_resp.status_code}")
-            except Exception as e:
-                logger.error(f"MDG photo download error: {e}")
-
-        result     = post_mdg_sheet({
+        # ── Send file_id + tg_url to Apps Script (GAS downloads — no timeout) ──
+        # Vercel only has 10s; let Apps Script (6 min limit) handle the download
+        filename = f"MDG_{sender_id}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
+        result   = post_mdg_sheet({
             "action":      "mdg_add_photo",
             "ref_id":      ref_id,
-            "photo_b64":   photo_b64,
+            "tg_url":      tg_url,              # direct Telegram file URL
+            "tg_file_id":  largest.file_id,     # fallback: GAS calls getFile API
             "filename":    filename,
             "sender_name": sender_name,
             "sender_id":   sender_id,
