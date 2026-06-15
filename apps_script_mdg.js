@@ -275,29 +275,32 @@ function mdgAddPhoto(body) {
 
     // ── 1. Download photo (3 methods, fallback chain) ─────────
     let blob = null;
+    let errA = "skipped", errB = "skipped", errC = "skipped";
 
     // Method A: tg_url trực tiếp (Python đã tính sẵn)
-    if (!blob && body.tg_url) {
+    if (body.tg_url) {
       try {
         const r = UrlFetchApp.fetch(body.tg_url, {muteHttpExceptions:true});
         if (r.getResponseCode() === 200) {
           blob = r.getBlob();
           Logger.log("✅ Method A: tg_url OK");
         } else {
-          Logger.log("⚠️ Method A: tg_url returned " + r.getResponseCode());
+          errA = "HTTP " + r.getResponseCode();
+          Logger.log("⚠️ Method A: " + errA);
         }
-      } catch(e) { Logger.log("⚠️ Method A error: "+e.message); }
-    }
+      } catch(e) { errA = "EX:" + e.message; Logger.log("⚠️ Method A error: "+e.message); }
+    } else { errA = "no tg_url"; }
 
     // Method B: Gọi Telegram getFile API → fresh URL (nếu A bị 404)
     if (!blob && body.tg_file_id) {
       try {
-        const botToken = TG_BOT_TOKEN;  // Script Properties or hardcoded fallback
+        const botToken = TG_BOT_TOKEN;
         if (botToken) {
           const apiUrl  = "https://api.telegram.org/bot" + botToken
                         + "/getFile?file_id=" + encodeURIComponent(body.tg_file_id);
           const apiResp = UrlFetchApp.fetch(apiUrl, {muteHttpExceptions:true});
-          const apiData = JSON.parse(apiResp.getContentText());
+          const apiText = apiResp.getContentText();
+          const apiData = JSON.parse(apiText);
           if (apiData.ok) {
             const freshUrl = "https://api.telegram.org/file/bot" + botToken
                            + "/" + apiData.result.file_path;
@@ -306,16 +309,16 @@ function mdgAddPhoto(body) {
               blob = r2.getBlob();
               Logger.log("✅ Method B: getFile+fresh URL OK");
             } else {
-              Logger.log("⚠️ Method B: fresh URL returned " + r2.getResponseCode());
+              errB = "download HTTP " + r2.getResponseCode();
+              Logger.log("⚠️ Method B: " + errB);
             }
           } else {
-            Logger.log("⚠️ Method B: getFile API failed: " + apiResp.getContentText());
+            errB = "API err:" + (apiData.error_code||"?") + " " + (apiData.description||apiText.substring(0,80));
+            Logger.log("⚠️ Method B: getFile failed: " + errB);
           }
-        } else {
-          Logger.log("⚠️ Method B: no bot token available");
-        }
-      } catch(e) { Logger.log("⚠️ Method B error: "+e.message); }
-    }
+        } else { errB = "no token"; }
+      } catch(e) { errB = "EX:" + e.message; Logger.log("⚠️ Method B error: "+e.message); }
+    } else if (!blob) { errB = "no file_id"; }
 
     // Method C: base64 (Python đã download sẵn — fallback cuối)
     if (!blob && body.photo_b64) {
@@ -323,11 +326,13 @@ function mdgAddPhoto(body) {
         const bytes = Utilities.base64Decode(body.photo_b64);
         blob = Utilities.newBlob(bytes, "image/jpeg", body.filename || "photo.jpg");
         Logger.log("✅ Method C: base64 OK");
-      } catch(e) { Logger.log("⚠️ Method C error: "+e.message); }
-    }
+      } catch(e) { errC = "EX:" + e.message; Logger.log("⚠️ Method C error: "+e.message); }
+    } else if (!blob) { errC = "no b64"; }
 
     if (!blob) {
-      return json_({ status:"error", message:"All 3 download methods failed. Set COLLECTOR_BOT_TOKEN in Script Properties." });
+      const errMsg = "A=" + errA + " | B=" + errB + " | C=" + errC;
+      Logger.log("❌ All failed: " + errMsg);
+      return json_({ status:"error", message: errMsg });
     }
 
     // ── 2. Upload lên Drive ───────────────────────────────────
