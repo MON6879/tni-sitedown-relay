@@ -348,3 +348,31 @@ site_down_notify.gs trigger mỗi 5 phút
 | [apps_script_collector.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_collector.js) | GAS collector: thêm action `store_site_down` (chưa deploy, để dành) |
 | [site_down_notify.gs](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/site_down_notify.gs) | GAS site down: polling CONTROL 5p → ghi Col A → gửi T1/T2/T3/T4 |
 
+---
+
+## 🐛 Lịch sử bugs đã fix (16/06/2026)
+
+| Bug | Nguyên nhân | Fix |
+|---|---|---|
+| **botlookup_relay fail toàn bộ từ ~03:30 AM** | `AuthKeyDuplicatedError` — Telethon session `TELEGRAM_SESSION` bị Telegram vô hiệu hóa do tài khoản `@Phongha79` đăng nhập từ 2 IP khác nhau cùng lúc (GitHub Actions runner IP ≠ IP cũ) | Chạy `get_session.py` trên máy local → tạo session string mới → update GitHub Secret `TELEGRAM_SESSION` |
+| **Teams không nhận tin ~7 tiếng (03:43–13:31)** | Hệ quả của lỗi trên — CONTROL không nhận dữ liệu → GAS không có gì để gửi | Fix session là đủ — GAS hoạt động bình thường suốt thời gian đó |
+
+### ⚡ Khi nào cần tạo session mới (`TELEGRAM_SESSION`)
+- GitHub Actions fail với lỗi `AuthKeyDuplicatedError` hoặc `SessionExpired`
+- Sau khi đổi mật khẩu Telegram `@Phongha79`
+- Sau khi đăng nhập tài khoản trên thiết bị mới
+
+### 🔧 Cách tạo session mới (< 2 phút)
+```powershell
+# 1. Mở PowerShell tại thư mục Task and WO
+cd "D:\6. AI\1. QLTC\Task and WO"
+python get_session.py
+
+# 2. Nhập SĐT @Phongha79 → nhập OTP từ Telegram
+# 3. Copy SESSION STRING xuất hiện
+# 4. Vào GitHub → Settings → Secrets → TELEGRAM_SESSION → Update
+# 5. Chạy thủ công workflow "Botlookup TNI Relay" để test
+```
+
+> **Script:** [`get_session.py`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/get_session.py) — API_ID: `38060453` | API_HASH: `49dbb07f2d226a968571b11eab076d73`
+
