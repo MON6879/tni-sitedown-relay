@@ -1,0 +1,30 @@
+name: TNI Search Bot 24/7
+
+on:
+  workflow_dispatch:   # Chạy thủ công khi cần restart
+  push:
+    branches: [main]
+    paths:
+      - 'telegram_bot.py'   # Tự restart khi sửa code
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350   # ~5h45 (GitHub Actions max 6h/job)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install python-telegram-bot requests pandas python-dotenv
+
+      - name: Run TNI Search + Daily Report Bot
+        env:
+          TELEGRAM_TOKEN:         ${{ secrets.TELEGRAM_TOKEN }}
+          APPS_SCRIPT_URL:        ${{ secrets.APPS_SCRIPT_URL }}
+          DAILY_APPS_SCRIPT_URL:  ${{ secrets.DAILY_APPS_SCRIPT_URL }}
+        run: python telegram_bot.py

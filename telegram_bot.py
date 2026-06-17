@@ -2,11 +2,13 @@ import os
 import re
 import io
 import html
+import time
 import asyncio
 import logging
 import threading
 import requests
 import pandas as pd
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import (
@@ -37,6 +39,32 @@ GID_WO   = "1429089905"  # 'Input WO'(matrix)– col E=TNI, A+B:C+F
 df_site: pd.DataFrame = None
 df_task: pd.DataFrame = None
 df_wo:   pd.DataFrame = None
+
+# ===================== DAILY REPORT CONFIG =====================
+DAILY_APPS_SCRIPT_URL = os.getenv("DAILY_APPS_SCRIPT_URL", "")
+DAILY_PHOTO_WINDOW    = 3600   # 60 phút — ảnh gửi sau báo cáo được attach tự động
+TZ_MM = timezone(timedelta(hours=6, minutes=30))  # Myanmar UTC+6:30
+
+# Theo dõi lần gửi báo cáo cuối: {chat_id: timestamp}
+# Dùng để attach ảnh vào đúng dòng trong vòng 60 phút
+_last_daily: dict[int, float] = {}
+
+# Cache fields từ GAS
+_daily_fields: list[str]  = []
+_daily_fields_ts: float   = 0.0
+DAILY_FIELDS_CACHE_SEC    = 600   # refresh mỗi 10 phút
+
+# Fallback fields khi GAS chưa deploy
+DAILY_FIELDS_DEFAULT = [
+    "Daily report",
+    "Transportation Used", "Full Name", "Detail WO", "Detail task",
+    "Name Site rescue", "Name Cell rescue", "Resuce Cable",
+    "Name and detail Site repair alarm",
+    "Name Site follow partner refuel", "Other task",
+    "Name and detail Site go busines trip start go",
+    "Name and detail Site go busines trip end go",
+    "Km moto bike start", "Km moto bike the end",
+]
 
 # ===================== LOAD DATA =====================
 def fetch_csv(gid: str, has_header: bool = True) -> pd.DataFrame:
@@ -237,10 +265,192 @@ def split_messages(text: str) -> list:
     return chunks
 
 
+# ================================================================
+#  DAILY REPORT — Thu thập báo cáo hàng ngày + công tác
+# ================================================================
+
+def fetch_daily_fields() -> list[str]:
+    """Lấy danh sách field từ GAS (cached 10 phút)."""
+    global _daily_fields, _daily_fields_ts
+    now = time.time()
+    if _daily_fields and (now - _daily_fields_ts) < DAILY_FIELDS_CACHE_SEC:
+        return _daily_fields
+    if not DAILY_APPS_SCRIPT_URL:
+        return DAILY_FIELDS_DEFAULT
+    try:
+        resp = requests.get(
+            DAILY_APPS_SCRIPT_URL + "?action=get_fields",
+            timeout=15
+        )
+        data = resp.json()
+        if data.get("status") == "ok" and data.get("fields"):
+            _daily_fields    = data["fields"]
+            _daily_fields_ts = now
+            logger.info(f"📋 Daily fields loaded: {_daily_fields}")
+            return _daily_fields
+    except Exception as ex:
+        logger.warning(f"⚠️ fetch_daily_fields: {ex}")
+    return _daily_fields or DAILY_FIELDS_DEFAULT
+
+
+def parse_daily_report(text: str, fields: list[str]) -> dict:
+    """
+    Parse nội dung người dùng gửi dạng 'Field: value'.
+    Hỗ trợ nhiều dòng, ghép nội dung xuống dòng vào field trước.
+    """
+    result: dict[str, str] = {}
+    cur_key: str | None = None
+    cur_val: list[str]  = []
+
+    def flush():
+        if cur_key:
+            result[cur_key] = " ".join(cur_val).strip()
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if ":" in line:
+            colon  = line.index(":")
+            label  = line[:colon].strip()
+            val    = line[colon + 1:].strip()
+            # Tìm field khớp (không phân biệt hoa thường)
+            matched = None
+            label_l = label.lower()
+            for f in fields:
+                f_l = f.lower()
+                if f_l in label_l or label_l in f_l:
+                    matched = f
+                    break
+            if matched:
+                flush()
+                cur_key = matched
+                cur_val = [val] if val else []
+                continue
+        # Dòng không khớp field → nối vào field trước
+        if cur_key:
+            cur_val.append(line)
+
+    flush()
+    return result
+
+
+def is_daily_report(text: str) -> bool:
+    """Có chữ 'daily' (không phân biệt hoa thường) là daily report."""
+    return "daily" in text.lower()
+
+
+async def cmd_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Lệnh /daily — Gửi mẫu báo cáo để nhân viên copy-paste."""
+    fields = fetch_daily_fields()
+    now_mm = datetime.now(TZ_MM)
+    date_s = now_mm.strftime("%d/%m/%Y")
+
+    lines = [f"Daily report: {date_s}"]
+    for i, f in enumerate(fields[1:], start=1):
+        lines.append(f"{i}. {f}:")
+    template = "\n".join(lines)
+
+    await update.message.reply_text(
+        f"📋 *Mẫu Daily Report*\n"
+        f"Nhấn copy → chỉnh sửa → gửi lại:\n\n"
+        f"```\n{template}\n```",
+        parse_mode="Markdown",
+    )
+
+
+async def submit_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """
+    Tự động nhận báo cáo khi tin nhắn chứa chữ 'daily'.
+    Trả về True nếu đã xử lý.
+    """
+    text = update.message.text or ""
+    if not is_daily_report(text):
+        return False
+
+    fields  = fetch_daily_fields()
+    parsed  = parse_daily_report(text, fields)
+    now_mm  = datetime.now(TZ_MM)
+    user    = update.effective_user
+    chat_id = update.effective_chat.id
+
+    # Tự thêm ngày nếu chưa có
+    if "Daily report" not in parsed:
+        parsed["Daily report"] = now_mm.strftime("%d/%m/%Y")
+
+    if not DAILY_APPS_SCRIPT_URL or DAILY_APPS_SCRIPT_URL.startswith("CHƯA"):
+        await update.message.reply_text(
+            "❌ Bot chưa cấu hình DAILY_APPS_SCRIPT_URL"
+        )
+        return True
+
+    payload = {
+        "action":      "daily_add",
+        "telegram_id": str(user.id),
+        "fields":      parsed,
+    }
+    try:
+        resp   = requests.post(DAILY_APPS_SCRIPT_URL, json=payload, timeout=45)
+        result = resp.json()
+        if result.get("status") == "ok":
+            name = result.get("name") or user.first_name or str(user.id)
+            _last_daily[chat_id] = time.time()   # lưu để attach ảnh
+            await update.message.reply_text(
+                f"✅ Đã lưu — {html.escape(name)}\n"
+                f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}"
+            )
+        else:
+            await update.message.reply_text(
+                f"❌ Lỗi lưu\n{result.get('message', '')[:120]}"
+            )
+    except Exception as ex:
+        logger.error(f"submit_daily_report: {ex}")
+        await update.message.reply_text(f"❌ Lỗi kết nối\n{str(ex)[:80]}")
+
+    return True
+
+
+async def handle_daily_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Nhận ảnh trong vòng 60 phút sau khi gửi báo cáo → lưu Drive qua GAS."""
+    chat_id = update.effective_chat.id
+    last_ts = _last_daily.get(chat_id, 0)
+
+    # Chỉ xử lý nếu trong vòng DAILY_PHOTO_WINDOW giây kể từ lần gửi báo cáo cuối
+    if time.time() - last_ts > DAILY_PHOTO_WINDOW:
+        return
+    if not DAILY_APPS_SCRIPT_URL or DAILY_APPS_SCRIPT_URL.startswith("CHƯA"):
+        return
+
+    user  = update.effective_user
+    photo = update.message.photo[-1]   # chất lượng cao nhất
+    try:
+        f       = await context.bot.get_file(photo.file_id)
+        tg_url  = f"https://api.telegram.org/file/bot{TOKEN}/{f.file_path}"
+        payload = {
+            "action":      "daily_photo",
+            "telegram_id": str(user.id),
+            "tg_url":      tg_url,
+        }
+        resp   = requests.post(DAILY_APPS_SCRIPT_URL, json=payload, timeout=60)
+        result = resp.json()
+        _last_daily[chat_id] = time.time()   # gia hạn window
+        await update.message.reply_text("📷 ✅" if result.get("status") == "ok" else "📷 ❌")
+    except Exception as ex:
+        logger.error(f"handle_daily_photo: {ex}")
+        await update.message.reply_text("📷 ❌")
+
+
 # ===================== BOT HANDLERS =====================
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    m    = re.search(r"(TNI\w+)", text, re.IGNORECASE)
+
+    # ── 1. Daily report: tin nhắn có chữ "daily" → lưu sheet
+    if is_daily_report(text):
+        await submit_daily_report(update, context)
+        return
+
+    # ── 2. TNI Lookup (existing logic)
+    m = re.search(r"(TNI\w+)", text, re.IGNORECASE)
     if not m:
         return
     tni      = m.group(1).upper()
@@ -405,8 +615,12 @@ async def main():
     app.add_handler(CommandHandler("reload", reload_command))
     app.add_handler(CommandHandler("id",     id_command))
     app.add_handler(CommandHandler("myid",   myid_command))
+    app.add_handler(CommandHandler("daily",  cmd_daily))        # Daily report
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, handle_message
+    ))
+    app.add_handler(MessageHandler(
+        filters.PHOTO, handle_daily_photo                        # Ảnh daily report
     ))
 
     logger.info("Bot TNI dang lang nghe...")
