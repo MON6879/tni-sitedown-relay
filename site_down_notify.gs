@@ -482,11 +482,16 @@ function checkColC(sheet) {
   const raw = sheet.getRange("A1").getValue().toString().trim();
   if (!raw) { Logger.log("[Tin1] A1 rỗng — bỏ qua"); return; }
 
+  // Dùng timestamp + 60 ký tự đầu làm key (tránh vượt giới hạn 9KB của PropertiesService)
+  // Ưu tiên parse timestamp từ A1; nếu không được thì lấy 200 ký tự đầu
+  const ts1   = parseA1Timestamp(sheet);
+  const storeKey = ts1 ? (ts1 + "|" + raw.substring(0, 60)) : raw.substring(0, 200);
+
   const props   = PropertiesService.getScriptProperties();
   const lastKey = props.getProperty(TS_KEY_A1) || "";
-  if (raw === lastKey) { Logger.log("[Tin1] A1 không đổi — bỏ qua"); return; }
+  if (storeKey === lastKey) { Logger.log("[Tin1] A1 không đổi (" + storeKey.substring(0,40) + ") — bỏ qua"); return; }
 
-  Logger.log("[Tin1] 🆕 A1 thay đổi → gửi Col C...");
+  Logger.log("[Tin1] 🆕 A1 thay đổi (" + storeKey.substring(0,40) + ") → gửi Col C...");
 
   const colCRaw = readColCRaw(sheet);
   if (!colCRaw) { Logger.log("[Tin1] Col C trống — bỏ qua"); return; }
@@ -497,7 +502,9 @@ function checkColC(sheet) {
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     const coloredRaw = colorizeTeams(colCRaw);
-    sendTelegram(controlId, "<pre>" + escHtml(coloredRaw) + "</pre>", "[Tin1][CONTROL]");
+    // Fix: split nội dung TRƯỚC khi bọc <pre></pre>
+    // Tránh lỗi Telegram "Unclosed tag" khi split cắt giữa <pre>...</pre>
+    sendTelegramPre(controlId, coloredRaw, "[Tin1][CONTROL]");
   }
 
   // ② Mỗi Team: header chung + summary team đó + site của team đó
@@ -537,13 +544,14 @@ function checkColC(sheet) {
 
     // Tô màu team code trong tin nhắn
     const coloredContent = colorizeTeams(teamContent);
-    sendTelegram(chatId, "<pre>" + escHtml(coloredContent) + "</pre>", "[Tin1][" + team + "]");
+    // Fix: dùng sendTelegramPre để mỗi chunk đều có <pre></pre> đúng
+    sendTelegramPre(chatId, coloredContent, "[Tin1][" + team + "]");
   }
 
   // ③ TNI cá nhân → KHÔNG nhận Tin1 (site list), chỉ nhận Tin2 (summary)
 
-  props.setProperty(TS_KEY_A1, raw);
-  Logger.log("[Tin1] ✅ Xong");
+  props.setProperty(TS_KEY_A1, storeKey);  // lưu key ngắn, không lưu toàn bộ A1
+  Logger.log("[Tin1] ✅ Xong — lưu key: " + storeKey.substring(0, 60));
   // NOTE: sendNoteB2B5 đã chuyển sang gửi từ @Phongha79 (Telethon) trong botlookup_relay.py
   //       để hỗ trợ theo dõi ai đã đọc (GetMessageReadParticipantsRequest)
 }
@@ -590,6 +598,10 @@ function checkAwAz(sheet) {
   const ts = parseAW4Timestamp(sheet);
   if (!ts) { Logger.log("[Tin2] Không có timestamp trong AW4"); return; }
 
+  // Chỉ so sánh timestamp AW4 — KHÔNG dùng hash nội dung AW4:AZ8
+  // Lý do: hash quá nhạy, trigger gửi lại khi Col C cập nhật (botlookup mới)
+  // nhưng AW4 timestamp chưa đổi → gửi SUMMARY với data cũ (lỗi 06:43 04:25)
+  // Logic đúng: SUMMARY chỉ gửi khi AW4 có timestamp MỚI (cập nhật từ hệ thống)
   const props  = PropertiesService.getScriptProperties();
   const lastTs = props.getProperty(TS_KEY_AW4) || "";
   if (ts === lastTs) { Logger.log("[Tin2] AW4 không đổi (" + ts + ") — bỏ qua"); return; }
@@ -629,7 +641,7 @@ function checkAwAz(sheet) {
     Utilities.sleep(300);
   }
 
-  props.setProperty(TS_KEY_AW4, ts);
+  props.setProperty(TS_KEY_AW4, ts);  // lưu chỉ timestamp AW4
   Logger.log("[Tin2] ✅ Xong — lưu timestamp: " + ts);
 }
 
@@ -905,6 +917,40 @@ function sendTelegram(chatId, text, tag) {
     } catch (e) {
       Logger.log((tag||"") + " ❌ " + e.message);
     }
+  });
+}
+
+
+// ============================================================
+// GỬI TELEGRAM với <pre> block — split TRƯỚC khi bọc tag
+// Fix lỗi Telegram "Unclosed tag" khi tin dài > 4000 ký tự:
+//   splitMessage("<pre>...very long...</pre>") cắt giữa → mất tag đóng/mở
+//   → Telegram reject 400 Bad Request cho CONTROL (toàn bộ 4 teams)
+//   Teams ngắn hơn → không cần split → không bị lỗi → vì vậy Team có nhận, Control không
+// Giải pháp: split nội dung TRONG pre (plain text), rồi bọc từng chunk bằng <pre></pre>
+// ============================================================
+function sendTelegramPre(chatId, plainContent, tag) {
+  const url        = "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/sendMessage";
+  const maxInner   = 3800;  // để lại chỗ cho <pre></pre> và overhead
+  const escaped    = escHtml(plainContent);
+  const chunks     = splitMessage(escaped, maxInner);  // split nội dung đã escape
+  chunks.forEach((chunk, i) => {
+    const wrappedChunk = "<pre>" + chunk + "</pre>";   // mỗi chunk có tag đầy đủ
+    try {
+      const resp = UrlFetchApp.fetch(url, {
+        method:             "post",
+        contentType:        "application/json",
+        payload:            JSON.stringify({ chat_id: chatId, text: wrappedChunk, parse_mode: "HTML" }),
+        muteHttpExceptions: true,
+      });
+      const res = JSON.parse(resp.getContentText());
+      Logger.log((tag||"") + (res.ok ? " ✅ OK→" : " ❌ ERR→") + chatId +
+        (chunks.length > 1 ? " [" + (i+1) + "/" + chunks.length + "]" : "") +
+        (!res.ok ? " | " + res.description : ""));
+    } catch (e) {
+      Logger.log((tag||"") + " ❌ " + e.message);
+    }
+    if (i < chunks.length - 1) Utilities.sleep(300);
   });
 }
 

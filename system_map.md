@@ -68,12 +68,13 @@
 
 ## 🤖 Bots
 
-| Bot | Token env var | Token | Chức năng |
-|---|---|---|---|
-| `@TNIASSETorderREQUEST_BOT` | `COLLECTOR_BOT_TOKEN` | `8928677923:AAE_...` | Thu thập Order/Revoke/Export/Move/Asset Sent/Destroys |
-| `@TNIREPORTTASK_BOT` | `REPORT_TASK_BOT_TOKEN` | `8646913750:AAG3...` | ⚠️ Không dùng nữa cho nhân viên (nhân viên chưa start bot này) |
-| `@TNITECHINICALDEPREPORT_BOT` | `TECHNICAL_DEP_BOT_TOKEN` | `8928677923:AAE_...` | Gửi cho Technical Dept (E75:E87) |
-| `SEND_BOT` | `SEND_BOT_TOKEN` | `8897800070:AAHc...` | Gửi cho **TẤT CẢ**: Nhân viên + Team Leaders + Management + BOD |
+| Bot | Token env var | Token | Chức năng | Deploy |
+|---|---|---|---|---|
+| `@TNIASSETorderREQUEST_BOT` | `COLLECTOR_BOT_TOKEN` | `8928677923:AAE_...` | Thu thập Order/Revoke/Export/Move/Asset Sent/Destroys | Vercel webhook |
+| `@SEARCHTNITASKWOBOT` | `TELEGRAM_TOKEN` | `8606383435:AAEs...` | Tra cứu TNI Site/Task/WO + Daily Report | **Vercel webhook 24/7** |
+| `@TNIREPORTTASK_BOT` | `REPORT_TASK_BOT_TOKEN` | `8646913750:AAG3...` | ⚠️ Không dùng nữa cho nhân viên (nhân viên chưa start bot này) | — |
+| `@TNITECHINICALDEPREPORT_BOT` | `TECHNICAL_DEP_BOT_TOKEN` | `8928677923:AAE_...` | Gửi cho Technical Dept (E75:E87) | GitHub Actions |
+| `SEND_BOT` | `SEND_BOT_TOKEN` | `8897800070:AAHc...` | Gửi cho **TẤT CẢ**: Nhân viên + Team Leaders + Management + BOD | GitHub Actions |
 
 ---
 
@@ -81,23 +82,36 @@
 
 | File | Deploy | Chức năng |
 |---|---|---|
-| [collector.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/api/collector.py) | **Vercel** | Bot thu thập — webhook, lưu Order/Revoke... vào Sheet |
+| [search_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/api/search_bot.py) | **Vercel webhook** | Bot tra cứu TNI + Daily Report — 24/7 miễn phí |
+| [collector.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/api/collector.py) | **Vercel webhook** | Bot thu thập — lưu Order/Revoke... vào Sheet |
 | [cron_send.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/cron_send.py) | **GitHub Actions** | Gửi task remain hàng ngày 17:30 — dùng SEND_BOT cho tất cả |
 | [send_now.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/send_now.py) | **GitHub Actions** | Gửi search stats + asset stats + D75:E87 custom |
-| [combined_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/combined_bot.py) | **Render** (nếu dùng) | Scheduler 24/7 (thay thế bởi cron_send.py) |
+| [telegram_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/telegram_bot.py) | ~~GitHub Actions~~ | ⚠️ ĐÃ THAY THẾ bởi `api/search_bot.py` (Vercel webhook) |
 | [apps_script_collector.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_collector.js) | **Apps Script** | Backend xử lý dữ liệu Sheet |
 
 ---
 
 ## 🚀 Deploy targets
 
-### Vercel (Collector Bot)
+### Vercel (Collector Bot + Search Bot)
 - **URL:** `https://tni-bot.vercel.app`
 - **Deploy:** `npx -y vercel --prod --yes`
-- **Files:** `api/collector.py`
+- **Endpoints:**
+  - `/api/collector` → `api/collector.py` (Order/Revoke thu thập)
+  - `/api/search_bot` → `api/search_bot.py` (TNI Search + Daily Report — **24/7**)
+- **Webhook URLs:**
+  - Collector: `https://tni-bot.vercel.app/api/collector`
+  - Search Bot: `https://tni-bot.vercel.app/api/search_bot`
+- **Set webhook:** `python setup_search_webhook.py` (chạy 1 lần)
 - **Env vars trên Vercel:**
-  - `COLLECTOR_BOT_TOKEN`
+  - `TELEGRAM_TOKEN` (Search Bot)
+  - `COLLECTOR_BOT_TOKEN` (Collector Bot)
   - `APPS_SCRIPT_URL`
+  - `DAILY_APPS_SCRIPT_URL`
+  - `CABLE_APPS_SCRIPT_URL`
+  - `MDG_APPS_SCRIPT_URL`
+  - `CABLE_CHAT_ID`
+  - `MDG_CHAT_ID`
 
 ### GitHub Actions (Scheduled sending)
 - **Repo:** `phonghdpxd-cmd/tni-bot`
@@ -108,6 +122,7 @@
 | **Daily Task Reminder (17:30 Myanmar)** | `daily_task.yml` | `0 11 * * *` UTC = 17:30 Myanmar | `cron_send.py` |
 | Gửi thông báo task | `daily_send.yml` | `30 10 * * *` UTC = 17:00 Myanmar | `send_now.py` |
 | **Botlookup TNI Relay** | `botlookup_relay.yml` | `0,30 22,23 * * *` + `0,30 0-14 * * *` + `0 15 * * *` UTC = 04:30–21:30 Myanmar mỗi 30p | `botlookup_relay.py` |
+| ~~TNI Search Bot 24/7~~ | `tni_search_bot.yml` | **⚠️ ĐÃ TẮT** — chuyển sang Vercel webhook (`api/search_bot.py`) | ~~`telegram_bot.py`~~ |
 | ~~Telegram Daily Send~~ | `telegram_send.yml` | **⚠️ ĐÃ TẮT** — cron cũ `30 17` UTC = 00:00 Myanmar (SAI) | ~~`cron_send.py`~~ |
 
 - **Secrets trên GitHub:**
@@ -375,4 +390,15 @@ python get_session.py
 ```
 
 > **Script:** [`get_session.py`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/get_session.py) — API_ID: `38060453` | API_HASH: `49dbb07f2d226a968571b11eab076d73`
+
+---
+
+## 🐛 Lịch sử bugs đã fix (18/06/2026)
+
+| Bug | Nguyên nhân | Fix |
+|---|---|---|
+| **CONTROL không nhận Tin 1 (Col C site list)** | `sendTelegram("<pre>...8000 chars...</pre>")` → `splitMessage` cắt giữa `<pre>...</pre>` → mỗi chunk thiếu tag đóng/mở → Telegram reject 400 "Unclosed tag". Teams ngắn hơn nên không cần split → không lỗi | Thêm hàm `sendTelegramPre()`: split nội dung TRƯỚC, rồi bọc từng chunk bằng `<pre></pre>` riêng |
+| **checkColC lưu toàn bộ A1 vào PropertiesService** | A1 dài > 9KB → property bị cắt → key không khớp → gửi trùng lặp hoặc bỏ qua sai | Thay bằng `storeKey = timestamp + 60 ký tự đầu A1` (luôn < 200 bytes) |
+| **TNI Search Bot chết sau ~6h, không tự restart** | `tni_search_bot.yml` chỉ có `push` + `workflow_dispatch`, không có `schedule` cron → bot chết sau timeout 350p, không bao giờ restart | Thêm cron `0 0,5,10,15,20 * * *` (mỗi 5h UTC) + `concurrency: cancel-in-progress: true` |
+| **CONTROL nhận mgmt_report (cron_send.py)** | `mgmt_report` chỉ gửi cho rows 60-74 cá nhân, không gửi vào group CONTROL SITE | Thêm step 8b gửi `mgmt_report` vào CONTROL SITE dùng `TECHNICAL_DEP_BOT_TOKEN` |
 

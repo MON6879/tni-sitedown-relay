@@ -749,6 +749,18 @@ async def main():
         except Exception as e:
             logger.error(f"❌ Asset stats → CONTROL SITE: {e}")
 
+    # ── 8b. Gửi mgmt_report (báo cáo tổng hợp TL) vào CONTROL SITE ──
+    # Bug fix: trước đây CONTROL SITE chỉ nhận asset_msg, không nhận mgmt_report
+    # (mgmt_report chỉ được gửi cho rows 60-74 cá nhân, không gửi vào group)
+    if mgmt_report and TECHNICAL_DEP_BOT_TOKEN:
+        logger.info("--- Gửi mgmt_report (tổng hợp TL) → CONTROL SITE (-5251698940) ---")
+        try:
+            async with Bot(token=TECHNICAL_DEP_BOT_TOKEN) as ctrl_bot2:
+                await send_msg(ctrl_bot2, CONTROL_CHAT_ID, mgmt_report, "CONTROL-mgmt")
+            logger.info("✅ mgmt_report → CONTROL SITE")
+        except Exception as e:
+            logger.error(f"❌ mgmt_report → CONTROL SITE: {e}")
+
     # ── 9. Gửi tin gộp theo Team lên Group Telegram (T1–T4) ──────
     # Đọc lại sheet, thu thập rows 4-59, nhóm theo Cột A (team)
     import html as _html

@@ -106,9 +106,16 @@ function handleSyncHeaders() {
   // Cột B header
   sheet.getRange(1, COL_B).setValue("Tên nhân viên").setFontWeight("bold").setBackground("#D9E1F2");
 
-  // Cột R = Telegram ID, Cột S = Employee Name
+  // Cột R = Telegram ID, Cột S = Tên nhân viên (công thức tự động)
   sheet.getRange(1, COL_TG_ID).setValue("Telegram ID").setFontWeight("bold").setBackground("#FCE4D6");
   sheet.getRange(1, COL_EMP_NAME).setValue("Tên nhân viên").setFontWeight("bold").setBackground("#FCE4D6");
+
+  // ARRAYFORMULA tự động lấy tên từ tab 'ID Telegram' (Cột E = TG ID, Cột B = Tên)
+  // Ghi vào S2 — áp dụng cho toàn bộ cột S mãi mãi
+  const arrayFormula =
+    "=ARRAYFORMULA(IF(R2:R=\"\",,IFERROR(INDEX('ID Telegram'!B:B," +
+    "MATCH(TEXT(R2:R,\"0\"),'ID Telegram'!E:E,0)),\"?\")))"; 
+  sheet.getRange(2, COL_EMP_NAME).setFormula(arrayFormula);
 
   // Cột T → Y = Photo 1-6
   const photoHeaders = [["Photo 1","Photo 2","Photo 3","Photo 4","Photo 5","Photo 6"]];
@@ -132,8 +139,7 @@ function handleDailyAdd(body) {
   const tgId    = String(body.telegram_id || "").trim();
   const fields  = body.fields || {};
 
-  // Lookup tên nhân viên từ tab "ID Telegram"
-  const empName = lookupEmployeeName_(ss, tgId);
+  // Không cần lookup tên — Col S đã có ARRAYFORMULA tự điền
 
   // Lấy header hàng 1 để map đúng cột
   const headers = sheet.getRange(1, COL_DATA_START, 1, NUM_DATA_COLS).getValues()[0];
@@ -154,10 +160,9 @@ function handleDailyAdd(body) {
 
   // Build full row (A→Y = 25 cột)
   const row = new Array(TOTAL_COLS).fill("");
-  row[COL_B - 1]          = empName;                   // B = Tên NV
   dataRow.forEach((v, i) => { row[COL_DATA_START - 1 + i] = v; }); // C:Q = data
-  row[COL_TG_ID - 1]      = tgId;                      // R = Telegram ID
-  row[COL_EMP_NAME - 1]   = empName;                   // S = Tên NV
+  row[COL_TG_ID - 1]      = tgId;   // R = Telegram ID
+  // Col S (COL_EMP_NAME) được ARRAYFORMULA tự điền — không ghi đè
 
   sheet.appendRow(row);
   const rowNum = sheet.getLastRow();
@@ -177,8 +182,8 @@ function handleDailyAdd(body) {
     props.deleteProperty(pKey);
   }
 
-  Logger.log("✅ Daily row added: row=" + rowNum + " tgId=" + tgId + " name=" + empName);
-  return jsonOut({ status: "ok", row: rowNum, name: empName });
+  Logger.log("✅ Daily row added: row=" + rowNum + " tgId=" + tgId);
+  return jsonOut({ status: "ok", row: rowNum, name: tgId });
 }
 
 // ================================================================
@@ -253,7 +258,7 @@ function handleDailyPhoto(body) {
 
 // ================================================================
 //  LOOKUP TÊN NHÂN VIÊN từ tab "ID Telegram"
-//  Tự động thử cả 2 chiều: (Name|TgID) hoặc (TgID|Name)
+//  Cột E = Telegram ID  |  Cột B = Tên nhân viên
 // ================================================================
 function lookupEmployeeName_(ss, telegramId) {
   if (!telegramId) return "";
@@ -265,13 +270,11 @@ function lookupEmployeeName_(ss, telegramId) {
     }
     const data = sheet.getDataRange().getValues();
     for (let i = 0; i < data.length; i++) {
-      const a = String(data[i][0] || "").trim();
-      const b = String(data[i][1] || "").trim();
-      // Thử col B = Telegram ID, col A = Name
-      if (b === telegramId && a) return a;
-      // Thử col A = Telegram ID, col B = Name
-      if (a === telegramId && b) return b;
+      const colE = String(data[i][4] || "").trim();   // Cột E (index 4)
+      const colB = String(data[i][1] || "").trim();   // Cột B (index 1)
+      if (colE === telegramId && colB) return colB;
     }
+    Logger.log("⚠️ Không tìm thấy Telegram ID: " + telegramId);
   } catch (e) {
     Logger.log("❌ lookupEmployeeName: " + e.message);
   }
