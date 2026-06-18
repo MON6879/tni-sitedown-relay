@@ -207,6 +207,12 @@ function cableAdd(body) {
     }
 
     Logger.log("✅ cable_add REF:" + ref + " row:" + newRow);
+
+    // Gắn ảnh đã gửi TRƯỚC báo cáo (pending queue ±15 phút)
+    if (body.sender_id) {
+      attachPendingPhotos_(sheet, newRow, String(body.sender_id), ref);
+    }
+
     return json_({ status: "ok", row: last, ref: ref });
   } catch (err) {
     Logger.log("❌ cable_add error: " + err.message);
@@ -356,25 +362,28 @@ function cableAddPhoto(body) {
         }
       }
 
-      // Fallback: dòng mới nhất trong 30 phút từ cùng sender
+      // Fallback: dòng GẦN NHẤT trong ±15 phút từ cùng sender (trước HOẶC sau)
       if (targetRow < 0 && body.sender_id) {
-        const WIN_MS = 30 * 60 * 1000;
-        const nowMs  = new Date().getTime();
-        const data   = sheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
+        const WIN_MS  = 15 * 60 * 1000;  // ±15 phút
+        const nowMs   = new Date().getTime();
+        const data    = sheet.getRange(2, 1, lastRow - 1, TOTAL_COLS).getValues();
+        let   bestDiff = Infinity;
         for (let i = data.length - 1; i >= 0; i--) {
           if (String(data[i][COL.SENDERID - 1] || "") !== String(body.sender_id)) continue;
-          // Parse date+time
           const dtStr = (data[i][COL.DATE - 1] || "") + " " + (data[i][COL.TIME - 1] || "");
           const m = dtStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
-          if (!m) break;
+          if (!m) continue;
           const rowMs = new Date(m[3], m[2]-1, m[1], m[4], m[5]).getTime();
+          const diff  = Math.abs(nowMs - rowMs);
+          if (diff <= WIN_MS && diff < bestDiff) {
+            bestDiff  = diff;
+            targetRow = i + 2;
+          }
+          // Dừng khi row quá cũ (>15 phút so với now)
           if (nowMs - rowMs > WIN_MS) break;
-          targetRow = i + 2; break;
         }
       }
-
-      // Fallback cuối: dòng cuối cùng
-      if (targetRow < 0) targetRow = lastRow;
+      // Không có fallback "dòng cuối cùng" — tránh gắn nhầm sang báo cáo khác
     }
 
     // ── 4. Ghi link vào cột S (Photos), tối đa 6 ảnh ─────────────────
@@ -386,29 +395,12 @@ function cableAddPhoto(body) {
       const refVal = sheet.getRange(targetRow, COL.REF).getValue();
       if (refVal) matchedRef = String(refVal).trim();
 
-      const cell     = sheet.getRange(targetRow, COL.PHOTOS);
-      const existing = cell.getValue().toString().trim();
-      const photos   = existing ? existing.split(" | ") : [];
+      const cell   = sheet.getRange(targetRow, COL.PHOTOS);
+      const photos = readPhotoUrls_(cell);  // đọc URLs thực từ RichText
 
       if (photos.length < 6) {
         photos.push(driveLink);
-        // Tạo RichText với link clickable: "Photo 1 | Photo 2 | ..."
-        let fullText = "";
-        const segments = [];
-        for (let i = 0; i < photos.length; i++) {
-          if (i > 0) { fullText += " | "; segments.push({ url: null }); }
-          const label = "Photo " + (i + 1);
-          segments.push({ url: photos[i], label: label });
-          fullText += label;
-        }
-        const rtb = SpreadsheetApp.newRichTextValue().setText(fullText);
-        let pos = 0;
-        for (const seg of segments) {
-          const len = (seg.label || " | ").length;
-          if (seg.url) rtb.setLinkUrl(pos, pos + len, seg.url);
-          pos += len;
-        }
-        cell.setRichTextValue(rtb.build());
+        cell.setRichTextValue(buildPhotoRichText_(photos));
         attached = true;
         Logger.log("✅ Link saved at row " + targetRow + " REF:" + matchedRef + " (" + photos.length + "/6)");
       } else {
@@ -416,10 +408,90 @@ function cableAddPhoto(body) {
       }
     }
 
+    // Nếu chưa gắn được (ảnh đến TRƯỚC báo cáo) → đưa vào pending queue
+    if (!attached && body.sender_id && driveLink) {
+      const key   = "pp_" + String(body.sender_id);
+      const props = PropertiesService.getScriptProperties();
+      try {
+        const raw   = props.getProperty(key);
+        const queue = raw ? JSON.parse(raw) : { links: [], time: new Date().getTime() };
+        if (queue.links.length < 6) {
+          queue.links.push(driveLink);
+          queue.time = new Date().getTime();
+          props.setProperty(key, JSON.stringify(queue));
+          Logger.log("📥 Pending queue " + queue.links.length + " photos → sender:" + body.sender_id);
+        }
+      } catch(pe) { Logger.log("⚠️ pending queue error: " + pe.message); }
+    }
+
     return json_({ status: "ok", link: driveLink, attached: attached, ref: matchedRef });
   } catch (err) {
     Logger.log("❌ cable_add_photo error: " + err.message);
     return json_({ status: "error", message: err.message });
+  }
+}
+
+// ── Helper: build RichText clickable "Photo 1 | Photo 2 | ..." ───────────
+function buildPhotoRichText_(urls) {
+  let fullText = ""; const segs = [];
+  for (let i = 0; i < urls.length; i++) {
+    if (i > 0) { fullText += " | "; segs.push({ url: null }); }
+    const label = "Photo " + (i + 1);
+    segs.push({ url: urls[i], label: label });
+    fullText += label;
+  }
+  const rtb = SpreadsheetApp.newRichTextValue().setText(fullText);
+  let pos = 0;
+  for (const seg of segs) {
+    const len = (seg.label || " | ").length;
+    if (seg.url) rtb.setLinkUrl(pos, pos + len, seg.url);
+    pos += len;
+  }
+  return rtb.build();
+}
+
+// ── Helper: đọc URLs thực từ RichText cell ────────────────────────────────
+function readPhotoUrls_(cell) {
+  try {
+    const rtv = cell.getRichTextValue();
+    if (!rtv) return [];
+    const urls = [];
+    for (const run of rtv.getRuns()) {
+      const url = run.getLinkUrl();
+      if (url) urls.push(url);
+    }
+    return urls;
+  } catch(e) { return []; }
+}
+
+// ── Helper: gắn ảnh pending (gửi TRƯỚC báo cáo) vào row vừa tạo ─────────
+function attachPendingPhotos_(sheet, row, senderId, ref) {
+  try {
+    const key   = "pp_" + senderId;
+    const props = PropertiesService.getScriptProperties();
+    const raw   = props.getProperty(key);
+    if (!raw) return;
+
+    const queue  = JSON.parse(raw);
+    const WIN_MS = 15 * 60 * 1000;
+    const nowMs  = new Date().getTime();
+    if (Math.abs(nowMs - queue.time) > WIN_MS) {
+      props.deleteProperty(key); return;  // Hết hạn 15 phút
+    }
+
+    const links = (queue.links || []).slice(0, 6);
+    if (!links.length) { props.deleteProperty(key); return; }
+
+    const cell     = sheet.getRange(row, COL.PHOTOS);
+    const existing = readPhotoUrls_(cell);
+    const combined = existing.concat(links).slice(0, 6);
+    cell.setRichTextValue(buildPhotoRichText_(combined));
+
+    props.deleteProperty(key);
+    Logger.log("✅ Attached " + links.length + " pending photos → REF:" + ref);
+  } catch(e) {
+    Logger.log("⚠️ attachPendingPhotos_ error: " + e.message);
+    try { PropertiesService.getScriptProperties().deleteProperty("pp_" + senderId); } catch(x) {}
   }
 }
 
