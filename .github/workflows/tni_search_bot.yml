@@ -1,11 +1,16 @@
 name: TNI Search Bot 24/7
 
+# ⚠️ ĐÃ TẮT — Bot chuyển sang Vercel webhook 24/7 (api/search_bot.py)
+# Chỉ giữ workflow_dispatch để debug khi cần
 on:
-  workflow_dispatch:   # Chạy thủ công khi cần restart
-  push:
-    branches: [main]
-    paths:
-      - 'telegram_bot.py'   # Tự restart khi sửa code
+  workflow_dispatch:   # Chạy thủ công khi cần debug
+  # schedule:          # ĐÃ TẮT — dùng Vercel webhook thay thế
+  # push:              # ĐÃ TẮT
+
+# Cancel job cũ khi job mới chạy → tránh 2 bot chạy song song
+concurrency:
+  group: tni-search-bot
+  cancel-in-progress: true
 
 jobs:
   run-bot:

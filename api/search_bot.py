@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 # ── Config ────────────────────────────────────────────────────────────────────
 TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip()
 DAILY_APPS_SCRIPT_URL = os.environ.get("DAILY_APPS_SCRIPT_URL", "").strip()
+APPS_SCRIPT_URL       = os.environ.get("APPS_SCRIPT_URL", "").strip()
 SPREADSHEET_ID        = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
 BASE_URL              = (
     f"https://docs.google.com/spreadsheets/d/"
@@ -341,11 +342,33 @@ def handle(update: dict) -> None:
             send_daily_template(chat_id)
 
         elif cmd in ("/id", "/myid"):
+            chat_title = msg["chat"].get("title") or first_name or "Private"
+            chat_type  = msg["chat"].get("type", "private")
+            msg_extra  = ""
+            if APPS_SCRIPT_URL:
+                try:
+                    r = requests.post(APPS_SCRIPT_URL, json={
+                        "action":     "register_chat" if cmd == "/id" else "register_user",
+                        "chat_id":    str(chat_id),
+                        "chat_title": chat_title,
+                        "chat_type":  chat_type,
+                        "reg_by":     first_name,
+                        "user_id":    str(user_id),
+                        "user_name":  first_name,
+                    }, timeout=15)
+                    res = r.json()
+                    if res.get("status") == "ok":
+                        msg_extra = "\n✅ Saved"
+                    elif res.get("status") == "duplicate":
+                        msg_extra = "\n⚠️ Already exists"
+                except Exception:
+                    pass
             tg_send(chat_id,
-                f"👤 <b>Thông tin của bạn</b>\n"
-                f"ID: <code>{user_id}</code>\n"
-                f"Tên: {html.escape(first_name)}\n"
-                f"Chat ID: <code>{chat_id}</code>")
+                f"👤 <b>{html.escape(first_name)}</b>\n"
+                f"🔑 ID: <code>{user_id}</code>\n"
+                f"💬 Chat: <code>{chat_id}</code>\n"
+                f"📍 Type: {chat_type}"
+                + msg_extra)
 
         elif cmd == "/reload":
             global _cache_ts
@@ -378,6 +401,21 @@ def handle(update: dict) -> None:
     result = lookup_tni(tni)
     for chunk in split_messages(result):
         tg_send(chat_id, chunk)
+
+    # ── Ghi log tìm kiếm (fire & forget) ──
+    if APPS_SCRIPT_URL:
+        try:
+            now_mm = datetime.now(TZ_MM)
+            requests.post(APPS_SCRIPT_URL, json={
+                "action":    "log_search",
+                "user_name": first_name or str(user_id),
+                "user_id":   str(user_id),
+                "tni_code":  tni,
+                "date":      now_mm.strftime("%d/%m/%Y"),
+                "time":      now_mm.strftime("%H:%M"),
+            }, timeout=15)
+        except Exception:
+            pass
 
 
 # ── Vercel entry point ────────────────────────────────────────────────────────
