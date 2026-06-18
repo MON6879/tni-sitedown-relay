@@ -25,7 +25,7 @@ const TIMEZONE         = "Asia/Yangon";   // UTC+6:30
 // R=18  → Telegram ID người gửi
 // S=19  → Tên nhân viên (lookup)
 // T-Y   → 6 ảnh Google Drive
-const COL_B            = 2;
+const COL_REF          = 2;   // B  → số thứ tự (REF)
 const COL_DATA_START   = 3;   // C
 const NUM_DATA_COLS    = 15;  // C → Q
 const COL_TG_ID        = 18;  // R
@@ -33,6 +33,7 @@ const COL_EMP_NAME     = 19;  // S
 const COL_PHOTO_START  = 20;  // T
 const NUM_PHOTO_COLS   = 6;   // T → Y
 const TOTAL_COLS       = 25;  // A → Y
+const TEMPLATE_ROWS    = 15;  // số dòng template (A1:A15)
 
 // ================================================================
 //  ENTRY POINTS
@@ -103,8 +104,8 @@ function handleSyncHeaders() {
        .setFontWeight("bold")
        .setBackground("#D9E1F2");
 
-  // Cột B header
-  sheet.getRange(1, COL_B).setValue("Tên nhân viên").setFontWeight("bold").setBackground("#D9E1F2");
+  // Cột B header = REF (số thứ tự dòng dữ liệu)
+  sheet.getRange(1, COL_REF).setValue("REF").setFontWeight("bold").setBackground("#D9EAD3");
 
   // Cột R = Telegram ID, Cột S = Tên nhân viên (công thức tự động)
   sheet.getRange(1, COL_TG_ID).setValue("Telegram ID").setFontWeight("bold").setBackground("#FCE4D6");
@@ -164,12 +165,22 @@ function handleDailyAdd(body) {
   row[COL_TG_ID - 1]      = tgId;   // R = Telegram ID
   // Col S (COL_EMP_NAME) được ARRAYFORMULA tự điền — không ghi đè
 
+  // Tính REF: đếm số dòng dữ liệu đã có (bựa qua TEMPLATE_ROWS dòng template)
+  const lastRow = sheet.getLastRow();
+  const ref     = String(Math.max(0, lastRow - TEMPLATE_ROWS) + 1).padStart(5, "0");
+
   sheet.appendRow(row);
   const rowNum = sheet.getLastRow();
+
+  // Ghi REF vào cột B
+  const refCell = sheet.getRange(rowNum, COL_REF);
+  refCell.setValue(ref);
+  refCell.setFontWeight("bold").setHorizontalAlignment("center");
 
   // Màu xen kẽ
   const bg = rowNum % 2 === 0 ? "#EBF3FB" : "#FFFFFF";
   sheet.getRange(rowNum, 1, 1, TOTAL_COLS).setBackground(bg);
+  refCell.setBackground("#D9EAD3"); // giữ màu xanh REF
 
   // Attach ảnh pending (nếu người dùng đã gửi ảnh trước text)
   const props   = PropertiesService.getScriptProperties();
@@ -182,8 +193,8 @@ function handleDailyAdd(body) {
     props.deleteProperty(pKey);
   }
 
-  Logger.log("✅ Daily row added: row=" + rowNum + " tgId=" + tgId);
-  return jsonOut({ status: "ok", row: rowNum, name: tgId });
+  Logger.log("✅ Daily row added: REF:" + ref + " row=" + rowNum + " tgId=" + tgId);
+  return jsonOut({ status: "ok", row: rowNum, ref: ref, name: tgId });
 }
 
 // ================================================================

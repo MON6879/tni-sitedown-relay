@@ -394,9 +394,11 @@ async def submit_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE
         result = resp.json()
         if result.get("status") == "ok":
             name = result.get("name") or user.first_name or str(user.id)
+            ref  = result.get("ref", "")
             _last_daily[chat_id] = time.time()   # lưu để attach ảnh
+            ref_line = f" | REF:{ref}" if ref else ""
             await update.message.reply_text(
-                f"✅ Đã lưu — {html.escape(name)}\n"
+                f"✅ Đã lưu{ref_line} — {html.escape(str(name))}\n"
                 f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}"
             )
         else:
