@@ -29,6 +29,7 @@ BASE_URL              = (
 GID_SITE = "1095689918"
 GID_TASK = "1755404595"
 GID_WO   = "1429089905"
+GID_INFO = "171059303"   # Tab: Name Site / Site / Cable / Gpon / DIA
 
 TZ_MM    = timezone(timedelta(hours=6, minutes=30))   # Myanmar UTC+6:30
 MAX_LEN  = 4096
@@ -195,6 +196,40 @@ def split_messages(text: str) -> list:
     if current: chunks.append(current)
     return chunks
 
+# ── Info lookup (Site/Cable/Gpon/DIA) ─────────────────────────────────────
+def get_info(tni: str) -> dict | None:
+    """Tìm TNI trong sheet gid=171059303, trả về Site/Cable/Gpon/DIA."""
+    try:
+        df = fetch_csv(GID_INFO)
+        rows = df.iloc[1:] if len(df) > 1 else df
+        for _, row in rows.iterrows():
+            a = safe(row, 0)  # Col A = Name Site (TNI code)
+            if a.upper() == tni.upper():
+                return {
+                    "site":  safe(row, 1),  # Col B
+                    "cable": safe(row, 2),  # Col C
+                    "gpon":  safe(row, 3),  # Col D
+                    "dia":   safe(row, 4),  # Col E
+                }
+        return None
+    except Exception as ex:
+        logger.error(f"get_info error: {ex}")
+        return None
+
+def build_info_reply(tni: str, info: dict) -> str:
+    e = html.escape
+    lines = [f"📡 <b>Info: {e(tni)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
+    if info.get("site"):
+        lines.append(f"\n🏢 <b>Site</b>\n{e(info['site'])}")
+    if info.get("cable"):
+        lines.append(f"\n🔌 <b>Cable</b>\n{e(info['cable'])}")
+    if info.get("gpon"):
+        lines.append(f"\n📶 <b>Gpon</b>\n{e(info['gpon'])}")
+    if info.get("dia"):
+        lines.append(f"\n🌐 <b>DIA</b>\n{e(info['dia'])}")
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    return "\n".join(lines)
+
 # ── Daily Report ──────────────────────────────────────────────────────────────
 def fetch_daily_fields() -> list[str]:
     global _daily_fields, _daily_fields_ts
@@ -334,7 +369,8 @@ def handle(update: dict) -> None:
         if cmd == "/start":
             tg_send(chat_id,
                 "👋 <b>TNI Search Bot</b>\n\n"
-                "• Gõ mã <code>TNI...</code> để tra cứu\n"
+                "• Gõ mã <code>TNI...</code> để tra cứu Task/WO\n"
+                "• <code>Info: TNI...</code> tra cứu Site/Cable/DIA\n"
                 "• Gửi báo cáo có chữ <b>Daily</b> để lưu\n"
                 "• /daily — xem mẫu báo cáo")
 
@@ -380,6 +416,7 @@ def handle(update: dict) -> None:
             tg_send(chat_id,
                 "📖 <b>Hướng dẫn</b>\n\n"
                 "• Gõ mã TNI (vd: <code>TNI0009</code>) → tra cứu Site/Task/WO\n"
+                "• <code>Info: TNI0009</code> → tra cứu Site/Cable/Gpon/DIA\n"
                 "• Gửi báo cáo Daily → tự lưu vào Sheet\n"
                 "• /daily → xem mẫu báo cáo\n"
                 "• /reload → cập nhật dữ liệu\n"
@@ -389,6 +426,27 @@ def handle(update: dict) -> None:
     # ── DAILY REPORT ────────────────────────────────────────────────────────
     if is_daily(text):
         submit_daily(chat_id, user_id, first_name, text)
+        return
+
+    # ── INFO: TNIxxxx — tra cứu Site/Cable/Gpon/DIA ────────────────────────
+    info_match = re.match(r"^info[:\s]+\s*(TNI\w+)", text, re.IGNORECASE)
+    if info_match:
+        tni = info_match.group(1).upper()
+        logger.info(f"Info lookup: {tni} | chat={chat_id}")
+        tg_send(chat_id, f"⏳ Đang tìm thông tin <b>{html.escape(tni)}</b>...")
+        try:
+            info = get_info(tni)
+            if info and any(info.values()):
+                reply = build_info_reply(tni, info)
+                for chunk in split_messages(reply):
+                    tg_send(chat_id, chunk)
+            else:
+                tg_send(chat_id,
+                    f"❌ Không tìm thấy <b>{html.escape(tni)}</b> trong danh sách Site Info."
+                )
+        except Exception as err:
+            logger.error(f"Info error [{tni}]: {err}")
+            tg_send(chat_id, f"❌ Lỗi tra cứu: {html.escape(str(err))}")
         return
 
     # ── TNI LOOKUP ──────────────────────────────────────────────────────────
