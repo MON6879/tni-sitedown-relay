@@ -77,13 +77,13 @@ def get_keywords() -> list:
 
 
 # ── Send data to Asset Google Sheet via Apps Script ──────────────────────
-def post_sheet(payload: dict):
+def post_sheet(payload: dict, timeout: int = 15):
     """POST JSON to Asset Apps Script Web App."""
     if not APPS_SCRIPT_URL:
         logger.error("APPS_SCRIPT_URL not set.")
         return {"status": "error", "message": "APPS_SCRIPT_URL not configured"}
     try:
-        resp = requests.post(APPS_SCRIPT_URL, json=payload, timeout=15)
+        resp = requests.post(APPS_SCRIPT_URL, json=payload, timeout=timeout)
         resp.raise_for_status()
         logger.info(f"Apps Script response: {resp.text[:300]}")
         return resp.json()
@@ -605,19 +605,73 @@ async def handle(data: dict):
 
         # ── Photo messages ─────────────────────────────────────────────
         if msg.photo:
-            largest   = msg.photo[-1]          # highest resolution
-            file_info = await bot.get_file(largest.file_id)
-            tg_url    = (
-                f"https://api.telegram.org/file/bot{COLLECTOR_BOT_TOKEN}/"
-                f"{file_info.file_path}"
-            )
-            post_sheet({
-                "action":  "add_photo",
-                "user_id": str(user.id if user else ""),
-                "tg_url":  tg_url,
-                "date":    now.strftime("%d/%m/%Y %H:%M"),
-            })
+            largest = msg.photo[-1]
+
+            # Tìm ref_id nếu có (Reply hoặc caption)
+            ref_id = None
+            reply  = msg.reply_to_message
+            if reply:
+                m = re.search(r"#(\d+)", reply.text or reply.caption or "")
+                if m:
+                    ref_id = m.group(1)
+            if not ref_id and msg.caption:
+                m = re.search(r"#(\d+)", msg.caption)
+                if m:
+                    ref_id = m.group(1)
+
+            try:
+                # Bước 1: Python download ảnh từ Telegram (dùng library built-in)
+                file_info = await bot.get_file(largest.file_id)
+                photo_bytes = await file_info.download_as_bytearray()
+                if not photo_bytes:
+                    await bot.send_message(
+                        chat_id,
+                        "⚠️ Telegram download failed: empty file"
+                    )
+                    return
+
+                photo_b64 = base64.b64encode(bytes(photo_bytes)).decode("utf-8")
+                ext = (file_info.file_path or "photo.jpg").rsplit(".", 1)[-1]
+
+                # Bước 2: Gửi base64 lên GAS
+                payload = {
+                    "action":     "add_photo",
+                    "user_id":    str(user.id if user else ""),
+                    "photo_b64":  photo_b64,
+                    "photo_ext":  ext,
+                    "date":       now.strftime("%d/%m/%Y %H:%M"),
+                }
+                if ref_id:
+                    payload["ref_id"] = ref_id
+
+                result = post_sheet(payload, timeout=25)
+                logger.info(f"Photo result: {result}")
+
+                # Bước 3: Reply cho user
+                status = result.get("status", "")
+                if status == "ok":
+                    r_id = str(result.get("ref_id") or ref_id or "").zfill(5) or "..."
+                    await bot.send_message(
+                        chat_id,
+                        f"📷 Photo gắn vào <b>#{r_id}</b>",
+                        parse_mode="HTML"
+                    )
+                else:
+                    err_msg = result.get("message", "unknown")[:200]
+                    await bot.send_message(
+                        chat_id,
+                        f"⚠️ Photo GAS error: {err_msg}",
+                        parse_mode="HTML"
+                    )
+
+            except Exception as e:
+                logger.error(f"Photo handler error: {e}")
+                try:
+                    await bot.send_message(chat_id, f"⚠️ Photo exception: {e}")
+                except:
+                    pass
             return
+
 
         # ── Text only from here ────────────────────────────────────────
         if not msg.text:
