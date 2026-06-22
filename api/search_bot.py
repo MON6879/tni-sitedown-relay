@@ -447,6 +447,21 @@ def handle(update: dict) -> None:
         except Exception as err:
             logger.error(f"Info error [{tni}]: {err}")
             tg_send(chat_id, f"❌ Lỗi tra cứu: {html.escape(str(err))}")
+
+        # ── Ghi log tìm kiếm Info (fire & forget) ──
+        if APPS_SCRIPT_URL:
+            try:
+                now_mm = datetime.now(TZ_MM)
+                requests.post(APPS_SCRIPT_URL, json={
+                    "action":    "log_search",
+                    "user_name": first_name or str(user_id),
+                    "user_id":   str(user_id),
+                    "tni_code":  tni,
+                    "date":      now_mm.strftime("%d/%m/%Y"),
+                    "time":      now_mm.strftime("%H:%M"),
+                }, timeout=15)
+            except Exception:
+                pass
         return
 
     # ── TNI LOOKUP ──────────────────────────────────────────────────────────

@@ -121,15 +121,18 @@ function drGatherData(ss) {
     }
   }
 
-  // B. Search stats
+  // B. Search stats — key = user_id (col D, index 3) thay vì name
+  //    Vì Telegram first_name (col C) thường khác tên đầy đủ trong Task Remain
+  //    user_id (Search Log col D) === chat_id (Task Remain col E)
   const srch = {}, logSh = ss.getSheetByName(DR_SEARCH_LOG);
   if (logSh && logSh.getLastRow() >= 2) {
     const rows = logSh.getRange(2,1,logSh.getLastRow()-1,5).getValues();
     for (const r of rows) {
-      const dt=str(r[0]), name=str(r[2]).toLowerCase();
-      if (!name) continue;
-      if (!srch[name]) srch[name]={today:0,d1:0,d2:0,week:0,month:0};
-      const u=srch[name], pts=dt.split("/");
+      const dt=str(r[0]), uid=str(r[3]), tni=str(r[4]);  // col D = User ID, col E = TNI Code
+      if (!uid) continue;
+      if (!tni.toUpperCase().startsWith("TNI")) continue; // Chỉ đếm tra cứu TNIxxxx
+      if (!srch[uid]) srch[uid]={today:0,d1:0,d2:0,week:0,month:0};
+      const u=srch[uid], pts=dt.split("/");
       if (pts.length!==3) continue;
       const rd=new Date(+pts[2],+pts[1]-1,+pts[0]), diff=now-rd;
       if (dt===todayStr)    u.today++;
@@ -224,7 +227,7 @@ function drBuildRaw(ss, d) {
   // Nhân viên + Leader
   for (const [name, info] of Object.entries(taskRemain)) {
     if (!["Nhân viên","Team Leader"].includes(info.role)) continue;
-    const s=srch[name.toLowerCase()]||{};
+    const s=srch[info.chat_id]||{};
     const [d2,d1,td,wk,mo]=[s.d2||0,s.d1||0,s.today||0,s.week||0,s.month||0];
     rows.push([dg,info.role,name,info.team,info.role, d2,d1,td,wk,mo,`${d2}/${d1}/${td}`,
                "",0,0,0,0,0,0,0, 0,0,0,"", info.wo||""]);
@@ -234,7 +237,7 @@ function drBuildRaw(ss, d) {
   const tAgg={};
   for (const [name, info] of Object.entries(taskRemain)) {
     if (!["Nhân viên","Team Leader"].includes(info.role)) continue;
-    const s=srch[name.toLowerCase()]||{};
+    const s=srch[info.chat_id]||{};
     if (!tAgg[info.team]) tAgg[info.team]={d2:0,d1:0,today:0,week:0,month:0};
     const t=tAgg[info.team];
     t.d2+=s.d2||0; t.d1+=s.d1||0; t.today+=s.today||0; t.week+=s.week||0; t.month+=s.month||0;
@@ -322,7 +325,7 @@ function drBuildDash(ss, d) {
 
   for (const [name, info] of Object.entries(taskRemain)) {
     if (!["Nhân viên","Team Leader"].includes(info.role)) continue;
-    const s=srch[name.toLowerCase()]||{};
+    const s=srch[info.chat_id]||{};
     const [d2,d1,td,wk,mo]=[s.d2||0,s.d1||0,s.today||0,s.week||0,s.month||0];
     const isL = info.role==="Team Leader";
     push([stt++,name,info.team,info.role,`${d2}/${d1}/${td}`,d2,d1,td,wk,mo,"",""],
@@ -482,7 +485,7 @@ function drBuildCharts(ss, dashSh, d) {
   const tAgg={};
   for (const [name, info] of Object.entries(taskRemain)) {
     if (!["Nhân viên","Team Leader"].includes(info.role)) continue;
-    const s=srch[name.toLowerCase()]||{};
+    const s=srch[info.chat_id]||{};
     if (!tAgg[info.team]) tAgg[info.team]={week:0,month:0};
     tAgg[info.team].week+=s.week||0; tAgg[info.team].month+=s.month||0;
   }

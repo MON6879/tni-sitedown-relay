@@ -410,3 +410,27 @@ python get_session.py
 |---|---|---|
 | **Nhân viên (rows 4-32) nhận tin thiếu Detail** | Khi Apps Script match employee (`emp_match`), code dùng `format_employee_report()` chỉ tạo 4 dòng tóm tắt (name, rank, close%, WO remain, dep stats). Toàn bộ phần **Detail** bị mất: Cell Down, DG Abnormal, Smoke, Open Door, Battery Door, Site need refuel, danh sách site, danh sách WO | Bỏ `format_employee_report()` cho employee rows. Luôn dùng Col D content đầy đủ. Nếu nội dung > 4000 ký tự, `send_msg()` tự split thành nhiều tin |
 
+---
+
+## 🐛 Lịch sử bugs đã fix (23/06/2026)
+
+| Bug | Nguyên nhân | Fix |
+|---|---|---|
+| **Dashboard Report bảng tổng hợp hiển thị toàn 0** | `10_DASHBOARD_REPORT.gs` join Search Log với Task Remain **theo tên** (`name.toLowerCase()`). Search Log col C = Telegram `first_name` (vd: "Bhone"), Task Remain col B = tên đầy đủ (vd: "Bhone Htet Aung") → **không bao giờ khớp** → tất cả search stats = 0 | Đổi key `srch` dict từ `name` (col C, index 2) sang `user_id` (col D, index 3). Lookup đổi từ `srch[name.toLowerCase()]` sang `srch[info.chat_id]`. Vì Telegram `user_id` (Search Log col D) === `chat_id` (Task Remain col E) cho private chats |
+| **Info: TNIxxxx không ghi Search Log** | `search_bot.py` chỉ gọi `log_search` khi tra cứu TNI thường (line 463-476), nhưng bỏ qua khi dùng `Info: TNIxxxx` (line 431-450) | Thêm block `log_search` fire-and-forget vào sau xử lý Info lookup (trước `return`) |
+| **Dashboard đếm cả tra cứu Info (không phải TNIxxxx)** | `10_DASHBOARD_REPORT.gs` đếm tất cả rows trong Search Log, không filter theo TNI Code (col E). Khi `Info:` cũng ghi log → số liệu bị phồng | Thêm filter `tni.toUpperCase().startsWith("TNI")` trước khi đếm. Chỉ đếm tra cứu TNIxxxx thực sự |
+
+### Dashboard Report — Match logic mới (23/06/2026)
+```
+Search Log (col D = user_id)  ←→  Task Remain (col E = chat_id)
+       "7123456789"           ===         "7123456789"
+```
+> **Ưu điểm**: user_id không bao giờ thay đổi (khác first_name có thể đổi bất kỳ lúc nào trên Telegram).
+
+### Dashboard Report — Filter logic (23/06/2026)
+```
+Search Log col E (TNI Code) → chỉ đếm khi bắt đầu bằng "TNI"
+Bỏ qua: Info lookup (tni_code = "TNIXXXX" nhưng từ Info: flow — vẫn bắt đầu TNI → cũng được đếm)
+```
+> **Lưu ý**: Cả TNI lookup và Info: TNIxxxx đều ghi tni_code = "TNIxxxx" → đều được đếm (đúng logic).
+
