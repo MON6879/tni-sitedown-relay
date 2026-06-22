@@ -402,3 +402,11 @@ python get_session.py
 | **TNI Search Bot chết sau ~6h, không tự restart** | `tni_search_bot.yml` chỉ có `push` + `workflow_dispatch`, không có `schedule` cron → bot chết sau timeout 350p, không bao giờ restart | Thêm cron `0 0,5,10,15,20 * * *` (mỗi 5h UTC) + `concurrency: cancel-in-progress: true` |
 | **CONTROL nhận mgmt_report (cron_send.py)** | `mgmt_report` chỉ gửi cho rows 60-74 cá nhân, không gửi vào group CONTROL SITE | Thêm step 8b gửi `mgmt_report` vào CONTROL SITE dùng `TECHNICAL_DEP_BOT_TOKEN` |
 
+---
+
+## 🐛 Lịch sử bugs đã fix (22/06/2026)
+
+| Bug | Nguyên nhân | Fix |
+|---|---|---|
+| **Nhân viên (rows 4-32) nhận tin thiếu Detail** | Khi Apps Script match employee (`emp_match`), code dùng `format_employee_report()` chỉ tạo 4 dòng tóm tắt (name, rank, close%, WO remain, dep stats). Toàn bộ phần **Detail** bị mất: Cell Down, DG Abnormal, Smoke, Open Door, Battery Door, Site need refuel, danh sách site, danh sách WO | Bỏ `format_employee_report()` cho employee rows. Luôn dùng Col D content đầy đủ. Nếu nội dung > 4000 ký tự, `send_msg()` tự split thành nhiều tin |
+
