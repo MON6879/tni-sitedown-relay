@@ -690,29 +690,16 @@ async def main():
 
         elif content:
             # ── Employee rows (4-32) ──
-            # Tìm employee match theo chat_id
-            emp_match = next(
-                (e for e in report_data.get("employees", []) if e.get("chat_id") == cid),
-                None
+            # Luôn dùng Col D content đầy đủ (có Detail: Cell Down, DG Abnormal,
+            # Smoke, Open Door, Refuel...). format_employee_report() chỉ tạo 4 dòng
+            # tóm tắt, bỏ mất toàn bộ phần Detail → KHÔNG dùng.
+            msg = (
+                f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"{content}\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
             )
-            if emp_match and month_days:
-                emp_text = format_employee_report(emp_match, now_str, month_days)
-                msg = (
-                    f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"{emp_text}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
-                )
-            else:
-                # Fallback: nội dung cột D thô
-                msg = (
-                    f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"{content}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
-                )
         else:
             continue  # skip rows with no content and not management
 
