@@ -42,13 +42,12 @@ function drStep1_BuildTables() {
     const d = drGatherData(ss);
     drBuildRaw(ss, d);
     drBuildDash(ss, d);        // chỉ ghi bảng, không chart
-    SpreadsheetApp.getUi().alert(
-      "✅ BƯỚC 1 XONG!\n\n" +
-      "Bảng đã tạo tại sheet 'Dashboard Report' và 'Dashboard Raw'.\n\n" +
-      "→ Tiếp theo: Chạy BƯỚC 2 để vẽ biểu đồ."
-    );
+    const msg = "✅ BƯỚC 1 XONG! Bảng đã tạo tại 'Dashboard Report' và 'Dashboard Raw'.";
+    Logger.log(msg);
+    try { SpreadsheetApp.getUi().alert(msg + "\n\n→ Tiếp theo: Chạy BƯỚC 2 để vẽ biểu đồ."); } catch(_) {}
   } catch(e) {
-    SpreadsheetApp.getUi().alert("❌ Lỗi: " + e.message + "\n\n" + e.stack);
+    Logger.log("❌ Lỗi: " + e.message + "\n" + e.stack);
+    try { SpreadsheetApp.getUi().alert("❌ Lỗi: " + e.message); } catch(_) {}
   }
 }
 
@@ -57,15 +56,18 @@ function drStep2_BuildCharts() {
   const ss   = SpreadsheetApp.getActiveSpreadsheet();
   const dash = ss.getSheetByName(DR_DASH_NAME);
   if (!dash) {
-    SpreadsheetApp.getUi().alert("❌ Chưa có sheet 'Dashboard Report'.\nHãy chạy BƯỚC 1 trước!");
+    Logger.log("❌ Chưa có sheet 'Dashboard Report'. Hãy chạy BƯỚC 1 trước!");
+    try { SpreadsheetApp.getUi().alert("❌ Chưa có sheet 'Dashboard Report'.\nHãy chạy BƯỚC 1 trước!"); } catch(_) {}
     return;
   }
   try {
     const d = drGatherData(ss);
     drBuildCharts(ss, dash, d);
-    SpreadsheetApp.getUi().alert("✅ BƯỚC 2 XONG! Biểu đồ đã được tạo.");
+    Logger.log("✅ BƯỚC 2 XONG! Biểu đồ đã được tạo.");
+    try { SpreadsheetApp.getUi().alert("✅ BƯỚC 2 XONG! Biểu đồ đã được tạo."); } catch(_) {}
   } catch(e) {
-    SpreadsheetApp.getUi().alert("❌ Lỗi biểu đồ: " + e.message);
+    Logger.log("❌ Lỗi biểu đồ: " + e.message);
+    try { SpreadsheetApp.getUi().alert("❌ Lỗi biểu đồ: " + e.message); } catch(_) {}
   }
 }
 
