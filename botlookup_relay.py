@@ -178,13 +178,16 @@ async def main():
                     timeout=30
                 )
                 raw_note = note_resp.text.strip()
-                # Guard: bỏ qua nếu GAS trả về JSON (error/status response)
-                # Xảy ra khi GAS chưa redeploy hoặc action không tồn tại
-                if raw_note and not raw_note.startswith("{") and not raw_note.startswith("["):
+                # Guard: bỏ qua nếu GAS trả về JSON (error/status) HOẶC HTML (404/lỗi server)
+                # HTML page bắt đầu bằng <!DOCTYPE hoặc <html
+                is_json    = raw_note.startswith("{") or raw_note.startswith("[")
+                is_html    = raw_note.lower().startswith("<!doctype") or raw_note.lower().startswith("<html")
+                is_invalid = not raw_note or is_json or is_html or note_resp.status_code != 200
+                if not is_invalid:
                     note_text = raw_note
                     print(f"[{myanmar_now()}] 📝 Note B2:B5: {note_text[:100]}")
                 else:
-                    print(f"[{myanmar_now()}] ⚠️ Note response không hợp lệ (JSON/trống) — bỏ qua. GAS cần redeploy!")
+                    print(f"[{myanmar_now()}] ⚠️ Note response không hợp lệ (HTML/JSON/trống/lỗi HTTP {note_resp.status_code}) — bỏ qua. GAS cần redeploy!")
             except Exception as ex:
                 print(f"[{myanmar_now()}] ⚠️ Lấy Note lỗi: {ex}")
 
