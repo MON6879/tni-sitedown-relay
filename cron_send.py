@@ -154,7 +154,7 @@ def build_no_search_list(team_key: str, report_data: dict) -> str:
         return ""
 
     names = ", ".join(no_search)
-    return f"⚠️ Chưa Search hôm nay ({len(no_search)}): {names}"
+    return f"⚠️ Not Searched Today ({len(no_search)}): {names}"
 
 
 def build_asset_msg(now_str, asset_data):
@@ -189,7 +189,7 @@ def build_asset_msg(now_str, asset_data):
 
     PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15"]
 
-    lines = [f"📦 Thống kê Asset – {now_str}"]
+    lines = [f"📦 Asset Stats – {now_str}"]
 
     for tm in teams:
         tm_short = TEAM_SHORT.get(tm, tm)
@@ -303,7 +303,7 @@ def get_input_task_summary() -> str:
         if not stats:
             return ""
 
-        lines = ["📋 Input Task theo Dep:"]
+        lines = ["📋 Input Task by Dep:"]
         grand_total = grand_done = 0
         for dep, s in sorted(stats.items()):
             t, d = s["total"], s["done"]
@@ -311,7 +311,7 @@ def get_input_task_summary() -> str:
             grand_total += t
             grand_done += d
             lines.append(f"  • {dep}: ✅{d}/{t} | ⏳Remain:{r}")
-        lines.append(f"  → Tổng: ✅{grand_done}/{grand_total} | ⏳{grand_total - grand_done}")
+        lines.append(f"  → Total: ✅{grand_done}/{grand_total} | ⏳{grand_total - grand_done}")
         return "\n".join(lines)
     except Exception as e:
         logger.warning(f"get_input_task_summary failed: {e}")
@@ -377,7 +377,7 @@ def build_asset_progress_summary(content: str) -> str:
                     d_month  += int(m.group(6))
             if t_total > 0 or d7 > 0 or d_month > 0:
                 result.append(
-                    f"📊 Tổng: Total:{t_total} | 3day:{d3a}/{d3b}/{d3c} | 7day:{d7} | Month:{d_month}"
+                    f"📊 Summary: Total:{t_total} | 3day:{d3a}/{d3b}/{d3c} | 7day:{d7} | Month:{d_month}"
                 )
             # Thêm các dòng section vào kết quả
             result.extend(section_lines)
@@ -656,7 +656,7 @@ async def main():
 
     # ── 6. Build management report: TL summaries + Technical Dept only ──
     # BOD/Manager chỉ nhận TL Reports + Technical Dept
-    mgmt_parts = [f"📊 Báo cáo tổng hợp – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
+    mgmt_parts = [f"📊 Summary Report – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
     if team_leader_content:
         mgmt_parts.append("👑 Team Leader Reports:")
         for tl in team_leader_content:
@@ -737,7 +737,7 @@ async def main():
             t_icon = TEAM_ICON.get(team_key, "🏷️")
 
             lines = [
-                f"{t_icon} 𝗕𝗮́𝗼 𝗰𝗮́𝗼 {t_short} – {now_str}",
+                f"{t_icon} 𝗥𝗲𝗽𝗼𝗿𝘁 {t_short} – {now_str}",
                 "━" * 22,
             ]
 
@@ -773,7 +773,7 @@ async def main():
                 lines.append(no_search)
 
             lines.append("\n" + "━" * 22)
-            lines.append(f"👥 Tổng: {len(members)} người")
+            lines.append(f"👥 Total: {len(members)} members")
             lines.append("⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။")
 
             grp_msg = "\n".join(lines)
@@ -797,7 +797,7 @@ async def main():
             tech_lines.append(content)
 
         tech_lines.append("\n" + "━" * 22)
-        tech_lines.append(f"👥 Tổng: {len(tech_messages)} người")
+        tech_lines.append(f"👥 Total: {len(tech_messages)} members")
 
         tech_msg = "\n".join(tech_lines)
         groups.setdefault(SEND_BOT_TOKEN, []).append(
