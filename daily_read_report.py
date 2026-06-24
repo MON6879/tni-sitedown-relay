@@ -307,22 +307,50 @@ async def main():
         print(f"[{myanmar_now()}] 🔑 Logged in: @{me.username} ({me.first_name})")
 
         # Collect data from all groups
-        all_results = []
+        all_results = {}  # group_key -> data
         for group_key, chat_id in GROUPS.items():
             data = await process_group(client, group_key, chat_id, me.id, team_sheet_members)
             if data:
-                all_results.append(data)
+                all_results[group_key] = data
 
         if not all_results:
             print("⚠️  No data to report")
             return
 
-        # Build ONE consolidated report
         now_mm = datetime.now(MYANMAR_TZ)
         date_str = now_mm.strftime("%d/%m/%Y")
         now_str  = myanmar_now()
         divider  = "━" * 30
 
+        # ── 1. Send per-team report to each Team group ──
+        for gk in ("T1", "T2", "T3", "T4"):
+            r = all_results.get(gk)
+            if not r:
+                continue
+
+            note_line = f"📝 Note: {r['note_preview']}...\n" if r["note_preview"] else ""
+            team_report = (
+                f"👁 NOTE READ REPORT — {gk}\n"
+                f"📅 {date_str}  |  🕐 {now_str}\n"
+                f"⏰ Cutoff: 20:00 Myanmar\n"
+                f"{note_line}"
+                f"{divider}\n"
+                f"📊 Read: 3Day: {r['cnt_d2']}/{r['cnt_d1']}/{r['cnt_d0']}  "
+                f"7Day: {r['cnt_d7']}  Month: {r['cnt_month']}\n"
+                f"👥 Team Members: {r['member_count']}\n"
+                f"{divider}\n"
+                f"✅ Read ({len(r['today_read'])}): "
+                f"{', '.join(r['today_read']) if r['today_read'] else 'No one yet'}\n"
+                f"❌ Unread ({len(r['today_unread'])}): "
+                f"{', '.join(r['today_unread']) if r['today_unread'] else 'Everyone has read ✅'}\n"
+                f"{divider}"
+            )
+            chat_id = GROUPS[gk]
+            await client.send_message(chat_id, team_report)
+            print(f"📤 Report sent to {gk}")
+            await asyncio.sleep(1)
+
+        # ── 2. Send consolidated report to CONTROL ──
         lines = [
             f"👁 NOTE READ REPORT — Summary",
             f"📅 {date_str}  |  🕐 {now_str}",
@@ -330,16 +358,15 @@ async def main():
             divider,
         ]
 
-        # Note preview (from first result that has it)
-        for r in all_results:
+        # Note preview
+        for r in all_results.values():
             if r["note_preview"]:
                 lines.append(f"📝 Note: {r['note_preview']}...")
                 lines.append("")
                 break
 
-        # Per-group stats
-        for r in all_results:
-            gk = r["group_key"]
+        # Per-group stats (all teams + CONTROL)
+        for gk, r in all_results.items():
             lines.append(
                 f"🏷️ {gk}  |  👥 {r['member_count']}  |  "
                 f"3Day: {r['cnt_d2']}/{r['cnt_d1']}/{r['cnt_d0']}  "
@@ -353,9 +380,9 @@ async def main():
         lines.append(divider)
 
         # Grand totals
-        total_members = sum(r["member_count"] for r in all_results)
-        total_read = sum(len(r["today_read"]) for r in all_results)
-        total_unread = sum(len(r["today_unread"]) for r in all_results)
+        total_members = sum(r["member_count"] for r in all_results.values())
+        total_read = sum(len(r["today_read"]) for r in all_results.values())
+        total_unread = sum(len(r["today_unread"]) for r in all_results.values())
         lines.append(
             f"📊 Total: {total_members} members  |  "
             f"✅ Read: {total_read}  |  ❌ Unread: {total_unread}"
@@ -363,15 +390,12 @@ async def main():
         lines.append(divider)
 
         report = "\n".join(lines)
-
-        # Send to CONTROL SITE group only
         control_id = GROUPS["CONTROL"]
         await client.send_message(control_id, report)
-        print(f"\n📤 Consolidated report sent to CONTROL SITE")
+        print(f"📤 Consolidated report sent to CONTROL SITE")
 
     print(f"\n[{myanmar_now()}] 🎉 Complete!")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-
