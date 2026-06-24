@@ -569,11 +569,8 @@ function handleLogSearch(ss, body) {
     logSheet.getRange("A:B").setNumberFormat("@STRING@");
   }
 
-  // Ghi 1 dòng log — ép lưu date/time dạng text để Google Sheets không tự parse
-  const newRow = logSheet.getLastRow() + 1;
-  logSheet.getRange(newRow, 1, 1, 5).setValues([[dateStr, timeStr, userName, userId, tniCode]]);
-  // Ép cột Date (A) và Time (B) dòng này lưu dạng plain text (@STRING@)
-  logSheet.getRange(newRow, 1, 1, 2).setNumberFormat("@STRING@");
+  // Ghi 1 dòng log — dùng appendRow đơn giản, date_iso (YYYY-MM-DD) được Google Sheets đọc đúng
+  logSheet.appendRow([dateStr, timeStr, userName, userId, tniCode]);
 
   // Cập nhật Search Stats
   refreshStats(ss);

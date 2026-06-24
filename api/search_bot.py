@@ -466,7 +466,7 @@ def handle(update: dict) -> None:
                 "user_name": first_name or str(user_id),
                 "user_id":   str(user_id),
                 "tni_code":  tni,
-                "date":      now_mm.strftime("%d/%m/%Y"),
+                "date":      now_mm.strftime("%Y-%m-%d"),   # ISO: Google Sheets reads correctly
                 "time":      now_mm.strftime("%H:%M"),
                 "date_iso":  now_mm.strftime("%Y-%m-%d"),
             }, timeout=15)
