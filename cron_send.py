@@ -595,7 +595,10 @@ async def main():
         for tl in team_leader_content:
             short = tl["content"][:600] + "..." if len(tl["content"]) > 600 else tl["content"]
             mgmt_parts.append(f"\n🏷️ {tl['team']}:\n{short}")
-    # asset_msg gửi KÈM với mgmt_report (plain text, không cần parse_mode)
+    # search_msg và asset_msg gửi KÈM với mgmt_report
+    if search_msg:
+        mgmt_parts.append("━" * 20)
+        mgmt_parts.append(search_msg)
     if asset_msg:
         mgmt_parts.append("━" * 20)
         mgmt_parts.append(asset_msg)
