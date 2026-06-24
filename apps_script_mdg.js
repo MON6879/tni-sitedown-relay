@@ -9,7 +9,7 @@ const MDG_DATA_TAB  = "MDG Detail";
 const MDG_PHOTO_DIR = "2.4 Run MDG";
 // Telegram bot token — hardcoded for reliability
 // (Script Properties was returning wrong value → 401 Unauthorized)
-const TG_BOT_TOKEN  = "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM";
+const MDG_BOT_TOKEN  = "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM";
 
 // ── Column index (1-based) ──────────────────────────────────
 const MCOL = {
@@ -55,7 +55,7 @@ const MHEADERS = [
 // ============================================================
 // ENTRY POINTS
 // ============================================================
-function doPost(e) {
+function doPostMdg_(e) {
   try {
     const body   = JSON.parse(e.postData.contents);
     const action = body.action || "";
@@ -63,11 +63,11 @@ function doPost(e) {
     if (action === "mdg_confirm")   return mdgConfirm(body);
     if (action === "mdg_add_photo") return mdgAddPhoto(body);
     if (action === "mdg_get_stats") return mdgGetStats(body);
-    return json_({ status:"error", message:"Unknown action: "+action });
-  } catch(err) { return json_({ status:"error", message:err.message }); }
+    return json({ status:"error", message:"Unknown action: "+action });
+  } catch(err) { return json({ status:"error", message:err.message }); }
 }
 
-function doGet(e) {
+function doGetMdg_(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || "";
     if (action === "mdg_get_stats") return mdgGetStats(e.parameter || {});
@@ -76,22 +76,22 @@ function doGet(e) {
       const ss  = SpreadsheetApp.openById(MDG_SHEET_ID);
       const sh  = getMdgSheet_(ss);
       const lr  = sh.getLastRow();
-      if (lr < 2) return json_({ status:"error", message:"No data" });
+      if (lr < 2) return json({ status:"error", message:"No data" });
       const rc  = sh.getRange(2, MCOL.REF, lr-1, 1).getValues();
       for (let i=0;i<rc.length;i++) {
         if (String(rc[i][0]||"").replace(/^0+/,"")===ref.replace(/^0+/,"")) {
           const row=sh.getRange(i+2,1,1,MTOTAL_COLS).getValues()[0];
-          return json_({ status:"ok",ref:ref,sheetRow:i+2,
+          return json({ status:"ok",ref:ref,sheetRow:i+2,
             E_RPT_DATE:row[MCOL.RPT_DATE-1], F_SITE_ID:row[MCOL.SITE_ID-1],
             H_TEAM:row[MCOL.TEAM-1], I_MDG_CODE:row[MCOL.MDG_CODE-1] });
         }
       }
-      return json_({ status:"error", message:"REF not found: "+ref });
+      return json({ status:"error", message:"REF not found: "+ref });
     }
     const ss = SpreadsheetApp.openById(MDG_SHEET_ID);
     ensureMdgHeaders_(ss);
-    return json_({ status:"ok", version:"mdg-v2.2", message:"MDG Collector running ✅" });
-  } catch(err) { return json_({ status:"error", message:err.message }); }
+    return json({ status:"ok", version:"mdg-v2.2", message:"MDG Collector running ✅" });
+  } catch(err) { return json({ status:"error", message:err.message }); }
 }
 
 // ============================================================
@@ -226,8 +226,8 @@ function mdgAdd(body) {
 
     if (nr%2===0) sh.getRange(nr,1,1,MTOTAL_COLS).setBackground("#EFF3FB");
     Logger.log("✅ MDG added REF="+ref+" row="+nr);
-    return json_({ status:"ok", ref:ref, row:last });
-  } catch(err) { Logger.log("❌ mdg_add: "+err.message); return json_({ status:"error", message:err.message }); }
+    return json({ status:"ok", ref:ref, row:last });
+  } catch(err) { Logger.log("❌ mdg_add: "+err.message); return json({ status:"error", message:err.message }); }
 }
 
 
@@ -239,20 +239,20 @@ function mdgConfirm(body) {
     const ss  = SpreadsheetApp.openById(MDG_SHEET_ID);
     const sh  = getMdgSheet_(ss);
     const rid = String(body.ref_id||"").trim();
-    if (!rid) return json_({ status:"error", message:"ref_id required" });
+    if (!rid) return json({ status:"error", message:"ref_id required" });
     const lr  = sh.getLastRow();
-    if (lr<2) return json_({ status:"error", message:"No data" });
+    if (lr<2) return json({ status:"error", message:"No data" });
     const rc  = sh.getRange(2,MCOL.REF,lr-1,1).getValues();
     for (let i=0;i<rc.length;i++) {
       if (String(rc[i][0]||"").replace(/^0+/,"")===rid.replace(/^0+/,"")) {
         const r=i+2;
         sh.getRange(r,MCOL.CONFIRM).setValue("✅ "+body.confirmed_by+" "+body.date);
         sh.getRange(r,1,1,MTOTAL_COLS).setBackground("#D4EDDA");
-        return json_({ status:"ok", ref:rid, row:r });
+        return json({ status:"ok", ref:rid, row:r });
       }
     }
-    return json_({ status:"error", message:"REF not found: "+rid });
-  } catch(err) { return json_({ status:"error", message:err.message }); }
+    return json({ status:"error", message:"REF not found: "+rid });
+  } catch(err) { return json({ status:"error", message:err.message }); }
 }
 
 // ============================================================
@@ -286,7 +286,7 @@ function mdgAddPhoto(body) {
     // Method B: Gọi Telegram getFile API → fresh URL (nếu A bị 404)
     if (!blob && body.tg_file_id) {
       try {
-        const botToken = TG_BOT_TOKEN;
+        const botToken = MDG_BOT_TOKEN;
         if (botToken) {
           const apiUrl  = "https://api.telegram.org/bot" + botToken
                         + "/getFile?file_id=" + encodeURIComponent(body.tg_file_id);
@@ -324,7 +324,7 @@ function mdgAddPhoto(body) {
     if (!blob) {
       const errMsg = "A=" + errA + " | B=" + errB + " | C=" + errC;
       Logger.log("❌ All failed: " + errMsg);
-      return json_({ status:"error", message: errMsg });
+      return json({ status:"error", message: errMsg });
     }
 
     // ── 2. Upload lên Drive ───────────────────────────────────
@@ -373,11 +373,11 @@ function mdgAddPhoto(body) {
           break;
         }
       }
-      if (photoNum===0) return json_({ status:"error", message:"Max 6 photos reached for REF:"+mRef });
-      return json_({ status:"ok", link:link, attached:true, ref:mRef, photoNum:photoNum });
+      if (photoNum===0) return json({ status:"error", message:"Max 6 photos reached for REF:"+mRef });
+      return json({ status:"ok", link:link, attached:true, ref:mRef, photoNum:photoNum });
     }
-    return json_({ status:"ok", link:link, attached:false, ref:mRef });
-  } catch(err) { Logger.log("❌ mdg_add_photo: "+err.message); return json_({ status:"error", message:err.message }); }
+    return json({ status:"ok", link:link, attached:false, ref:mRef });
+  } catch(err) { Logger.log("❌ mdg_add_photo: "+err.message); return json({ status:"error", message:err.message }); }
 }
 
 // ============================================================
@@ -394,8 +394,8 @@ function mdgGetStats(body) {
       const ds=sh.getRange(2,MCOL.REC_DATE,lr-1,1).getValues();
       tc=ds.filter(r=>String(r[0]).includes(today)).length;
     }
-    return json_({ status:"ok", stats:{ total:Math.max(lr-1,0), today:tc } });
-  } catch(err) { return json_({ status:"error", message:err.message }); }
+    return json({ status:"ok", stats:{ total:Math.max(lr-1,0), today:tc } });
+  } catch(err) { return json({ status:"error", message:err.message }); }
 }
 
 // ============================================================
@@ -407,7 +407,7 @@ function getMdgFolder_() {
   const fi=root.getFoldersByName(MDG_PHOTO_DIR);
   return fi.hasNext()?fi.next():root.createFolder(MDG_PHOTO_DIR);
 }
-function json_(obj) {
+function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }

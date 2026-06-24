@@ -16,7 +16,7 @@ const CABLE_DATA_TAB  = "Detail cable";
 const CABLE_PERMIT_TAB = "Cable permit ID";
 const TZ_CABLE        = "Asia/Yangon"; // UTC+6:30
 // Telegram bot token — for Method B (getFile API fallback)
-const TG_BOT_TOKEN    = "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM";
+const CABLE_BOT_TOKEN    = "8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM";
 
 // ── Column index (1-based) ──────────────────────────────────────────────
 const COL = {
@@ -55,7 +55,7 @@ const TOTAL_COLS = HEADERS.length; // 19
 
 
 // ── JSON helper ─────────────────────────────────────────────────────────
-function json_(obj) {
+function json(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
@@ -65,7 +65,7 @@ function json_(obj) {
 // ENTRY POINTS
 // ============================================================
 
-function doPost(e) {
+function doPostCable_(e) {
   try {
     const body   = JSON.parse(e.postData.contents);
     const action = body.action || "";
@@ -75,13 +75,13 @@ function doPost(e) {
     if (action === "cable_add_photo") return cableAddPhoto(body);
     if (action === "cable_get_stats") return cableGetStats(body);
 
-    return json_({ status: "error", message: "Unknown action: " + action });
+    return json({ status: "error", message: "Unknown action: " + action });
   } catch (err) {
-    return json_({ status: "error", message: err.message });
+    return json({ status: "error", message: err.message });
   }
 }
 
-function doGet(e) {
+function doGetCable_(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || "";
     if (action === "cable_get_stats") return cableGetStats(e.parameter || {});
@@ -90,12 +90,12 @@ function doGet(e) {
       const ss  = SpreadsheetApp.openById(CABLE_SHEET_ID);
       const sheet = getDataSheet_(ss);
       const lastRow = sheet.getLastRow();
-      if (lastRow < 2) return json_({ status: "error", message: "No data" });
+      if (lastRow < 2) return json({ status: "error", message: "No data" });
       const refCol = sheet.getRange(2, COL.REF, lastRow - 1, 1).getValues();
       for (let i = 0; i < refCol.length; i++) {
         if (String(refCol[i][0] || "").replace(/^0+/, "") === ref.replace(/^0+/, "")) {
           const row = sheet.getRange(i + 2, 1, 1, TOTAL_COLS).getValues()[0];
-          return json_({
+          return json({
             status: "ok", ref: ref, sheetRow: i + 2,
             H_INC_DATE:  row[COL.INC_DATE  - 1],
             I_INCIDENT:  row[COL.INCIDENT  - 1],
@@ -104,14 +104,14 @@ function doGet(e) {
           });
         }
       }
-      return json_({ status: "error", message: "REF not found: " + ref });
+      return json({ status: "error", message: "REF not found: " + ref });
     }
 
     const ss = SpreadsheetApp.openById(CABLE_SHEET_ID);
     ensureHeaders_(ss);
-    return json_({ status: "ok", version: "v3.0-INC_DATE_H8", message: "Cable Collector running ✅" });
+    return json({ status: "ok", version: "v3.0-INC_DATE_H8", message: "Cable Collector running ✅" });
   } catch (err) {
-    return json_({ status: "error", message: err.message });
+    return json({ status: "error", message: err.message });
   }
 }
 
@@ -213,10 +213,10 @@ function cableAdd(body) {
       attachPendingPhotos_(sheet, newRow, String(body.sender_id), ref);
     }
 
-    return json_({ status: "ok", row: last, ref: ref });
+    return json({ status: "ok", row: last, ref: ref });
   } catch (err) {
     Logger.log("❌ cable_add error: " + err.message);
-    return json_({ status: "error", message: err.message });
+    return json({ status: "error", message: err.message });
   }
 }
 
@@ -245,10 +245,10 @@ function cableConfirm(body) {
     const sheet = getDataSheet_(ss);
     const refId = String(body.ref_id || "").trim();
 
-    if (!refId) return json_({ status: "error", message: "Missing ref_id" });
+    if (!refId) return json({ status: "error", message: "Missing ref_id" });
 
     const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return json_({ status: "error", message: "No data yet" });
+    if (lastRow < 2) return json({ status: "error", message: "No data yet" });
 
     const refCol = sheet.getRange(2, COL.REF, lastRow - 1, 1).getValues();
     let targetRow = -1;
@@ -259,7 +259,7 @@ function cableConfirm(body) {
     }
 
     if (targetRow < 0) {
-      return json_({ status: "error", message: "REF not found: " + refId });
+      return json({ status: "error", message: "REF not found: " + refId });
     }
 
     // Build confirm text
@@ -274,10 +274,10 @@ function cableConfirm(body) {
     cell.setFontWeight("bold");
 
     Logger.log("✅ cable_confirm REF:" + refId + " row:" + targetRow);
-    return json_({ status: "ok", row: targetRow, ref: refId });
+    return json({ status: "ok", row: targetRow, ref: refId });
   } catch (err) {
     Logger.log("❌ cable_confirm error: " + err.message);
-    return json_({ status: "error", message: err.message });
+    return json({ status: "error", message: err.message });
   }
 }
 
@@ -294,7 +294,7 @@ function cableAddPhoto(body) {
     const tgUrl = body.tg_url || "";
 
     if (!tgUrl && !body.tg_file_id)
-      return json_({ status: "error", message: "Missing tg_url and tg_file_id" });
+      return json({ status: "error", message: "Missing tg_url and tg_file_id" });
 
     // ── 1. Download ảnh (Method A: tg_url; Method B: tg_file_id) ─────────
     let blob;
@@ -316,12 +316,12 @@ function cableAddPhoto(body) {
     // Method B: tg_file_id → gọi Telegram getFile API
     if (!blob && body.tg_file_id) {
       try {
-        const apiUrl = `https://api.telegram.org/bot${TG_BOT_TOKEN}/getFile?file_id=${encodeURIComponent(body.tg_file_id)}`;
+        const apiUrl = `https://api.telegram.org/bot${CABLE_BOT_TOKEN}/getFile?file_id=${encodeURIComponent(body.tg_file_id)}`;
         const apiR   = UrlFetchApp.fetch(apiUrl, { muteHttpExceptions: true, deadline: 15 });
         const apiJ   = JSON.parse(apiR.getContentText());
         if (apiJ.ok) {
           const filePath   = apiJ.result.file_path;
-          const fileUrl    = `https://api.telegram.org/file/bot${TG_BOT_TOKEN}/${filePath}`;
+          const fileUrl    = `https://api.telegram.org/file/bot${CABLE_BOT_TOKEN}/${filePath}`;
           const dlR        = UrlFetchApp.fetch(fileUrl, { muteHttpExceptions: true, deadline: 30 });
           if (dlR.getResponseCode() === 200) {
             blob = dlR.getBlob();
@@ -332,7 +332,7 @@ function cableAddPhoto(body) {
     }
 
     if (!blob) {
-      return json_({ status: "error", message: `A=${errA} | B=${errB}` });
+      return json({ status: "error", message: `A=${errA} | B=${errB}` });
     }
 
     const ts   = Utilities.formatDate(new Date(), TZ_CABLE, "yyyyMMdd_HHmmss");
@@ -424,10 +424,10 @@ function cableAddPhoto(body) {
       } catch(pe) { Logger.log("⚠️ pending queue error: " + pe.message); }
     }
 
-    return json_({ status: "ok", link: driveLink, attached: attached, ref: matchedRef });
+    return json({ status: "ok", link: driveLink, attached: attached, ref: matchedRef });
   } catch (err) {
     Logger.log("❌ cable_add_photo error: " + err.message);
-    return json_({ status: "error", message: err.message });
+    return json({ status: "error", message: err.message });
   }
 }
 
@@ -518,7 +518,7 @@ function cableGetStats(params) {
     const last  = sheet.getLastRow();
 
     if (last < 2) {
-      return json_({ status: "ok", stats: {
+      return json({ status: "ok", stats: {
         today: 0, day3: 0, day7: 0, month: 0, total: 0,
         confirmed: 0, pending: 0, by_type: {}
       }});
@@ -578,9 +578,9 @@ function cableGetStats(params) {
     }
 
     Logger.log("cable_get_stats: " + JSON.stringify(stats));
-    return json_({ status: "ok", stats: stats });
+    return json({ status: "ok", stats: stats });
   } catch (err) {
     Logger.log("❌ cable_get_stats error: " + err.message);
-    return json_({ status: "error", message: err.message });
+    return json({ status: "error", message: err.message });
   }
 }

@@ -32,14 +32,14 @@ const COL_TG_ID        = 18;  // R
 const COL_EMP_NAME     = 19;  // S
 const COL_PHOTO_START  = 20;  // T
 const NUM_PHOTO_COLS   = 6;   // T → Y
-const TOTAL_COLS       = 25;  // A → Y
+const DR_TOTAL_COLS    = 25;  // A → Y
 const TEMPLATE_ROWS    = 15;  // số dòng template (A1:A15)
 
 // ================================================================
 //  ENTRY POINTS
 // ================================================================
 
-function doPost(e) {
+function doPostDaily_(e) {
   try {
     const body = JSON.parse(e.postData.contents);
     if (body.action === "daily_add")    return handleDailyAdd(body);
@@ -51,7 +51,7 @@ function doPost(e) {
   }
 }
 
-function doGet(e) {
+function doGetDaily_(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || "";
     if (action === "get_fields") return handleGetFields();
@@ -160,7 +160,7 @@ function handleDailyAdd(body) {
   });
 
   // Build full row (A→Y = 25 cột)
-  const row = new Array(TOTAL_COLS).fill("");
+  const row = new Array(DR_TOTAL_COLS).fill("");
   dataRow.forEach((v, i) => { row[COL_DATA_START - 1 + i] = v; }); // C:Q = data
   row[COL_TG_ID - 1]      = tgId;   // R = Telegram ID
   // Col S (COL_EMP_NAME) được ARRAYFORMULA tự điền — không ghi đè
@@ -179,7 +179,7 @@ function handleDailyAdd(body) {
 
   // Màu xen kẽ
   const bg = rowNum % 2 === 0 ? "#EBF3FB" : "#FFFFFF";
-  sheet.getRange(rowNum, 1, 1, TOTAL_COLS).setBackground(bg);
+  sheet.getRange(rowNum, 1, 1, DR_TOTAL_COLS).setBackground(bg);
   refCell.setBackground("#D9EAD3"); // giữ màu xanh REF
 
   // Attach ảnh pending (nếu người dùng đã gửi ảnh trước text)

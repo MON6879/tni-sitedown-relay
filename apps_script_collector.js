@@ -53,6 +53,23 @@ function doPost(e) {
     if (body.action === "get_asset_stats")   return handleGetAssetStats(ss);
     if (body.action === "store_site_down")   return handleStoreSiteDownDirect(body);
 
+    // ── Daily Report Collector ─────────────────────────────────────────────
+    if (body.action === "daily_add" ||
+        body.action === "daily_photo" ||
+        body.action === "sync_headers")      return doPostDaily_(e);
+
+    // ── Cable Collector ───────────────────────────────────────────────────
+    if (body.action === "cable_add" ||
+        body.action === "cable_confirm" ||
+        body.action === "cable_add_photo" ||
+        body.action === "cable_get_stats")   return doPostCable_(e);
+
+    // ── MDG Collector ─────────────────────────────────────────────────────
+    if (body.action === "mdg_add" ||
+        body.action === "mdg_confirm" ||
+        body.action === "mdg_add_photo" ||
+        body.action === "mdg_get_stats")     return doPostMdg_(e);
+
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
     return json({ status: "error", message: err.message });
@@ -68,6 +85,11 @@ function doGet(e) {
 
     // ── Note B2:B5 từ SD Sheet (cho botlookup_relay.py gửi từ @Phongha79) ──
     if (action === "get_note_b2b5")     return getNoteB2B5();
+
+    // ── Cable / MDG GET endpoints ─────────────────────────────────────────
+    if (action === "cable_get_stats" || action === "cable_check_row") return doGetCable_(e);
+    if (action === "mdg_get_stats"   || action === "mdg_check_row")   return doGetMdg_(e);
+    if (action === "get_fields")                                       return doGetDaily_(e);
 
     // ── Default: status check ─────────────────────────────────
     const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -156,38 +178,63 @@ function handleAdd(sheet, body) {
   const pending = JSON.parse(props.getProperty(pKey) || "[]");
   if (pending.length > 0) {
     pending.forEach(function(link, idx) {
-      if (idx < 6) {
-        sheet.getRange(rowNum, 6 + idx).setValue(link); // F=6, G=7 ... K=11
+      if (idx < 12) {
+        sheet.getRange(rowNum, 6 + idx).setValue(link); // F=6 ... Q=17
       }
     });
     props.deleteProperty(pKey);
   }
 
   const bg = seqId % 2 === 0 ? "#EBF3FB" : "#FFFFFF";
-  sheet.getRange(rowNum, 1, 1, 11).setBackground(bg); // A–K
+  sheet.getRange(rowNum, 1, 1, 17).setBackground(bg); // A–Q
+
+  // Lưu ACTIVE_REF + reset PHOTO_COUNT cho user này
+  // Ảnh gửi sau sẽ tự gắn vào đây, dừng sau 12 ảnh
+  props.setProperty("ACTIVE_REF_"   + chatId, String(seqId));
+  props.setProperty("PHOTO_COUNT_"  + chatId, "0");  // reset đếm
 
   return json({ status: "ok", message: "Row added", row: seqId });
 }
 
 // ============================================================
-// ACTION: ADD_PHOTO — ảnh Telegram → Google Drive → link vào cột F–K
+// ACTION: ADD_PHOTO — ảnh Telegram → Google Drive → link vào cột F–Q
 // Payload: { action, user_id, tg_url, date }
-// Cột F=6, G=7, H=8, I=9, J=10, K=11 (tối đa 6 ảnh)
+// Cột F=6, G=7, H=8, I=9, J=10, K=11, L=12, M=13, N=14, O=15, P=16, Q=17 (tối đa 12 ảnh)
 // ============================================================
 function handleAddPhoto(sheet, body) {
   const userId = String(body.user_id || "").trim();
-  const tgUrl  = body.tg_url || "";
-  if (!userId || !tgUrl) {
-    return json({ status: "error", message: "Missing user_id or tg_url" });
+  if (!userId) {
+    return json({ status: "error", message: "Missing user_id" });
   }
 
-  // 1. Download ảnh từ Telegram
+  // 1. Tạo blob từ base64 (Python đã download sẵn) hoặc download từ URL (fallback cũ)
   let blob;
   try {
-    blob = UrlFetchApp.fetch(tgUrl, { muteHttpExceptions: true }).getBlob();
+    if (body.photo_b64) {
+      // ✅ Cách mới: Python gửi binary dạng base64
+      const bytes = Utilities.base64Decode(body.photo_b64);
+      const ext   = (body.photo_ext || "jpg").toLowerCase();
+      const mime  = ext === "png" ? "image/png" : "image/jpeg";
+      blob = Utilities.newBlob(bytes, mime, "photo_" + new Date().getTime() + "." + ext);
+    } else if (body.tg_url) {
+      // 🔄 Fallback cũ: GAS tự download từ Telegram URL
+      const resp = UrlFetchApp.fetch(body.tg_url, { muteHttpExceptions: true });
+      const code = resp.getResponseCode();
+      if (code !== 200) {
+        return json({ status: "error", message: "Telegram fetch HTTP " + code });
+      }
+      blob = resp.getBlob();
+      const ct = blob.getContentType() || "";
+      if (ct.indexOf("image") === -1 && ct.indexOf("octet") === -1) {
+        return json({ status: "error", message: "Invalid content type: " + ct });
+      }
+    } else {
+      return json({ status: "error", message: "Missing photo_b64 or tg_url" });
+    }
   } catch(e) {
-    return json({ status: "error", message: "Download failed: " + e.message });
+    return json({ status: "error", message: "Blob error: " + e.message });
   }
+
 
   // 2. Upload lên Google Drive folder 'TNI_Asset_Photos'
   const folder   = getOrCreatePhotoFolder_();
@@ -195,26 +242,65 @@ function handleAddPhoto(sheet, body) {
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   const driveLink = "https://drive.google.com/file/d/" + file.getId() + "/view";
 
-  // 3. Tìm dòng gần nhất của user này trong 30 phút
-  const data   = sheet.getDataRange().getValues();
+  // 3. Gắn ảnh vào đúng row
+  let refId  = body.ref_id ? parseInt(body.ref_id) : null;
   const WIN_MS = 30 * 60 * 1000;
   const nowMs  = new Date().getTime();
   let attached = false;
 
-  for (let i = data.length - 1; i >= 0; i--) {
-    if (String(data[i][2] || "").trim() !== userId) continue;  // Col C = user_id
-    const rowTime = parseSheetDate_(String(data[i][1] || ""));
-    if (!rowTime || (nowMs - rowTime.getTime()) > WIN_MS) break; // quá cũ
+  // Ưu tiên 1a: ref_id từ Reply/caption
+  // Ưu tiên 1b: ACTIVE_REF_{userId} — lệnh text gần nhất của user
+  if (!refId) {
+    const activeStr = PropertiesService.getScriptProperties().getProperty("ACTIVE_REF_" + userId);
+    if (activeStr) refId = parseInt(activeStr);
+  }
 
-    // Tìm cột ảnh trống (F=col5 → K=col10, index 0-based)
-    for (let c = 5; c <= 10; c++) {
-      if (!data[i][c]) {
-        sheet.getRange(i + 1, c + 1).setValue(driveLink);
-        attached = true;
-        break;
+  const props2    = PropertiesService.getScriptProperties();
+  const countKey  = "PHOTO_COUNT_" + userId;
+  const photoCount = parseInt(props2.getProperty(countKey) || "0");
+
+  // Dừng nếu đã đủ 12 ảnh
+  if (photoCount >= 12) {
+    return json({ status: "ok", attached: false, reason: "max_photos_reached" });
+  }
+
+  // Tính thẳng row: seqId = rowNum - 1 → rowNum = refId + 1
+  if (refId) {
+    const targetRow = refId + 1;
+    const lastRow   = sheet.getLastRow();
+    if (targetRow >= 2 && targetRow <= lastRow) {
+      // Đọc cột F–Q (col 6–17) của row đó
+      const photoCols = sheet.getRange(targetRow, 6, 1, 12).getValues()[0];
+      for (let c = 0; c < 12; c++) {
+        if (!photoCols[c]) {
+          sheet.getRange(targetRow, 6 + c).setValue(driveLink);
+          attached = true;
+          // Tăng đếm ảnh
+          props2.setProperty(countKey, String(photoCount + 1));
+          break;
+        }
       }
     }
-    break;
+  }
+
+  // Ưu tiên 2 (fallback): tìm row gần nhất của user trong 30 phút
+  if (!attached) {
+    const data = sheet.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (String(data[i][2] || "").trim() !== userId) continue;  // Col C = user_id
+      const rowTime = parseSheetDate_(String(data[i][1] || ""));
+      if (!rowTime || (nowMs - rowTime.getTime()) > WIN_MS) break; // quá cũ
+
+      // Tìm cột ảnh trống (F=col5 → Q=col16, index 0-based)
+      for (let c = 5; c <= 16; c++) {
+        if (!data[i][c]) {
+          sheet.getRange(i + 1, c + 1).setValue(driveLink);
+          attached = true;
+          break;
+        }
+      }
+      break;
+    }
   }
 
   // 4. Nếu chưa có dòng → lưu tạm (chờ text gửi sau)
@@ -222,27 +308,29 @@ function handleAddPhoto(sheet, body) {
     const props = PropertiesService.getScriptProperties();
     const key   = "PENDING_PHOTO_" + userId;
     const arr   = JSON.parse(props.getProperty(key) || "[]");
-    if (arr.length < 6) {
+    if (arr.length < 12) {
       arr.push(driveLink);
       props.setProperty(key, JSON.stringify(arr));
     }
   }
 
-  return json({ status: "ok", attached: attached, link: driveLink });
+  return json({ status: "ok", attached: attached, ref_id: refId, link: driveLink });
 }
 
-// Tạo hoặc lấy folder '2.2 TNIASSET TELEGRAM' bên trong '1 VCM BRANCH TNI'
+// Lấy folder '2.2 TNIASSET TELEGRAM' bằng ID trực tiếp
 function getOrCreatePhotoFolder_() {
-  const PARENT_NAME = "1 VCM BRANCH TNI";
-  const CHILD_NAME  = "2.2 TNIASSET TELEGRAM";
-
-  // Tìm folder cha
-  const parents = DriveApp.getFoldersByName(PARENT_NAME);
-  const parent  = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
-
-  // Tìm hoặc tạo folder con bên trong
-  const children = parent.getFoldersByName(CHILD_NAME);
-  return children.hasNext() ? children.next() : parent.createFolder(CHILD_NAME);
+  const FOLDER_ID = "1yvTYN5Dmjh-6QGjjNTwVb43CpzXVIpH6";
+  try {
+    return DriveApp.getFolderById(FOLDER_ID);
+  } catch(e) {
+    // Fallback: tìm theo tên nếu ID không truy cập được
+    const PARENT_NAME = "1 VCM BRANCH TNI";
+    const CHILD_NAME  = "2.2 TNIASSET TELEGRAM";
+    const parents = DriveApp.getFoldersByName(PARENT_NAME);
+    const parent  = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+    const children = parent.getFoldersByName(CHILD_NAME);
+    return children.hasNext() ? children.next() : parent.createFolder(CHILD_NAME);
+  }
 }
 
 
