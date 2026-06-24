@@ -457,24 +457,24 @@ def handle(update: dict) -> None:
         return
 
     tni = m.group(1).upper()
-    
-    # ── Ghi log tìm kiếm (fire & forget) chạy song song trước để tránh timeout ──
+    # ── Ghi log tìm kiếm (fire & forget đồng bộ) chạy trước để tránh timeout ──
     if APPS_SCRIPT_URL:
-        import threading
-        def _log_it():
-            try:
-                now_mm = datetime.now(TZ_MM)
-                requests.post(APPS_SCRIPT_URL, json={
-                    "action":    "log_search",
-                    "user_name": first_name or str(user_id),
-                    "user_id":   str(user_id),
-                    "tni_code":  tni,
-                    "date":      now_mm.strftime("%d/%m/%Y"),
-                    "time":      now_mm.strftime("%H:%M"),
-                }, timeout=15)
-            except Exception as e:
-                logger.error(f"log_search failed: {e}")
-        threading.Thread(target=_log_it, daemon=True).start()
+        try:
+            now_mm = datetime.now(TZ_MM)
+            # Dùng read timeout 0.1s để "fire and forget" mà không cần thread
+            requests.post(APPS_SCRIPT_URL, json={
+                "action":    "log_search",
+                "user_name": first_name or str(user_id),
+                "user_id":   str(user_id),
+                "tni_code":  tni,
+                "date":      now_mm.strftime("%d/%m/%Y"),
+                "time":      now_mm.strftime("%H:%M"),
+            }, timeout=(3.0, 0.1))
+        except requests.exceptions.ReadTimeout:
+            # Expected: server received the payload, we just didn't wait for response
+            pass
+        except Exception as e:
+            logger.error(f"log_search failed: {e}")
 
     load_all_sheets()
     result = lookup_tni(tni)
