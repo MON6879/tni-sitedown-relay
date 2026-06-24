@@ -190,16 +190,22 @@ async def get_note_msgs_period(client, chat_id: int,
     return notes
 
 
-async def get_reader_ids(client, chat_id: int, msg_id: int) -> set:
-    """Get set of user_ids who have read msg_id."""
+async def get_reader_ids_with_time(client, chat_id: int, msg_id: int) -> dict:
+    """Get {user_id: read_datetime_utc} for msg_id."""
     try:
         readers = await client(GetMessageReadParticipantsRequest(
             peer=chat_id, msg_id=msg_id,
         ))
-        return {getattr(r, "user_id", 0) for r in readers}
+        result = {}
+        for r in readers:
+            uid = getattr(r, "user_id", 0)
+            rdate = getattr(r, "date", None)
+            if uid:
+                result[uid] = rdate
+        return result
     except Exception as e:
         print(f"    ⚠️  get_reader_ids error: {e}")
-        return set()
+        return {}
 
 
 async def process_group(client, group_key: str, chat_id: int,
@@ -240,32 +246,52 @@ async def process_group(client, group_key: str, chat_id: int,
     d2_start = today_start - timedelta(days=2)
     d7_start = today_start - timedelta(days=7)
 
-    # Cutoff: only count reads before 20:00 Myanmar today
-    cutoff_20 = today_start.replace(hour=20, minute=0)
+    # Read window: 18:00 - 20:00 Myanmar per day
+    READ_START_H = 18  # 6PM
+    READ_END_H   = 20  # 8PM
+
+    def in_read_window(read_dt, day_start):
+        """Check if read_dt falls in 18:00-20:00 window of that day."""
+        if read_dt is None:
+            return True  # no timestamp → count anyway
+        if read_dt.tzinfo is None:
+            read_dt = read_dt.replace(tzinfo=timezone.utc)
+        read_mm = read_dt.astimezone(MYANMAR_TZ)
+        win_start = day_start.replace(hour=READ_START_H, minute=0)
+        win_end   = day_start.replace(hour=READ_END_H, minute=0)
+        return win_start <= read_mm <= win_end
 
     # Collect reader IDs per period
-    readers_d0 = set()  # today (before 20:00)
-    readers_d1 = set()  # yesterday
-    readers_d2 = set()  # day before
+    readers_d0 = set()  # today 18:00-20:00
+    readers_d1 = set()  # yesterday 18:00-20:00
+    readers_d2 = set()  # day before 18:00-20:00
     readers_d7 = set()  # 7 days
     readers_month = set()  # 30 days
     today_note_msg = None
 
     for msg, dt_mm in note_msgs:
-        rids = await get_reader_ids(client, chat_id, msg.id)
-        rids = rids & member_ids  # only count team members
+        rid_map = await get_reader_ids_with_time(client, chat_id, msg.id)
+        # Filter to team members only
+        rid_map = {uid: t for uid, t in rid_map.items() if uid in member_ids}
 
-        readers_month |= rids
+        all_rids = set(rid_map.keys())
+        readers_month |= all_rids
 
         if dt_mm >= d7_start:
-            readers_d7 |= rids
+            readers_d7 |= all_rids
 
         if dt_mm >= d2_start and dt_mm < d1_start:
-            readers_d2 |= rids
+            # Day before yesterday: filter 18:00-20:00
+            filtered = {uid for uid, t in rid_map.items() if in_read_window(t, d2_start)}
+            readers_d2 |= filtered
         elif dt_mm >= d1_start and dt_mm < today_start:
-            readers_d1 |= rids
+            # Yesterday: filter 18:00-20:00
+            filtered = {uid for uid, t in rid_map.items() if in_read_window(t, d1_start)}
+            readers_d1 |= filtered
         elif dt_mm >= today_start:
-            readers_d0 |= rids
+            # Today: filter 18:00-20:00
+            filtered = {uid for uid, t in rid_map.items() if in_read_window(t, today_start)}
+            readers_d0 |= filtered
             if today_note_msg is None:
                 today_note_msg = msg
 
@@ -332,7 +358,7 @@ async def main():
             team_report = (
                 f"👁 NOTE READ REPORT — {gk}\n"
                 f"📅 {date_str}  |  🕐 {now_str}\n"
-                f"⏰ Cutoff: 20:00 Myanmar\n"
+                f"⏰ Read Window: 18:00–20:00 Myanmar\n"
                 f"{note_line}"
                 f"{divider}\n"
                 f"📊 Read: 3Day: {r['cnt_d2']}/{r['cnt_d1']}/{r['cnt_d0']}  "
@@ -354,7 +380,7 @@ async def main():
         lines = [
             f"👁 NOTE READ REPORT — Summary",
             f"📅 {date_str}  |  🕐 {now_str}",
-            f"⏰ Cutoff: 20:00 Myanmar",
+            f"⏰ Read Window: 18:00–20:00 Myanmar",
             divider,
         ]
 
