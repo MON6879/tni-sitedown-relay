@@ -5,14 +5,21 @@ Run at 17:00 Myanmar — check who has read the Note message
 ("Team leader and Staff control Site down make plan rescue...")
 in T1 / T2 / T3 / T4 / CONTROL.
 
+For Team groups: only count team members from sheet (col E, rows 4-59).
+For CONTROL: count all group participants.
+
 Tracks read status over 3Day / 7Day / Month like Search Stats.
 Sends report to each group.
 """
 
 import asyncio
+import io
 import os
+import re
 from datetime import datetime, timezone, timedelta
 
+import pandas as pd
+import requests
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import (
@@ -35,19 +42,30 @@ GROUPS = {
     "CONTROL": -5251698940,   # 5 TNI TECHNICA DEP CONTROL SITE
 }
 
+# Map team string patterns → group key
+TEAM_TO_GROUP = {
+    "TEAM01": "T1", "TEAM 1": "T1", "TEAM1": "T1",
+    "TEAM02": "T2", "TEAM 2": "T2", "TEAM2": "T2",
+    "TEAM05": "T2", "TEAM 5": "T2", "TEAM5": "T2",  # Team 5 → Team 2
+    "TEAM03": "T3", "TEAM 3": "T3", "TEAM3": "T3",
+    "TEAM04": "T4", "TEAM 4": "T4", "TEAM4": "T4",
+}
+
+# Sheet config
+SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
+SHEET_URL = (
+    f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
+    "/export?format=csv&gid=133591305"
+)
+HEADER_ROWS = 3
+COL_A, COL_B, COL_C, COL_E = 0, 1, 2, 4
+
 # Keywords to identify Note message
 NOTE_KEYWORDS = ["team leader", "site down", "make plan", "rescue", "mdg", "mbb"]
 # ──────────────────────────────────────────────────────────────────
 
 def myanmar_now() -> str:
     return datetime.now(MYANMAR_TZ).strftime("%H:%M %d/%m/%Y")
-
-def fmt_time(dt: datetime) -> str:
-    if dt is None:
-        return "?"
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(MYANMAR_TZ).strftime("%H:%M %d/%m")
 
 def days_ago_utc(n: int) -> datetime:
     """Midnight N days ago in Myanmar time → UTC."""
@@ -61,8 +79,76 @@ def is_note_msg(text: str) -> bool:
     return sum(1 for kw in NOTE_KEYWORDS if kw in t) >= 2
 
 
-async def get_members(client, chat_id: int, me_id: int) -> list[dict]:
-    """Get all members in group (excluding bots and self)."""
+def get_team_members_from_sheet() -> dict:
+    """
+    Read sheet rows 4-59 (col A=team, B=name, C=role, E=chat_id).
+    Returns: { group_key: [ {"name": str, "chat_id": int}, ... ] }
+    """
+    result = {}
+    try:
+        resp = requests.get(SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+        resp.raise_for_status()
+        df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str, on_bad_lines="skip")
+
+        for idx in range(HEADER_ROWS, len(df)):
+            sheet_row = idx + 1
+            if sheet_row < 4 or sheet_row > 59:
+                continue
+
+            row = df.iloc[idx]
+            col_a = str(row.iloc[COL_A]).strip() if not pd.isna(row.iloc[COL_A]) else ""
+            col_b = str(row.iloc[COL_B]).strip() if not pd.isna(row.iloc[COL_B]) else ""
+            col_c = str(row.iloc[COL_C]).strip() if not pd.isna(row.iloc[COL_C]) else ""
+            col_e = str(row.iloc[COL_E]).strip() if not pd.isna(row.iloc[COL_E]) else ""
+
+            if col_a.lower() in ("nan", "none", ""):
+                col_a = ""
+            if col_b.lower() in ("nan", "none", ""):
+                col_b = ""
+            if col_e.lower() in ("nan", "none", ""):
+                col_e = ""
+
+            # Determine team group
+            team_str = col_a.upper()
+            # For TL rows (33-59), extract team from col_c "team leader X"
+            if 33 <= sheet_row <= 59 and col_c and "team leader" in col_c.lower():
+                m = re.search(r'team\s*leader\s*(\d+)', col_c, re.IGNORECASE)
+                if m:
+                    tl_num = m.group(1)
+                    team_str = f"TEAM{tl_num.zfill(2)}"
+
+            group_key = None
+            for pattern, gk in TEAM_TO_GROUP.items():
+                if pattern in team_str:
+                    group_key = gk
+                    break
+
+            if not group_key or not col_b or not col_e:
+                continue
+
+            # Parse chat_id
+            cid = col_e.replace(".0", "") if col_e.endswith(".0") else col_e
+            if not cid.lstrip("-").isdigit():
+                continue
+
+            name = col_b
+            result.setdefault(group_key, []).append({
+                "name": name,
+                "chat_id": int(cid),
+            })
+
+        print(f"  📋 Sheet: {sum(len(v) for v in result.values())} members across {len(result)} teams")
+        for gk, members in result.items():
+            print(f"     {gk}: {len(members)} members")
+
+    except Exception as e:
+        print(f"  ❌ Sheet read error: {e}")
+
+    return result
+
+
+async def get_all_members(client, chat_id: int, me_id: int) -> list[dict]:
+    """Get all members in group (excluding bots and self) — for CONTROL."""
     try:
         participants = await client.get_participants(chat_id)
         members = []
@@ -116,13 +202,20 @@ async def get_reader_ids(client, chat_id: int, msg_id: int) -> set:
         return set()
 
 
-async def process_group(client, name: str, chat_id: int,
-                        me_id: int, members_cache: dict):
+async def process_group(client, group_key: str, chat_id: int,
+                        me_id: int, team_sheet_members: dict):
     """Process 1 group: check Note reads over 3Day/7Day/Month."""
-    print(f"\n[{name}] chat_id={chat_id}")
+    print(f"\n[{group_key}] chat_id={chat_id}")
 
-    # Get members
-    members = await get_members(client, chat_id, me_id)
+    # Get member list: sheet for teams, participants for CONTROL
+    if group_key in team_sheet_members:
+        sheet_list = team_sheet_members[group_key]
+        members = [{"id": m["chat_id"], "name": m["name"]} for m in sheet_list]
+        print(f"  📋 Using sheet members: {len(members)}")
+    else:
+        members = await get_all_members(client, chat_id, me_id)
+        print(f"  👥 Using group participants: {len(members)}")
+
     member_ids = {m["id"] for m in members}
     member_count = len(members)
 
@@ -157,7 +250,7 @@ async def process_group(client, name: str, chat_id: int,
 
     for msg, dt_mm in note_msgs:
         rids = await get_reader_ids(client, chat_id, msg.id)
-        rids = rids & member_ids  # only count actual members
+        rids = rids & member_ids  # only count team members
 
         readers_month |= rids
 
@@ -198,13 +291,13 @@ async def process_group(client, name: str, chat_id: int,
     divider  = "━" * 28
 
     report = (
-        f"👁 NOTE READ REPORT — {name}\n"
+        f"👁 NOTE READ REPORT — {group_key}\n"
         f"📅 {date_str}  |  🕐 {now_str}\n"
         f"{note_preview}"
         f"{divider}\n"
         f"📊 Read Stats: 3Day: {cnt_d2}/{cnt_d1}/{cnt_d0}  "
         f"7Day: {cnt_d7}  Month: {cnt_month}\n"
-        f"👥 Members: {member_count}\n"
+        f"👥 Team Members: {member_count}\n"
         f"{divider}\n"
         f"✅ Read Today ({len(today_read)}):  "
         f"{', '.join(today_read) if today_read else 'No one yet'}\n"
@@ -222,15 +315,18 @@ async def process_group(client, name: str, chat_id: int,
 async def main():
     print(f"[{myanmar_now()}] 🚀 Daily Note Read Report starting...")
 
+    # Read team members from sheet (col E, rows 4-59)
+    print(f"[{myanmar_now()}] 📋 Reading team members from sheet...")
+    team_sheet_members = get_team_members_from_sheet()
+
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
     async with client:
         me = await client.get_me()
         print(f"[{myanmar_now()}] 🔑 Logged in: @{me.username} ({me.first_name})")
 
-        members_cache = {}
-        for group_name, chat_id in GROUPS.items():
-            await process_group(client, group_name, chat_id, me.id, members_cache)
+        for group_key, chat_id in GROUPS.items():
+            await process_group(client, group_key, chat_id, me.id, team_sheet_members)
 
     print(f"\n[{myanmar_now()}] 🎉 Complete!")
 
