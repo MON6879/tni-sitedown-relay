@@ -547,7 +547,8 @@ async def main():
             team_name = safe(row, COL_A) or col_b or "Unknown"
             team_leader_content.append({"team": team_name, "name": col_b, "content": content})
 
-        if not cid or cid == "-" or not cid.lstrip("-").isdigit():
+        is_team_row = 4 <= sheet_row <= 59
+        if not is_team_row and (not cid or cid == "-" or not cid.lstrip("-").isdigit()):
             continue
 
         all_rows.append((sheet_row, content, cid, col_c, safe(row, COL_A)))
@@ -572,6 +573,7 @@ async def main():
         2: "MYT_TNI_TEAM02_Myeik",
         3: "MYT_TNI_TEAM03_Bokpyin",
         4: "MYT_TNI_TEAM04_Kawthoung",
+        5: "MYT_TNI_TEAM02_Myeik",  # Team 5 nhập chung Team 2 (Myeik)
     }
     team_to_employees: dict = {}
     for _e in report_data.get("employees", []):
@@ -580,21 +582,12 @@ async def main():
     # ── 6. Build management report: TL summaries + Technical Dept only ──
     # BOD/Manager chỉ nhận TL Reports + Technical Dept
     mgmt_parts = [f"📊 Báo cáo tổng hợp – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
-    if leaders_data:
-        mgmt_parts.append("👑 Team Leader Reports:")
-        for ld in leaders_data:
-            if month_days:
-                ld_text = format_leader_report(ld, now_str, month_days)
-            else:
-                raw = (ld.get("content") or "").strip()
-                ld_text = raw[:600] + "..." if len(raw) > 600 else raw
-            if ld_text:
-                mgmt_parts.append(f"\n🏷️ {ld.get('team','')}:\n{ld_text}")
-    elif team_leader_content:
+    if team_leader_content:
         mgmt_parts.append("👑 Team Leader Reports:")
         for tl in team_leader_content:
-            short = tl["content"][:600] + "..." if len(tl["content"]) > 600 else tl["content"]
-            mgmt_parts.append(f"\n🏷️ {tl['team']}:\n{short}")
+            raw = (tl.get("content") or "").strip()
+            if raw:
+                mgmt_parts.append(f"\n🏷️ {tl['team']}:\n{raw}")
     # search_msg và asset_msg gửi KÈM với mgmt_report
     if search_msg:
         mgmt_parts.append("━" * 20)
@@ -613,16 +606,24 @@ async def main():
 
     # Group by bot token
     groups = {}  # token -> [(sheet_row, message, cid, label)]
+    team_messages = {} # target_gid -> list of contents
+
+    def get_target_group(team_str: str):
+        if not team_str: return None
+        ts = team_str.upper()
+        if "TEAM01" in ts or "TEAM 1" in ts or "TEAM1" in ts: return -5180992881
+        if "TEAM02" in ts or "TEAM 2" in ts or "TEAM2" in ts or "TEAM05" in ts or "TEAM 5" in ts or "TEAM5" in ts: return -5188855349
+        if "TEAM03" in ts or "TEAM 3" in ts or "TEAM3" in ts: return -5183480727
+        if "TEAM04" in ts or "TEAM 4" in ts or "TEAM4" in ts: return -5238696719
+        return None
 
     for sheet_row, content, cid, col_c, col_a_val in all_rows:
         # ── Kiểm tra Cột A: rows 4-59 phải có Team, nếu trống thì bỏ qua ──
-        if sheet_row <= 59 and not col_a_val:
+        if sheet_row <= 59 and not col_a_val and not (col_c and "team leader" in col_c.lower()):
             logger.debug(f"  Skip row{sheet_row}: Cột A trống (không có team)")
             continue
 
         # Determine bot token
-        # NOTE: Rows 4-32 (nhân viên) dùng SEND_BOT vì nhân viên đã start SEND_BOT,
-        #       không phải @TNIREPORTTASK. Dùng cùng bot với gửi thủ công.
         if 75 <= sheet_row <= 87 and TECHNICAL_DEP_BOT_TOKEN:
             token = TECHNICAL_DEP_BOT_TOKEN
             bot_label = "@TNITECHNICAL"
@@ -632,17 +633,31 @@ async def main():
         else:
             continue
 
-        # Determine message content
+        # ── Group per-team (FT + TL) into their respective groups ──
+        if 4 <= sheet_row <= 59:
+            # Xác định Team
+            team_val = col_a_val
+            if 33 <= sheet_row <= 59 and col_c and "team leader" in col_c.lower():
+                m_tl = re.search(r'team\s*leader\s*(\d+)', col_c, re.IGNORECASE)
+                tl_num = int(m_tl.group(1)) if m_tl else 0
+                team_val = TEAM_BY_NUMBER.get(tl_num, col_a_val)
+                
+            target_gid = get_target_group(team_val)
+            if target_gid and content:
+                prefix = "👑 [TEAM LEADER]" if 33 <= sheet_row <= 59 else "👤 [FT]"
+                team_messages.setdefault(target_gid, []).append(f"{prefix}\n{content}")
+            continue
+
+        # ── Determine message content for others (MGMT / TECH) ──
         if 60 <= sheet_row <= 74:
             # Management rows: send compiled report (even if D is empty)
             msg = mgmt_report
             if cid and cid not in mgmt_cids:   # thu thập để gửi asset HTML sau
                 mgmt_cids.append(cid)
         elif 75 <= sheet_row <= 87:
-            # Technical Dept: gửi RIÊNG từng người (Col C = tên, Col E = Telegram ID)
+            # Technical Dept: gửi RIÊNG từng người
             if not content:
                 continue
-            # Thêm input_task_summary vào đầu mỗi tin Technical Dept
             task_header = ""
             if input_task_summary:
                 task_header = (
@@ -657,56 +672,23 @@ async def main():
                 f"{content}\n"
                 f"{'━'*20}"
             )
+        else:
+            continue  # skip
 
+        groups.setdefault(token, []).append((sheet_row, msg, cid, bot_label))
 
-        elif col_c and "team leader" in col_c.lower() and 33 <= sheet_row <= 59:
-            # ── Team Leader rows: gửi TL report + từng NV riêng lẻ ──
-            m_tl = re.search(r'team\s*leader\s*(\d+)', col_c, re.IGNORECASE)
-            tl_num = int(m_tl.group(1)) if m_tl else 0
-            tl_team = TEAM_BY_NUMBER.get(tl_num, col_a_val)
-
-            ld_match = next(
-                (ld for ld in leaders_data if ld.get("team", "") == tl_team), None
-            )
-            if ld_match and month_days:
-                tl_body = format_leader_report(ld_match, now_str, month_days)
-            elif content:
-                tl_body = content
-            else:
-                continue
-
-            # Gửi báo cáo TL của chính TL
-            tl_msg = f"Team Leader Report – {now_str}\n{'━'*20}\n{tl_body}\n{'━'*20}"
-            groups.setdefault(token, []).append(
-                (sheet_row, tl_msg, cid, f"{bot_label}-TL")
-            )
-
-            # Gửi từng NV trong đội cho TL riêng lẻ (không gộp)
-            for _emp in team_to_employees.get(tl_team, []):
-                _emp_text = format_employee_report(_emp, now_str, month_days) if month_days else ""
-                if _emp_text:
-                    _emp_msg = f"[{_emp.get('name', '')}]\n{'━'*20}\n{_emp_text}"
-                    groups.setdefault(token, []).append(
-                        (sheet_row, _emp_msg, cid, f"{bot_label}-emp")
-                    )
-            continue  # bỏ qua groups.append cuối vòng lặp
-
-        elif content:
-            # ── Employee rows (4-32) ──
-            # Luôn dùng Col D content đầy đủ (có Detail: Cell Down, DG Abnormal,
-            # Smoke, Open Door, Refuel...). format_employee_report() chỉ tạo 4 dòng
-            # tóm tắt, bỏ mất toàn bộ phần Detail → KHÔNG dùng.
+    # Gộp tin nhắn của từng Team và đẩy vào queue SEND_BOT
+    if SEND_BOT_TOKEN:
+        for gid, contents in team_messages.items():
+            combined = "\n━━━━━━━━━━━━━━━━━━━━\n".join(contents)
             msg = (
-                f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_str}\n"
+                f"📋 Báo cáo tổng hợp Team – {now_str}\n"
                 f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"{content}\n"
+                f"{combined}\n"
                 f"━━━━━━━━━━━━━━━━━━━━\n"
                 f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
             )
-        else:
-            continue  # skip rows with no content and not management
-
-        groups.setdefault(token, []).append((sheet_row, msg, cid, bot_label))
+            groups.setdefault(SEND_BOT_TOKEN, []).append((0, msg, str(gid), "TEAM_GROUP"))
 
     for token, items in groups.items():
         bot_name = items[0][3] if items else "BOT"
@@ -751,56 +733,9 @@ async def main():
         except Exception as e:
             logger.error(f"❌ mgmt_report → CONTROL SITE: {e}")
 
-    # ── 9. Gửi tin gộp theo Team lên Group Telegram (T1–T4) ──────
-    # Đọc lại sheet, thu thập rows 4-59, nhóm theo Cột A (team)
-    import html as _html
-    team_members: dict[str, list[tuple]] = {}  # team -> [(col_b, col_c, content)]
-    for idx2, row2 in df.iterrows():
-        srow2 = idx2 + 1
-        if srow2 <= HEADER_ROWS:
-            continue
-        if srow2 > 59:
-            break
-        col_a2 = safe(row2, COL_A)
-        if not col_a2 or col_a2 not in TEAM_GROUPS:
-            continue
-        content2 = safe(row2, COL_D)
-        if not content2:
-            continue
-        col_b2 = safe(row2, COL_B)
-        col_c2 = safe(row2, COL_C)
-        team_members.setdefault(col_a2, []).append((col_b2, col_c2, content2))
-
-    if team_members and SEND_BOT_TOKEN:
-        logger.info(f"--- Gửi Team Group: {list(team_members.keys())} ---")
-        async with Bot(token=SEND_BOT_TOKEN) as grp_bot:
-            for team, members in team_members.items():
-                grp_cid  = TEAM_GROUPS[team]
-                t_icon   = TEAM_ICON.get(team, "🏷️")
-                t_short  = TEAM_SHORT.get(team, team)
-
-                # Header
-                lines = [
-                    f"{t_icon} <b>{t_short} – {now_str}</b>",
-                    "━" * 22,
-                ]
-
-                for i, (name, role, content3) in enumerate(members):
-                    emp_icon = EMP_ICONS[i % len(EMP_ICONS)]
-                    # Tên nhân viên (ưu tiên col_b, fallback col_c)
-                    display = name or role or f"NV {i+1}"
-                    # Escape HTML đặc biệt trong nội dung
-                    safe_content = _html.escape(content3)
-                    lines.append(f"\n{emp_icon} <b>{_html.escape(display)}</b>")
-                    lines.append(f"<code>{safe_content}</code>")
-
-                lines.append("\n" + "━" * 22)
-                lines.append(f"👥 Tổng: {len(members)} nhân viên")
-
-                grp_msg = "\n".join(lines)
-                await send_msg(grp_bot, grp_cid, grp_msg, f"Group-{t_short}", parse_mode="HTML")
-                await asyncio.sleep(0.5)
-                logger.info(f"✅ Group {t_short} → {grp_cid}")
+    # ── 9. (Removed) ──
+    # Logic gửi tin gộp vào Group đã được tích hợp vào Step 6–7 (team_messages).
+    # Không cần đọc lại sheet lần thứ 2 — tránh gửi trùng lặp.
 
 
 if __name__ == "__main__":
