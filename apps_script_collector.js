@@ -1118,6 +1118,7 @@ function handleGetReportData(ss) {
   // Sắp xếp leader theo % close để gán rank
   const ldWithScore = leaders.map(ld => {
     const wo = parseWoFromContent(ld.content);
+    const s = statsMap[ld.name.toLowerCase()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     // Đọc thêm từ TL content: "3-Day Result: 11/0/0/0" → member_count / eod_today / eod_d1 / eod_d2
     const eodM = ld.content.match(/3-Day\s*Result\s*:\s*(\d+)\/(\d+)\/(\d+)\/(\d+)/i);
     const member_count   = eodM ? parseInt(eodM[1]) || 0 : 0;
@@ -1137,6 +1138,7 @@ function handleGetReportData(ss) {
       name: ld.name, sys_name: ld.sys_name, team: ld.team, chat_id: chatId, content: ld.content,
       member_count: member_count || twStats.member_count,
       eod_today, eod_d1, eod_d2,
+      search_today: s.today, search_d1: s.d1, search_d2: s.d2, search_week: s.week, search_month: s.month,
       wo_remain: wo.wo_remain || twStats.wo_remain,
       wo_total: wo.wo_total || twStats.wo_total,
       wo_month_close: wo.wo_month_close || twStats.wo_month_close,

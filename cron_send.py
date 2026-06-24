@@ -140,14 +140,18 @@ def build_team_search_section(team_key: str, report_data: dict) -> str:
 
 
 def build_no_search_list(team_key: str, report_data: dict) -> str:
-    """List employees with 0 searches today for a specific team."""
-    employees = report_data.get("employees", [])
-    if not employees or not team_key:
+    """List employees + leaders with 0 searches today for a specific team (rows 4-59)."""
+    if not team_key:
+        return ""
+
+    # Combine employees (FT) + leaders (TL) — covers rows 4-59
+    all_members = list(report_data.get("employees", [])) + list(report_data.get("leaders", []))
+    if not all_members:
         return ""
 
     no_search = [
         e.get("name", "?")
-        for e in employees
+        for e in all_members
         if e.get("team", "") == team_key and e.get("search_today", 0) == 0
     ]
     if not no_search:
