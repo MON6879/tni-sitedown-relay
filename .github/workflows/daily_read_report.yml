@@ -1,10 +1,10 @@
-name: Daily Read Report (17:30 Myanmar)
+name: Daily Read Report (18:00 Myanmar)
 
-# 17:30 Myanmar (UTC+6:30) = 11:00 UTC
+# 18:00 Myanmar (UTC+6:30) = 11:30 UTC — runs 30min after cron_send
 on:
   schedule:
-    - cron: "00 11 * * *"
-  workflow_dispatch:          # Chạy tay để test
+    - cron: "30 11 * * *"
+  workflow_dispatch:          # Manual trigger for testing
 
 jobs:
   read-report:
