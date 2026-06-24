@@ -203,8 +203,8 @@ async def get_reader_ids(client, chat_id: int, msg_id: int) -> set:
 
 
 async def process_group(client, group_key: str, chat_id: int,
-                        me_id: int, team_sheet_members: dict):
-    """Process 1 group: check Note reads over 3Day/7Day/Month."""
+                        me_id: int, team_sheet_members: dict) -> dict | None:
+    """Process 1 group: check Note reads over 3Day/7Day/Month. Returns data dict."""
     print(f"\n[{group_key}] chat_id={chat_id}")
 
     # Get member list: sheet for teams, participants for CONTROL
@@ -221,7 +221,7 @@ async def process_group(client, group_key: str, chat_id: int,
 
     if member_count == 0:
         print(f"  ⚠️  No members found — skip")
-        return
+        return None
 
     # Get Note messages from last 30 days
     since_month = days_ago_utc(30)
@@ -229,7 +229,7 @@ async def process_group(client, group_key: str, chat_id: int,
 
     if not note_msgs:
         print(f"  ℹ️  No Note messages found in last 30 days — skip")
-        return
+        return None
 
     print(f"  📨 Found {len(note_msgs)} Note messages in last 30 days")
 
@@ -240,8 +240,11 @@ async def process_group(client, group_key: str, chat_id: int,
     d2_start = today_start - timedelta(days=2)
     d7_start = today_start - timedelta(days=7)
 
+    # Cutoff: only count reads before 20:00 Myanmar today
+    cutoff_20 = today_start.replace(hour=20, minute=0)
+
     # Collect reader IDs per period
-    readers_d0 = set()  # today
+    readers_d0 = set()  # today (before 20:00)
     readers_d1 = set()  # yesterday
     readers_d2 = set()  # day before
     readers_d7 = set()  # 7 days
@@ -268,48 +271,26 @@ async def process_group(client, group_key: str, chat_id: int,
 
         await asyncio.sleep(0.3)
 
-    # Count reads per period
-    cnt_d0 = len(readers_d0)
-    cnt_d1 = len(readers_d1)
-    cnt_d2 = len(readers_d2)
-    cnt_d7 = len(readers_d7)
-    cnt_month = len(readers_month)
-
     # Today's unread list
     today_unread = [m["name"] for m in members if m["id"] not in readers_d0]
     today_read   = [m["name"] for m in members if m["id"] in readers_d0]
 
-    # Note preview
-    note_preview = ""
-    if today_note_msg:
-        preview_text = (today_note_msg.message or "")[:60].replace("\n", " ")
-        note_preview = f"📝 Note: {preview_text}...\n"
-
-    # Build report
-    date_str = now_mm.strftime("%d/%m/%Y")
-    now_str  = myanmar_now()
-    divider  = "━" * 28
-
-    report = (
-        f"👁 NOTE READ REPORT — {group_key}\n"
-        f"📅 {date_str}  |  🕐 {now_str}\n"
-        f"{note_preview}"
-        f"{divider}\n"
-        f"📊 Read Stats: 3Day: {cnt_d2}/{cnt_d1}/{cnt_d0}  "
-        f"7Day: {cnt_d7}  Month: {cnt_month}\n"
-        f"👥 Team Members: {member_count}\n"
-        f"{divider}\n"
-        f"✅ Read Today ({len(today_read)}):  "
-        f"{', '.join(today_read) if today_read else 'No one yet'}\n"
-        f"❌ Unread Today ({len(today_unread)}): "
-        f"{', '.join(today_unread) if today_unread else 'Everyone has read ✅'}\n"
-        f"{divider}"
-    )
-
-    await client.send_message(chat_id, report)
-    print(f"  ✅ Report sent — Read: 3Day:{cnt_d2}/{cnt_d1}/{cnt_d0} 7Day:{cnt_d7} Month:{cnt_month}")
+    print(f"  ✅ Read: 3Day:{len(readers_d2)}/{len(readers_d1)}/{len(readers_d0)} "
+          f"7Day:{len(readers_d7)} Month:{len(readers_month)}")
     print(f"     Today: {len(today_read)} read / {len(today_unread)} unread")
-    await asyncio.sleep(1)
+
+    return {
+        "group_key": group_key,
+        "member_count": member_count,
+        "cnt_d0": len(readers_d0),
+        "cnt_d1": len(readers_d1),
+        "cnt_d2": len(readers_d2),
+        "cnt_d7": len(readers_d7),
+        "cnt_month": len(readers_month),
+        "today_read": today_read,
+        "today_unread": today_unread,
+        "note_preview": (today_note_msg.message or "")[:60].replace("\n", " ") if today_note_msg else "",
+    }
 
 
 async def main():
@@ -325,11 +306,72 @@ async def main():
         me = await client.get_me()
         print(f"[{myanmar_now()}] 🔑 Logged in: @{me.username} ({me.first_name})")
 
+        # Collect data from all groups
+        all_results = []
         for group_key, chat_id in GROUPS.items():
-            await process_group(client, group_key, chat_id, me.id, team_sheet_members)
+            data = await process_group(client, group_key, chat_id, me.id, team_sheet_members)
+            if data:
+                all_results.append(data)
+
+        if not all_results:
+            print("⚠️  No data to report")
+            return
+
+        # Build ONE consolidated report
+        now_mm = datetime.now(MYANMAR_TZ)
+        date_str = now_mm.strftime("%d/%m/%Y")
+        now_str  = myanmar_now()
+        divider  = "━" * 30
+
+        lines = [
+            f"👁 NOTE READ REPORT — Summary",
+            f"📅 {date_str}  |  🕐 {now_str}",
+            f"⏰ Cutoff: 20:00 Myanmar",
+            divider,
+        ]
+
+        # Note preview (from first result that has it)
+        for r in all_results:
+            if r["note_preview"]:
+                lines.append(f"📝 Note: {r['note_preview']}...")
+                lines.append("")
+                break
+
+        # Per-group stats
+        for r in all_results:
+            gk = r["group_key"]
+            lines.append(
+                f"🏷️ {gk}  |  👥 {r['member_count']}  |  "
+                f"3Day: {r['cnt_d2']}/{r['cnt_d1']}/{r['cnt_d0']}  "
+                f"7Day: {r['cnt_d7']}  Month: {r['cnt_month']}"
+            )
+            if r["today_unread"]:
+                lines.append(f"   ❌ Unread ({len(r['today_unread'])}): {', '.join(r['today_unread'])}")
+            else:
+                lines.append(f"   ✅ Everyone has read!")
+
+        lines.append(divider)
+
+        # Grand totals
+        total_members = sum(r["member_count"] for r in all_results)
+        total_read = sum(len(r["today_read"]) for r in all_results)
+        total_unread = sum(len(r["today_unread"]) for r in all_results)
+        lines.append(
+            f"📊 Total: {total_members} members  |  "
+            f"✅ Read: {total_read}  |  ❌ Unread: {total_unread}"
+        )
+        lines.append(divider)
+
+        report = "\n".join(lines)
+
+        # Send to CONTROL SITE group only
+        control_id = GROUPS["CONTROL"]
+        await client.send_message(control_id, report)
+        print(f"\n📤 Consolidated report sent to CONTROL SITE")
 
     print(f"\n[{myanmar_now()}] 🎉 Complete!")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+
