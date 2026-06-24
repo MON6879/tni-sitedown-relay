@@ -457,25 +457,29 @@ def handle(update: dict) -> None:
         return
 
     tni = m.group(1).upper()
+    
+    # ── Ghi log tìm kiếm (fire & forget) chạy song song trước để tránh timeout ──
+    if APPS_SCRIPT_URL:
+        import threading
+        def _log_it():
+            try:
+                now_mm = datetime.now(TZ_MM)
+                requests.post(APPS_SCRIPT_URL, json={
+                    "action":    "log_search",
+                    "user_name": first_name or str(user_id),
+                    "user_id":   str(user_id),
+                    "tni_code":  tni,
+                    "date":      now_mm.strftime("%d/%m/%Y"),
+                    "time":      now_mm.strftime("%H:%M"),
+                }, timeout=15)
+            except Exception as e:
+                logger.error(f"log_search failed: {e}")
+        threading.Thread(target=_log_it, daemon=True).start()
+
     load_all_sheets()
     result = lookup_tni(tni)
     for chunk in split_messages(result):
         tg_send(chat_id, chunk)
-
-    # ── Ghi log tìm kiếm (fire & forget) ──
-    if APPS_SCRIPT_URL:
-        try:
-            now_mm = datetime.now(TZ_MM)
-            requests.post(APPS_SCRIPT_URL, json={
-                "action":    "log_search",
-                "user_name": first_name or str(user_id),
-                "user_id":   str(user_id),
-                "tni_code":  tni,
-                "date":      now_mm.strftime("%d/%m/%Y"),
-                "time":      now_mm.strftime("%H:%M"),
-            }, timeout=15)
-        except Exception:
-            pass
 
 
 # ── Vercel entry point ────────────────────────────────────────────────────────
