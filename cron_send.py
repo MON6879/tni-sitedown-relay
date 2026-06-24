@@ -153,6 +153,14 @@ def build_no_search_list(team_key: str, report_data: dict) -> str:
     if not team_members:
         return ""
 
+    # Deduplicate by name (keep first occurrence with highest search count)
+    seen = {}
+    for e in team_members:
+        name = e.get("name", "?")
+        if name not in seen or e.get("search_today", 0) > seen[name].get("search_today", 0):
+            seen[name] = e
+    team_members = list(seen.values())
+
     # Sort: not searched today first, then by name
     team_members.sort(key=lambda e: (1 if e.get("search_today", 0) > 0 else 0, e.get("name", "")))
 
