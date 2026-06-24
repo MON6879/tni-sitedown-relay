@@ -466,9 +466,9 @@ def handle(update: dict) -> None:
                 "user_name": first_name or str(user_id),
                 "user_id":   str(user_id),
                 "tni_code":  tni,
-                "date":      now_mm.strftime("%Y-%m-%d"),   # ISO: Google Sheets reads correctly
+                "date":      now_mm.strftime("%d/%m/%Y"),   # dd/mm/yyyy — khớp format dữ liệu cũ
                 "time":      now_mm.strftime("%H:%M"),
-                "date_iso":  now_mm.strftime("%Y-%m-%d"),
+                "date_iso":  now_mm.strftime("%d/%m/%Y"),
             }, timeout=15)
         except Exception as e:
             logger.error(f"log_search failed: {e}")

@@ -459,6 +459,23 @@ Bỏ qua: Info lookup (tni_code = "TNIXXXX" nhưng từ Info: flow — vẫn b�
 | **Raw HTML gửi vào nhóm Telegram** | `botlookup_relay.py` lấy Note từ GAS, guard chỉ check `startswith("{")`. Khi GAS URL 404, response là HTML `<!DOCTYPE...>` → guard bỏ qua → gửi HTML vào tất cả groups | Thêm `is_html = raw_note.lower().startswith("<!doctype")` + check `status_code != 200` vào guard |
 | **Apps Script URL bị 404 sau clasp deploy** | `clasp deploy --deploymentId` reset authorization settings của Web App → mất quyền "Execute as Me / Anyone" | **KHÔNG dùng** `clasp deploy --deploymentId` nữa. Chỉ dùng `clasp push` rồi vào UI update |
 
+### ⚡ Search Log — Cấu trúc ghi (cập nhật 24/06/2026)
+
+```
+Sheet: Team All Find (SHEET_ID = 1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8)
+Tab:   "Search Log" (GID: 1426553697)
+Cột:   Date (A) | Time (B) | User Name (C) | User ID (D) | TNI Code (E)
+Date:  GAS tự lấy = new Date() — KHÔNG phụ thuộc Python gửi lên
+Time:  HH:MM (Myanmar UTC+6:30)
+format cột A: dd/MM/yyyy (chỉ set trên dòng mới, không sựa toàn cột)
+GAS:   handleLogSearch(ss, body) — dùng ss (= SHEET_ID = Team All Find)
+```
+
+> [!CAUTION]
+> **handleLogSearch PHẢI dùng `ss`** (từ doPost = SHEET_ID = Team All Find). **KHÔNG dùng SD_SHEET_ID** (Site Down sheet riêng). SD_SHEET_ID chỉ dùng cho `store_site_down`.
+
+> **botlookup_relay.py**: Guard `raw_note` phải check `is_html` (`<!doctype` / `<html`) VÀ `status_code != 200`. Nếu không, HTML 404 từ GAS sṩ bị gửi vào tất cả Telegram groups.
+
 ### ⚠️ Quy tắc QUAN TRỌNG khi sửa Apps Script (từ 24/06/2026)
 
 ```
@@ -469,7 +486,6 @@ SAI:   clasp deploy --deploymentId  ← PHẢI TRÁNH — làm mất quyền Web
 SAI:   clasp deploy                 ← tạo deployment mới chưa có quyền → 404
 ```
 
-### Apps Script URLs hiện tại (24/06/2026)
 
 | Biến | URL |
 |---|---|
@@ -564,4 +580,50 @@ is_invalid = not raw_note or is_json or is_html or note_resp.status_code != 200
 if raw_note and not raw_note.startswith("{") and not raw_note.startswith("["):
 ```
 
+### 6. `setNumberFormat` trên toàn bộ cột — GÂY RA LỖI NGHIEM TRỌNG
+```javascript
+// SAI — format cả cột làm getLastRow() trả về 1000+ → appendRow() ghi vào row 1017+!
+logSheet.getRange("A:B").setNumberFormat("General");   // ← NEVER DO THIS
+logSheet.getRange("A:B").setNumberFormat("dd/MM/yyyy"); // ← NEVER DO THIS
 
+// ĐÚNG — chỉ format đúng dòng mới:
+const newRow = ...; // tìm bằng scan cột C
+logSheet.getRange(newRow, 1).setNumberFormat("dd/MM/yyyy");
+logSheet.getRange(newRow, 2).setNumberFormat("HH:mm");
+```
+
+### 7. `getLastRow()` — KHÔNG đáng tin khi có format trên ô trống
+```javascript
+// getLastRow() tính cả các ô chỉ có FORMAT (không có giá trị) → trả về số sai!
+// appendRow() cũng dùng getLastRow() → ghi vào row sai!
+
+// Fix — scan cột C (User Name) tìm ô trống đầu tiên:
+const SCAN_LIMIT = 600;
+const colC = logSheet.getRange(2, 3, SCAN_LIMIT, 1).getValues();
+let nextRow = SCAN_LIMIT + 2;
+for (let i = 0; i < colC.length; i++) {
+  if (!colC[i][0] || colC[i][0].toString().trim() === "") {
+    nextRow = i + 2; break;
+  }
+}
+logSheet.getRange(nextRow, 1, 1, 5).setValues([[dateObj, gasTime, userName, userId, tniCode]]);
+```
+
+### 8. `APPS_SCRIPT_URL` — phải cập nhật CẢ VERCEL lẫn GITHUB SECRET
+```
+Vercel   → search_bot.py → log_search (Search Log)
+GitHub   → botlookup_relay.py → store_site_down (Site Down col A)
+Thiếu 1 trong 2 → chức năng đó âm thầm không ghi, không báo lỗi!
+```
+
+---
+
+## 📝 Lịch sử sựa lỗi
+
+### 24/06/2026 — Search Log + Site Down pipeline
+| Vấn đề | Nguyên nhân | Fix |
+|---|---|---|
+| Search Log không ghi sau 17/06 | `APPS_SCRIPT_URL` trống trong Vercel | Cập nhật Vercel env var |
+| Data ghi vào row 1017 thay vì 133 | `setNumberFormat("A:B")` làm format cả 1000 ô trống | Dùng scan cột C tìm nextRow |
+| Date hiển thị là số (46190) thay vì 17/06/2026 | `setNumberFormat("General")` xóa format date cũ | Chỉ format dòng mới, dùng Date object |
+| Site Down không ghi vào cột A | `APPS_SCRIPT_URL` trống trong GitHub Secret | Cập nhật GitHub Secret |

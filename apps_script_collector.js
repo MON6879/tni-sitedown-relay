@@ -47,6 +47,7 @@ function doPost(e) {
     if (body.action === "register_user")    return handleRegisterUser(ss, body);
     if (body.action === "get_users")        return handleGetUsers(ss);
     if (body.action === "log_search")       return handleLogSearch(ss, body);
+    if (body.action === "clean_search_log") return handleCleanSearchLog(ss);
     if (body.action === "refresh_general") return handleRefreshGeneral(ss);
     if (body.action === "get_general")      return handleGetGeneral(ss);
     if (body.action === "get_report_data")   return handleGetReportData(ss);
@@ -568,15 +569,56 @@ function handleLogSearch(ss, body) {
             .setBackground("#34A853").setFontColor("#FFFFFF");
   }
 
-  // Reset format cột A và B về Auto (xóa @STRING@ cũ) để gviz CSV đọc đúng
-  logSheet.getRange("A:B").setNumberFormat("General");
-  // Ghi 1 dòng log — dùng appendRow đơn giản, date_iso (YYYY-MM-DD) được Google Sheets đọc đúng
-  logSheet.appendRow([dateStr, timeStr, userName, userId, tniCode]);
+  // Tìm dòng trống đầu tiên bằng cách quét cột C (User Name) — KHÔNG dùng getLastRow()
+  // vì getLastRow() tính cả dòng chỉ có format → bị sai vị trí
+  const SCAN_LIMIT = 600;
+  const colC = logSheet.getRange(2, 3, SCAN_LIMIT, 1).getValues();
+  let nextRow = SCAN_LIMIT + 2; // fallback nếu 600 dòng đều có data
+  for (let i = 0; i < colC.length; i++) {
+    if (!colC[i][0] || colC[i][0].toString().trim() === "") {
+      nextRow = i + 2; // +2: bù 0-index và header row
+      break;
+    }
+  }
+
+  // Lấy ngày giờ từ GAS (Myanmar UTC+6:30)
+  const TZ      = "Asia/Rangoon";
+  const nowDate = new Date();
+  const dateObj = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+  const gasTime = Utilities.formatDate(nowDate, TZ, "HH:mm");
+
+  // Ghi vào đúng dòng tiếp theo — chỉ format dòng mới, không đụng gì dòng khác
+  logSheet.getRange(nextRow, 1, 1, 5).setValues([[dateObj, gasTime, userName, userId, tniCode]]);
+  logSheet.getRange(nextRow, 1).setNumberFormat("dd/MM/yyyy");
+  logSheet.getRange(nextRow, 2).setNumberFormat("HH:mm");
+
+
 
   // Cập nhật Search Stats
   refreshStats(ss);
-
   return json({ status: "ok" });
+}
+
+// ============================================================
+// ACTION: CLEAN_SEARCH_LOG — xóa rows 133+ (test data) để reset về đúng vị trí
+// ============================================================
+function handleCleanSearchLog(ss) {
+  const logSheet = ss.getSheetByName(SEARCH_LOG_TAB);
+  if (!logSheet) return json({ status: "ok", message: "no sheet" });
+
+  const maxRows = logSheet.getMaxRows();
+  const deleted = maxRows - 132;
+
+  // Xóa tất cả rows sau row 132 (toàn bộ là data test hôm nay)
+  if (maxRows > 132) {
+    logSheet.deleteRows(133, maxRows - 132);
+  }
+
+  // Khôi phục format dd/MM/yyyy cho cột A rows 2-132
+  logSheet.getRange(2, 1, 131, 1).setNumberFormat("dd/MM/yyyy");
+  logSheet.getRange(2, 2, 131, 1).setNumberFormat("HH:mm");
+
+  return json({ status: "ok", deleted_rows: deleted, remaining: logSheet.getLastRow() });
 }
 
 
