@@ -80,10 +80,10 @@ async def get_members(client, chat_id: int, me_id: int) -> list[dict]:
         return []
 
 
-async def get_note_msgs_period(client, chat_id: int, me_id: int,
+async def get_note_msgs_period(client, chat_id: int,
                                since_utc: datetime) -> list:
     """
-    Get Note messages sent by this account from since_utc until now.
+    Get Note messages from ANY sender from since_utc until now.
     Returns list of (msg, date_mm) tuples.
     """
     notes = []
@@ -96,8 +96,7 @@ async def get_note_msgs_period(client, chat_id: int, me_id: int,
         for msg in history.messages:
             if msg.date < since_utc:
                 break
-            sender_id = getattr(msg.from_id, "user_id", None)
-            if sender_id == me_id and msg.message and is_note_msg(msg.message):
+            if msg.message and is_note_msg(msg.message):
                 dt_mm = msg.date.astimezone(MYANMAR_TZ) if msg.date.tzinfo else msg.date.replace(tzinfo=timezone.utc).astimezone(MYANMAR_TZ)
                 notes.append((msg, dt_mm))
     except Exception as e:
@@ -133,7 +132,7 @@ async def process_group(client, name: str, chat_id: int,
 
     # Get Note messages from last 30 days
     since_month = days_ago_utc(30)
-    note_msgs = await get_note_msgs_period(client, chat_id, me_id, since_month)
+    note_msgs = await get_note_msgs_period(client, chat_id, since_month)
 
     if not note_msgs:
         print(f"  ℹ️  No Note messages found in last 30 days — skip")
