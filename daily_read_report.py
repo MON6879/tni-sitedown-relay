@@ -261,58 +261,57 @@ async def process_group(client, group_key: str, chat_id: int,
         win_end   = day_start.replace(hour=READ_END_H, minute=0)
         return win_start <= read_mm <= win_end
 
-    # Collect reader IDs per period
-    readers_d0 = set()  # today 18:00-20:00
-    readers_d1 = set()  # yesterday 18:00-20:00
-    readers_d2 = set()  # day before 18:00-20:00
-    readers_d7 = set()  # 7 days
-    readers_month = set()  # 30 days
+    # Per-person tracking: {user_id: {d0:0/1, d1:0/1, d2:0/1, d7:count, month:count}}
+    per_person = {m["id"]: {"name": m["name"], "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0}
+                  for m in members}
     today_note_msg = None
 
     for msg, dt_mm in note_msgs:
         rid_map = await get_reader_ids_with_time(client, chat_id, msg.id)
-        # Filter to team members only
         rid_map = {uid: t for uid, t in rid_map.items() if uid in member_ids}
 
-        all_rids = set(rid_map.keys())
-        readers_month |= all_rids
+        for uid, read_dt in rid_map.items():
+            if uid not in per_person:
+                continue
+            pp = per_person[uid]
+            pp["month"] += 1
 
-        if dt_mm >= d7_start:
-            readers_d7 |= all_rids
+            if dt_mm >= d7_start:
+                pp["d7"] += 1
 
-        if dt_mm >= d2_start and dt_mm < d1_start:
-            # Day before yesterday: filter 18:00-20:00
-            filtered = {uid for uid, t in rid_map.items() if in_read_window(t, d2_start)}
-            readers_d2 |= filtered
-        elif dt_mm >= d1_start and dt_mm < today_start:
-            # Yesterday: filter 18:00-20:00
-            filtered = {uid for uid, t in rid_map.items() if in_read_window(t, d1_start)}
-            readers_d1 |= filtered
-        elif dt_mm >= today_start:
-            # Today: filter 18:00-20:00
-            filtered = {uid for uid, t in rid_map.items() if in_read_window(t, today_start)}
-            readers_d0 |= filtered
-            if today_note_msg is None:
-                today_note_msg = msg
+            if dt_mm >= d2_start and dt_mm < d1_start:
+                if in_read_window(read_dt, d2_start):
+                    pp["d2"] = 1
+            elif dt_mm >= d1_start and dt_mm < today_start:
+                if in_read_window(read_dt, d1_start):
+                    pp["d1"] = 1
+            elif dt_mm >= today_start:
+                if in_read_window(read_dt, today_start):
+                    pp["d0"] = 1
+
+        if dt_mm >= today_start and today_note_msg is None:
+            today_note_msg = msg
 
         await asyncio.sleep(0.3)
 
-    # Today's unread list
-    today_unread = [m["name"] for m in members if m["id"] not in readers_d0]
-    today_read   = [m["name"] for m in members if m["id"] in readers_d0]
+    # Sort: unread today first, then by name
+    per_member = sorted(per_person.values(), key=lambda p: (p["d0"], p["name"]))
 
-    print(f"  ✅ Read: 3Day:{len(readers_d2)}/{len(readers_d1)}/{len(readers_d0)} "
-          f"7Day:{len(readers_d7)} Month:{len(readers_month)}")
-    print(f"     Today: {len(today_read)} read / {len(today_unread)} unread")
+    today_read = [p["name"] for p in per_person.values() if p["d0"] == 1]
+    today_unread = [p["name"] for p in per_person.values() if p["d0"] == 0]
+
+    # Totals
+    cnt_d0 = sum(1 for p in per_person.values() if p["d0"])
+    cnt_d1 = sum(1 for p in per_person.values() if p["d1"])
+    cnt_d2 = sum(1 for p in per_person.values() if p["d2"])
+
+    print(f"  ✅ Today: {cnt_d0} read / {len(today_unread)} unread")
 
     return {
         "group_key": group_key,
         "member_count": member_count,
-        "cnt_d0": len(readers_d0),
-        "cnt_d1": len(readers_d1),
-        "cnt_d2": len(readers_d2),
-        "cnt_d7": len(readers_d7),
-        "cnt_month": len(readers_month),
+        "cnt_d0": cnt_d0, "cnt_d1": cnt_d1, "cnt_d2": cnt_d2,
+        "per_member": per_member,
         "today_read": today_read,
         "today_unread": today_unread,
         "note_preview": (today_note_msg.message or "")[:60].replace("\n", " ") if today_note_msg else "",
@@ -348,6 +347,18 @@ async def main():
         now_str  = myanmar_now()
         divider  = "━" * 30
 
+        # Helper: build per-member lines
+        def member_lines(per_member):
+            lines = []
+            for p in per_member:
+                icon = "✅" if p["d0"] else "❌"
+                lines.append(
+                    f"  {icon} {p['name']}: "
+                    f"3Day:{p['d2']}/{p['d1']}/{p['d0']}  "
+                    f"7Day:{p['d7']}  Month:{p['month']}"
+                )
+            return lines
+
         # ── 1. Send per-team report to each Team group ──
         for gk in ("T1", "T2", "T3", "T4"):
             r = all_results.get(gk)
@@ -355,24 +366,22 @@ async def main():
                 continue
 
             note_line = f"📝 Note: {r['note_preview']}...\n" if r["note_preview"] else ""
-            team_report = (
-                f"👁 NOTE READ REPORT — {gk}\n"
-                f"📅 {date_str}  |  🕐 {now_str}\n"
-                f"⏰ Read Window: 18:00–20:00 Myanmar\n"
-                f"{note_line}"
-                f"{divider}\n"
-                f"📊 Read: 3Day: {r['cnt_d2']}/{r['cnt_d1']}/{r['cnt_d0']}  "
-                f"7Day: {r['cnt_d7']}  Month: {r['cnt_month']}\n"
-                f"👥 Team Members: {r['member_count']}\n"
-                f"{divider}\n"
-                f"✅ Read ({len(r['today_read'])}): "
-                f"{', '.join(r['today_read']) if r['today_read'] else 'No one yet'}\n"
-                f"❌ Unread ({len(r['today_unread'])}): "
-                f"{', '.join(r['today_unread']) if r['today_unread'] else 'Everyone has read ✅'}\n"
-                f"{divider}"
-            )
+            tl = [
+                f"👁 NOTE READ REPORT — {gk}",
+                f"📅 {date_str}  |  🕐 {now_str}",
+                f"⏰ Read Window: 18:00–20:00 Myanmar",
+            ]
+            if note_line:
+                tl.append(f"📝 Note: {r['note_preview']}...")
+            tl.append(divider)
+            tl.append(f"👥 Team Members: {r['member_count']}  |  "
+                       f"✅ Read: {r['cnt_d0']}  |  ❌ Unread: {len(r['today_unread'])}")
+            tl.append(divider)
+            tl.extend(member_lines(r["per_member"]))
+            tl.append(divider)
+
             chat_id = GROUPS[gk]
-            await client.send_message(chat_id, team_report)
+            await client.send_message(chat_id, "\n".join(tl))
             print(f"📤 Report sent to {gk}")
             await asyncio.sleep(1)
 
@@ -391,23 +400,20 @@ async def main():
                 lines.append("")
                 break
 
-        # Per-group stats (all teams + CONTROL)
+        # Per-group with per-person details
         for gk, r in all_results.items():
             lines.append(
                 f"🏷️ {gk}  |  👥 {r['member_count']}  |  "
-                f"3Day: {r['cnt_d2']}/{r['cnt_d1']}/{r['cnt_d0']}  "
-                f"7Day: {r['cnt_d7']}  Month: {r['cnt_month']}"
+                f"✅ {r['cnt_d0']}  ❌ {len(r['today_unread'])}"
             )
-            if r["today_unread"]:
-                lines.append(f"   ❌ Unread ({len(r['today_unread'])}): {', '.join(r['today_unread'])}")
-            else:
-                lines.append(f"   ✅ Everyone has read!")
+            lines.extend(member_lines(r["per_member"]))
+            lines.append("")
 
         lines.append(divider)
 
         # Grand totals
         total_members = sum(r["member_count"] for r in all_results.values())
-        total_read = sum(len(r["today_read"]) for r in all_results.values())
+        total_read = sum(r["cnt_d0"] for r in all_results.values())
         total_unread = sum(len(r["today_unread"]) for r in all_results.values())
         lines.append(
             f"📊 Total: {total_members} members  |  "
@@ -425,3 +431,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
