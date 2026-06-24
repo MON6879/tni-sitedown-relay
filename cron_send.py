@@ -183,6 +183,47 @@ def build_asset_msg(now_str, asset_data):
     return "\n".join(lines)
 
 
+def build_team_asset_section(team_key: str, asset_data: dict) -> str:
+    """Build asset stats section for a specific team."""
+    if not asset_data.get("actionTypes") or not team_key:
+        return ""
+
+    action_types = asset_data.get("actionTypes", [])
+    stats = asset_data.get("stats", {})
+    PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15"]
+
+    parts = []
+    has_data = False
+    for at in action_types:
+        ts = stats.get(at, {}).get(team_key, {})
+        total = ts.get("total", 0)
+        done = ts.get("done", 0)
+        if total > 0 or done > 0:
+            has_data = True
+        parts.append(f"{at}: {total} /{done}")
+
+    if not has_data:
+        return ""
+
+    # Period breakdown
+    team_total = {k: 0 for k in PERIOD_KEYS}
+    for at in action_types:
+        s = stats.get(at, {}).get(team_key, {})
+        for k in PERIOD_KEYS:
+            team_total[k] += s.get(k, 0)
+
+    period_line = (
+        f"3Day: {team_total.get('d2',0)}/{team_total.get('d1',0)}/{team_total.get('d0',0)}"
+        f"  7Day: {team_total.get('d6',0)}"
+        f"  Month: {team_total.get('d15',0)}"
+    )
+
+    return (
+        f"📦 Asset: " + " | ".join(parts) + "\n"
+        f"   📅 {period_line}"
+    )
+
+
 INPUT_TASK_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
     "/gviz/tq?tqx=out:csv&gid=1755404595"
@@ -551,7 +592,7 @@ async def main():
         if not is_team_row and (not cid or cid == "-" or not cid.lstrip("-").isdigit()):
             continue
 
-        all_rows.append((sheet_row, content, cid, col_c, safe(row, COL_A)))
+        all_rows.append((sheet_row, content, cid, col_c, safe(row, COL_A), col_b))
 
     # ── 3. Get asset stats ──
     asset_data = get_asset_stats()
@@ -599,14 +640,16 @@ async def main():
 
     # Chat ID nhóm "5 TNI TECHNICA DEP CONTROL SITE"
     CONTROL_CHAT_ID = "-5251698940"
-    mgmt_cids = []   # sẽ thu thập khi duyệt rows 60-74
 
     # ── 7. Send messages ──
     ok = fail = 0
 
-    # Group by bot token
+    # Reverse mapping GID → team key (dùng cho asset lookup)
+    GID_TO_TEAM = {v: k for k, v in TEAM_GROUPS.items()}
+
     groups = {}  # token -> [(sheet_row, message, cid, label)]
-    team_messages = {} # target_gid -> list of contents
+    team_messages = {}  # target_gid -> list of (prefix, name, content, is_tl)
+    tech_messages = []  # list of (name, content) for tech dept
 
     def get_target_group(team_str: str):
         if not team_str: return None
@@ -617,79 +660,108 @@ async def main():
         if "TEAM04" in ts or "TEAM 4" in ts or "TEAM4" in ts: return -5238696719
         return None
 
-    for sheet_row, content, cid, col_c, col_a_val in all_rows:
+    for sheet_row, content, cid, col_c, col_a_val, col_b in all_rows:
         # ── Kiểm tra Cột A: rows 4-59 phải có Team, nếu trống thì bỏ qua ──
         if sheet_row <= 59 and not col_a_val and not (col_c and "team leader" in col_c.lower()):
             logger.debug(f"  Skip row{sheet_row}: Cột A trống (không có team)")
             continue
 
-        # Determine bot token
-        if 75 <= sheet_row <= 87 and TECHNICAL_DEP_BOT_TOKEN:
-            token = TECHNICAL_DEP_BOT_TOKEN
-            bot_label = "@TNITECHNICAL"
-        elif SEND_BOT_TOKEN:
-            token = SEND_BOT_TOKEN
-            bot_label = "SEND_BOT"
-        else:
-            continue
-
-        # ── Group per-team (FT + TL) into their respective groups ──
+        # ── Rows 4-59: Gom FT + TL vào Group Team ──
         if 4 <= sheet_row <= 59:
-            # Xác định Team
             team_val = col_a_val
             if 33 <= sheet_row <= 59 and col_c and "team leader" in col_c.lower():
                 m_tl = re.search(r'team\s*leader\s*(\d+)', col_c, re.IGNORECASE)
                 tl_num = int(m_tl.group(1)) if m_tl else 0
                 team_val = TEAM_BY_NUMBER.get(tl_num, col_a_val)
-                
+
             target_gid = get_target_group(team_val)
             if target_gid and content:
-                prefix = "👑 [TEAM LEADER]" if 33 <= sheet_row <= 59 else "👤 [FT]"
-                team_messages.setdefault(target_gid, []).append(f"{prefix}\n{content}")
+                is_tl = 33 <= sheet_row <= 59
+                name = col_b or col_c or f"NV row{sheet_row}"
+                team_messages.setdefault(target_gid, []).append(
+                    ("👑" if is_tl else "👤", name, content, is_tl)
+                )
             continue
 
-        # ── Determine message content for others (MGMT / TECH) ──
+        # ── Rows 60-74: BOD/Management — KHÔNG gửi riêng, xem trên Group ──
         if 60 <= sheet_row <= 74:
-            # Management rows: send compiled report (even if D is empty)
-            msg = mgmt_report
-            if cid and cid not in mgmt_cids:   # thu thập để gửi asset HTML sau
-                mgmt_cids.append(cid)
-        elif 75 <= sheet_row <= 87:
-            # Technical Dept: gửi RIÊNG từng người
-            if not content:
-                continue
-            task_header = ""
-            if input_task_summary:
-                task_header = (
-                    f"🔧 Technical Dept Tasks:\n"
-                    f"{input_task_summary}\n"
-                    f"{'━'*20}\n"
-                )
-            msg = (
-                f"{task_header}"
-                f"Technical Dept Report – {now_str}\n"
-                f"{'━'*20}\n"
-                f"{content}\n"
-                f"{'━'*20}"
-            )
-        else:
-            continue  # skip
+            logger.debug(f"  Skip row{sheet_row}: BOD xem trên Group CONTROL SITE")
+            continue
 
-        groups.setdefault(token, []).append((sheet_row, msg, cid, bot_label))
+        # ── Rows 75-87: Technical Dept — Gộp lại gửi vào CONTROL SITE ──
+        if 75 <= sheet_row <= 87:
+            if content:
+                name = col_b or col_c or f"NV row{sheet_row}"
+                tech_messages.append((name, content))
+            continue
 
-    # Gộp tin nhắn của từng Team và đẩy vào queue SEND_BOT
+    # ── 7a. Gộp tin nhắn Team + Asset từng Team → Group Team ──
     if SEND_BOT_TOKEN:
-        for gid, contents in team_messages.items():
-            combined = "\n━━━━━━━━━━━━━━━━━━━━\n".join(contents)
-            msg = (
-                f"📋 Báo cáo tổng hợp Team – {now_str}\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"{combined}\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
-                f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
-            )
-            groups.setdefault(SEND_BOT_TOKEN, []).append((0, msg, str(gid), "TEAM_GROUP"))
+        for gid, members in team_messages.items():
+            team_key = GID_TO_TEAM.get(gid, "")
+            t_short = TEAM_SHORT.get(team_key, f"Team")
+            t_icon = TEAM_ICON.get(team_key, "🏷️")
 
+            lines = [
+                f"{t_icon} 𝗕𝗮́𝗼 𝗰𝗮́𝗼 {t_short} – {now_str}",
+                "━" * 22,
+            ]
+
+            # Team Leader trước, FT sau
+            tl_list = [(p, n, c) for p, n, c, is_tl in members if is_tl]
+            ft_list = [(p, n, c) for p, n, c, is_tl in members if not is_tl]
+
+            for prefix, name, content in tl_list:
+                lines.append(f"\n{prefix} 【{name}】")
+                lines.append(content)
+
+            if ft_list:
+                lines.append("\n" + "─" * 22)
+
+            for i, (prefix, name, content) in enumerate(ft_list):
+                emp_icon = EMP_ICONS[i % len(EMP_ICONS)]
+                lines.append(f"\n{emp_icon} ▸ {name}")
+                lines.append(content)
+
+            # Per-team asset stats
+            team_asset = build_team_asset_section(team_key, asset_data)
+            if team_asset:
+                lines.append("\n" + "━" * 22)
+                lines.append(team_asset)
+
+            lines.append("\n" + "━" * 22)
+            lines.append(f"👥 Tổng: {len(members)} người")
+            lines.append("⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။")
+
+            grp_msg = "\n".join(lines)
+            groups.setdefault(SEND_BOT_TOKEN, []).append(
+                (0, grp_msg, str(gid), "TEAM_GROUP")
+            )
+
+    # ── 7b. Gộp Tech Dept → Group CONTROL SITE ──
+    if tech_messages and TECHNICAL_DEP_BOT_TOKEN:
+        tech_lines = [
+            f"🔧 Technical Dept Report – {now_str}",
+            "━" * 22,
+        ]
+        if input_task_summary:
+            tech_lines.append(input_task_summary)
+            tech_lines.append("─" * 22)
+
+        for i, (name, content) in enumerate(tech_messages):
+            emp_icon = EMP_ICONS[i % len(EMP_ICONS)]
+            tech_lines.append(f"\n{emp_icon} ▸ 【{name}】")
+            tech_lines.append(content)
+
+        tech_lines.append("\n" + "━" * 22)
+        tech_lines.append(f"👥 Tổng: {len(tech_messages)} người")
+
+        tech_msg = "\n".join(tech_lines)
+        groups.setdefault(TECHNICAL_DEP_BOT_TOKEN, []).append(
+            (0, tech_msg, CONTROL_CHAT_ID, "TECH_GROUP")
+        )
+
+    # ── Gửi tất cả messages ──
     for token, items in groups.items():
         bot_name = items[0][3] if items else "BOT"
         logger.info(f"--- {bot_name}: {len(items)} messages ---")
@@ -704,26 +776,17 @@ async def main():
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
 
-    # ── 8. Gửi asset_msg (HTML) đến rows 60-74 + CONTROL SITE ──
-    if asset_msg and SEND_BOT_TOKEN:
-        logger.info(f"--- Gửi Asset Stats (HTML) → {len(mgmt_cids)} mgmt CIDs ---")
-        async with Bot(token=SEND_BOT_TOKEN) as asset_bot:
-            for cid in mgmt_cids:
-                await send_msg(asset_bot, cid, asset_msg, "Asset(MGMT)", parse_mode="HTML")
-                await asyncio.sleep(0.4)
-
+    # ── 8. Gửi tổng asset + mgmt report → Group CONTROL SITE ──
+    # (BOD và mọi người xem trên Group này)
     if asset_msg and TECHNICAL_DEP_BOT_TOKEN:
-        logger.info("--- Gửi Asset Stats (HTML) → CONTROL SITE (-5251698940) ---")
+        logger.info("--- Gửi Asset Stats → CONTROL SITE (-5251698940) ---")
         try:
             async with Bot(token=TECHNICAL_DEP_BOT_TOKEN) as ctrl_bot:
-                await send_msg(ctrl_bot, CONTROL_CHAT_ID, asset_msg, "CONTROL", parse_mode="HTML")
+                await send_msg(ctrl_bot, CONTROL_CHAT_ID, asset_msg, "CONTROL-asset")
             logger.info("✅ Asset stats → CONTROL SITE")
         except Exception as e:
             logger.error(f"❌ Asset stats → CONTROL SITE: {e}")
 
-    # ── 8b. Gửi mgmt_report (báo cáo tổng hợp TL) vào CONTROL SITE ──
-    # Bug fix: trước đây CONTROL SITE chỉ nhận asset_msg, không nhận mgmt_report
-    # (mgmt_report chỉ được gửi cho rows 60-74 cá nhân, không gửi vào group)
     if mgmt_report and TECHNICAL_DEP_BOT_TOKEN:
         logger.info("--- Gửi mgmt_report (tổng hợp TL) → CONTROL SITE (-5251698940) ---")
         try:
@@ -732,10 +795,6 @@ async def main():
             logger.info("✅ mgmt_report → CONTROL SITE")
         except Exception as e:
             logger.error(f"❌ mgmt_report → CONTROL SITE: {e}")
-
-    # ── 9. (Removed) ──
-    # Logic gửi tin gộp vào Group đã được tích hợp vào Step 6–7 (team_messages).
-    # Không cần đọc lại sheet lần thứ 2 — tránh gửi trùng lặp.
 
 
 if __name__ == "__main__":
