@@ -139,6 +139,24 @@ def build_team_search_section(team_key: str, report_data: dict) -> str:
     return ""
 
 
+def build_no_search_list(team_key: str, report_data: dict) -> str:
+    """List employees with 0 searches today for a specific team."""
+    employees = report_data.get("employees", [])
+    if not employees or not team_key:
+        return ""
+
+    no_search = [
+        e.get("name", "?")
+        for e in employees
+        if e.get("team", "") == team_key and e.get("search_today", 0) == 0
+    ]
+    if not no_search:
+        return ""
+
+    names = ", ".join(no_search)
+    return f"⚠️ Chưa Search hôm nay ({len(no_search)}): {names}"
+
+
 def build_asset_msg(now_str, asset_data):
     """Build compact asset stats message with 3-day/7-day/month."""
     if not asset_data.get("actionTypes"):
@@ -749,6 +767,11 @@ async def main():
             if team_search:
                 lines.append(team_search)
 
+            # Per-team: ai chưa search hôm nay
+            no_search = build_no_search_list(team_key, report_data)
+            if no_search:
+                lines.append(no_search)
+
             lines.append("\n" + "━" * 22)
             lines.append(f"👥 Tổng: {len(members)} người")
             lines.append("⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။")
@@ -759,7 +782,7 @@ async def main():
             )
 
     # ── 7b. Gộp Tech Dept → Group CONTROL SITE ──
-    if tech_messages and TECHNICAL_DEP_BOT_TOKEN:
+    if tech_messages and SEND_BOT_TOKEN:
         tech_lines = [
             f"🔧 Technical Dept Report – {now_str}",
             "━" * 22,
@@ -777,7 +800,7 @@ async def main():
         tech_lines.append(f"👥 Tổng: {len(tech_messages)} người")
 
         tech_msg = "\n".join(tech_lines)
-        groups.setdefault(TECHNICAL_DEP_BOT_TOKEN, []).append(
+        groups.setdefault(SEND_BOT_TOKEN, []).append(
             (0, tech_msg, CONTROL_CHAT_ID, "TECH_GROUP")
         )
 
@@ -796,31 +819,31 @@ async def main():
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
 
-    # ── 8. Gửi tổng asset + mgmt report → Group CONTROL SITE ──
-    # (BOD và mọi người xem trên Group này)
-    if asset_msg and TECHNICAL_DEP_BOT_TOKEN:
+    # ── 8. Gửi tổng asset + mgmt report + search → Group CONTROL SITE ──
+    # (BOD và mọi người xem trên Group này, dùng SEND_BOT vì đã add vào group)
+    if asset_msg and SEND_BOT_TOKEN:
         logger.info("--- Gửi Asset Stats → CONTROL SITE (-5251698940) ---")
         try:
-            async with Bot(token=TECHNICAL_DEP_BOT_TOKEN) as ctrl_bot:
+            async with Bot(token=SEND_BOT_TOKEN) as ctrl_bot:
                 await send_msg(ctrl_bot, CONTROL_CHAT_ID, asset_msg, "CONTROL-asset")
             logger.info("✅ Asset stats → CONTROL SITE")
         except Exception as e:
             logger.error(f"❌ Asset stats → CONTROL SITE: {e}")
 
-    if mgmt_report and TECHNICAL_DEP_BOT_TOKEN:
+    if mgmt_report and SEND_BOT_TOKEN:
         logger.info("--- Gửi mgmt_report (tổng hợp TL) → CONTROL SITE (-5251698940) ---")
         try:
-            async with Bot(token=TECHNICAL_DEP_BOT_TOKEN) as ctrl_bot2:
+            async with Bot(token=SEND_BOT_TOKEN) as ctrl_bot2:
                 await send_msg(ctrl_bot2, CONTROL_CHAT_ID, mgmt_report, "CONTROL-mgmt")
             logger.info("✅ mgmt_report → CONTROL SITE")
         except Exception as e:
             logger.error(f"❌ mgmt_report → CONTROL SITE: {e}")
 
     # ── 8c. Gửi Search Stats tổng hợp → CONTROL SITE ──
-    if search_msg and TECHNICAL_DEP_BOT_TOKEN:
+    if search_msg and SEND_BOT_TOKEN:
         logger.info("--- Gửi Search Stats → CONTROL SITE (-5251698940) ---")
         try:
-            async with Bot(token=TECHNICAL_DEP_BOT_TOKEN) as ctrl_bot3:
+            async with Bot(token=SEND_BOT_TOKEN) as ctrl_bot3:
                 await send_msg(ctrl_bot3, CONTROL_CHAT_ID, search_msg, "CONTROL-search")
             logger.info("✅ Search stats → CONTROL SITE")
         except Exception as e:
