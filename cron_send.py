@@ -839,16 +839,8 @@ async def main():
         except Exception as e:
             logger.error(f"❌ mgmt_report → CONTROL SITE: {e}")
 
-    # ── 8c. Gửi Search Stats tổng hợp → CONTROL SITE ──
-    if search_msg and SEND_BOT_TOKEN:
-        logger.info("--- Gửi Search Stats → CONTROL SITE (-5251698940) ---")
-        try:
-            async with Bot(token=SEND_BOT_TOKEN) as ctrl_bot3:
-                await send_msg(ctrl_bot3, CONTROL_CHAT_ID, search_msg, "CONTROL-search")
-            logger.info("✅ Search stats → CONTROL SITE")
-        except Exception as e:
-            logger.error(f"❌ Search stats → CONTROL SITE: {e}")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+
