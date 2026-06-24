@@ -1,9 +1,9 @@
-name: Daily Read Report (18:00 Myanmar)
+name: Daily Note Read Report (17:00 Myanmar)
 
-# 18:00 Myanmar (UTC+6:30) = 11:30 UTC — runs 30min after cron_send
+# 17:00 Myanmar (UTC+6:30) = 10:30 UTC — check who read the Note message
 on:
   schedule:
-    - cron: "30 11 * * *"
+    - cron: "30 10 * * *"
   workflow_dispatch:          # Manual trigger for testing
 
 jobs:
