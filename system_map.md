@@ -5,8 +5,21 @@
 
 ---
 
-## 📊 Google Sheet
-**ID:** `1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8`
+## 📊 Google Sheets — HAI SPREADSHEET RIÊNG BIỆT
+
+> [!CAUTION]
+> Hệ thống có **2 Google Spreadsheet khác nhau**. Nhầm lẫn giữa 2 sheet này sẽ làm mất dữ liệu hoặc bot ghi sai chỗ!
+
+| Tên | Sheet ID | Dùng cho | Ai xem |
+|---|---|---|---|
+| **Team All Find** (sheet chính) | `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow` | Search Log, Dashboard Report, Site Down data, Chat IDs | **USER xem hàng ngày** |
+| **Collector** (sheet phụ) | `1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8` | Order/Revoke/Export từ Telegram bot, Asset Stats | Bot ghi, ít ai xem trực tiếp |
+
+Trong `apps_script_collector.js`:
+- `SHEET_ID` = `1Etd2P...` → **Collector** (sheet phụ)
+- `SD_SHEET_ID` = `1FvDhIwq8...` → **Team All Find** (sheet chính, user xem)
+
+### Team All Find — Sheet ID: `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow`
 
 ### Sheet tabs
 
@@ -464,17 +477,91 @@ SAI:   clasp deploy                 ← tạo deployment mới chưa có quyền
 | Script ID | `1rvgWwrAMDbqtmqwOfqzguXB7m9snA5UZeOs9iGu64VJbejlNAkH2m6uR` |
 | Search Log GID | `1426553697` |
 
+### ⚠️ KHI `APPS_SCRIPT_URL` THAY ĐỔI — Checklist BẮT BUỘC
+
+> URL này được dùng ở **2 chỗ độc lập**. Đổi URL mà chỉ cập nhật 1 chỗ → các workflow còn lại bị 404 ngay!
+
+| # | Cập nhật ở đâu | Dùng cho | Cách cập nhật |
+|---|---|---|---|
+| 1 | **Vercel Environment Variables** | `search_bot.py` (TNI search bot) | `vercel env rm APPS_SCRIPT_URL production --yes` → `Write-Output "URL" \| vercel env add APPS_SCRIPT_URL production` → `vercel --prod --yes` |
+| 2 | **GitHub Secrets** | `botlookup_relay.py`, `daily_send.py`, `telegram_send.py`, `daily_task.py`, `send_teams_telethon.py` | [github.com/.../settings/secrets/actions](https://github.com/phonghdpxd-cmd/tni-bot/settings/secrets/actions) → `APPS_SCRIPT_URL` → Update |
+| 3 | **`.env` local** | Test local | Sửa trực tiếp file `.env` |
+
+**Các workflow GitHub dùng `APPS_SCRIPT_URL`:**
+- `botlookup_relay.yml` — lấy site down, ghi store_site_down, đọc Note B2:B5
+- `daily_send.yml` — báo cáo hàng ngày
+- `telegram_send.yml` — gửi task nhân viên
+- `daily_task.yml` — daily task
+- `send_teams_telethon.yml` — gửi teams
+
+
+
 ### Search Log — Cấu trúc ghi (24/06/2026)
 
 ```
-Tab: "Search Log" | GID: 1426553697
-Cột: Date (A) | Time (B) | User Name (C) | User ID (D) | TNI Code (E)
-date format: YYYY-MM-DD (ISO) — Google Sheets đọc đúng
-time format: HH:MM
-Chỉ ghi: text khớp TNIxxxx (KHÔNG ghi Info:, KHÔNG ghi Daily)
-GAS handleLogSearch: reset A:B về "General" → appendRow([dateStr, timeStr, ...])
+Sheet: Team All Find (SD_SHEET_ID = 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow)
+Tab:   "Search Log"
+Cột:   Date (A) | Time (B) | User Name (C) | User ID (D) | TNI Code (E)
+date:  YYYY-MM-DD (ISO) — Google Sheets đọc đúng
+time:  HH:MM
+Chỉ ghi khi: text Telegram khớp TNIxxxx
+KHÔNG ghi: Info:, Daily, các lệnh khác
+GAS:   handleLogSearch() → mở SD_SHEET_ID (không phải SHEET_ID!) → reset A:B "General" → appendRow
 ```
 
+> [!WARNING]
+> `handleLogSearch` phải dùng `SD_SHEET_ID` (Team All Find), **không phải** `ss` (SHEET_ID/Collector) được truyền vào từ `doPost`. Nếu dùng nhầm `ss`, dữ liệu ghi vào sheet Collector và user sẽ không thấy gì cả!
+
 > **Lưu ý `botlookup_relay.py`**: Guard `raw_note` phải check `is_html` (`<!doctype` / `<html`) VÀ `status_code != 200`. Nếu không, HTML 404 từ GAS sẽ bị gửi vào tất cả Telegram groups.
+
+---
+
+## 🚫 NHỮNG THỨ KHÔNG ĐƯỢC ĐỤNG VÀO (tránh cascading failures)
+
+> [!CAUTION]
+> Đây là danh sách những thay đổi tưởng vô hại nhưng hay gây sự cố dây chuyền.
+
+### 1. `clasp deploy` — TUYỆT ĐỐI KHÔNG DÙNG
+```
+SAI: clasp deploy --deploymentId <id>   ← reset quyền Web App → URL 404 ngay lập tức
+SAI: clasp deploy                       ← tạo URL mới chưa có quyền → 404
+ĐÚNG: clasp push --force               ← chỉ đẩy code
+      → UI: Deploy → Manage Deployments → Edit → New version → Update
+```
+
+### 2. `APPS_SCRIPT_URL` — Phải cập nhật ĐỦ 3 CHỖ khi đổi URL
+```
+[ ] 1. Vercel: vercel env rm/add + vercel --prod --yes
+[ ] 2. GitHub Secrets: Settings → Secrets → APPS_SCRIPT_URL → Update
+[ ] 3. .env local (cho test)
+Thiếu bất kỳ chỗ nào → workflow đó bị 404 âm thầm, không báo lỗi!
+```
+
+### 3. `setNumberFormat("@STRING@")` trong GAS — KHÔNG dùng trên cột A:B Search Log
+```
+Vấn đề: Lock format → appendRow tiếp theo kế thừa → gviz CSV hiển thị trống
+Fix nếu lỡ dùng: thêm logSheet.getRange("A:B").setNumberFormat("General") trước appendRow
+```
+
+### 4. `handleLogSearch` — PHẢI dùng SD_SHEET_ID, không dùng ss
+```javascript
+// ĐÚNG:
+const logSS = SpreadsheetApp.openById("1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow");
+let logSheet = logSS.getSheetByName(SEARCH_LOG_TAB);
+
+// SAI (dùng ss từ doPost = SHEET_ID = Collector sheet, user không thấy):
+let logSheet = ss.getSheetByName(SEARCH_LOG_TAB);
+```
+
+### 5. Guard HTML trong `botlookup_relay.py` — Phải check ĐỦ điều kiện
+```python
+# ĐÚNG:
+is_json    = raw_note.startswith("{") or raw_note.startswith("[")
+is_html    = raw_note.lower().startswith("<!doctype") or raw_note.lower().startswith("<html")
+is_invalid = not raw_note or is_json or is_html or note_resp.status_code != 200
+
+# SAI (thiếu check HTML → khi GAS 404, HTML bị gửi vào tất cả Telegram groups):
+if raw_note and not raw_note.startswith("{") and not raw_note.startswith("["):
+```
 
 
