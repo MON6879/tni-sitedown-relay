@@ -468,6 +468,7 @@ def handle(update: dict) -> None:
                 "tni_code":  tni,
                 "date":      now_mm.strftime("%d/%m/%Y"),
                 "time":      now_mm.strftime("%H:%M"),
+                "date_iso":  now_mm.strftime("%Y-%m-%d"),
             }, timeout=15)
         except Exception as e:
             logger.error(f"log_search failed: {e}")

@@ -550,8 +550,9 @@ function handleLogSearch(ss, body) {
   const userName = (body.user_name || "").toString().trim();
   const userId   = (body.user_id   || "").toString().trim();
   const tniCode  = (body.tni_code  || "").toString().trim().toUpperCase();
-  const dateStr  = (body.date      || "").toString().trim();
   const timeStr  = (body.time      || "").toString().trim();
+  // Ưu tiên date_iso (YYYY-MM-DD) — Google Sheets nhận dạng tốt hơn dd/mm/yyyy
+  const dateStr  = (body.date_iso  || body.date || "").toString().trim();
 
   if (!userId || !tniCode) {
     return json({ status: "error", message: "Thiếu user_id hoặc tni_code" });
@@ -564,10 +565,15 @@ function handleLogSearch(ss, body) {
     logSheet.appendRow(["Date", "Time", "User Name", "User ID", "TNI Code"]);
     logSheet.getRange(1, 1, 1, 5).setFontWeight("bold")
             .setBackground("#34A853").setFontColor("#FFFFFF");
+    // Ép cột A (Date) và B (Time) toàn bộ sheet thành plain text
+    logSheet.getRange("A:B").setNumberFormat("@STRING@");
   }
 
-  // Ghi 1 dòng log
-  logSheet.appendRow([dateStr, timeStr, userName, userId, tniCode]);
+  // Ghi 1 dòng log — ép lưu date/time dạng text để Google Sheets không tự parse
+  const newRow = logSheet.getLastRow() + 1;
+  logSheet.getRange(newRow, 1, 1, 5).setValues([[dateStr, timeStr, userName, userId, tniCode]]);
+  // Ép cột Date (A) và Time (B) dòng này lưu dạng plain text (@STRING@)
+  logSheet.getRange(newRow, 1, 1, 2).setNumberFormat("@STRING@");
 
   // Cập nhật Search Stats
   refreshStats(ss);
