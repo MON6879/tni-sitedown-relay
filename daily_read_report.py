@@ -28,10 +28,11 @@ SESSION_STRING = os.environ["TELEGRAM_SESSION"]
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
 GROUPS = {
-    "T1": -5180992881,   # TNI TEAM 1
-    "T2": -5188855349,   # TNI TEAM 2 (T2+T5)
-    "T3": -5183480727,   # TNI TEAM 3
-    "T4": -5238696719,   # TNI TEAM 4
+    "T1":      -5180992881,   # TNI TEAM 1
+    "T2":      -5188855349,   # TNI TEAM 2 (T2+T5)
+    "T3":      -5183480727,   # TNI TEAM 3
+    "T4":      -5238696719,   # TNI TEAM 4
+    "CONTROL": -5251698940,   # 5 TNI TECHNICA DEP CONTROL SITE
 }
 
 # Từ khóa nhận biết Note B2:B5 (tin nhắn cần theo dõi)

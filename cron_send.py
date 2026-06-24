@@ -123,6 +123,22 @@ def build_search_summary(now_str, report_data):
     return "\n".join(lines)
 
 
+def build_team_search_section(team_key: str, report_data: dict) -> str:
+    """Build search stats section for a specific team."""
+    team_summary = report_data.get("teamSummary", [])
+    if not team_summary or not team_key:
+        return ""
+
+    for ts in team_summary:
+        if ts.get("team", "") == team_key:
+            return (
+                f"🔍 Search: "
+                f"3Day:{ts.get('d2',0)}/{ts.get('d1',0)}/{ts.get('today',0)} "
+                f"7Day:{ts.get('week',0)} Month:{ts.get('month',0)}"
+            )
+    return ""
+
+
 def build_asset_msg(now_str, asset_data):
     """Build compact asset stats message with 3-day/7-day/month."""
     if not asset_data.get("actionTypes"):
@@ -723,11 +739,15 @@ async def main():
                 lines.append(f"\n{emp_icon} ▸ {name}")
                 lines.append(content)
 
-            # Per-team asset stats
+            # Per-team asset stats + search stats
             team_asset = build_team_asset_section(team_key, asset_data)
-            if team_asset:
+            team_search = build_team_search_section(team_key, report_data)
+            if team_asset or team_search:
                 lines.append("\n" + "━" * 22)
+            if team_asset:
                 lines.append(team_asset)
+            if team_search:
+                lines.append(team_search)
 
             lines.append("\n" + "━" * 22)
             lines.append(f"👥 Tổng: {len(members)} người")
@@ -795,6 +815,16 @@ async def main():
             logger.info("✅ mgmt_report → CONTROL SITE")
         except Exception as e:
             logger.error(f"❌ mgmt_report → CONTROL SITE: {e}")
+
+    # ── 8c. Gửi Search Stats tổng hợp → CONTROL SITE ──
+    if search_msg and TECHNICAL_DEP_BOT_TOKEN:
+        logger.info("--- Gửi Search Stats → CONTROL SITE (-5251698940) ---")
+        try:
+            async with Bot(token=TECHNICAL_DEP_BOT_TOKEN) as ctrl_bot3:
+                await send_msg(ctrl_bot3, CONTROL_CHAT_ID, search_msg, "CONTROL-search")
+            logger.info("✅ Search stats → CONTROL SITE")
+        except Exception as e:
+            logger.error(f"❌ Search stats → CONTROL SITE: {e}")
 
 
 if __name__ == "__main__":
