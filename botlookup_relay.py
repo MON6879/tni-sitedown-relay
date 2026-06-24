@@ -192,19 +192,44 @@ async def main():
                 print(f"[{myanmar_now()}] ⚠️ Lấy Note lỗi: {ex}")
 
 
-        # ── 11. @Phongha79 gửi Note đến TẤT CẢ groups ───────────
+        # ── 11. @Phongha79 gửi Note đến TẤT CẢ groups — REPLY vào tin alarm ──
         # Gửi từ tài khoản cá nhân → Telegram cho phép xem ai đã đọc
         if note_text:
-            print(f"[{myanmar_now()}] 📨 Gửi Note từ @{me.username} đến {len(ALL_GROUPS)} nhóm...")
+            print(f"[{myanmar_now()}] ⏳ Chờ 5s để alarm kịp vào các nhóm...")
+            await asyncio.sleep(5)
+
+            print(f"[{myanmar_now()}] 📨 Gửi Note từ @{me.username} đến {len(ALL_GROUPS)} nhóm (reply vào alarm)...")
             for gname, gid in ALL_GROUPS.items():
                 try:
-                    await client.send_message(gid, note_text)
-                    print(f"[{myanmar_now()}] ✅ Note → {gname} ({gid})")
+                    # Tìm tin alarm mới nhất trong nhóm để reply vào
+                    reply_to_id = None
+                    try:
+                        grp_hist = await client(GetHistoryRequest(
+                            peer=gid, limit=15,
+                            offset_date=None, offset_id=0,
+                            max_id=0, min_id=0, add_offset=0, hash=0,
+                        ))
+                        for m in grp_hist.messages:
+                            if m.message and (
+                                "SITE_DOWN" in m.message.upper() or
+                                "site down" in m.message.lower() or
+                                "Site down" in m.message
+                            ):
+                                reply_to_id = m.id
+                                print(f"[{myanmar_now()}] 🔗 Tìm thấy alarm msg_id={reply_to_id} trong {gname}")
+                                break
+                    except Exception as ex_hist:
+                        print(f"[{myanmar_now()}] ⚠️ Đọc lịch sử {gname} lỗi: {ex_hist}")
+
+                    await client.send_message(gid, note_text, reply_to=reply_to_id)
+                    status = f"reply→{reply_to_id}" if reply_to_id else "standalone"
+                    print(f"[{myanmar_now()}] ✅ Note → {gname} ({status})")
                     await asyncio.sleep(1)
                 except Exception as ex:
                     print(f"[{myanmar_now()}] ⚠️ Note → {gname} lỗi: {ex}")
         else:
             print(f"[{myanmar_now()}] ℹ️ B2:B5 trống — bỏ qua gửi Note")
+
 
         print(f"[{myanmar_now()}] ✅ Xong tất cả.")
 
