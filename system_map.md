@@ -12,14 +12,14 @@
 
 | Tên | Sheet ID | Dùng cho | Ai xem |
 |---|---|---|---|
-| **Team All Find** (sheet chính) | `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow` | Search Log, Dashboard Report, Site Down data, Chat IDs | **USER xem hàng ngày** |
-| **Collector** (sheet phụ) | `1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8` | Order/Revoke/Export từ Telegram bot, Asset Stats | Bot ghi, ít ai xem trực tiếp |
+| **Team All Find** (sheet chính) | `1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8` | Search Log, Dashboard Report, Asset Stats, Chat IDs | **USER xem hàng ngày** |
+| **Site Down sheet** | `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow` | Site Down data (store_site_down), Task Remain riêng | Bot ghi, dùng bởi botlookup_relay |
 
 Trong `apps_script_collector.js`:
-- `SHEET_ID` = `1Etd2P...` → **Collector** (sheet phụ)
-- `SD_SHEET_ID` = `1FvDhIwq8...` → **Team All Find** (sheet chính, user xem)
+- `SHEET_ID` = `1Etd2P...` → **Team All Find** (sheet chính, user xem) ← **DÙNG cho handleLogSearch**
+- `SD_SHEET_ID` = `1FvDhIwq8...` → **Site Down sheet** (riêng biệt, dùng cho store_site_down)
 
-### Team All Find — Sheet ID: `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow`
+### Team All Find — Sheet ID: `1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8`
 
 ### Sheet tabs
 
@@ -543,14 +543,14 @@ Vấn đề: Lock format → appendRow tiếp theo kế thừa → gviz CSV hi�
 Fix nếu lỡ dùng: thêm logSheet.getRange("A:B").setNumberFormat("General") trước appendRow
 ```
 
-### 4. `handleLogSearch` — PHẢI dùng SD_SHEET_ID, không dùng ss
+### 4. `handleLogSearch` — DÙNG `ss` (đúng), KHÔNG dùng SD_SHEET_ID (sai)
 ```javascript
-// ĐÚNG:
-const logSS = SpreadsheetApp.openById("1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow");
-let logSheet = logSS.getSheetByName(SEARCH_LOG_TAB);
-
-// SAI (dùng ss từ doPost = SHEET_ID = Collector sheet, user không thấy):
+// ĐÚNG: ss từ doPost = SHEET_ID = "1Etd2P..." = Team All Find — đúng sheet!
 let logSheet = ss.getSheetByName(SEARCH_LOG_TAB);
+
+// SAI: SD_SHEET_ID = "1FvDhIwq8..." = Site Down sheet riêng, user không thấy Search Log ở đó:
+const logSS = SpreadsheetApp.openById("1FvDhIwq8...");
+let logSheet = logSS.getSheetByName(SEARCH_LOG_TAB);
 ```
 
 ### 5. Guard HTML trong `botlookup_relay.py` — Phải check ĐỦ điều kiện

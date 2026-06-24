@@ -558,15 +558,11 @@ function handleLogSearch(ss, body) {
     return json({ status: "error", message: "Thiếu user_id hoặc tni_code" });
   }
 
-  // ── Ghi vào SD_SHEET_ID (Team All Find) — đây là sheet user đang xem ──
-  // KHÔNG dùng ss (SHEET_ID/collector) vì Search Log phải nằm trong Team All Find
-  const SD_SHEET_ID = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
-  const logSS = SpreadsheetApp.openById(SD_SHEET_ID);
-
-  // Lấy / tạo tab "Search Log"
-  let logSheet = logSS.getSheetByName(SEARCH_LOG_TAB);
+  // ss = SHEET_ID = "1Etd2P..." = "Team All Find - Sum WO and Task" — ĐÚNG SHEET!
+  // KHÔNG dùng SD_SHEET_ID (= Site Down sheet khác, sai chỗ)
+  let logSheet = ss.getSheetByName(SEARCH_LOG_TAB);
   if (!logSheet) {
-    logSheet = logSS.insertSheet(SEARCH_LOG_TAB);
+    logSheet = ss.insertSheet(SEARCH_LOG_TAB);
     logSheet.appendRow(["Date", "Time", "User Name", "User ID", "TNI Code"]);
     logSheet.getRange(1, 1, 1, 5).setFontWeight("bold")
             .setBackground("#34A853").setFontColor("#FFFFFF");
@@ -577,8 +573,8 @@ function handleLogSearch(ss, body) {
   // Ghi 1 dòng log — dùng appendRow đơn giản, date_iso (YYYY-MM-DD) được Google Sheets đọc đúng
   logSheet.appendRow([dateStr, timeStr, userName, userId, tniCode]);
 
-  // Cập nhật Search Stats (cũng trong logSS)
-  refreshStats(logSS);
+  // Cập nhật Search Stats
+  refreshStats(ss);
 
   return json({ status: "ok" });
 }
