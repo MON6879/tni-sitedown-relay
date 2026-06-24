@@ -140,7 +140,7 @@ def build_team_search_section(team_key: str, report_data: dict) -> str:
 
 
 def build_no_search_list(team_key: str, report_data: dict) -> str:
-    """List employees + leaders with 0 searches today for a specific team (rows 4-59)."""
+    """Per-person search stats for a team (rows 4-59) with 3Day/7Day/Month."""
     if not team_key:
         return ""
 
@@ -149,16 +149,29 @@ def build_no_search_list(team_key: str, report_data: dict) -> str:
     if not all_members:
         return ""
 
-    no_search = [
-        e.get("name", "?")
-        for e in all_members
-        if e.get("team", "") == team_key and e.get("search_today", 0) == 0
-    ]
-    if not no_search:
+    team_members = [e for e in all_members if e.get("team", "") == team_key]
+    if not team_members:
         return ""
 
-    names = ", ".join(no_search)
-    return f"⚠️ Not Searched Today ({len(no_search)}): {names}"
+    # Sort: not searched today first, then by name
+    team_members.sort(key=lambda e: (1 if e.get("search_today", 0) > 0 else 0, e.get("name", "")))
+
+    lines = []
+    not_searched_count = 0
+    for e in team_members:
+        name = e.get("name", "?")
+        d0 = e.get("search_today", 0)
+        d1 = e.get("search_d1", 0)
+        d2 = e.get("search_d2", 0)
+        w  = e.get("search_week", 0)
+        m  = e.get("search_month", 0)
+        icon = "✅" if d0 > 0 else "❌"
+        if d0 == 0:
+            not_searched_count += 1
+        lines.append(f"  {icon} {name}: 3Day:{d2}/{d1}/{d0} 7Day:{w} Month:{m}")
+
+    header = f"🔍 Search per member ({not_searched_count} not searched today):"
+    return header + "\n" + "\n".join(lines)
 
 
 def build_asset_msg(now_str, asset_data):
