@@ -434,3 +434,47 @@ Bỏ qua: Info lookup (tni_code = "TNIXXXX" nhưng từ Info: flow — vẫn b�
 ```
 > **Lưu ý**: Cả TNI lookup và Info: TNIxxxx đều ghi tni_code = "TNIxxxx" → đều được đếm (đúng logic).
 
+---
+
+## 🐛 Lịch sử bugs đã fix (24/06/2026)
+
+| Bug | Nguyên nhân | Fix |
+|---|---|---|
+| **Search Log không ghi dữ liệu gì cả** | `APPS_SCRIPT_URL` trong Vercel bị lưu là `""` (chuỗi rỗng) → `if APPS_SCRIPT_URL:` luôn `False` → không bao giờ gọi GAS | Xóa biến cũ, thêm lại đúng URL vào Vercel, redeploy |
+| **Cột Date/Time trong Search Log trống** | Dùng `setNumberFormat("@STRING@")` trên cells → lock format → gviz CSV không đọc được; `appendRow` tiếp theo kế thừa format đó từ row trên | Thêm `logSheet.getRange("A:B").setNumberFormat("General")` TRƯỚC mỗi `appendRow` để reset format |
+| **Date format `dd/mm/yyyy` → trống** | Google Sheets (locale Myanmar) không parse được `"24/06/2026"` → lưu trống | Đổi sang ISO `YYYY-MM-DD` (`now_mm.strftime("%Y-%m-%d")`) — Google Sheets nhận dạng chuẩn |
+| **Raw HTML gửi vào nhóm Telegram** | `botlookup_relay.py` lấy Note từ GAS, guard chỉ check `startswith("{")`. Khi GAS URL 404, response là HTML `<!DOCTYPE...>` → guard bỏ qua → gửi HTML vào tất cả groups | Thêm `is_html = raw_note.lower().startswith("<!doctype")` + check `status_code != 200` vào guard |
+| **Apps Script URL bị 404 sau clasp deploy** | `clasp deploy --deploymentId` reset authorization settings của Web App → mất quyền "Execute as Me / Anyone" | **KHÔNG dùng** `clasp deploy --deploymentId` nữa. Chỉ dùng `clasp push` rồi vào UI update |
+
+### ⚠️ Quy tắc QUAN TRỌNG khi sửa Apps Script (từ 24/06/2026)
+
+```
+ĐÚNG:  clasp push --force          ← chỉ đẩy code lên
+       → Vào UI: Deploy → Manage Deployments → Edit → New version → Update
+
+SAI:   clasp deploy --deploymentId  ← PHẢI TRÁNH — làm mất quyền Web App → 404
+SAI:   clasp deploy                 ← tạo deployment mới chưa có quyền → 404
+```
+
+### Apps Script URLs hiện tại (24/06/2026)
+
+| Biến | URL |
+|---|---|
+| `APPS_SCRIPT_URL` | `https://script.google.com/macros/s/AKfycbzvQrwvk7N0bc2Bh-lZEnLxRE6Lx8NE4xffUmZJSkUg4EdquSKYPg9VfD1VXTfkim2gFg/exec` |
+| Script ID | `1rvgWwrAMDbqtmqwOfqzguXB7m9snA5UZeOs9iGu64VJbejlNAkH2m6uR` |
+| Search Log GID | `1426553697` |
+
+### Search Log — Cấu trúc ghi (24/06/2026)
+
+```
+Tab: "Search Log" | GID: 1426553697
+Cột: Date (A) | Time (B) | User Name (C) | User ID (D) | TNI Code (E)
+date format: YYYY-MM-DD (ISO) — Google Sheets đọc đúng
+time format: HH:MM
+Chỉ ghi: text khớp TNIxxxx (KHÔNG ghi Info:, KHÔNG ghi Daily)
+GAS handleLogSearch: reset A:B về "General" → appendRow([dateStr, timeStr, ...])
+```
+
+> **Lưu ý `botlookup_relay.py`**: Guard `raw_note` phải check `is_html` (`<!doctype` / `<html`) VÀ `status_code != 200`. Nếu không, HTML 404 từ GAS sẽ bị gửi vào tất cả Telegram groups.
+
+
