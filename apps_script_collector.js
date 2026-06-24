@@ -569,6 +569,8 @@ function handleLogSearch(ss, body) {
     logSheet.getRange("A:B").setNumberFormat("@STRING@");
   }
 
+  // Reset format cột A và B về Auto (xóa @STRING@ cũ) để gviz CSV đọc đúng
+  logSheet.getRange("A:B").setNumberFormat("General");
   // Ghi 1 dòng log — dùng appendRow đơn giản, date_iso (YYYY-MM-DD) được Google Sheets đọc đúng
   logSheet.appendRow([dateStr, timeStr, userName, userId, tniCode]);
 
