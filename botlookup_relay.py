@@ -194,13 +194,37 @@ async def main():
 
         # ── 11. @Phongha79 gửi Note đến TẤT CẢ groups — REPLY vào tin alarm ──
         # Gửi từ tài khoản cá nhân → Telegram cho phép xem ai đã đọc
+        # Xóa Note cũ trước khi gửi mới → tránh loãng group
         if note_text:
             print(f"[{myanmar_now()}] ⏳ Chờ 5s để alarm kịp vào các nhóm...")
             await asyncio.sleep(5)
 
+            # ── 11a. Đọc Note message_ids cũ từ GAS ──
+            old_note_ids = {}
+            if gas_url:
+                try:
+                    nr = requests.get(gas_url, params={"action": "get_note_msgids"}, timeout=30)
+                    nd = nr.json()
+                    old_note_ids = nd.get("msgids", {})
+                    if old_note_ids:
+                        print(f"[{myanmar_now()}] 📋 Note cũ: {old_note_ids}")
+                except Exception as ex:
+                    print(f"[{myanmar_now()}] ⚠️ Đọc Note cũ lỗi: {ex}")
+
+            # ── 11b. Xóa Note cũ + Gửi Note mới ──
+            new_note_ids = {}
             print(f"[{myanmar_now()}] 📨 Gửi Note từ @{me.username} đến {len(ALL_GROUPS)} nhóm (reply vào alarm)...")
             for gname, gid in ALL_GROUPS.items():
                 try:
+                    # Xóa Note cũ trong nhóm này
+                    old_id = old_note_ids.get(gname)
+                    if old_id:
+                        try:
+                            await client.delete_messages(gid, [int(old_id)])
+                            print(f"[{myanmar_now()}] 🗑️ Xóa Note cũ msg_id={old_id} trong {gname}")
+                        except Exception as ex_del:
+                            print(f"[{myanmar_now()}] ⚠️ Xóa Note {gname} lỗi: {ex_del}")
+
                     # Tìm tin alarm mới nhất trong nhóm để reply vào
                     reply_to_id = None
                     try:
@@ -221,12 +245,25 @@ async def main():
                     except Exception as ex_hist:
                         print(f"[{myanmar_now()}] ⚠️ Đọc lịch sử {gname} lỗi: {ex_hist}")
 
-                    await client.send_message(gid, note_text, reply_to=reply_to_id)
+                    sent_msg = await client.send_message(gid, note_text, reply_to=reply_to_id)
+                    new_note_ids[gname] = sent_msg.id
                     status = f"reply→{reply_to_id}" if reply_to_id else "standalone"
-                    print(f"[{myanmar_now()}] ✅ Note → {gname} ({status})")
+                    print(f"[{myanmar_now()}] ✅ Note → {gname} ({status}) msg_id={sent_msg.id}")
                     await asyncio.sleep(1)
                 except Exception as ex:
                     print(f"[{myanmar_now()}] ⚠️ Note → {gname} lỗi: {ex}")
+
+            # ── 11c. Lưu Note message_ids mới vào GAS ──
+            if new_note_ids and gas_url:
+                try:
+                    requests.post(
+                        gas_url,
+                        json={"action": "save_note_msgids", "msgids": new_note_ids},
+                        timeout=30
+                    )
+                    print(f"[{myanmar_now()}] 💾 Lưu Note msgids: {new_note_ids}")
+                except Exception as ex:
+                    print(f"[{myanmar_now()}] ⚠️ Lưu Note msgids lỗi: {ex}")
         else:
             print(f"[{myanmar_now()}] ℹ️ B2:B5 trống — bỏ qua gửi Note")
 

@@ -566,7 +566,5 @@ function getInvFolder_() {
   const fi=root.getFoldersByName(INV_PHOTO_DIR);
   return fi.hasNext()?fi.next():root.createFolder(INV_PHOTO_DIR);
 }
-function json(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+// ── JSON helper: json() lives in apps_script_collector.js (shared) ──
+// DO NOT redeclare here — GAS global namespace!

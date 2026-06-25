@@ -53,6 +53,7 @@ function doPost(e) {
     if (body.action === "get_report_data")   return handleGetReportData(ss);
     if (body.action === "get_asset_stats")   return handleGetAssetStats(ss);
     if (body.action === "store_site_down")   return handleStoreSiteDownDirect(body);
+    if (body.action === "save_note_msgids")   return handleSaveNoteMsgIds(body);
 
     // ── Daily Report Collector ─────────────────────────────────────────────
     if (body.action === "daily_add" ||
@@ -92,7 +93,8 @@ function doGet(e) {
     if (action === "get_site_down_data") return getSiteDownData();
 
     // ── Note B2:B5 từ SD Sheet (cho botlookup_relay.py gửi từ @Phongha79) ──
-    if (action === "get_note_b2b5")     return getNoteB2B5();
+    if (action === "get_note_b2b5")       return getNoteB2B5();
+    if (action === "get_note_msgids")     return handleGetNoteMsgIds();
 
     // ── Cable / MDG GET endpoints ─────────────────────────────────────────
     if (action === "cable_get_stats" || action === "cable_check_row") return doGetCable_(e);
@@ -1666,13 +1668,8 @@ function handleStoreSiteDownDirect(body) {
 }
 
 // ════════════════════════════════════════════════════════════
-// ALIAS — Trigger cũ "relayBotlookupToTNI" (mỗi 30 phút)
-// Gọi checkAndSend() trong site_down_notify.gs
-// ════════════════════════════════════════════════════════════
-function relayBotlookupToTNI() {
-  checkAndSend();
-}
-
+// NOTE: relayBotlookupToTNI() lives in site_down_notify.gs (ONLY)
+// DO NOT add a duplicate here — GAS shares global namespace!
 // ════════════════════════════════════════════════════════════
 // GET NOTE B2:B5 — Đọc nội dung B2:B5 từ SD Sheet
 // Trả về plain text để botlookup_relay.py gửi từ @Phongha79

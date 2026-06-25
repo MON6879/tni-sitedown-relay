@@ -54,12 +54,8 @@ const HEADERS = [
 const TOTAL_COLS = HEADERS.length; // 19
 
 
-// ── JSON helper ─────────────────────────────────────────────────────────
-function json(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+// ── JSON helper: json() lives in apps_script_collector.js (shared) ───────
+// DO NOT redeclare here — GAS global namespace!
 
 // ============================================================
 // ENTRY POINTS

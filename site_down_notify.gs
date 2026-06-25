@@ -504,7 +504,8 @@ function checkColC(sheet) {
     const coloredRaw = colorizeTeams(colCRaw);
     // Fix: split nội dung TRƯỚC khi bọc <pre></pre>
     // Tránh lỗi Telegram "Unclosed tag" khi split cắt giữa <pre>...</pre>
-    sendTelegramPre(controlId, coloredRaw, "[Tin1][CONTROL]");
+    // Edit-in-place: edit tin cũ trong ngày, gửi mới nếu chưa có hoặc tin dài
+    sendOrEditTelegramPre(controlId, coloredRaw, "TIN1_CONTROL", "[Tin1][CONTROL]");
   }
 
   // ② Mỗi Team: header chung + summary team đó + site của team đó
@@ -544,8 +545,8 @@ function checkColC(sheet) {
 
     // Tô màu team code trong tin nhắn
     const coloredContent = colorizeTeams(teamContent);
-    // Fix: dùng sendTelegramPre để mỗi chunk đều có <pre></pre> đúng
-    sendTelegramPre(chatId, coloredContent, "[Tin1][" + team + "]");
+    // Edit-in-place: edit tin cũ trong ngày, gửi mới nếu chưa có hoặc tin dài
+    sendOrEditTelegramPre(chatId, coloredContent, "TIN1_" + team, "[Tin1][" + team + "]");
   }
 
   // ③ TNI cá nhân → KHÔNG nhận Tin1 (site list), chỉ nhận Tin2 (summary)
@@ -616,7 +617,7 @@ function checkAwAz(sheet) {
     const chatId = SD_GROUPS[team];
     if (!chatId) continue;
     const msg = buildAwAzTeamMessage(team, ts, awaz, AWAZ_COL[team]);
-    sendTelegram(chatId, msg, "[Tin2][" + team + "]");
+    sendOrEditTelegram(chatId, msg, "TIN2_" + team, "[Tin2][" + team + "]");
   }
 
   // Gửi Tin 2 tổng hợp vào Control (HTML + emoji)
@@ -624,7 +625,7 @@ function checkAwAz(sheet) {
   if (controlId2) {
     try {
       const msg = buildAwAzControlMessage(ts, awaz);
-      sendTelegram(controlId2, msg, "[Tin2][CONTROL]");
+      sendOrEditTelegram(controlId2, msg, "TIN2_CONTROL", "[Tin2][CONTROL]");
     } catch(e) {
       Logger.log("[Tin2][CONTROL] ❌ Lỗi: " + e.message);
     }
@@ -634,7 +635,7 @@ function checkAwAz(sheet) {
   for (const pid of SD_PERSONAL_IDS) {
     try {
       const msgPersonal = buildAwAzControlMessage(ts, awaz);
-      sendTelegram(pid, msgPersonal, "[Tin2][TNI]");
+      sendOrEditTelegram(pid, msgPersonal, "TIN2_P_" + pid, "[Tin2][TNI]");
     } catch(e) {
       Logger.log("[Tin2][TNI] ❌ Lỗi: " + e.message);
     }
@@ -893,6 +894,199 @@ function buildAwAzControlMessage(ts, awaz) {
   return lines.join("\n");
 }
 
+
+
+// ============================================================
+// DELETE-OLD → SEND-NEW: Helpers
+// Mỗi lần có data mới → xóa tin cũ trong group → gửi tin mới
+// Lưu message_ids vào PropertiesService để xóa lần sau
+// ============================================================
+
+/** Ngày hôm nay theo giờ Myanmar (yyyy-MM-dd) */
+function getTodayStr_() {
+  return Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyy-MM-dd");
+}
+
+/** Lưu danh sách message_ids cho một key (hỗ trợ multi-chunk) */
+function saveMsgIds_(msgKey, messageIds) {
+  var key = "SD_MSGID_" + msgKey;
+  var val = JSON.stringify(messageIds) + "|" + getTodayStr_();
+  PropertiesService.getScriptProperties().setProperty(key, val);
+}
+
+/** Lấy danh sách message_ids đã lưu (bất kể ngày nào — để xóa tin cũ) */
+function getSavedMsgIds_(msgKey) {
+  var key = "SD_MSGID_" + msgKey;
+  var val = PropertiesService.getScriptProperties().getProperty(key) || "";
+  if (!val) return [];
+  var pipeIdx = val.lastIndexOf("|");
+  if (pipeIdx === -1) return [];
+  var jsonPart = val.substring(0, pipeIdx);
+  try { return JSON.parse(jsonPart); } catch(e) { return []; }
+}
+
+/** Xóa message_ids đã lưu */
+function clearMsgIds_(msgKey) {
+  PropertiesService.getScriptProperties().deleteProperty("SD_MSGID_" + msgKey);
+}
+
+/** Gọi Telegram deleteMessage — xóa 1 tin trong group */
+function deleteTelegramMsgBot_(chatId, messageId) {
+  var url = "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/deleteMessage";
+  try {
+    var resp = UrlFetchApp.fetch(url, {
+      method:             "post",
+      contentType:        "application/json",
+      payload:            JSON.stringify({ chat_id: chatId, message_id: messageId }),
+      muteHttpExceptions: true,
+    });
+    var res = JSON.parse(resp.getContentText());
+    if (res.ok) {
+      Logger.log("[delete] 🗑️ msg_id=" + messageId + " → " + chatId);
+    } else {
+      Logger.log("[delete] ⚠️ msg_id=" + messageId + ": " + (res.description || ""));
+    }
+    return res.ok === true;
+  } catch (e) {
+    Logger.log("[delete] ❌ " + e.message);
+    return false;
+  }
+}
+
+/** Xóa TẤT CẢ tin cũ đã lưu cho một key */
+function deleteOldMessages_(chatId, msgKey) {
+  var oldIds = getSavedMsgIds_(msgKey);
+  for (var i = 0; i < oldIds.length; i++) {
+    deleteTelegramMsgBot_(chatId, oldIds[i]);
+    if (i < oldIds.length - 1) Utilities.sleep(200);
+  }
+  if (oldIds.length > 0) clearMsgIds_(msgKey);
+}
+
+/** Gửi tin Telegram (HTML) + trả về array message_ids */
+function sendTelegramCollectIds_(chatId, text, tag) {
+  var url    = "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/sendMessage";
+  var chunks = splitMessage(text, 4000);
+  var ids    = [];
+  chunks.forEach(function(chunk, i) {
+    try {
+      var resp = UrlFetchApp.fetch(url, {
+        method:             "post",
+        contentType:        "application/json",
+        payload:            JSON.stringify({ chat_id: chatId, text: chunk, parse_mode: "HTML" }),
+        muteHttpExceptions: true,
+      });
+      var res = JSON.parse(resp.getContentText());
+      if (res.ok && res.result && res.result.message_id) {
+        ids.push(res.result.message_id);
+      }
+      Logger.log((tag||"") + (res.ok ? " ✅ OK→" : " ❌ ERR→") + chatId +
+        (chunks.length > 1 ? " [" + (i+1) + "/" + chunks.length + "]" : "") +
+        (!res.ok ? " | " + res.description : ""));
+    } catch (e) {
+      Logger.log((tag||"") + " ❌ " + e.message);
+    }
+  });
+  return ids;
+}
+
+/** Gửi tin Telegram <pre> + trả về array message_ids */
+function sendTelegramPreCollectIds_(chatId, plainContent, tag) {
+  var url      = "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/sendMessage";
+  var maxInner = 3800;
+  var escaped  = escHtml(plainContent);
+  var chunks   = splitMessage(escaped, maxInner);
+  var ids      = [];
+  chunks.forEach(function(chunk, i) {
+    var wrappedChunk = "<pre>" + chunk + "</pre>";
+    try {
+      var resp = UrlFetchApp.fetch(url, {
+        method:             "post",
+        contentType:        "application/json",
+        payload:            JSON.stringify({ chat_id: chatId, text: wrappedChunk, parse_mode: "HTML" }),
+        muteHttpExceptions: true,
+      });
+      var res = JSON.parse(resp.getContentText());
+      if (res.ok && res.result && res.result.message_id) {
+        ids.push(res.result.message_id);
+      }
+      Logger.log((tag||"") + (res.ok ? " ✅ OK→" : " ❌ ERR→") + chatId +
+        (chunks.length > 1 ? " [" + (i+1) + "/" + chunks.length + "]" : "") +
+        (!res.ok ? " | " + res.description : ""));
+    } catch (e) {
+      Logger.log((tag||"") + " ❌ " + e.message);
+    }
+    if (i < chunks.length - 1) Utilities.sleep(300);
+  });
+  return ids;
+}
+
+
+// ============================================================
+// DELETE-OLD → SEND-NEW WRAPPERS
+// Gọi từ checkColC / checkAwAz
+// ============================================================
+
+/**
+ * Xóa tin cũ → gửi tin mới (HTML mode)
+ * @param {string} chatId  - Telegram chat ID
+ * @param {string} text    - Nội dung HTML
+ * @param {string} msgKey  - Key duy nhất (VD: "TIN1_CONTROL", "TIN2_T1")
+ * @param {string} tag     - Log tag
+ */
+function sendOrEditTelegram(chatId, text, msgKey, tag) {
+  // 1. Xóa tin cũ
+  deleteOldMessages_(chatId, msgKey);
+
+  // 2. Gửi mới + lưu message_ids
+  var newIds = sendTelegramCollectIds_(chatId, text, tag);
+  if (newIds.length > 0) {
+    saveMsgIds_(msgKey, newIds);
+  }
+}
+
+/**
+ * Xóa tin cũ → gửi tin mới (<pre> mode)
+ * @param {string} chatId       - Telegram chat ID
+ * @param {string} plainContent - Nội dung plain text (sẽ được escape + bọc <pre>)
+ * @param {string} msgKey       - Key duy nhất
+ * @param {string} tag          - Log tag
+ */
+function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
+  // 1. Xóa tin cũ
+  deleteOldMessages_(chatId, msgKey);
+
+  // 2. Gửi mới + lưu message_ids
+  var newIds = sendTelegramPreCollectIds_(chatId, plainContent, tag);
+  if (newIds.length > 0) {
+    saveMsgIds_(msgKey, newIds);
+  }
+}
+
+
+// ============================================================
+// NOTE MESSAGE_IDS — Lưu/đọc message_ids của Note gửi bởi @Phongha79
+// botlookup_relay.py sẽ gọi GAS để lưu/đọc, rồi xóa Note cũ qua Telethon
+// ============================================================
+
+/** Lưu Note message_ids — gọi từ botlookup_relay.py */
+function handleSaveNoteMsgIds(body) {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty("SD_NOTE_MSGIDS", JSON.stringify(body.msgids || {}));
+  Logger.log("[Note] 💾 Saved Note msgids: " + JSON.stringify(body.msgids));
+  return json({ status: "ok" });
+}
+
+/** Đọc Note message_ids — gọi từ botlookup_relay.py */
+function handleGetNoteMsgIds() {
+  var props = PropertiesService.getScriptProperties();
+  var raw   = props.getProperty("SD_NOTE_MSGIDS") || "{}";
+  try {
+    return json({ status: "ok", msgids: JSON.parse(raw) });
+  } catch(e) {
+    return json({ status: "ok", msgids: {} });
+  }
+}
 
 
 // ============================================================
