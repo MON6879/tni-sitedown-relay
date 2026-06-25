@@ -193,6 +193,27 @@ def parse_mdg_fields(text: str) -> dict:
     return result
 
 
+# ── Inventory: field list ─────────────────────────────────────────────────
+INV_FIELDS_LIST = [
+    "inventory fuel", "dg id", "fuel cm", "fuel %",
+    "fuel level", "kwh", "rh", "note"
+]
+
+def parse_inv_fields(text: str) -> dict:
+    """Extract Inventory Fuel field values."""
+    result = {}
+    for field in INV_FIELDS_LIST:
+        word_pattern = r"\s+".join(re.escape(w) for w in field.split())
+        pattern = rf"(?i){word_pattern}\s*:\s*(.+?)(?=\n|$)"
+        m = re.search(pattern, text)
+        if m:
+            val = m.group(1).strip()
+            val = re.sub(r"^[:\s]+", "", val).strip()
+            result[field] = val
+    return result
+
+
+
 # ── Cable: detect type keyword ────────────────────────────────────────────
 def parse_cable_type(text: str) -> str:
     """Return Rescue / Request Change / Maintenance / Deploy (or empty)."""
@@ -445,11 +466,18 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
             if ref_m:
                 ref_id = ref_m.group(1)
 
+        action_name = "process_photo"
+        if msg.reply_to_message and msg.reply_to_message.text:
+            rt_upper = msg.reply_to_message.text.upper()
+            if "INVENTORY" in rt_upper:
+                action_name = "inv_add_photo"
+            elif "MDG" in rt_upper:
+                action_name = "mdg_add_photo"
+
         # ── Send file_id + tg_url to Apps Script (GAS downloads — no timeout) ──
-        # Vercel only has 10s; let Apps Script (6 min limit) handle the download
         filename = f"MDG_{sender_id}_{now.strftime('%Y%m%d_%H%M%S')}.jpg"
         result   = post_mdg_photo({
-            "action":      "mdg_add_photo",
+            "action":      action_name,
             "ref_id":      ref_id,
             "tg_url":      tg_url,
             "tg_file_id":  largest.file_id,
@@ -464,13 +492,14 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
 
         if status == "ok":
             photo_num = result.get("photoNum", "")
+            msg_type = result.get("type", "")
+            prefix = "⛽" if msg_type == "INV" else "📷"
             await bot.send_message(
                 chat_id,
-                f"📷 <b>REF:{ref_show}</b> | Photo {photo_num}/6 saved",
+                f"{prefix} <b>REF:{ref_show}</b> | Photo {photo_num} saved",
                 parse_mode="HTML",
             )
         elif status == "processing":
-            # GAS is processing in background — normal for large photos
             await bot.send_message(
                 chat_id,
                 f"📷 <b>REF:{ref_show}</b> | Photo submitted ⏳ (uploading to Drive...)",
@@ -494,23 +523,9 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
     if text.lower().startswith("/start"):
         await bot.send_message(
             chat_id,
-            "⚡ <b>TNI MDG Run Collector Bot</b>\n"
+            "⚡ <b>TNI MDG Run & Inventory Collector</b>\n"
             "━━━━━━━━━━━━━━━━━━━━━\n"
-            "📌 <b>Send MDG report in this format:</b>\n\n"
-            "<code>MDG ::Report\n"
-            "Date: 9/6/2026\n"
-            "Site ID: TNI00305\n"
-            "Branch : TNI\n"
-            "TEAM: Team01\n"
-            "MDG CODE: HYNUDAI\n"
-            "MDG Capacity: 5.5KVA\n"
-            "MDG Serial: DH420/070954324\n"
-            "DG start time: 6:00AM\n"
-            "DG end Time: 7:30AM\n"
-            "Total hours : 1.5\n"
-            "Staff Name: Bhone Htet Aung\n"
-            "Staff code: VCM855517\n"
-            "Remark: Main DG broken</code>\n\n"
+            "📌 <b>Send report in correct format</b>\n"
             "✅ <b>Confirm:</b> Reply bot message with <code>Confirm</code>\n"
             "📷 <b>Photo:</b> Send photo (reply to bot msg with REF) — max 6",
             parse_mode="HTML",
@@ -523,8 +538,12 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
         ref_m = re.search(r"REF:(\d+)", reply_text)
         if ref_m:
             ref_id = ref_m.group(1)
+            action_name = "mdg_confirm"
+            if "INVENTORY" in reply_text.upper():
+                action_name = "inv_confirm"
+            
             result = post_mdg_sheet({
-                "action":       "mdg_confirm",
+                "action":       action_name,
                 "ref_id":       ref_id,
                 "confirmed_by": sender_name,
                 "date":         now.strftime("%d/%m/%Y %H:%M"),
@@ -540,38 +559,67 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
                 await bot.send_message(chat_id, f"⚠️ Confirm failed: {err}", parse_mode="HTML")
         return
 
-    # ── MDG Report message ───────────────────────────────────────────────
-    # Trigger: text contains "MDG" (case-insensitive)
-    if "mdg" not in text.lower():
+    # ── Inventory Report message ─────────────────────────────────────────
+    if "inventory fuel" in text.lower():
+        fields = parse_inv_fields(text)
+        dg_id = fields.get("dg id", "")
+
+        payload = {
+            "action":      "inv_add",
+            "date":        now.strftime("%d/%m/%Y"),
+            "time":        now.strftime("%H:%M"),
+            "sender_name": sender_name,
+            "sender_id":   sender_id,
+            "fields":      fields,
+            "raw":         text,
+        }
+
+        result = post_mdg_sheet(payload)
+
+        if result.get("status") == "ok":
+            ref = result.get("ref") or str(result.get("row", "???")).zfill(5)
+            dg_show = html.escape(dg_id) if dg_id else "—"
+            await bot.send_message(
+                chat_id,
+                f"⛽ <b>REF:{ref}</b> | INVENTORY | {dg_show} | {now.strftime('%d/%m/%Y %H:%M')}\n"
+                f"✅ Reply <code>Confirm</code> to close | 📷 Photo → reply this msg",
+                parse_mode="HTML",
+            )
+        else:
+            err = html.escape(result.get("message", "Apps Script error"))
+            await bot.send_message(chat_id, f"⚠️ Failed to record: {err}", parse_mode="HTML")
         return
 
-    fields = parse_mdg_fields(text)
-    site_id = fields.get("site id", "")
+    # ── MDG Report message ───────────────────────────────────────────────
+    if "mdg" in text.lower():
+        fields = parse_mdg_fields(text)
+        site_id = fields.get("site id", "")
 
-    payload = {
-        "action":      "mdg_add",
-        "date":        now.strftime("%d/%m/%Y"),
-        "time":        now.strftime("%H:%M"),
-        "sender_name": sender_name,
-        "sender_id":   sender_id,
-        "fields":      fields,
-        "raw":         text,
-    }
+        payload = {
+            "action":      "mdg_add",
+            "date":        now.strftime("%d/%m/%Y"),
+            "time":        now.strftime("%H:%M"),
+            "sender_name": sender_name,
+            "sender_id":   sender_id,
+            "fields":      fields,
+            "raw":         text,
+        }
 
-    result = post_mdg_sheet(payload)
+        result = post_mdg_sheet(payload)
 
-    if result.get("status") == "ok":
-        ref = result.get("ref") or str(result.get("row", "???")).zfill(5)
-        site_show = html.escape(site_id) if site_id else "—"
-        await bot.send_message(
-            chat_id,
-            f"⚡ <b>REF:{ref}</b> | MDG | {site_show} | {now.strftime('%d/%m/%Y %H:%M')}\n"
-            f"✅ Reply <code>Confirm</code> to close | 📷 Photo → reply this msg",
-            parse_mode="HTML",
-        )
-    else:
-        err = html.escape(result.get("message", "Apps Script error"))
-        await bot.send_message(chat_id, f"⚠️ Failed to record: {err}", parse_mode="HTML")
+        if result.get("status") == "ok":
+            ref = result.get("ref") or str(result.get("row", "???")).zfill(5)
+            site_show = html.escape(site_id) if site_id else "—"
+            await bot.send_message(
+                chat_id,
+                f"⚡ <b>REF:{ref}</b> | MDG | {site_show} | {now.strftime('%d/%m/%Y %H:%M')}\n"
+                f"✅ Reply <code>Confirm</code> to close | 📷 Photo → reply this msg",
+                parse_mode="HTML",
+            )
+        else:
+            err = html.escape(result.get("message", "Apps Script error"))
+            await bot.send_message(chat_id, f"⚠️ Failed to record: {err}", parse_mode="HTML")
+        return
 
 
 # ============================================================

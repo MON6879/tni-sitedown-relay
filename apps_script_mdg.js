@@ -52,6 +52,48 @@ const MHEADERS = [
   "Photo 1","Photo 2","Photo 3","Photo 4","Photo 5","Photo 6"
 ];
 
+// ── Inventory Column index (1-based) ────────────────────────
+const INV_DATA_TAB  = "Inventory Main DG";
+const INV_PHOTO_DIR = "2.8 INVENTORY FUEL MAIN DG";
+
+const ICOL = {
+  REF:       1,   // A
+  CONFIRM:   2,   // B
+  REC_DATE:  3,   // C
+  REC_TIME:  4,   // D
+  INV_DATE:  5,   // E (Inventory Fuel)
+  DG_ID:     6,   // F
+  FUEL_CM:   7,   // G
+  FUEL_PCT:  8,   // H
+  FUEL_LVL:  9,   // I
+  KWH:       10,  // J
+  RH:        11,  // K
+  NOTE:      12,  // L
+  SENDER:    13,  // M
+  SENDER_ID: 14,  // N
+  RAW:       15,  // O
+  PHOTO_1:   16,  // P
+  PHOTO_2:   17,
+  PHOTO_3:   18,
+  PHOTO_4:   19,
+  PHOTO_5:   20,
+  PHOTO_6:   21,
+  PHOTO_7:   22,
+  PHOTO_8:   23,
+  PHOTO_9:   24,
+  PHOTO_10:  25,
+  PHOTO_11:  26,
+  PHOTO_12:  27,
+};
+const IPHOTO_COLS  = [16,17,18,19,20,21,22,23,24,25,26,27];
+const ITOTAL_COLS = 27;
+const IHEADERS = [
+  "REF","Confirm Complete","Recorded Date","Recorded Time",
+  "Inventory Fuel","DG ID","Fuel Cm","Fuel %","Fuel Level",
+  "KWh","RH","Note","Sender Name","Sender ID","Raw Content",
+  "Photo 1","Photo 2","Photo 3","Photo 4","Photo 5","Photo 6",
+  "Photo 7","Photo 8","Photo 9","Photo 10","Photo 11","Photo 12"
+];
 // ============================================================
 // ENTRY POINTS
 // ============================================================
@@ -61,7 +103,11 @@ function doPostMdg_(e) {
     const action = body.action || "";
     if (action === "mdg_add")       return mdgAdd(body);
     if (action === "mdg_confirm")   return mdgConfirm(body);
-    if (action === "mdg_add_photo") return mdgAddPhoto(body);
+    if (action === "mdg_add_photo") return processPhoto(body, "MDG"); // Explicit MDG
+    if (action === "inv_add")       return invAdd(body);
+    if (action === "inv_confirm")   return invConfirm(body);
+    if (action === "inv_add_photo") return processPhoto(body, "INV"); // Explicit INV
+    if (action === "process_photo") return processPhoto(body, "AUTO"); // Auto-detect
     if (action === "mdg_get_stats") return mdgGetStats(body);
     return json({ status:"error", message:"Unknown action: "+action });
   } catch(err) { return json({ status:"error", message:err.message }); }
@@ -112,6 +158,24 @@ function ensureMdgHeaders_(ss) {
     sh.setFrozenRows(1);
     sh.setColumnWidth(MCOL.RAW,300);
     PHOTO_COLS.forEach(c => sh.setColumnWidth(c,120));
+  }
+}
+
+function getInvSheet_(ss) {
+  let sh = ss.getSheetByName(INV_DATA_TAB);
+  if (!sh) sh = ss.insertSheet(INV_DATA_TAB);
+  return sh;
+}
+function ensureInvHeaders_(ss) {
+  const sh = getInvSheet_(ss);
+  const fv = sh.getRange(1,1).getValue();
+  if (!fv || fv.toString().trim()==="") {
+    const hdr = sh.getRange(1,1,1,ITOTAL_COLS);
+    hdr.setValues([IHEADERS]);
+    hdr.setFontWeight("bold").setBackground("#FF6F00").setFontColor("#FFFFFF");
+    sh.setFrozenRows(1);
+    sh.setColumnWidth(ICOL.RAW,300);
+    IPHOTO_COLS.forEach(c => sh.setColumnWidth(c,120));
   }
 }
 
@@ -256,128 +320,217 @@ function mdgConfirm(body) {
 }
 
 // ============================================================
-// MDG ADD PHOTO  (GAS downloads from Telegram — no Python timeout)
+// INV ADD
 // ============================================================
-function mdgAddPhoto(body) {
+function invAdd(body) {
+  try {
+    const ss  = SpreadsheetApp.openById(MDG_SHEET_ID);
+    const sh  = getInvSheet_(ss);
+    ensureInvHeaders_(ss);
+    const f   = body.fields || {};
+    const last= Math.max(sh.getLastRow(),1);
+    const nr  = last+1;
+    const ref = String(last).padStart(5,"0");
+    const rd  = new Array(ITOTAL_COLS).fill("");
+    
+    rd[ICOL.REF      -1] = ref;
+    rd[ICOL.CONFIRM  -1] = "";
+    rd[ICOL.REC_DATE -1] = body.date        || "";
+    rd[ICOL.REC_TIME -1] = body.time        || "";
+    rd[ICOL.INV_DATE -1] = f["inventory fuel"]|| "";
+    rd[ICOL.DG_ID    -1] = f["dg id"]       || "";
+    rd[ICOL.FUEL_CM  -1] = f["fuel cm"]     || "";
+    rd[ICOL.FUEL_PCT -1] = f["fuel %"]      || "";
+    rd[ICOL.FUEL_LVL -1] = f["fuel level"]  || "";
+    rd[ICOL.KWH      -1] = f["kwh"]         || "";
+    rd[ICOL.RH       -1] = f["rh"]          || "";
+    rd[ICOL.NOTE     -1] = f["note"]        || "";
+    rd[ICOL.SENDER   -1] = body.sender_name || "";
+    rd[ICOL.SENDER_ID-1] = body.sender_id   || "";
+    rd[ICOL.RAW      -1] = body.raw         || "";
+
+    sh.getRange(nr,1,1,ITOTAL_COLS).setValues([rd]);
+
+    // Force INV_DATE as text
+    if (rd[ICOL.INV_DATE-1]) {
+      const dc = sh.getRange(nr, ICOL.INV_DATE);
+      dc.setNumberFormat("@"); dc.setValue(rd[ICOL.INV_DATE-1]);
+    }
+
+    if (nr%2===0) sh.getRange(nr,1,1,ITOTAL_COLS).setBackground("#FFF3E0");
+    Logger.log("✅ INV added REF="+ref+" row="+nr);
+    return json({ status:"ok", ref:ref, row:last });
+  } catch(err) { Logger.log("❌ inv_add: "+err.message); return json({ status:"error", message:err.message }); }
+}
+
+// ============================================================
+// INV CONFIRM
+// ============================================================
+function invConfirm(body) {
+  try {
+    const ss  = SpreadsheetApp.openById(MDG_SHEET_ID);
+    const sh  = getInvSheet_(ss);
+    const rid = String(body.ref_id||"").trim();
+    if (!rid) return json({ status:"error", message:"ref_id required" });
+    const lr  = sh.getLastRow();
+    if (lr<2) return json({ status:"error", message:"No data" });
+    const rc  = sh.getRange(2,ICOL.REF,lr-1,1).getValues();
+    for (let i=0;i<rc.length;i++) {
+      if (String(rc[i][0]||"").replace(/^0+/,"")===rid.replace(/^0+/,"")) {
+        const r=i+2;
+        sh.getRange(r,ICOL.CONFIRM).setValue("✅ "+body.confirmed_by+" "+body.date);
+        sh.getRange(r,1,1,ITOTAL_COLS).setBackground("#D4EDDA");
+        return json({ status:"ok", ref:rid, row:r });
+      }
+    }
+    return json({ status:"error", message:"REF not found: "+rid });
+  } catch(err) { return json({ status:"error", message:err.message }); }
+}
+
+// ============================================================
+// ADD PHOTO  (GAS downloads from Telegram — no Python timeout)
+// ============================================================
+function processPhoto(body, modeStr) {
   try {
     const ss      = SpreadsheetApp.openById(MDG_SHEET_ID);
-    const sh      = getMdgSheet_(ss);
+    const mdgSh   = getMdgSheet_(ss);
+    const invSh   = getInvSheet_(ss);
     const refId   = String(body.ref_id   ||"").trim();
     const senderId= String(body.sender_id||"").trim();
+    const now     = new Date();
 
-    // ── 1. Download photo (3 methods, fallback chain) ─────────
+    // ── Helper: Tìm row mới nhất theo Sender ID trong 30 phút ──
+    const findLatest = (sh, colSender, colDate, colTime) => {
+      const lr = sh.getLastRow();
+      if (lr < 2) return { row: -1, msDiff: 9999999999 };
+      const sc = sh.getRange(2, colSender, lr-1, 1).getValues();
+      const dc = sh.getRange(2, colDate, lr-1, 1).getValues();
+      const tc = sh.getRange(2, colTime, lr-1, 1).getValues();
+      for (let i = sc.length - 1; i >= 0; i--) {
+        if (String(sc[i][0] || "") === senderId) {
+          try { 
+            const d = new Date(dc[i][0] + " " + tc[i][0]);
+            const diff = now - d;
+            if (diff < 30 * 60 * 1000) return { row: i + 2, msDiff: diff };
+          } catch(e) {}
+        }
+      }
+      return { row: -1, msDiff: 9999999999 };
+    };
+
+    let targetType = "UNKNOWN";
+    let targetRow = -1;
+    let targetSheet = null;
+
+    // ── 1. Xác định Target ────────────────────────────────────
+    if (modeStr === "MDG" || modeStr === "INV") {
+      targetType = modeStr;
+      targetSheet = modeStr === "MDG" ? mdgSh : invSh;
+      const sh = targetSheet;
+      const refCol = modeStr === "MDG" ? MCOL.REF : ICOL.REF;
+      const senderCol = modeStr === "MDG" ? MCOL.SENDER_ID : ICOL.SENDER_ID;
+      const dateCol = modeStr === "MDG" ? MCOL.REC_DATE : ICOL.REC_DATE;
+      const timeCol = modeStr === "MDG" ? MCOL.REC_TIME : ICOL.REC_TIME;
+
+      if (refId) {
+        const lr = sh.getLastRow();
+        if (lr > 1) {
+          const rc = sh.getRange(2, refCol, lr-1, 1).getValues();
+          for (let i = 0; i < rc.length; i++) {
+            if (String(rc[i][0]||"").replace(/^0+/,"") === refId.replace(/^0+/,"")) {
+              targetRow = i + 2; break;
+            }
+          }
+        }
+      }
+      if (targetRow < 0 && senderId) {
+        targetRow = findLatest(sh, senderCol, dateCol, timeCol).row;
+      }
+    } else {
+      // AUTO MODE: tìm sheet nào có báo cáo gần nhất trong 30 phút
+      const mdgMatch = findLatest(mdgSh, MCOL.SENDER_ID, MCOL.REC_DATE, MCOL.REC_TIME);
+      const invMatch = findLatest(invSh, ICOL.SENDER_ID, ICOL.REC_DATE, ICOL.REC_TIME);
+      
+      if (mdgMatch.row > 0 && invMatch.row > 0) {
+        if (mdgMatch.msDiff <= invMatch.msDiff) {
+          targetType = "MDG"; targetRow = mdgMatch.row; targetSheet = mdgSh;
+        } else {
+          targetType = "INV"; targetRow = invMatch.row; targetSheet = invSh;
+        }
+      } else if (mdgMatch.row > 0) {
+        targetType = "MDG"; targetRow = mdgMatch.row; targetSheet = mdgSh;
+      } else if (invMatch.row > 0) {
+        targetType = "INV"; targetRow = invMatch.row; targetSheet = invSh;
+      }
+    }
+
+    if (targetRow < 0) {
+      return json({ status:"error", message: "Cannot find recent report (within 30 mins) for Sender: " + senderId });
+    }
+
+    // ── 2. Download photo (3 methods, fallback chain) ─────────
     let blob = null;
     let errA = "skipped", errB = "skipped", errC = "skipped";
 
-    // Method A: tg_url trực tiếp (Python đã tính sẵn)
     if (body.tg_url) {
       try {
         const r = UrlFetchApp.fetch(body.tg_url, {muteHttpExceptions:true});
-        if (r.getResponseCode() === 200) {
-          blob = r.getBlob();
-          Logger.log("✅ Method A: tg_url OK");
-        } else {
-          errA = "HTTP " + r.getResponseCode();
-          Logger.log("⚠️ Method A: " + errA);
-        }
-      } catch(e) { errA = "EX:" + e.message; Logger.log("⚠️ Method A error: "+e.message); }
-    } else { errA = "no tg_url"; }
+        if (r.getResponseCode() === 200) { blob = r.getBlob(); Logger.log("✅ Method A: tg_url OK"); }
+        else errA = "HTTP " + r.getResponseCode();
+      } catch(e) { errA = "EX:" + e.message; }
+    } else errA = "no tg_url";
 
-    // Method B: Gọi Telegram getFile API → fresh URL (nếu A bị 404)
     if (!blob && body.tg_file_id) {
       try {
         const botToken = MDG_BOT_TOKEN;
         if (botToken) {
-          const apiUrl  = "https://api.telegram.org/bot" + botToken
-                        + "/getFile?file_id=" + encodeURIComponent(body.tg_file_id);
+          const apiUrl = "https://api.telegram.org/bot" + botToken + "/getFile?file_id=" + encodeURIComponent(body.tg_file_id);
           const apiResp = UrlFetchApp.fetch(apiUrl, {muteHttpExceptions:true});
-          const apiText = apiResp.getContentText();
-          const apiData = JSON.parse(apiText);
+          const apiData = JSON.parse(apiResp.getContentText());
           if (apiData.ok) {
-            const freshUrl = "https://api.telegram.org/file/bot" + botToken
-                           + "/" + apiData.result.file_path;
+            const freshUrl = "https://api.telegram.org/file/bot" + botToken + "/" + apiData.result.file_path;
             const r2 = UrlFetchApp.fetch(freshUrl, {muteHttpExceptions:true});
-            if (r2.getResponseCode() === 200) {
-              blob = r2.getBlob();
-              Logger.log("✅ Method B: getFile+fresh URL OK");
-            } else {
-              errB = "download HTTP " + r2.getResponseCode();
-              Logger.log("⚠️ Method B: " + errB);
-            }
-          } else {
-            errB = "API err:" + (apiData.error_code||"?") + " " + (apiData.description||apiText.substring(0,80));
-            Logger.log("⚠️ Method B: getFile failed: " + errB);
-          }
-        } else { errB = "no token"; }
-      } catch(e) { errB = "EX:" + e.message; Logger.log("⚠️ Method B error: "+e.message); }
-    } else if (!blob) { errB = "no file_id"; }
+            if (r2.getResponseCode() === 200) { blob = r2.getBlob(); Logger.log("✅ Method B OK"); }
+            else errB = "download HTTP " + r2.getResponseCode();
+          } else errB = "API err:" + apiData.error_code;
+        } else errB = "no token";
+      } catch(e) { errB = "EX:" + e.message; }
+    } else if (!blob) errB = "no file_id";
 
-    // Method C: base64 (Python đã download sẵn — fallback cuối)
     if (!blob && body.photo_b64) {
       try {
         const bytes = Utilities.base64Decode(body.photo_b64);
         blob = Utilities.newBlob(bytes, "image/jpeg", body.filename || "photo.jpg");
-        Logger.log("✅ Method C: base64 OK");
-      } catch(e) { errC = "EX:" + e.message; Logger.log("⚠️ Method C error: "+e.message); }
-    } else if (!blob) { errC = "no b64"; }
+      } catch(e) { errC = "EX:" + e.message; }
+    } else if (!blob) errC = "no b64";
 
-    if (!blob) {
-      const errMsg = "A=" + errA + " | B=" + errB + " | C=" + errC;
-      Logger.log("❌ All failed: " + errMsg);
-      return json({ status:"error", message: errMsg });
-    }
+    if (!blob) return json({ status:"error", message: "A=" + errA + " | B=" + errB + " | C=" + errC });
 
-    // ── 2. Upload lên Drive ───────────────────────────────────
-    const folder = getMdgFolder_();
+    // ── 3. Upload lên Drive ───────────────────────────────────
+    const folder = targetType === "MDG" ? getMdgFolder_() : getInvFolder_();
     const df     = folder.createFile(blob);
     df.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     const link   = df.getUrl();
-    Logger.log("✅ Photo uploaded: "+link);
 
-    // ── 3. Tìm target row ─────────────────────────────────────
-    const lr = sh.getLastRow();
-    let tRow = -1, mRef = refId||null;
-    if (refId && lr>1) {
-      const rc = sh.getRange(2,MCOL.REF,lr-1,1).getValues();
-      for (let i=0;i<rc.length;i++)
-        if (String(rc[i][0]||"").replace(/^0+/,"")===refId.replace(/^0+/,"")) { tRow=i+2; break; }
-    }
-    // Fallback: sender_id trong 30 phút
-    if (tRow<0 && senderId && lr>1) {
-      const now=new Date();
-      const sc=sh.getRange(2,MCOL.SENDER_ID,lr-1,1).getValues();
-      const dc=sh.getRange(2,MCOL.REC_DATE, lr-1,1).getValues();
-      const tc=sh.getRange(2,MCOL.REC_TIME, lr-1,1).getValues();
-      for (let i=sc.length-1;i>=0;i--) {
-        if (String(sc[i][0]||"")===senderId) {
-          try { const d=new Date(dc[i][0]+" "+tc[i][0]); if((now-d)<30*60*1000){tRow=i+2;break;} }
-          catch(_){tRow=i+2;break;}
-        }
+    // ── 4. Ghi =HYPERLINK() ───────────────────────────────────
+    const targetCols = targetType === "MDG" ? PHOTO_COLS : IPHOTO_COLS;
+    const refCol = targetType === "MDG" ? MCOL.REF : ICOL.REF;
+    let mRef = String(targetSheet.getRange(targetRow, refCol).getValue()).trim();
+    if (!mRef) mRef = refId || "?";
+
+    let photoNum = 0;
+    for (let i = 0; i < targetCols.length; i++) {
+      const cell = targetSheet.getRange(targetRow, targetCols[i]);
+      if (!cell.getValue()) {
+        photoNum = i + 1;
+        cell.setFormula('=HYPERLINK("' + link + '","Photo ' + photoNum + '")');
+        cell.setFontColor("#1155CC").setFontLine("underline");
+        break;
       }
     }
-    if (tRow<0) tRow=lr;
-
-    // ── 4. Ghi =HYPERLINK() vào cột Photo trống đầu tiên ─────
-    if (tRow>0) {
-      const rv = sh.getRange(tRow,MCOL.REF).getValue();
-      if (rv) mRef = String(rv).trim();
-
-      let photoNum = 0;
-      for (let i=0;i<PHOTO_COLS.length;i++) {
-        const cell = sh.getRange(tRow, PHOTO_COLS[i]);
-        if (!cell.getValue()) {
-          photoNum = i+1;
-          cell.setFormula('=HYPERLINK("'+link+'","Photo '+photoNum+'")');
-          cell.setFontColor("#1155CC").setFontLine("underline");
-          Logger.log("✅ HYPERLINK at col "+PHOTO_COLS[i]+" (Photo "+photoNum+") REF:"+mRef);
-          break;
-        }
-      }
-      if (photoNum===0) return json({ status:"error", message:"Max 6 photos reached for REF:"+mRef });
-      return json({ status:"ok", link:link, attached:true, ref:mRef, photoNum:photoNum });
-    }
-    return json({ status:"ok", link:link, attached:false, ref:mRef });
-  } catch(err) { Logger.log("❌ mdg_add_photo: "+err.message); return json({ status:"error", message:err.message }); }
+    if (photoNum === 0) return json({ status:"error", message: "Max photos reached for REF:" + mRef });
+    return json({ status:"ok", link:link, attached:true, ref:mRef, photoNum:photoNum, type: targetType });
+  } catch(err) { Logger.log("❌ processPhoto: "+err.message); return json({ status:"error", message:err.message }); }
 }
 
 // ============================================================
@@ -406,6 +559,12 @@ function getMdgFolder_() {
   const root=pi.hasNext()?pi.next():DriveApp.getRootFolder();
   const fi=root.getFoldersByName(MDG_PHOTO_DIR);
   return fi.hasNext()?fi.next():root.createFolder(MDG_PHOTO_DIR);
+}
+function getInvFolder_() {
+  const pi=DriveApp.getFoldersByName("1 VCM BRANCH TNI");
+  const root=pi.hasNext()?pi.next():DriveApp.getRootFolder();
+  const fi=root.getFoldersByName(INV_PHOTO_DIR);
+  return fi.hasNext()?fi.next():root.createFolder(INV_PHOTO_DIR);
 }
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
