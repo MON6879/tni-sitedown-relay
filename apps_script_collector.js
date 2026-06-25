@@ -68,11 +68,15 @@ function doPost(e) {
         body.action === "cable_add_photo" ||
         body.action === "cable_get_stats")   return doPostCable_(e);
 
-    // ── MDG Collector ─────────────────────────────────────────────────────
+    // ── MDG + Inventory Collector ──────────────────────────────────────────
     if (body.action === "mdg_add" ||
         body.action === "mdg_confirm" ||
         body.action === "mdg_add_photo" ||
-        body.action === "mdg_get_stats")     return doPostMdg_(e);
+        body.action === "mdg_get_stats" ||
+        body.action === "inv_add" ||
+        body.action === "inv_confirm" ||
+        body.action === "inv_add_photo" ||
+        body.action === "process_photo")     return doPostMdg_(e);
 
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
