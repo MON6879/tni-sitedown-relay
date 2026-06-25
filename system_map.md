@@ -29,6 +29,7 @@ Trong `apps_script_collector.js`:
 | **Config** | `1236389870` | Keywords (col A), Chat ID authorized (col D), Asset recipients (col C) |
 | **Data** | DATA_TAB | Collector bot lưu tin nhắn Order/Revoke/Export... |
 | **Input task** | `1755404595` | Nội dung task cho E75:E87. Col B=Dep, Col D=content, Col J=Done date |
+| **Team leader Plan** | `835972075` | ⚠️ ĐÃ CHUYỂN → xem sheet `1C8hU8SXpOdq` tab "Team leader assign Plan" |
 
 ### Task remain — Cấu trúc row (ĐÃ XÁC NHẬN từ screenshot 07/06/2026)
 
@@ -98,6 +99,7 @@ Trong `apps_script_collector.js`:
 | [search_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/api/search_bot.py) | **Vercel webhook** | Bot tra cứu TNI + Daily Report — 24/7 miễn phí |
 | [collector.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/api/collector.py) | **Vercel webhook** | Bot thu thập — lưu Order/Revoke... vào Sheet |
 | [cron_send.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/cron_send.py) | **GitHub Actions** | Gửi task remain hàng ngày 17:30 — dùng SEND_BOT cho tất cả |
+| [daily_plan_report.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/daily_plan_report.py) | **GitHub Actions** | Thu thập Daily Plan từ TL → Sheet + gửi report 3Day/7Day/Month 17:30 |
 | [send_now.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/send_now.py) | **GitHub Actions** | Gửi search stats + asset stats + D75:E87 custom |
 | [telegram_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/telegram_bot.py) | ~~GitHub Actions~~ | ⚠️ ĐÃ THAY THẾ bởi `api/search_bot.py` (Vercel webhook) |
 | [apps_script_collector.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_collector.js) | **Apps Script** | Backend xử lý dữ liệu Sheet |
@@ -133,6 +135,7 @@ Trong `apps_script_collector.js`:
 | Workflow | File | Schedule | Script |
 |---|---|---|---|
 | **Daily Task Reminder (17:30 Myanmar)** | `daily_task.yml` | `0 11 * * *` UTC = 17:30 Myanmar | `cron_send.py` |
+| **Daily Plan Report (17:30 Myanmar)** | `daily_plan_report.yml` | `0 11 * * *` UTC = 17:30 Myanmar | `daily_plan_report.py` |
 | Gửi thông báo task | `daily_send.yml` | `30 10 * * *` UTC = 17:00 Myanmar | `send_now.py` |
 | **Botlookup TNI Relay** | `botlookup_relay.yml` | `0,30 22,23 * * *` + `0,30 0-14 * * *` + `0 15 * * *` UTC = 04:30–21:30 Myanmar mỗi 30p | `botlookup_relay.py` |
 | ~~TNI Search Bot 24/7~~ | `tni_search_bot.yml` | **⚠️ ĐÃ TẮT** — chuyển sang Vercel webhook (`api/search_bot.py`) | ~~`telegram_bot.py`~~ |

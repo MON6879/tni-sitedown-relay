@@ -97,6 +97,52 @@ Telegram Groups (per-team + consolidated to CONTROL)
 - ⚠️ **Must deploy manually** via Google Apps Script Editor → Deploy → New version
 
 ### 4. `check_read_status.py` — Quick Read Check (manual)
+
+### 5. `daily_plan_report.py` — Daily Plan Collection & Report (17:30 Myanmar)
+- **Trigger:** GitHub Actions `daily_plan_report.yml` (cron + workflow_dispatch)
+- **Schedule:** 17:30 Myanmar = 11:00 UTC
+- **API:** Telethon (read messages) + SEND_BOT (send reports) + Apps Script (sheet I/O)
+- **Sheet:** `1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y` (cùng spreadsheet Daily Report)
+- **Tab:** "Team leader assign Plan" (GID: 853981745)
+- **Collects:** Any message containing "Daily Plan" from T1/T2/T3/T4 groups
+- **Columns:** A=REF, B=Date, C=Team, D=Daily Plan, E=Daily Report results (B:S), F=Comparison
+- **Comparison:** Extract TNI site codes from Plan vs Daily Report → done/remaining count
+- **Reports:** 3Day/7Day/Month stats + Plan vs Actual comparison
+
+#### Per Team Group (T1, T2, T3, T4):
+```
+📋 DAILY PLAN REPORT — Team4 Kawthoung
+📅 26/06/2026  |  🕐 17:30
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Plan Stats: 3Day: 1/1/1 | 7Day: 7 | Month: 25
+
+📝 Today's Plan:
+──────────
+I. Hot task Rescue Cell down: TNI0052, TNI0288
+
+📊 Plan vs Actual:
+📋 Plan: 8 stations
+✅ Done: 5 stations (62%)
+⏳ Remaining: 3 stations
+Missing: TNI0052, TNI0185, TNI0058
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+#### CONTROL Group — Consolidated:
+```
+📋 DAILY PLAN REPORT — Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏷️ Team1 Dawei:
+   Plan: 10 | Done: 8 (80%) | Remain: 2
+   3Day: 1/1/1 | 7Day: 7 | Month: 25
+🏷️ Team2 Myeik:
+   ❌ No plan today
+   3Day: 0/0/0 | 7Day: 3 | Month: 15
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 Total: Plan: 24 | Done: 19 (79%) | Remain: 5
+📊 3Day: 1/1/1 | 7Day: 10 | Month: 40
+```
+
 - One-time check: who read last message in each group
 - Uses Telethon
 
@@ -156,6 +202,7 @@ Telegram Groups (per-team + consolidated to CONTROL)
 | Time | Script | Workflow | What |
 |---|---|---|---|
 | **17:30** | `cron_send.py` | `daily_task.yml` | Task + Asset + Search reports to all groups |
+| **17:30** | `daily_plan_report.py` | `daily_plan_report.yml` | Daily Plan collection + 3Day/7Day/Month report |
 | **20:30** | `daily_read_report.py` | `daily_read_report.yml` | Note read status per-person to teams + CONTROL |
 
 ---
@@ -219,6 +266,7 @@ python daily_read_report.py
 | File | Schedule | Script |
 |---|---|---|
 | `daily_task.yml` | workflow_dispatch (GAS trigger) | `cron_send.py` |
+| `daily_plan_report.yml` | 11:00 UTC (17:30 Myanmar) + manual | `daily_plan_report.py` |
 | `daily_read_report.yml` | 14:00 UTC (20:30 Myanmar) + manual | `daily_read_report.py` |
 | `botlookup_relay.yml` | — | `botlookup_relay.py` |
 | `send_teams_telethon.yml` | — | `send_teams_telethon.py` |

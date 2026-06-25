@@ -57,7 +57,10 @@ function doPost(e) {
     // ── Daily Report Collector ─────────────────────────────────────────────
     if (body.action === "daily_add" ||
         body.action === "daily_photo" ||
-        body.action === "sync_headers")      return doPostDaily_(e);
+        body.action === "sync_headers" ||
+        body.action === "store_daily_plan" ||
+        body.action === "get_daily_plans" ||
+        body.action === "get_daily_reports")  return doPostDaily_(e);
 
     // ── Cable Collector ───────────────────────────────────────────────────
     if (body.action === "cable_add" ||
@@ -1689,3 +1692,4 @@ function getNoteB2B5() {
     return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
   }
 }
+

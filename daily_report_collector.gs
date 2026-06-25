@@ -45,6 +45,10 @@ function doPostDaily_(e) {
     if (body.action === "daily_add")    return handleDailyAdd(body);
     if (body.action === "daily_photo")  return handleDailyPhoto(body);
     if (body.action === "sync_headers") return handleSyncHeaders();
+    // ── Daily Plan ──
+    if (body.action === "store_daily_plan")   return handleStoreDailyPlan(body);
+    if (body.action === "get_daily_plans")    return handleGetDailyPlans();
+    if (body.action === "get_daily_reports")  return handleGetDailyReports(body);
     return jsonOut({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
     return jsonOut({ status: "error", message: err.message });
@@ -353,4 +357,151 @@ function testGetFields() {
 function testLookup() {
   const ss = SpreadsheetApp.openById(DAILY_SHEET_ID);
   Logger.log("Name: " + lookupEmployeeName_(ss, "6859790680"));
+}
+
+// ============================================================
+// DAILY PLAN — Team leader assign Plan tab (GID: 853981745)
+// ============================================================
+
+const DAILY_PLAN_TAB = "Team leader assign Plan";
+
+/**
+ * Store a daily plan entry with comparison data.
+ * Payload: { action: "store_daily_plan", date, team, content, daily_report, comparison }
+ * Auto-generates REF. Dedup by date+team.
+ */
+function handleStoreDailyPlan(body) {
+  try {
+    const ss = SpreadsheetApp.openById(DAILY_SHEET_ID);
+    let sheet = ss.getSheetByName(DAILY_PLAN_TAB);
+    if (!sheet) {
+      sheet = ss.insertSheet(DAILY_PLAN_TAB);
+      sheet.getRange(1, 1, 1, 6).setValues(
+        [["REF", "Date", "Team", "Daily Plan", "Daily Report", "Comparison"]]
+      );
+      sheet.getRange(1, 1, 1, 6).setFontWeight("bold");
+    }
+
+    const date       = (body.date       || "").toString().trim();
+    const team       = (body.team       || "").toString().trim();
+    const content    = (body.content    || "").toString().trim();
+    const report     = (body.daily_report || "").toString().trim();
+    const comparison = (body.comparison || "").toString().trim();
+
+    if (!date || !team) {
+      return jsonOut({ status: "error", message: "Missing date or team" });
+    }
+
+    // Dedup: same date + team?
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      const existing = sheet.getRange(2, 2, lastRow - 1, 2).getValues();
+      for (let i = 0; i < existing.length; i++) {
+        const exDate = existing[i][0].toString().trim();
+        const exTeam = existing[i][1].toString().trim();
+        if (exDate === date && exTeam.toLowerCase() === team.toLowerCase()) {
+          // Update existing row E and F if new data
+          if (report)     sheet.getRange(i + 2, 5).setValue(report);
+          if (comparison) sheet.getRange(i + 2, 6).setValue(comparison);
+          return jsonOut({ status: "ok", message: "Updated existing", ref: sheet.getRange(i + 2, 1).getValue(), duplicate: true });
+        }
+      }
+    }
+
+    const refNum = lastRow;
+    const ref = "DP-" + String(refNum).padStart(3, "0");
+    sheet.appendRow([ref, date, team, content, report, comparison]);
+
+    return jsonOut({ status: "ok", ref: ref });
+  } catch (err) {
+    return jsonOut({ status: "error", message: err.message });
+  }
+}
+
+/**
+ * Get all daily plan entries.
+ * Returns array of { ref, date, team, content, daily_report, comparison }
+ */
+function handleGetDailyPlans() {
+  try {
+    const ss = SpreadsheetApp.openById(DAILY_SHEET_ID);
+    const sheet = ss.getSheetByName(DAILY_PLAN_TAB);
+    if (!sheet || sheet.getLastRow() < 2) {
+      return jsonOut({ status: "ok", plans: [] });
+    }
+
+    const lastRow = sheet.getLastRow();
+    const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+    const plans = [];
+
+    for (let i = 0; i < data.length; i++) {
+      const ref        = data[i][0].toString().trim();
+      const date       = data[i][1].toString().trim();
+      const team       = data[i][2].toString().trim();
+      const content    = data[i][3].toString().trim();
+      const report     = data[i][4].toString().trim();
+      const comparison = data[i][5].toString().trim();
+      if (date || team) {
+        plans.push({ ref, date, team, content, daily_report: report, comparison });
+      }
+    }
+
+    return jsonOut({ status: "ok", plans: plans });
+  } catch (err) {
+    return jsonOut({ status: "error", message: err.message });
+  }
+}
+
+/**
+ * Get daily report entries from "Daily report and Bussiness" tab.
+ * Payload: { action: "get_daily_reports", date: "26/06/2026" }
+ * Returns data from columns B:S filtered by date in col C (Daily report date).
+ */
+function handleGetDailyReports(body) {
+  try {
+    const ss = SpreadsheetApp.openById(DAILY_SHEET_ID);
+    const sheet = ss.getSheetByName(DAILY_SHEET_NAME);
+    if (!sheet || sheet.getLastRow() < 2) {
+      return jsonOut({ status: "ok", reports: [] });
+    }
+
+    const filterDate = (body.date || "").toString().trim();
+    const lastRow = sheet.getLastRow();
+    // Read B:S = columns 2 to 19
+    const data = sheet.getRange(2, 2, lastRow - 1, 18).getValues();
+    // Read header row for field names
+    const headers = sheet.getRange(1, 2, 1, 18).getValues()[0];
+    const reports = [];
+
+    for (let i = 0; i < data.length; i++) {
+      const empName  = data[i][0].toString().trim();   // B = col 0 in range
+      const dateCell = data[i][1].toString().trim();   // C = col 1 in range
+      const tgId     = data[i][16].toString().trim();  // R = col 16 in range
+      const empName2 = data[i][17].toString().trim();  // S = col 17 in range
+
+      if (!empName && !tgId) continue;
+
+      // Filter by date if provided
+      if (filterDate && dateCell && !dateCell.includes(filterDate)) continue;
+
+      // Build fields object from all columns
+      const fields = {};
+      for (let c = 0; c < headers.length; c++) {
+        const hdr = headers[c].toString().trim();
+        const val = data[i][c].toString().trim();
+        if (hdr && val) fields[hdr] = val;
+      }
+
+      reports.push({
+        name: empName || empName2,
+        telegram_id: tgId,
+        date: dateCell,
+        fields: fields
+      });
+    }
+
+    return jsonOut({ status: "ok", reports: reports });
+  } catch (err) {
+    return jsonOut({ status: "error", message: err.message });
+  }
 }
