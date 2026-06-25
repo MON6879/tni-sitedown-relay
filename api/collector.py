@@ -200,7 +200,10 @@ INV_FIELDS_LIST = [
 ]
 
 def parse_inv_fields(text: str) -> dict:
-    """Extract Inventory Fuel field values."""
+    """Extract Inventory Fuel field values.
+    Numeric fields: chỉ lấy số, bỏ đơn vị (vd: '19cm'→'19', '15%'→'15').
+    """
+    NUMERIC_FIELDS = {"fuel cm", "fuel %", "fuel level", "kwh", "rh"}
     result = {}
     for field in INV_FIELDS_LIST:
         word_pattern = r"\s+".join(re.escape(w) for w in field.split())
@@ -209,6 +212,10 @@ def parse_inv_fields(text: str) -> dict:
         if m:
             val = m.group(1).strip()
             val = re.sub(r"^[:\s]+", "", val).strip()
+            if field in NUMERIC_FIELDS:
+                # Chỉ giữ lại số và dấu chấm thập phân, bỏ đơn vị
+                num = re.sub(r"[^\d.]", "", val)
+                val = num if num else val
             result[field] = val
     return result
 
