@@ -203,16 +203,23 @@ async def main():
             old_note_ids = {}
             if gas_url:
                 try:
-                    nr = requests.get(gas_url, params={"action": "get_note_msgids"}, timeout=30)
-                    nd = nr.json()
-                    old_note_ids = nd.get("msgids", {})
-                    if old_note_ids:
-                        print(f"[{myanmar_now()}] 📋 Note cũ: {old_note_ids}")
+                    nr = requests.get(gas_url, params={"action": "get_note_msgids"}, timeout=30, allow_redirects=True)
+                    print(f"[{myanmar_now()}] 📋 get_note_msgids HTTP {nr.status_code} | body={nr.text[:300]}")
+                    if nr.status_code == 200:
+                        nd = nr.json()
+                        old_note_ids = nd.get("msgids", {})
+                        if old_note_ids:
+                            print(f"[{myanmar_now()}] 📋 Note cũ cần xóa: {old_note_ids}")
+                        else:
+                            print(f"[{myanmar_now()}] ℹ️ Không có Note cũ lưu trong GAS (lần đầu hoặc bị mất)")
+                    else:
+                        print(f"[{myanmar_now()}] ⚠️ get_note_msgids HTTP lỗi: {nr.status_code}")
                 except Exception as ex:
                     print(f"[{myanmar_now()}] ⚠️ Đọc Note cũ lỗi: {ex}")
 
             # ── 11b. Xóa Note cũ + Gửi Note mới ──
             new_note_ids = {}
+            deleted_count = 0
             print(f"[{myanmar_now()}] 📨 Gửi Note từ @{me.username} đến {len(ALL_GROUPS)} nhóm (reply vào alarm)...")
             for gname, gid in ALL_GROUPS.items():
                 try:
@@ -220,10 +227,13 @@ async def main():
                     old_id = old_note_ids.get(gname)
                     if old_id:
                         try:
-                            await client.delete_messages(gid, [int(old_id)])
-                            print(f"[{myanmar_now()}] 🗑️ Xóa Note cũ msg_id={old_id} trong {gname}")
+                            result = await client.delete_messages(gid, [int(old_id)])
+                            deleted_count += 1
+                            print(f"[{myanmar_now()}] 🗑️ Xóa Note cũ msg_id={old_id} trong {gname} → OK")
                         except Exception as ex_del:
-                            print(f"[{myanmar_now()}] ⚠️ Xóa Note {gname} lỗi: {ex_del}")
+                            print(f"[{myanmar_now()}] ⚠️ Xóa Note {gname} msg_id={old_id} lỗi: {ex_del}")
+                    else:
+                        print(f"[{myanmar_now()}] ℹ️ {gname}: không có Note cũ để xóa")
 
                     # Tìm tin alarm mới nhất trong nhóm để reply vào
                     reply_to_id = None
@@ -253,15 +263,30 @@ async def main():
                 except Exception as ex:
                     print(f"[{myanmar_now()}] ⚠️ Note → {gname} lỗi: {ex}")
 
+            print(f"[{myanmar_now()}] 📊 Xóa Note cũ: {deleted_count}/{len(ALL_GROUPS)} | Gửi mới: {len(new_note_ids)}/{len(ALL_GROUPS)}")
+
             # ── 11c. Lưu Note message_ids mới vào GAS ──
             if new_note_ids and gas_url:
                 try:
-                    requests.post(
+                    save_resp = requests.post(
                         gas_url,
                         json={"action": "save_note_msgids", "msgids": new_note_ids},
-                        timeout=30
+                        timeout=30,
+                        allow_redirects=True
                     )
-                    print(f"[{myanmar_now()}] 💾 Lưu Note msgids: {new_note_ids}")
+                    print(f"[{myanmar_now()}] 💾 save_note_msgids HTTP {save_resp.status_code} | body={save_resp.text[:200]}")
+                    # Verify: đọc lại để xác nhận lưu thành công
+                    try:
+                        verify_resp = requests.get(gas_url, params={"action": "get_note_msgids"}, timeout=15, allow_redirects=True)
+                        if verify_resp.status_code == 200:
+                            vd = verify_resp.json()
+                            saved = vd.get("msgids", {})
+                            if saved == new_note_ids:
+                                print(f"[{myanmar_now()}] ✅ Verify OK — msgids lưu đúng: {saved}")
+                            else:
+                                print(f"[{myanmar_now()}] ⚠️ Verify MISMATCH! Saved={saved} vs Expected={new_note_ids}")
+                    except Exception as vex:
+                        print(f"[{myanmar_now()}] ⚠️ Verify đọc lại lỗi: {vex}")
                 except Exception as ex:
                     print(f"[{myanmar_now()}] ⚠️ Lưu Note msgids lỗi: {ex}")
         else:
