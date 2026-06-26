@@ -192,49 +192,58 @@ async def main():
                 print(f"[{myanmar_now()}] ⚠️ Lấy Note lỗi: {ex}")
 
 
-        # ── 11. @Phongha79 gửi Note đến TẤT CẢ groups — REPLY vào tin alarm ──
+        # ── 11. Xóa Note cũ + Gửi Note mới từ @Phongha79 ──
         # Gửi từ tài khoản cá nhân → Telegram cho phép xem ai đã đọc
-        # Xóa Note cũ trước khi gửi mới → tránh loãng group
+        # LUÔN xóa Note cũ, ngay cả khi B2:B5 rỗng/không hợp lệ
+
+        # ── 11a. Đọc Note message_ids cũ từ GAS ──
+        old_note_ids = {}
+        if gas_url:
+            try:
+                nr = requests.get(gas_url, params={"action": "get_note_msgids"}, timeout=30, allow_redirects=True)
+                print(f"[{myanmar_now()}] 📋 get_note_msgids HTTP {nr.status_code} | body={nr.text[:300]}")
+                if nr.status_code == 200:
+                    nd = nr.json()
+                    old_note_ids = nd.get("msgids", {})
+                    if old_note_ids:
+                        print(f"[{myanmar_now()}] 📋 Note cũ cần xóa: {old_note_ids}")
+                    else:
+                        print(f"[{myanmar_now()}] ℹ️ Không có Note cũ lưu trong GAS (lần đầu hoặc bị mất)")
+                else:
+                    print(f"[{myanmar_now()}] ⚠️ get_note_msgids HTTP lỗi: {nr.status_code}")
+            except Exception as ex:
+                print(f"[{myanmar_now()}] ⚠️ Đọc Note cũ lỗi: {ex}")
+
+        # ── 11b. Xóa Note cũ (LUÔN xóa, dù B2:B5 trống) ──
+        deleted_count = 0
+        if old_note_ids:
+            for gname, gid in ALL_GROUPS.items():
+                old_id = old_note_ids.get(gname)
+                if old_id:
+                    try:
+                        await client.delete_messages(gid, [int(old_id)])
+                        deleted_count += 1
+                        print(f"[{myanmar_now()}] 🗑️ Xóa Note cũ msg_id={old_id} trong {gname} → OK")
+                    except Exception as ex_del:
+                        print(f"[{myanmar_now()}] ⚠️ Xóa Note {gname} msg_id={old_id} lỗi: {ex_del}")
+            # Clear saved IDs sau khi xóa
+            if deleted_count > 0 and gas_url:
+                try:
+                    requests.post(gas_url, json={"action": "save_note_msgids", "msgids": {}}, timeout=15, allow_redirects=True)
+                    print(f"[{myanmar_now()}] 🧹 Clear Note msgids sau khi xóa {deleted_count} tin cũ")
+                except Exception:
+                    pass
+            print(f"[{myanmar_now()}] 📊 Xóa Note cũ: {deleted_count}/{len(old_note_ids)}")
+
+        # ── 11c. Gửi Note mới (chỉ khi có text) ──
         if note_text:
             print(f"[{myanmar_now()}] ⏳ Chờ 5s để alarm kịp vào các nhóm...")
             await asyncio.sleep(5)
 
-            # ── 11a. Đọc Note message_ids cũ từ GAS ──
-            old_note_ids = {}
-            if gas_url:
-                try:
-                    nr = requests.get(gas_url, params={"action": "get_note_msgids"}, timeout=30, allow_redirects=True)
-                    print(f"[{myanmar_now()}] 📋 get_note_msgids HTTP {nr.status_code} | body={nr.text[:300]}")
-                    if nr.status_code == 200:
-                        nd = nr.json()
-                        old_note_ids = nd.get("msgids", {})
-                        if old_note_ids:
-                            print(f"[{myanmar_now()}] 📋 Note cũ cần xóa: {old_note_ids}")
-                        else:
-                            print(f"[{myanmar_now()}] ℹ️ Không có Note cũ lưu trong GAS (lần đầu hoặc bị mất)")
-                    else:
-                        print(f"[{myanmar_now()}] ⚠️ get_note_msgids HTTP lỗi: {nr.status_code}")
-                except Exception as ex:
-                    print(f"[{myanmar_now()}] ⚠️ Đọc Note cũ lỗi: {ex}")
-
-            # ── 11b. Xóa Note cũ + Gửi Note mới ──
             new_note_ids = {}
-            deleted_count = 0
             print(f"[{myanmar_now()}] 📨 Gửi Note từ @{me.username} đến {len(ALL_GROUPS)} nhóm (reply vào alarm)...")
             for gname, gid in ALL_GROUPS.items():
                 try:
-                    # Xóa Note cũ trong nhóm này
-                    old_id = old_note_ids.get(gname)
-                    if old_id:
-                        try:
-                            result = await client.delete_messages(gid, [int(old_id)])
-                            deleted_count += 1
-                            print(f"[{myanmar_now()}] 🗑️ Xóa Note cũ msg_id={old_id} trong {gname} → OK")
-                        except Exception as ex_del:
-                            print(f"[{myanmar_now()}] ⚠️ Xóa Note {gname} msg_id={old_id} lỗi: {ex_del}")
-                    else:
-                        print(f"[{myanmar_now()}] ℹ️ {gname}: không có Note cũ để xóa")
-
                     # Tìm tin alarm mới nhất trong nhóm để reply vào
                     reply_to_id = None
                     try:
@@ -263,9 +272,9 @@ async def main():
                 except Exception as ex:
                     print(f"[{myanmar_now()}] ⚠️ Note → {gname} lỗi: {ex}")
 
-            print(f"[{myanmar_now()}] 📊 Xóa Note cũ: {deleted_count}/{len(ALL_GROUPS)} | Gửi mới: {len(new_note_ids)}/{len(ALL_GROUPS)}")
+            print(f"[{myanmar_now()}] 📊 Gửi Note mới: {len(new_note_ids)}/{len(ALL_GROUPS)}")
 
-            # ── 11c. Lưu Note message_ids mới vào GAS ──
+            # ── 11d. Lưu Note message_ids mới vào GAS ──
             if new_note_ids and gas_url:
                 try:
                     save_resp = requests.post(
@@ -290,7 +299,7 @@ async def main():
                 except Exception as ex:
                     print(f"[{myanmar_now()}] ⚠️ Lưu Note msgids lỗi: {ex}")
         else:
-            print(f"[{myanmar_now()}] ℹ️ B2:B5 trống — bỏ qua gửi Note")
+            print(f"[{myanmar_now()}] ℹ️ B2:B5 trống — bỏ qua gửi Note (Note cũ đã xóa ở trên)")
 
 
         print(f"[{myanmar_now()}] ✅ Xong tất cả.")
