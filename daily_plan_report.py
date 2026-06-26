@@ -243,9 +243,12 @@ def get_report_data() -> dict:
 def build_emp_compact_line(emp: dict) -> str:
     """
     Format gọn 1 dòng cho nhân viên:
-      👤 Tin Maung Win: rank: 13 | Close: 4% <0/1/0> | WO remain: 24 | Task: 0:0/0/0
+      🟢 Tin Maung Win-myt_tinmaung.win: rank:13 | Close:4% <0/1/0> | WO remain:24 | Task:0:0/0/0
+      🔴 Khant Chaw Nyo-myt_khantchaw.nyo: rank:8 | Close:0% <0/0/0> | WO remain:18 | Task:0:0/0/0
+    🟢 = có WO close trong 3 ngày qua, 🔴 = không có WO nào (0/0/0)
     """
     name      = emp.get("name", "?")
+    sys_name  = emp.get("sys_name", "")
     rank      = emp.get("rank", 0)
     close_pct = emp.get("close_pct", 0)
     wo_d0     = emp.get("wo_d0", 0)
@@ -253,8 +256,15 @@ def build_emp_compact_line(emp: dict) -> str:
     wo_d2     = emp.get("wo_d2", 0)
     wo_remain = emp.get("wo_remain", 0)
     assign_mo = emp.get("assign_month_close", 0)
+
+    # Tên hiển thị: Name-sys_name
+    display_name = f"{name}-{sys_name}" if sys_name else name
+
+    # Màu theo 3day WO: 🟢 nếu có bất kỳ ngày nào > 0, 🔴 nếu tất cả 0/0/0
+    color = "🟢" if (wo_d0 > 0 or wo_d1 > 0 or wo_d2 > 0) else "🔴"
+
     return (
-        f"👤 {name}: rank:{rank} | Close:{close_pct}% "
+        f"{color} {display_name}: rank:{rank} | Close:{close_pct}% "
         f"<{wo_d2}/{wo_d1}/{wo_d0}> | WO remain:{wo_remain} "
         f"| Task:{assign_mo}:{wo_d2}/{wo_d1}/{wo_d0}"
     )
