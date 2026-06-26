@@ -85,17 +85,28 @@ def myanmar_now() -> datetime:
 
 
 def is_daily_plan_msg(text: str) -> bool:
-    """Check if message contains 'Daily Plan' (case-insensitive)."""
-    return bool(text and "daily plan" in text.lower())
+    """
+    Nhận dạng tin plan linh hoạt:
+    - Dòng đầu có chữ 'plan' (bất kỳ vị trí, case-insensitive)
+    - Và có ngày tháng (dạng d/m/yyyy hoặc dd/mm/yyyy) ở BẤT KỲ chỗ trong tin
+    Ví dụ hợp lệ: 'Team04 Plan ( 27/6/2026 )', 'Plan Team4 27/6/2026', 'Daily Plan: 26/06/2026'
+    """
+    if not text:
+        return False
+    first_line = text.strip().split("\n")[0].lower()
+    has_plan_word = "plan" in first_line
+    has_date = bool(re.search(r'\d{1,2}/\d{1,2}/\d{2,4}', text))
+    return has_plan_word and has_date
 
 
 def parse_daily_plan(text: str) -> dict | None:
     """
-    Parse a Daily Plan message into {date, team, content}.
-    Expected format:
-      Daily Plan: 26/06/2026
-      Team 4
-      I. Hot task Rescue Cell down: ...
+    Parse một tin plan (liệt linh hoạt) thành {date, team, content}.
+
+    Các định dạng được hỗ trợ:
+      Daily Plan: 26/06/2026          (cú pháp cũ)
+      Team04 Plan ( 27/6/2026 )       (cú pháp mới)
+      Plan Team4 27/6/2026            (bất kỳ thứ tự nào)
     """
     if not text:
         return None
@@ -104,35 +115,48 @@ def parse_daily_plan(text: str) -> dict | None:
     if not lines:
         return None
 
-    # Extract date: "Daily Plan: DD/MM/YYYY"
+    # Extract date: tìm ngày trong toàn bộ tin (flexible)
     date_str = ""
-    date_match = re.search(r'Daily\s+Plan[:\s]+(\d{1,2}/\d{1,2}/\d{2,4})', lines[0], re.IGNORECASE)
+    date_match = re.search(r'(\d{1,2}/\d{1,2}/\d{2,4})', text)
     if date_match:
         date_str = date_match.group(1)
+        # Chuẩn hoá thành dd/mm/yyyy nếu thiếu zero-padding
+        parts = date_str.split("/")
+        if len(parts) == 3:
+            d, m, y = parts
+            if len(y) == 2:
+                y = "20" + y
+            date_str = f"{d.zfill(2)}/{m.zfill(2)}/{y}"
     else:
-        date_match2 = re.search(r'(\d{1,2}/\d{1,2}/\d{4})', text)
-        if date_match2:
-            date_str = date_match2.group(1)
-        else:
-            date_str = myanmar_now().strftime("%d/%m/%Y")
+        date_str = myanmar_now().strftime("%d/%m/%Y")
 
-    # Extract team: "Team X"
+    # Extract team: tìm Team + số trong dòng đầu hoặc toàn bộ text
     team_str = ""
     team_line_idx = 0
-    for i, line in enumerate(lines):
-        team_match = re.match(r'^\s*(Team\s*\d+)\s*$', line.strip(), re.IGNORECASE)
-        if team_match:
-            team_str = team_match.group(1).strip()
-            team_line_idx = i
-            break
 
-    if not team_str:
-        team_match2 = re.search(r'(Team\s*\d+)', text, re.IGNORECASE)
-        if team_match2:
-            team_str = team_match2.group(1).strip()
+    # Ưu tiên tìm trong dòng đầu (dạng 'Team04', 'Team 4', 'T4')
+    team_match_first = re.search(
+        r'\b(Team\s*0?([1-5]))', lines[0], re.IGNORECASE
+    )
+    if team_match_first:
+        team_str = team_match_first.group(1).strip()
+        team_line_idx = 0
+    else:
+        # Tìm trong các dòng tiếp theo
+        for i, line in enumerate(lines[1:], start=1):
+            team_match = re.match(r'^\s*(Team\s*0?[1-5])\s*$', line.strip(), re.IGNORECASE)
+            if team_match:
+                team_str = team_match.group(1).strip()
+                team_line_idx = i
+                break
+        if not team_str:
+            team_match2 = re.search(r'(Team\s*0?[1-5])', text, re.IGNORECASE)
+            if team_match2:
+                team_str = team_match2.group(1).strip()
 
-    # Content: everything after team line
-    start_idx = team_line_idx + 1 if team_str and team_line_idx > 0 else 1
+    # Content: lấy mọi thứ sau dòng header (dòng đầu có 'plan')
+    # Nếu team nằm dòng riêng (không phải dòng đầu), bỏ qua dòng đó luôn
+    start_idx = max(1, team_line_idx + 1 if team_line_idx > 0 else 1)
     content_lines = []
     for i in range(start_idx, len(lines)):
         line = lines[i].strip()
