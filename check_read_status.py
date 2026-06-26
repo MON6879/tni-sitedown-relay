@@ -117,7 +117,7 @@ async def check_and_report(client, key, group_info):
     # ── Send report to group ──────────────────────────────
     report_text = "\n".join(report_lines)
     try:
-        await delete_old_messages_telethon(client, info["id"], GAS_URL, f"READSTATUS_{key}")
+        await delete_old_messages_telethon(client, chat_id, GAS_URL, f"READSTATUS_{key}")
         sent = await client.send_message(
             entity,
             report_text,

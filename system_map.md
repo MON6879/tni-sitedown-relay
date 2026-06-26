@@ -492,7 +492,7 @@ SAI:   clasp deploy                 ← tạo deployment mới chưa có quyền
 
 | Biến | URL |
 |---|---|
-| `APPS_SCRIPT_URL` | `https://script.google.com/macros/s/AKfycbzvQrwvk7N0bc2Bh-lZEnLxRE6Lx8NE4xffUmZJSkUg4EdquSKYPg9VfD1VXTfkim2gFg/exec` |
+| `APPS_SCRIPT_URL` | `https://script.google.com/macros/s/AKfycbzGFdnESGcSMt0Of7PrBIOHDXmuLCZsiraGv5iNzWrw4rjdxm8CGBDuVIP8pnPEkAULww/exec` |
 | Script ID | `1rvgWwrAMDbqtmqwOfqzguXB7m9snA5UZeOs9iGu64VJbejlNAkH2m6uR` |
 | Search Log GID | `1426553697` |
 

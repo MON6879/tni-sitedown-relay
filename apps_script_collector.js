@@ -1452,13 +1452,17 @@ const TG_SEND_TOKEN  = '8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A';
 const SEND_TAB_NAME  = 'SEND_TELEGRAM';
 
 function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('📲 Gửi Telegram')
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('📲 Gửi Telegram')
     .addItem('🆕 Tạo Sheet Gửi',   'setupSendTelegramSheet')
     .addItem('📤 Gửi tin nhắn',    'sendTelegramBulk')
     .addItem('🗑️ Xóa kết quả',    'clearTelegramResults')
     .addItem('🧪 Test 1 tin nhắn', 'sendTestMessage')
     .addToUi();
+
+  if (typeof drRegisterMenu_ === "function") {
+    drRegisterMenu_(ui);
+  }
 }
 
 function setupSendTelegramSheet() {

@@ -237,32 +237,50 @@ async def main():
 
         # ── 11c. Gửi Note mới (chỉ khi có text) ──
         if note_text:
-            print(f"[{myanmar_now()}] ⏳ Chờ 5s để alarm kịp vào các nhóm...")
-            await asyncio.sleep(5)
+            print(f"[{myanmar_now()}] ⏳ Chờ 3s trước khi bắt đầu quét alarm...")
+            await asyncio.sleep(3)
 
             new_note_ids = {}
             print(f"[{myanmar_now()}] 📨 Gửi Note từ @{me.username} đến {len(ALL_GROUPS)} nhóm (reply vào alarm)...")
             for gname, gid in ALL_GROUPS.items():
                 try:
-                    # Tìm tin alarm mới nhất trong nhóm để reply vào
+                    # Tìm tin alarm mới nhất trong nhóm để reply vào (retry tối đa 6 lần, mỗi lần cách nhau 3s)
                     reply_to_id = None
-                    try:
-                        grp_hist = await client(GetHistoryRequest(
-                            peer=gid, limit=15,
-                            offset_date=None, offset_id=0,
-                            max_id=0, min_id=0, add_offset=0, hash=0,
-                        ))
-                        for m in grp_hist.messages:
-                            if m.message and (
-                                "SITE_DOWN" in m.message.upper() or
-                                "site down" in m.message.lower() or
-                                "Site down" in m.message
-                            ):
-                                reply_to_id = m.id
-                                print(f"[{myanmar_now()}] 🔗 Tìm thấy alarm msg_id={reply_to_id} trong {gname}")
+                    for attempt in range(6):
+                        try:
+                            grp_hist = await client(GetHistoryRequest(
+                                peer=gid, limit=15,
+                                offset_date=None, offset_id=0,
+                                max_id=0, min_id=0, add_offset=0, hash=0,
+                            ))
+                            now_utc = datetime.now(timezone.utc)
+                            for m in grp_hist.messages:
+                                if m.message and (
+                                    "SITE_DOWN" in m.message.upper() or
+                                    "site down" in m.message.lower() or
+                                    "Site down" in m.message
+                                ):
+                                    # Bỏ qua tin nhắn do chính tài khoản này gửi (tránh reply nhầm vào Note cũ)
+                                    if m.sender_id == me.id:
+                                        continue
+                                    # Bỏ qua tin SUMMARY tổng hợp (chỉ reply vào tin chi tiết TNI Site down)
+                                    if "SUMMARY" in m.message.upper() or "TỔNG HỢP" in m.message.upper():
+                                        continue
+                                    # Chỉ nhận tin nhắn mới gửi trong vòng 5 phút (300s)
+                                    msg_date = m.date
+                                    if msg_date.tzinfo is None:
+                                        msg_date = msg_date.replace(tzinfo=timezone.utc)
+                                    if (now_utc - msg_date).total_seconds() < 300:
+                                        reply_to_id = m.id
+                                        print(f"[{myanmar_now()}] 🔗 [Lần {attempt+1}] Tìm thấy alarm msg_id={reply_to_id} trong {gname}")
+                                        break
+                            if reply_to_id:
                                 break
-                    except Exception as ex_hist:
-                        print(f"[{myanmar_now()}] ⚠️ Đọc lịch sử {gname} lỗi: {ex_hist}")
+                        except Exception as ex_hist:
+                            print(f"[{myanmar_now()}] ⚠️ [Lần {attempt+1}] Đọc lịch sử {gname} lỗi: {ex_hist}")
+                        
+                        if attempt < 5:
+                            await asyncio.sleep(3)
 
                     sent_msg = await client.send_message(gid, note_text, reply_to=reply_to_id)
                     new_note_ids[gname] = sent_msg.id
