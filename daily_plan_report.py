@@ -656,15 +656,16 @@ async def main():
                 f"| 7Day: {stats['d7']} | Month: {stats['month']}",
             ]
 
-            # ── Phần Team Leader: Plan + Plan vs Actual (chỉ vậy thôi) ──
+            # ── Phần Team Leader: chỉ đếm TNI + Plan vs Actual ──
             if stats["today_plans"]:
-                lines.append("")
-                lines.append("📝 Today's Plan:")
-                lines.append(sub_divider)
+                # Đếm tổng TNI codes trong plan hôm nay
+                all_plan_tni = set()
                 for tp in stats["today_plans"]:
-                    lines.append(tp.get("content", ""))
+                    all_plan_tni |= extract_tni_codes(tp.get("content", ""))
+                plan_count_tni = len(all_plan_tni)
+                lines.append(f"📝 Plan: {plan_count_tni} stations"
+                             + (f" ({', '.join(sorted(all_plan_tni))})" if all_plan_tni else ""))
                 if comp and comp.get("plan_count", 0) > 0:
-                    lines.append("")
                     lines.append("📊 Plan vs Actual:")
                     lines.append(comp["comparison_text"])
             else:
