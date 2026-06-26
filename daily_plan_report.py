@@ -231,6 +231,35 @@ def get_daily_plans() -> list:
     return data.get("plans", [])
 
 
+def get_report_data() -> dict:
+    """Get employee/leader stats từ Apps Script (rank, close%, WO remain, task close)."""
+    data = call_apps_script({"action": "get_report_data"}, timeout=120)
+    if data.get("status") != "ok":
+        logger.warning(f"get_report_data failed: {data.get('message', 'unknown')}")
+        return {}
+    return data
+
+
+def build_emp_compact_line(emp: dict) -> str:
+    """
+    Format gọn 1 dòng cho nhân viên:
+      👤 Tin Maung Win: rank: 13 | Close: 4% <0/1/0> | WO remain: 24 | Task: 0:0/0/0
+    """
+    name      = emp.get("name", "?")
+    rank      = emp.get("rank", 0)
+    close_pct = emp.get("close_pct", 0)
+    wo_d0     = emp.get("wo_d0", 0)
+    wo_d1     = emp.get("wo_d1", 0)
+    wo_d2     = emp.get("wo_d2", 0)
+    wo_remain = emp.get("wo_remain", 0)
+    assign_mo = emp.get("assign_month_close", 0)
+    return (
+        f"👤 {name}: rank:{rank} | Close:{close_pct}% "
+        f"<{wo_d2}/{wo_d1}/{wo_d0}> | WO remain:{wo_remain} "
+        f"| Task:{assign_mo}:{wo_d2}/{wo_d1}/{wo_d0}"
+    )
+
+
 # ── Daily Report data from Sheet ────────────────────────────────
 
 def get_team_member_mapping() -> dict:
@@ -587,6 +616,22 @@ async def main():
     all_plans = get_daily_plans()
     logger.info(f"  📊 Total plans in sheet: {len(all_plans)}")
 
+    # ── Step 4b: Get employee stats từ Apps Script ──
+    logger.info("📊 Fetching employee stats (rank/close/WO remain)...")
+    report_data = get_report_data()
+    # Gom nhân viên theo team key
+    team_emp_map: dict[str, list] = {}  # "T1"→[emp,...]
+    for emp in report_data.get("employees", []):
+        tk = emp.get("team", "")
+        # Chuẩn hoá: MYT_TNI_TEAM01_Dawei → T1
+        if "TEAM01" in tk.upper() or "TEAM1" in tk.upper(): tk = "T1"
+        elif "TEAM02" in tk.upper() or "TEAM2" in tk.upper() or "TEAM05" in tk.upper() or "TEAM5" in tk.upper(): tk = "T2"
+        elif "TEAM03" in tk.upper() or "TEAM3" in tk.upper(): tk = "T3"
+        elif "TEAM04" in tk.upper() or "TEAM4" in tk.upper(): tk = "T4"
+        if tk in ("T1","T2","T3","T4"):
+            team_emp_map.setdefault(tk, []).append(emp)
+    logger.info(f"  📋 Employees mapped: { {k: len(v) for k,v in team_emp_map.items()} }")
+
     # ── Step 5: Build and send reports ──
     if not SEND_BOT_TOKEN:
         logger.error("SEND_BOT_TOKEN not set — cannot send reports")
@@ -599,9 +644,9 @@ async def main():
         # ── 5a. Send per-team reports ──
         for group_key, chat_id in GROUPS.items():
             team_name = GROUP_NAMES.get(group_key, group_key)
-            stats = build_plan_stats(all_plans, team_filter=group_key)
-            comp = team_comparisons.get(group_key)
-            team_reps = team_reports.get(group_key, [])  # daily report của nhân viên
+            stats     = build_plan_stats(all_plans, team_filter=group_key)
+            comp      = team_comparisons.get(group_key)
+            emps      = team_emp_map.get(group_key, [])  # danh sách nhân viên
 
             lines = [
                 f"📋 DAILY PLAN REPORT — {team_name}",
@@ -611,34 +656,31 @@ async def main():
                 f"| 7Day: {stats['d7']} | Month: {stats['month']}",
             ]
 
+            # ── Phần Team Leader: Plan + Plan vs Actual (chỉ vậy thôi) ──
             if stats["today_plans"]:
                 lines.append("")
                 lines.append("📝 Today's Plan:")
                 lines.append(sub_divider)
                 for tp in stats["today_plans"]:
                     lines.append(tp.get("content", ""))
-
-                # Comparison section
-                if comp:
+                if comp and comp.get("plan_count", 0) > 0:
                     lines.append("")
                     lines.append("📊 Plan vs Actual:")
                     lines.append(comp["comparison_text"])
             else:
-                lines.append("")
                 lines.append("❌ No Daily Plan submitted today")
 
-            # ── Thêm phần tổng hợp daily report nhân viên ──
-            if team_reps:
-                lines.append("")
-                lines.append(sub_divider)
-                lines.append(f"📝 Daily Reports ({len(team_reps)} members):")
-                lines.append(sub_divider)
-                for rep in team_reps:
-                    lines.append(rep)
-                    lines.append("")  # blank line giữa các NV
+            # ── Phần nhân viên: chỉ rank / close% / WO remain / Task Close Month ──
+            lines.append("")
+            lines.append(sub_divider)
+            if emps:
+                lines.append(f"📋 Employee Stats ({len(emps)} members):")
+                # Sắp xếp theo rank tăng dần (rank nhỏ = tốt hơn)
+                sorted_emps = sorted(emps, key=lambda e: e.get("rank", 999))
+                for emp in sorted_emps:
+                    lines.append(build_emp_compact_line(emp))
             else:
-                lines.append("")
-                lines.append("❌ No Daily Reports submitted today")
+                lines.append("❌ No employee stats available")
 
             lines.append(divider)
 
