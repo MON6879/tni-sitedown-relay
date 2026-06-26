@@ -240,15 +240,17 @@ def get_report_data() -> dict:
     return data
 
 
-def build_emp_compact_line(emp: dict) -> str:
+def build_emp_compact_line(emp: dict, daily_counts: dict | None = None) -> str:
     """
     Format gọn 1 dòng cho nhân viên:
-      🟢 Tin Maung Win-myt_tinmaung.win: rank:13 | Close:4% <0/1/0> | WO remain:24 | Task:0:0/0/0
-      🔴 Khant Chaw Nyo-myt_khantchaw.nyo: rank:8 | Close:0% <0/0/0> | WO remain:18 | Task:0:0/0/0
-    🟢 = có WO close trong 3 ngày qua, 🔴 = không có WO nào (0/0/0)
+      🟢 Tin Maung Win-myt_tinmaung.win: rank:13 | Close:4% <0/1/0> | WO remain:24 | Task:0:0/0/0 | Daily:0/1/0 7D:1 M:5
+      🔴 Khant Chaw Nyo-myt_khantchaw.nyo: rank:21 | Close:0% <0/0/0> | WO remain:15 | Task:0:0/0/0 | Daily:0/0/0 7D:0 M:0
+    🟢 = có WO close trong 3 ngày qua, 🔴 = 0/0/0
+    daily_counts: { tg_id: {d0,d1,d2,d7,month} } — số lần nộp daily result
     """
     name      = emp.get("name", "?")
     sys_name  = emp.get("sys_name", "")
+    tg_id     = str(emp.get("telegram_id", emp.get("tg_id", ""))).replace(".0", "")
     rank      = emp.get("rank", 0)
     close_pct = emp.get("close_pct", 0)
     wo_d0     = emp.get("wo_d0", 0)
@@ -260,13 +262,22 @@ def build_emp_compact_line(emp: dict) -> str:
     # Tên hiển thị: Name-sys_name
     display_name = f"{name}-{sys_name}" if sys_name else name
 
-    # Màu theo 3day WO: 🟢 nếu có bất kỳ ngày nào > 0, 🔴 nếu tất cả 0/0/0
+    # Màu theo 3day WO
     color = "🟢" if (wo_d0 > 0 or wo_d1 > 0 or wo_d2 > 0) else "🔴"
+
+    # Daily result counts (số lần nộp daily report)
+    dr_part = ""
+    if daily_counts and tg_id and tg_id in daily_counts:
+        dc = daily_counts[tg_id]
+        dr_part = (
+            f" | Daily:{dc['d2']}/{dc['d1']}/{dc['d0']} "
+            f"7D:{dc['d7']} M:{dc['month']}"
+        )
 
     return (
         f"{color} {display_name}: rank:{rank} | Close:{close_pct}% "
         f"<{wo_d2}/{wo_d1}/{wo_d0}> | WO remain:{wo_remain} "
-        f"| Task:{assign_mo}:{wo_d2}/{wo_d1}/{wo_d0}"
+        f"| Task:{assign_mo}:{wo_d2}/{wo_d1}/{wo_d0}{dr_part}"
     )
 
 
@@ -375,6 +386,77 @@ def get_daily_reports_from_sheet(target_date: str) -> dict:
         logger.error(f"Daily report read error: {e}")
 
     return team_reports
+
+
+def get_employee_report_counts() -> dict:
+    """
+    Đếm số lần nhân viên nộp daily result theo Telegram ID.
+    Cú pháp daily report: dòng đầu = "Daily report: DD/MM/YYYY"
+
+    Returns:
+      { tg_id_str: {"d0":n, "d1":n, "d2":n, "d7":n, "month":n} }
+    """
+    counts: dict[str, dict] = {}
+    now = myanmar_now()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    d1_start    = today - timedelta(days=1)
+    d2_start    = today - timedelta(days=2)
+    d7_start    = today - timedelta(days=7)
+    month_start = today - timedelta(days=30)
+
+    DATE_FMTS = ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d")
+
+    def parse_date_cell(raw: str) -> datetime | None:
+        raw = raw.strip()
+        # Cố gắng parse nhiều định dạng
+        for fmt in DATE_FMTS:
+            try:
+                return datetime.strptime(raw[:len(fmt)+2], fmt).replace(tzinfo=MYANMAR_TZ)
+            except Exception:
+                pass
+        # Tìm pattern DD/MM/YYYY trong chuỗi
+        m = re.search(r'(\d{1,2}/\d{1,2}/\d{2,4})', raw)
+        if m:
+            for fmt in ("%d/%m/%Y", "%d/%m/%y"):
+                try:
+                    return datetime.strptime(m.group(1), fmt).replace(tzinfo=MYANMAR_TZ)
+                except Exception:
+                    pass
+        return None
+
+    try:
+        resp = requests.get(DAILY_REPORT_CSV, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+        resp.raise_for_status()
+        df = pd.read_csv(io.StringIO(resp.text), header=0, dtype=str, on_bad_lines="skip")
+        if df.empty:
+            return counts
+
+        for _, row in df.iterrows():
+            # Col C (idx 1) = ngày nộp | Col R (idx 16) = Telegram ID
+            date_raw = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else ""
+            tg_raw   = str(row.iloc[16]).strip() if len(row) > 16 and not pd.isna(row.iloc[16]) else ""
+
+            if tg_raw.lower() in ("nan", "none", ""): continue
+            if date_raw.lower() in ("nan", "none", ""): continue
+
+            tg_id = tg_raw.replace(".0", "") if tg_raw.endswith(".0") else tg_raw
+            dt    = parse_date_cell(date_raw)
+            if not dt: continue
+
+            day = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            rec = counts.setdefault(tg_id, {"d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0})
+
+            if day >= month_start: rec["month"] += 1
+            if day >= d7_start:    rec["d7"]    += 1
+            if day >= today:       rec["d0"]    += 1
+            elif day >= d1_start:  rec["d1"]    += 1
+            elif day >= d2_start:  rec["d2"]    += 1
+
+        logger.info(f"  📊 Daily report counts: {len(counts)} employees tracked")
+    except Exception as e:
+        logger.error(f"Employee report count error: {e}")
+
+    return counts
 
 
 def build_comparison(plan_content: str, report_texts: list) -> dict:
@@ -642,6 +724,10 @@ async def main():
             team_emp_map.setdefault(tk, []).append(emp)
     logger.info(f"  📋 Employees mapped: { {k: len(v) for k,v in team_emp_map.items()} }")
 
+    # ── Step 4c: Đếm số lần nộp daily result per-person ──
+    logger.info("📊 Counting employee daily report submissions...")
+    daily_counts = get_employee_report_counts()  # { tg_id: {d0,d1,d2,d7,month} }
+
     # ── Step 5: Build and send reports ──
     if not SEND_BOT_TOKEN:
         logger.error("SEND_BOT_TOKEN not set — cannot send reports")
@@ -689,7 +775,7 @@ async def main():
                 # Sắp xếp theo rank tăng dần (rank nhỏ = tốt hơn)
                 sorted_emps = sorted(emps, key=lambda e: e.get("rank", 999))
                 for emp in sorted_emps:
-                    lines.append(build_emp_compact_line(emp))
+                    lines.append(build_emp_compact_line(emp, daily_counts))
             else:
                 lines.append("❌ No employee stats available")
 
