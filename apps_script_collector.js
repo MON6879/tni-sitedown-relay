@@ -54,6 +54,7 @@ function doPost(e) {
     if (body.action === "get_asset_stats")   return handleGetAssetStats(ss);
     if (body.action === "store_site_down")   return handleStoreSiteDownDirect(body);
     if (body.action === "save_note_msgids")   return handleSaveNoteMsgIds(body);
+    if (body.action === "save_msgids")          return handleSaveMsgIds(body);
 
     // ── Daily Report Collector ─────────────────────────────────────────────
     if (body.action === "daily_add" ||
@@ -95,6 +96,7 @@ function doGet(e) {
     // ── Note B2:B5 từ SD Sheet (cho botlookup_relay.py gửi từ @Phongha79) ──
     if (action === "get_note_b2b5")       return getNoteB2B5();
     if (action === "get_note_msgids")     return handleGetNoteMsgIds();
+    if (action === "get_msgids")          return handleGetMsgIds(e.parameter || {});
 
     // ── Cable / MDG GET endpoints ─────────────────────────────────────────
     if (action === "cable_get_stats" || action === "cable_check_row") return doGetCable_(e);

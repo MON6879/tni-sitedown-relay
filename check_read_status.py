@@ -15,11 +15,13 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import GetMessageReadParticipantsRequest
 from telethon.errors import ChatAdminRequiredError
+from delete_old_helper import delete_old_messages_telethon, save_msgids
 
 # ── Config ──────────────────────────────────────────────────
 API_ID         = int(os.environ["TELEGRAM_API_ID"])
 API_HASH       = os.environ["TELEGRAM_API_HASH"]
 SESSION_STRING = os.environ["TELEGRAM_SESSION"]
+GAS_URL        = os.environ.get("APPS_SCRIPT_URL", "")
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
@@ -115,11 +117,13 @@ async def check_and_report(client, key, group_info):
     # ── Send report to group ──────────────────────────────
     report_text = "\n".join(report_lines)
     try:
-        await client.send_message(
+        await delete_old_messages_telethon(client, info["id"], GAS_URL, f"READSTATUS_{key}")
+        sent = await client.send_message(
             entity,
             report_text,
             parse_mode="html"
         )
+        save_msgids(GAS_URL, f"READSTATUS_{key}", [sent.id])
         print(f"  📤 Report sent to {gname}")
     except Exception as e:
         print(f"  ❌ Failed to send report: {e}")

@@ -10,6 +10,7 @@ import asyncio, io, logging, os, re, requests, pandas as pd
 from datetime import datetime, timezone, timedelta
 from telegram import Bot
 from dotenv import load_dotenv
+from delete_old_helper import delete_old_messages_bot, save_msgids
 
 load_dotenv()
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -597,22 +598,25 @@ async def send_msg(bot, cid, text, label="", parse_mode=None):
     if parse_mode:
         kwargs["parse_mode"] = parse_mode
 
+    msg_ids = []  # Collect message_ids from sent messages
     try:
         if len(text) <= MAX:
-            await bot.send_message(**kwargs)
+            sent = await bot.send_message(**kwargs)
+            msg_ids.append(sent.message_id)
         else:
             for p in chunk_text(text):
                 if p.strip():
                     kw = {"chat_id": cid, "text": p}
                     if parse_mode:
                         kw["parse_mode"] = parse_mode
-                    await bot.send_message(**kw)
+                    sent = await bot.send_message(**kw)
+                    msg_ids.append(sent.message_id)
                     await asyncio.sleep(0.3)
         logger.info(f"✅ {label} → {cid}")
-        return True
+        return True, msg_ids
     except Exception as e:
         logger.error(f"❌ {label} → {cid}: {e}")
-        return False
+        return False, msg_ids
 
 
 async def main():
@@ -829,18 +833,46 @@ async def main():
             (0, tech_msg, CONTROL_CHAT_ID, "TECH_GROUP")
         )
 
+    # ── Mapping chat_id → GAS key để delete-old / save-new ──
+    CHATID_TO_KEY = {
+        "-5180992881": "CRON_TEAM_T1",
+        "-5188855349": "CRON_TEAM_T2",
+        "-5183480727": "CRON_TEAM_T3",
+        "-5238696719": "CRON_TEAM_T4",
+    }
+
+    # ── Delete old messages trước khi gửi mới ──
+    if APPS_SCRIPT_URL and SEND_BOT_TOKEN:
+        for del_cid, del_key in CHATID_TO_KEY.items():
+            delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
+        # TECH_GROUP → CONTROL
+        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_CONTROL")
+
     # ── Gửi tất cả messages ──
+    collected_msgids = {}  # key → list[int], gom msg_ids theo GAS key
     for token, items in groups.items():
         bot_name = items[0][3] if items else "BOT"
         logger.info(f"--- {bot_name}: {len(items)} messages ---")
         async with Bot(token=token) as bot:
             for sheet_row, msg, cid, label in items:
-                result = await send_msg(bot, cid, msg, f"{label} row{sheet_row}")
+                result, msg_ids = await send_msg(bot, cid, msg, f"{label} row{sheet_row}")
                 if result:
                     ok += 1
+                    # Xác định GAS key từ label + chat_id
+                    if label == "TECH_GROUP":
+                        gas_key = "CRON_TECHDEP_CONTROL"
+                    else:
+                        gas_key = CHATID_TO_KEY.get(str(cid), "")
+                    if gas_key and msg_ids:
+                        collected_msgids.setdefault(gas_key, []).extend(msg_ids)
                 else:
                     fail += 1
                 await asyncio.sleep(0.4)
+
+    # ── Save msg_ids mới vào GAS ──
+    if APPS_SCRIPT_URL:
+        for gas_key, ids in collected_msgids.items():
+            save_msgids(APPS_SCRIPT_URL, gas_key, ids)
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
 
@@ -848,18 +880,26 @@ async def main():
     # (BOD và mọi người xem trên Group này, dùng SEND_BOT vì đã add vào group)
     if asset_msg and SEND_BOT_TOKEN:
         logger.info("--- Gửi Asset Stats → CONTROL SITE (-5251698940) ---")
+        if APPS_SCRIPT_URL:
+            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_ASSET_CONTROL")
         try:
             async with Bot(token=SEND_BOT_TOKEN) as ctrl_bot:
-                await send_msg(ctrl_bot, CONTROL_CHAT_ID, asset_msg, "CONTROL-asset")
+                result, msg_ids = await send_msg(ctrl_bot, CONTROL_CHAT_ID, asset_msg, "CONTROL-asset")
+                if result and msg_ids and APPS_SCRIPT_URL:
+                    save_msgids(APPS_SCRIPT_URL, "CRON_ASSET_CONTROL", msg_ids)
             logger.info("✅ Asset stats → CONTROL SITE")
         except Exception as e:
             logger.error(f"❌ Asset stats → CONTROL SITE: {e}")
 
     if mgmt_report and SEND_BOT_TOKEN:
         logger.info("--- Gửi mgmt_report (tổng hợp TL) → CONTROL SITE (-5251698940) ---")
+        if APPS_SCRIPT_URL:
+            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_MGMT_CONTROL")
         try:
             async with Bot(token=SEND_BOT_TOKEN) as ctrl_bot2:
-                await send_msg(ctrl_bot2, CONTROL_CHAT_ID, mgmt_report, "CONTROL-mgmt")
+                result, msg_ids = await send_msg(ctrl_bot2, CONTROL_CHAT_ID, mgmt_report, "CONTROL-mgmt")
+                if result and msg_ids and APPS_SCRIPT_URL:
+                    save_msgids(APPS_SCRIPT_URL, "CRON_MGMT_CONTROL", msg_ids)
             logger.info("✅ mgmt_report → CONTROL SITE")
         except Exception as e:
             logger.error(f"❌ mgmt_report → CONTROL SITE: {e}")

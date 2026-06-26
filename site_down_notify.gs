@@ -335,12 +335,32 @@ function sendTaskRemain() {
       teamTasks[chatId].push({ content, teleId, teamRaw });
     }
 
-    // Gửi từng task riêng lẻ đến group team (tách biệt để dễ đọc)
+    // Tìm team key từ chatId (để dùng làm msgKey)
+    var chatIdToTeam = {};
+    for (var tk in TASK_TEAM_MAP) {
+      chatIdToTeam[TASK_TEAM_MAP[tk]] = tk.toUpperCase();
+    }
+
+    // Xóa tin cũ → Gửi từng task riêng lẻ → Lưu msg_ids mới
     for (const [chatId, tasks] of Object.entries(teamTasks)) {
+      var teamKey = chatIdToTeam[chatId] || chatId;
+      var msgKey = "TASKREMAIN_" + teamKey;
+
+      // Xóa tất cả tin Task cũ trong group này
+      deleteOldMessages_(chatId, msgKey);
+
+      // Gửi từng task + thu thập msg_ids
+      var allNewIds = [];
       Logger.log("[TaskRemain] Gửi " + tasks.length + " task đến group " + chatId);
       for (const task of tasks) {
-        sendTelegram(chatId, task.content, "[Task][" + task.teamRaw + "]");
+        var ids = sendTelegramCollectIds_(chatId, task.content, "[Task][" + task.teamRaw + "]");
+        allNewIds = allNewIds.concat(ids);
         Utilities.sleep(800);   // tránh rate limit
+      }
+
+      // Lưu tất cả msg_ids mới
+      if (allNewIds.length > 0) {
+        saveMsgIds_(msgKey, allNewIds);
       }
     }
 
@@ -902,27 +922,42 @@ function buildAwAzControlMessage(ts, awaz) {
 // Lưu message_ids vào PropertiesService để xóa lần sau
 // ============================================================
 
-/** Ngày hôm nay theo giờ Myanmar (yyyy-MM-dd) */
-function getTodayStr_() {
-  return Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyy-MM-dd");
-}
-
-/** Lưu danh sách message_ids cho một key (hỗ trợ multi-chunk) */
+/** Lưu danh sách message_ids cho một key */
 function saveMsgIds_(msgKey, messageIds) {
   var key = "SD_MSGID_" + msgKey;
-  var val = JSON.stringify(messageIds) + "|" + getTodayStr_();
-  PropertiesService.getScriptProperties().setProperty(key, val);
+  PropertiesService.getScriptProperties().setProperty(key, JSON.stringify(messageIds));
+  Logger.log("[save] 💾 " + msgKey + " = " + JSON.stringify(messageIds));
 }
 
-/** Lấy danh sách message_ids đã lưu (bất kể ngày nào — để xóa tin cũ) */
+/** Lấy danh sách message_ids đã lưu — để xóa tin cũ */
 function getSavedMsgIds_(msgKey) {
   var key = "SD_MSGID_" + msgKey;
   var val = PropertiesService.getScriptProperties().getProperty(key) || "";
-  if (!val) return [];
+  if (!val) { Logger.log("[get] " + msgKey + " → trống"); return []; }
+  
+  // Thử parse JSON thuần trước (format mới)
+  try { 
+    var arr = JSON.parse(val);
+    if (Array.isArray(arr)) {
+      Logger.log("[get] 📋 " + msgKey + " → " + JSON.stringify(arr));
+      return arr;
+    }
+  } catch(e) {}
+  
+  // Fallback: format cũ có "|date" → cắt bỏ date
   var pipeIdx = val.lastIndexOf("|");
-  if (pipeIdx === -1) return [];
-  var jsonPart = val.substring(0, pipeIdx);
-  try { return JSON.parse(jsonPart); } catch(e) { return []; }
+  if (pipeIdx > 0) {
+    try { 
+      var arr2 = JSON.parse(val.substring(0, pipeIdx));
+      if (Array.isArray(arr2)) {
+        Logger.log("[get] 📋 " + msgKey + " (old format) → " + JSON.stringify(arr2));
+        return arr2;
+      }
+    } catch(e2) {}
+  }
+  
+  Logger.log("[get] ⚠️ " + msgKey + " parse lỗi: " + val);
+  return [];
 }
 
 /** Xóa message_ids đã lưu */
@@ -1088,6 +1123,40 @@ function handleGetNoteMsgIds() {
   }
 }
 
+// ============================================================
+// GENERIC MESSAGE_IDS API — Lưu/đọc message_ids cho Python scripts
+// Python gọi GAS qua HTTP: save_msgids / get_msgids
+// Key format: SD_MSGID_{key} — VD: CRON_TEAM_T1, PLAN_CONTROL, READREPORT_T2
+// ============================================================
+
+/** Lưu generic message_ids — gọi từ Python scripts */
+function handleSaveMsgIds(body) {
+  var key    = (body.key || "").toString().trim();
+  var msgids = body.msgids || [];
+  if (!key) return json({ status: "error", message: "Missing key" });
+
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty("SD_MSGID_" + key, JSON.stringify(msgids));
+  Logger.log("[MsgIds] 💾 Saved " + key + " = " + JSON.stringify(msgids));
+  return json({ status: "ok", key: key, count: msgids.length });
+}
+
+/** Đọc generic message_ids — gọi từ Python scripts */
+function handleGetMsgIds(body) {
+  var key = "";
+  // Hỗ trợ cả GET (e.parameter) và POST (body)
+  if (body && body.key) key = body.key.toString().trim();
+
+  if (!key) return json({ status: "error", message: "Missing key" });
+
+  var props = PropertiesService.getScriptProperties();
+  var raw   = props.getProperty("SD_MSGID_" + key) || "[]";
+  try {
+    return json({ status: "ok", key: key, msgids: JSON.parse(raw) });
+  } catch(e) {
+    return json({ status: "ok", key: key, msgids: [] });
+  }
+}
 
 // ============================================================
 // GỬI TELEGRAM (tự chia nếu > 4000 ký tự)

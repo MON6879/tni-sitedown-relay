@@ -31,6 +31,7 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import GetHistoryRequest
 from telegram import Bot
+from delete_old_helper import delete_old_messages_bot, save_msgids
 
 # ── Logging ─────────────────────────────────────────────────────
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -442,8 +443,9 @@ def build_plan_stats(plans: list, team_filter: str = None) -> dict:
 # ── Send message helper ────────────────────────────────────────
 
 async def send_msg(bot, cid, text, label=""):
-    """Send message with auto-split for >4096 chars."""
+    """Send message with auto-split for >4096 chars. Returns (ok, msg_ids)."""
     MAX = 4000
+    sent_ids = []  # collect message_id from each sent message
 
     def chunk_text(t):
         parts, current = [], ""
@@ -466,17 +468,19 @@ async def send_msg(bot, cid, text, label=""):
 
     try:
         if len(text) <= MAX:
-            await bot.send_message(chat_id=cid, text=text)
+            result = await bot.send_message(chat_id=cid, text=text)
+            sent_ids.append(result.message_id)
         else:
             for p in chunk_text(text):
                 if p.strip():
-                    await bot.send_message(chat_id=cid, text=p)
+                    result = await bot.send_message(chat_id=cid, text=p)
+                    sent_ids.append(result.message_id)
                     await asyncio.sleep(0.3)
         logger.info(f"✅ {label} → {cid}")
-        return True
+        return True, sent_ids
     except Exception as e:
         logger.error(f"❌ {label} → {cid}: {e}")
-        return False
+        return False, sent_ids
 
 
 # ── Main ────────────────────────────────────────────────────────
@@ -601,7 +605,10 @@ async def main():
             lines.append(divider)
 
             msg = "\n".join(lines)
-            await send_msg(bot, chat_id, msg, f"PLAN-{group_key}")
+            delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, f"PLAN_{group_key}")
+            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-{group_key}")
+            if ok and msg_ids:
+                save_msgids(APPS_SCRIPT_URL, f"PLAN_{group_key}", msg_ids)
             await asyncio.sleep(0.5)
 
         # ── 5b. Send consolidated report to CONTROL ──
@@ -677,7 +684,10 @@ async def main():
         ctrl_lines.append(divider)
 
         ctrl_msg = "\n".join(ctrl_lines)
-        await send_msg(bot, CONTROL_CHAT_ID, ctrl_msg, "PLAN-CONTROL")
+        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "PLAN_CONTROL")
+        ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, ctrl_msg, "PLAN-CONTROL")
+        if ok and msg_ids:
+            save_msgids(APPS_SCRIPT_URL, "PLAN_CONTROL", msg_ids)
 
     logger.info(f"🎉 Daily Plan Report complete – {myanmar_now().strftime('%H:%M')}")
 

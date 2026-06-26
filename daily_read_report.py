@@ -22,6 +22,7 @@ import pandas as pd
 import requests
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+from delete_old_helper import delete_old_messages_telethon, save_msgids
 from telethon.tl.functions.messages import (
     GetHistoryRequest,
     GetMessageReadParticipantsRequest,
@@ -31,6 +32,7 @@ from telethon.tl.functions.messages import (
 API_ID         = int(os.environ["TELEGRAM_API_ID"])
 API_HASH       = os.environ["TELEGRAM_API_HASH"]
 SESSION_STRING = os.environ["TELEGRAM_SESSION"]
+GAS_URL        = os.environ.get("APPS_SCRIPT_URL", "")
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
@@ -381,7 +383,9 @@ async def main():
             tl.append(divider)
 
             chat_id = GROUPS[gk]
-            await client.send_message(chat_id, "\n".join(tl))
+            await delete_old_messages_telethon(client, chat_id, GAS_URL, f"READREPORT_{gk}")
+            sent = await client.send_message(chat_id, "\n".join(tl))
+            save_msgids(GAS_URL, f"READREPORT_{gk}", [sent.id])
             print(f"📤 Report sent to {gk}")
             await asyncio.sleep(1)
 
@@ -423,7 +427,9 @@ async def main():
 
         report = "\n".join(lines)
         control_id = GROUPS["CONTROL"]
-        await client.send_message(control_id, report)
+        await delete_old_messages_telethon(client, control_id, GAS_URL, "READREPORT_CONTROL")
+        sent = await client.send_message(control_id, report)
+        save_msgids(GAS_URL, "READREPORT_CONTROL", [sent.id])
         print(f"📤 Consolidated report sent to CONTROL SITE")
 
     print(f"\n[{myanmar_now()}] 🎉 Complete!")
