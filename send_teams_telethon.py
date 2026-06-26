@@ -4,12 +4,13 @@ send_teams_telethon.py
 Thay thế GAS sending — đọc dữ liệu từ Sheet qua Apps Script URL,
 gửi Tin1 + Tin2 đến T1/T2/T3/T4 bằng tài khoản cá nhân (Telethon).
 → Hỗ trợ read receipt (xem ai đã đọc).
+→ Xóa tin cũ trước khi gửi mới (delete-old-send-new pattern).
 
 Chạy: GitHub Actions cron mỗi 5 phút.
 State: state/last_sd.json (commit vào repo sau mỗi lần gửi).
 """
 
-import asyncio, json, os, re, urllib.request
+import asyncio, json, os, re, urllib.request, requests
 from datetime import datetime, timezone, timedelta
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -19,6 +20,11 @@ API_ID          = int(os.environ["TELEGRAM_API_ID"])
 API_HASH        = os.environ["TELEGRAM_API_HASH"]
 SESSION_STRING  = os.environ["TELEGRAM_SESSION"]
 APPS_SCRIPT_URL = os.environ["APPS_SCRIPT_URL"]
+
+# GAS key pattern: SD_TIN1_{team_key}, SD_TIN2_{team_key}
+# Lưu msg_ids của Tin1 và Tin2 riêng cho từng team
+GAS_KEY_TIN1 = {"T1": "SD_TIN1_T1", "T2": "SD_TIN1_T2", "T3": "SD_TIN1_T3", "T4": "SD_TIN1_T4"}
+GAS_KEY_TIN2 = {"T1": "SD_TIN2_T1", "T2": "SD_TIN2_T2", "T3": "SD_TIN2_T3", "T4": "SD_TIN2_T4"}
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 STATE_FILE = "state/last_sd.json"
@@ -43,6 +49,60 @@ AWAZ_LABELS = [
 
 def myanmar_now():
     return datetime.now(MYANMAR_TZ).strftime("%H:%M %d/%m/%Y")
+
+
+# ── GAS msg_id helpers ────────────────────────────────────────
+def gas_get_msgids(key: str) -> list:
+    """Đọc msg_ids cũ từ GAS PropertiesService."""
+    if not APPS_SCRIPT_URL or not key:
+        return []
+    try:
+        resp = requests.get(
+            APPS_SCRIPT_URL,
+            params={"action": "get_msgids", "key": key},
+            timeout=30, allow_redirects=True
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return [int(x) for x in data.get("msgids", [])]
+    except Exception as ex:
+        print(f"[delete_old] ⚠️ get_msgids({key}): {ex}")
+    return []
+
+
+def gas_save_msgids(key: str, msgids: list):
+    """Lưu msg_ids mới vào GAS PropertiesService."""
+    if not APPS_SCRIPT_URL or not key or not msgids:
+        return
+    try:
+        resp = requests.post(
+            APPS_SCRIPT_URL,
+            json={"action": "save_msgids", "key": key, "msgids": msgids},
+            timeout=30, allow_redirects=True
+        )
+        if resp.status_code == 200:
+            print(f"[delete_old] 💾 Saved {key} = {msgids}")
+        else:
+            print(f"[delete_old] ⚠️ save_msgids({key}) HTTP {resp.status_code}")
+    except Exception as ex:
+        print(f"[delete_old] ⚠️ save_msgids({key}): {ex}")
+
+
+async def delete_old_msgs(client, chat_id, gas_key: str):
+    """Xóa tin cũ cho 1 key/team bằng Telethon."""
+    old_ids = gas_get_msgids(gas_key)
+    if not old_ids:
+        return
+    deleted = 0
+    for mid in old_ids:
+        try:
+            await client.delete_messages(chat_id, [mid])
+            deleted += 1
+            print(f"[delete_old] 🗑️ msg_id={mid} → {chat_id}")
+        except Exception as ex:
+            print(f"[delete_old] ⚠️ msg_id={mid}: {ex}")
+    print(f"[delete_old] 📊 {gas_key}: xóa {deleted}/{len(old_ids)}")
+
 
 # ── State management ──────────────────────────────────────────
 def load_state():
@@ -144,11 +204,15 @@ def build_tin2(team_key, awaz, col_idx):
         lines.append("✅ Không có sự cố")
     return "\n".join(lines)
 
-# ── Gửi qua Telethon ─────────────────────────────────────────
-async def send_chunks(client, entity, text):
+# ── Gửi qua Telethon (trả về list msg_ids) ───────────────────
+async def send_chunks(client, entity, text) -> list:
+    """Gửi tin nhắn (có thể nhiều chunk), trả về list message_id."""
+    msg_ids = []
     for chunk in split_msg(text):
-        await client.send_message(entity, chunk, parse_mode="html")
+        msg = await client.send_message(entity, chunk, parse_mode="html")
+        msg_ids.append(msg.id)
         await asyncio.sleep(0.5)
+    return msg_ids
 
 # ── Main ─────────────────────────────────────────────────────
 async def main():
@@ -186,16 +250,25 @@ async def main():
         print(f"\n🔑 Gửi bằng: @{me.username} ({me.first_name})")
 
         for key, info in TEAMS.items():
-            entity = await client.get_entity(info["id"])
+            chat_id = info["id"]
+            entity  = await client.get_entity(chat_id)
             print(f"\n[{key}] {info['name']}")
 
             if send_tin1 and col_c:
-                await send_chunks(client, entity, build_tin1(key, col_c))
-                print(f"  ✅ Tin 1 gửi xong")
+                # Xóa Tin 1 cũ trước khi gửi mới
+                await delete_old_msgs(client, chat_id, GAS_KEY_TIN1[key])
+                new_ids = await send_chunks(client, entity, build_tin1(key, col_c))
+                if new_ids:
+                    gas_save_msgids(GAS_KEY_TIN1[key], new_ids)
+                print(f"  ✅ Tin 1 gửi xong (msg_ids={new_ids})")
 
             if send_tin2 and awaz:
-                await client.send_message(entity, build_tin2(key, awaz, info["awaz_col"]), parse_mode="html")
-                print(f"  ✅ Tin 2 gửi xong")
+                # Xóa Tin 2 cũ trước khi gửi mới
+                await delete_old_msgs(client, chat_id, GAS_KEY_TIN2[key])
+                msg = await client.send_message(entity, build_tin2(key, awaz, info["awaz_col"]), parse_mode="html")
+                if msg and msg.id:
+                    gas_save_msgids(GAS_KEY_TIN2[key], [msg.id])
+                print(f"  ✅ Tin 2 gửi xong (msg_id={msg.id if msg else 'N/A'})")
 
             await asyncio.sleep(1)
 
