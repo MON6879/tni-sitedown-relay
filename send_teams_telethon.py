@@ -179,7 +179,8 @@ def build_tin1(team_key, col_c_lines):
             headers.append(s)
 
     content = "\n".join(headers + ["..."] + sites) if sites else "\n".join(headers + ["Không có site down"])
-    return f"<pre>{esc(content)}</pre>"
+    # Trả về plain text (KHÔNG dùng <pre>) → Telegram sẽ không hiển thị nút copy
+    return content
 
 # ── Build Tin 2 (AW:AZ) cho từng team ────────────────────────
 def build_tin2(team_key, awaz, col_idx):
@@ -205,8 +206,18 @@ def build_tin2(team_key, awaz, col_idx):
     return "\n".join(lines)
 
 # ── Gửi qua Telethon (trả về list msg_ids) ───────────────────
-async def send_chunks(client, entity, text) -> list:
-    """Gửi tin nhắn (có thể nhiều chunk), trả về list message_id."""
+async def send_chunks_plain(client, entity, text) -> list:
+    """Gửi plain text (không parse_mode) → không hiển thị nút copy."""
+    msg_ids = []
+    for chunk in split_msg(text):
+        msg = await client.send_message(entity, chunk)  # không parse_mode
+        msg_ids.append(msg.id)
+        await asyncio.sleep(0.5)
+    return msg_ids
+
+
+async def send_chunks_html(client, entity, text) -> list:
+    """Gửi HTML (dùng cho Tin 2 có bold/format)."""
     msg_ids = []
     for chunk in split_msg(text):
         msg = await client.send_message(entity, chunk, parse_mode="html")
@@ -257,7 +268,8 @@ async def main():
             if send_tin1 and col_c:
                 # Xóa Tin 1 cũ trước khi gửi mới
                 await delete_old_msgs(client, chat_id, GAS_KEY_TIN1[key])
-                new_ids = await send_chunks(client, entity, build_tin1(key, col_c))
+                # Plain text → không có nút copy
+                new_ids = await send_chunks_plain(client, entity, build_tin1(key, col_c))
                 if new_ids:
                     gas_save_msgids(GAS_KEY_TIN1[key], new_ids)
                 print(f"  ✅ Tin 1 gửi xong (msg_ids={new_ids})")
@@ -265,10 +277,11 @@ async def main():
             if send_tin2 and awaz:
                 # Xóa Tin 2 cũ trước khi gửi mới
                 await delete_old_msgs(client, chat_id, GAS_KEY_TIN2[key])
-                msg = await client.send_message(entity, build_tin2(key, awaz, info["awaz_col"]), parse_mode="html")
-                if msg and msg.id:
-                    gas_save_msgids(GAS_KEY_TIN2[key], [msg.id])
-                print(f"  ✅ Tin 2 gửi xong (msg_id={msg.id if msg else 'N/A'})")
+                # HTML → giữ bold/format cho Summary
+                new_ids2 = await send_chunks_html(client, entity, build_tin2(key, awaz, info["awaz_col"]))
+                if new_ids2:
+                    gas_save_msgids(GAS_KEY_TIN2[key], new_ids2)
+                print(f"  ✅ Tin 2 gửi xong (msg_ids={new_ids2})")
 
             await asyncio.sleep(1)
 
