@@ -14,7 +14,7 @@ Tab:   "Team leader assign Plan" (GID: 853981745)
   E = Daily Report results (from "Daily report and Bussiness" B:S)
   F = Comparison (Plan vs Actual)
 
-Trigger: GitHub Actions daily_plan_report.yml at 11:00 UTC = 17:30 Myanmar
+Trigger: GitHub Actions daily_plan_report.yml at 16:30 UTC = 23:00 Myanmar
 Uses: Telethon (read messages) + SEND_BOT (send reports) + Apps Script (sheet I/O)
 """
 
@@ -601,6 +601,7 @@ async def main():
             team_name = GROUP_NAMES.get(group_key, group_key)
             stats = build_plan_stats(all_plans, team_filter=group_key)
             comp = team_comparisons.get(group_key)
+            team_reps = team_reports.get(group_key, [])  # daily report của nhân viên
 
             lines = [
                 f"📋 DAILY PLAN REPORT — {team_name}",
@@ -625,6 +626,19 @@ async def main():
             else:
                 lines.append("")
                 lines.append("❌ No Daily Plan submitted today")
+
+            # ── Thêm phần tổng hợp daily report nhân viên ──
+            if team_reps:
+                lines.append("")
+                lines.append(sub_divider)
+                lines.append(f"📝 Daily Reports ({len(team_reps)} members):")
+                lines.append(sub_divider)
+                for rep in team_reps:
+                    lines.append(rep)
+                    lines.append("")  # blank line giữa các NV
+            else:
+                lines.append("")
+                lines.append("❌ No Daily Reports submitted today")
 
             lines.append(divider)
 

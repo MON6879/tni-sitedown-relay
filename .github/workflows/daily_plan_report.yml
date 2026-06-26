@@ -1,8 +1,8 @@
-name: Daily Plan Report (17:30 Myanmar)
+name: Daily Plan Report (23:00 Myanmar)
 
 on:
   schedule:
-    - cron: '0 11 * * *'  # 11:00 UTC = 17:30 Myanmar
+    - cron: '30 16 * * *'  # 16:30 UTC = 23:00 Myanmar
   workflow_dispatch:       # Manual trigger
 
 jobs:
