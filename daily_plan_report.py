@@ -14,7 +14,7 @@ Tab:   "Team leader assign Plan" (GID: 853981745)
   E = Daily Report results (from "Daily report and Bussiness" B:S)
   F = Comparison (Plan vs Actual)
 
-Trigger: GitHub Actions daily_plan_report.yml at 16:30 UTC = 23:00 Myanmar
+Trigger: GitHub Actions daily_plan_report.yml at 14:30 UTC = 21:00 Myanmar
 Uses: Telethon (read messages) + SEND_BOT (send reports) + Apps Script (sheet I/O)
 """
 
