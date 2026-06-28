@@ -980,14 +980,25 @@ async def main():
                     done_set = assigned_set & completed_set
                     remain_set = assigned_set - completed_set
 
+                    # Determine report submission status today
+                    sent_today = False
+                    if daily_counts and tg_id in daily_counts:
+                        sent_today = (daily_counts[tg_id].get("d0", 0) > 0)
+
+                    report_status_text = "Sent" if sent_today else "Not sent"
+
+                    # Determine color:
+                    # - 🟢 = 100% of plan completed (report sent)
+                    # - 🟡 = >0% but <100% completed (report sent)
+                    # - 🔴 = Plan assigned, but report not sent (0% completion)
+                    # - 🔵 = No plan assigned, but report was sent
+                    # - ⚪ = No plan assigned, and report not sent
                     if not assigned_set:
-                        color = "⚪"
+                        color = "🔵" if sent_today else "⚪"
                     else:
-                        pct = int((len(done_set) / len(assigned_set)) * 100)
-                        if pct == 100:
-                            color = "🟢"
-                        elif pct > 0:
-                            color = "🟡"
+                        if sent_today:
+                            pct = int((len(done_set) / len(assigned_set)) * 100)
+                            color = "🟢" if pct == 100 else "🟡"
                         else:
                             color = "🔴"
 
@@ -997,17 +1008,21 @@ async def main():
                     if assigned_set:
                         pct = int((len(done_set) / len(assigned_set)) * 100)
                         lines.append(f"   • Plan: {', '.join(sorted(assigned_set))}")
-                        lines.append(f"   • Actual: {', '.join(sorted(done_set)) if done_set else 'None'} (Done: {len(done_set)}/{len(assigned_set)}, {pct}%)")
+                        lines.append(f"   • Completed: {', '.join(sorted(done_set)) if done_set else 'None'} (Done: {len(done_set)}/{len(assigned_set)}, {pct}%)")
                         if remain_set:
                             lines.append(f"   • Remaining: {', '.join(sorted(remain_set))}")
                     else:
-                        lines.append("   • Plan: None (No plan assigned today)")
+                        lines.append("   • Plan: None")
+                        if completed_set:
+                            lines.append(f"   • Completed: {', '.join(sorted(completed_set))}")
+
+                    lines.append(f"   • Report: {report_status_text}")
 
                     dr_part = "3Day: 0/0/0 | 7Day: 0 | Month: 0"
                     if daily_counts and tg_id in daily_counts:
                         dc = daily_counts[tg_id]
                         dr_part = f"3Day: {dc['d2']}/{dc['d1']}/{dc['d0']} | 7Day: {dc['d7']} | Month: {dc['month']}"
-                    lines.append(f"   • Submission: {dr_part}")
+                    lines.append(f"   • Submission Stats: {dr_part}")
 
             lines.append(divider)
 
