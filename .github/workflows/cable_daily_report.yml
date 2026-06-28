@@ -21,11 +21,9 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        working-directory: Task and WO
         run: pip install requests python-dotenv
 
       - name: Send Cable Daily Report
-        working-directory: Task and WO
         env:
           COLLECTOR_BOT_TOKEN: ${{ secrets.COLLECTOR_BOT_TOKEN }}
           CABLE_APPS_SCRIPT_URL: ${{ secrets.CABLE_APPS_SCRIPT_URL }}
