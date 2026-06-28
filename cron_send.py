@@ -820,7 +820,7 @@ async def main():
                     team_lines.append(parsed_tl)
 
             seen_emps = set()
-            CIRCLES = ["🔴", "🔵", "🟢", "🟡", "🟠", "🟣", "⚫", "⚪", "🟤"]
+            CIRCLES = ["🔵", "🟢"]
             emp_idx = 0
             for prefix, name, content in ft_list:
                 parsed_emp_str = parse_emp(content)
