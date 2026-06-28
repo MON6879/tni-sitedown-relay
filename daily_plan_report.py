@@ -240,6 +240,49 @@ def get_report_data() -> dict:
     return data
 
 
+def get_team_leaders() -> dict:
+    """
+    Reads GID 133591305 and returns a dict mapping team key ("T1", "T2", "T3", "T4") -> leader's telegram ID (str).
+    """
+    leaders = {}
+    try:
+        resp = requests.get(TEAM_SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+        resp.raise_for_status()
+        df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str, on_bad_lines="skip")
+        
+        for idx in range(3, min(len(df), 59)):
+            row = df.iloc[idx]
+            team = str(row.iloc[0]).strip() if not pd.isna(row.iloc[0]) else ""
+            username = str(row.iloc[2]).strip() if not pd.isna(row.iloc[2]) else ""
+            tg_id = str(row.iloc[4]).strip() if len(row) > 4 and not pd.isna(row.iloc[4]) else ""
+            if tg_id.endswith(".0"): tg_id = tg_id[:-2]
+            
+            if "leader" in username.lower():
+                tk = team.upper()
+                if "TEAM01" in tk or "TEAM1" in tk: tk = "T1"
+                elif "TEAM02" in tk or "TEAM2" in tk or "TEAM05" in tk or "TEAM5" in tk: tk = "T2"
+                elif "TEAM03" in tk or "TEAM3" in tk: tk = "T3"
+                elif "TEAM04" in tk or "TEAM4" in tk: tk = "T4"
+                else: tk = ""
+                
+                if tk:
+                    leaders[tk] = tg_id
+    except Exception as e:
+        logger.error(f"Error loading team leaders from sheet: {e}")
+        
+    # Fallback to hardcoded IDs if sheet read fails or leader ID missing
+    fallback = {
+        "T1": "6859790680",
+        "T2": "6555381983",
+        "T3": "6710667362",
+        "T4": "6867087612"
+    }
+    for k, v in fallback.items():
+        leaders.setdefault(k, v)
+        
+    return leaders
+
+
 def get_unified_employees() -> list:
     """
     Loads employees from TEAM_SHEET_URL and merges with stats from get_report_data().
@@ -673,7 +716,7 @@ def build_comparison(plan_content: str, report_texts: list) -> dict:
 
 # ── Telegram message scanning ──────────────────────────────────
 
-async def scan_group_for_plans(client, chat_id: int, since_utc: datetime) -> list:
+async def scan_group_for_plans(client, chat_id: int, since_utc: datetime, leader_id: str = None) -> list:
     """Scan a Telegram group for 'Daily Plan' messages since given UTC time."""
     plans = []
     try:
@@ -685,6 +728,11 @@ async def scan_group_for_plans(client, chat_id: int, since_utc: datetime) -> lis
         for msg in history.messages:
             if msg.date < since_utc:
                 break
+            # Filter by sender if leader_id is provided
+            if leader_id:
+                sender_id_str = str(msg.sender_id) if msg.sender_id else ""
+                if sender_id_str != str(leader_id).strip():
+                    continue
             if msg.message and is_daily_plan_msg(msg.message):
                 parsed = parse_daily_plan(msg.message)
                 if parsed:
@@ -843,6 +891,10 @@ async def main():
 
     logger.info("📡 Scanning Telegram groups for Daily Plan messages...")
 
+    # Fetch team leaders to filter plan senders
+    leaders = get_team_leaders()
+    logger.info(f"  📋 Team leaders loaded for filtering: {leaders}")
+
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
     all_today_plans = {}  # group_key -> list of parsed plans
 
@@ -852,7 +904,8 @@ async def main():
 
         for group_key, chat_id in GROUPS.items():
             logger.info(f"  📡 Scanning {group_key} ({chat_id})...")
-            plans = await scan_group_for_plans(client, chat_id, since_utc)
+            leader_id = leaders.get(group_key)
+            plans = await scan_group_for_plans(client, chat_id, since_utc, leader_id=leader_id)
             logger.info(f"     Found {len(plans)} Daily Plan messages")
 
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
