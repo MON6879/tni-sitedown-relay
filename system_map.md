@@ -742,6 +742,7 @@ Flow:
       - Cột A đến I: Link/Tab/Cột điều kiện cho Copy, Paste và Delete Row
       - Cột J (Sort): Tên sheet + cột cần sort A:Z sau khi paste xong (Ví dụ: "2.1 Your Data solution!D")
   - Tối ưu hóa: Sử dụng cache ssCache_ để tránh gọi mở file nhiều lần, tăng tốc độ xử lý gấp 5-10 lần khi có 50+ hàng cấu hình.
+  - Sắp xếp thông minh: Tự tìm dòng có dữ liệu cuối cùng thực tế (actual last row) ở cột sort (hoặc cột 1) để chỉ sort dữ liệu thực, giữ các dòng trống nằm yên ở cuối sheet, không bị đẩy lên đầu.
 
 KHÔNG ĐỤNG:
   - Toàn bộ file auto_copy_processor.js
