@@ -274,6 +274,38 @@ function relayBotlookupToTNI() {
       Logger.log("[relayBotlookupToTNI] ℹ️ daily_task.yml đã dispatch hôm nay rồi — bỏ qua");
     }
   }
+
+  // Bước 6: 20:25–20:55 Myanmar → dispatch daily_read_report.yml (1 lần/ngày lúc 20:30)
+  const isReadReportTime = (myanmarHour === 20 && myanmarMin >= 25 && myanmarMin <= 55);
+  if (isReadReportTime) {
+    const readReportKey = "DAILY_READ_REPORT_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+    const props4        = PropertiesService.getScriptProperties();
+    if (!props4.getProperty(readReportKey)) {
+      const okRead = triggerDailyReadReport();
+      if (okRead) {
+        props4.setProperty(readReportKey, "done");
+        Logger.log("[relayBotlookupToTNI] ✅ Dispatch daily_read_report.yml lúc 20:xx Myanmar");
+      }
+    } else {
+      Logger.log("[relayBotlookupToTNI] ℹ️ daily_read_report.yml đã dispatch hôm nay rồi — bỏ qua");
+    }
+  }
+
+  // Bước 7: 20:55–21:25 Myanmar → dispatch daily_plan_report.yml (1 lần/ngày lúc 21:00)
+  const isPlanReportTime = (myanmarHour === 20 && myanmarMin >= 55) || (myanmarHour === 21 && myanmarMin <= 25);
+  if (isPlanReportTime) {
+    const planReportKey = "DAILY_PLAN_REPORT_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+    const props5        = PropertiesService.getScriptProperties();
+    if (!props5.getProperty(planReportKey)) {
+      const okPlan = triggerDailyPlanReport();
+      if (okPlan) {
+        props5.setProperty(planReportKey, "done");
+        Logger.log("[relayBotlookupToTNI] ✅ Dispatch daily_plan_report.yml lúc 21:xx Myanmar");
+      }
+    } else {
+      Logger.log("[relayBotlookupToTNI] ℹ️ daily_plan_report.yml đã dispatch hôm nay rồi — bỏ qua");
+    }
+  }
 }
 
 
@@ -441,6 +473,66 @@ function triggerDailyTask() {
     return code === 204;
   } catch(e) {
     Logger.log("[triggerDailyTask] ❌ Lỗi: " + e.message);
+    return false;
+  }
+}
+
+
+// ── Dispatch daily_read_report.yml lúc 20:30 Myanmar
+function triggerDailyReadReport() {
+  try {
+    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
+    if (!pat) {
+      Logger.log("[triggerDailyReadReport] ⚠️ GITHUB_PAT chưa set");
+      return false;
+    }
+    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_read_report.yml/dispatches";
+    const resp = UrlFetchApp.fetch(url, {
+      method: "post",
+      headers: {
+        "Authorization": "Bearer " + pat,
+        "Accept":        "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type":  "application/json"
+      },
+      payload: JSON.stringify({ ref: "main" }),
+      muteHttpExceptions: true
+    });
+    const code = resp.getResponseCode();
+    Logger.log("[triggerDailyReadReport] GitHub API response: " + code);
+    return code === 204;
+  } catch(e) {
+    Logger.log("[triggerDailyReadReport] ❌ Lỗi: " + e.message);
+    return false;
+  }
+}
+
+
+// ── Dispatch daily_plan_report.yml lúc 21:00 Myanmar
+function triggerDailyPlanReport() {
+  try {
+    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
+    if (!pat) {
+      Logger.log("[triggerDailyPlanReport] ⚠️ GITHUB_PAT chưa set");
+      return false;
+    }
+    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_plan_report.yml/dispatches";
+    const resp = UrlFetchApp.fetch(url, {
+      method: "post",
+      headers: {
+        "Authorization": "Bearer " + pat,
+        "Accept":        "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type":  "application/json"
+      },
+      payload: JSON.stringify({ ref: "main" }),
+      muteHttpExceptions: true
+    });
+    const code = resp.getResponseCode();
+    Logger.log("[triggerDailyPlanReport] GitHub API response: " + code);
+    return code === 204;
+  } catch(e) {
+    Logger.log("[triggerDailyPlanReport] ❌ Lỗi: " + e.message);
     return false;
   }
 }

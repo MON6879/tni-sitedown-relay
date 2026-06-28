@@ -2,9 +2,7 @@ name: Daily Note Read Report (20:30 Myanmar)
 
 # 20:30 Myanmar (UTC+6:30) = 14:00 UTC — check who read Note by 20:00
 on:
-  schedule:
-    - cron: "0 14 * * *"
-  workflow_dispatch:          # Manual trigger for testing
+  workflow_dispatch:          # Triggered from GAS at 20:30 Myanmar
 
 jobs:
   read-report:

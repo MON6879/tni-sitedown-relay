@@ -1,9 +1,7 @@
 name: Daily Plan Report (21:00 Myanmar)
 
 on:
-  schedule:
-    - cron: '30 14 * * *'  # 14:30 UTC = 21:00 Myanmar
-  workflow_dispatch:       # Manual trigger
+  workflow_dispatch:       # Triggered from GAS at 21:00 Myanmar
 
 jobs:
   daily-plan-report:
