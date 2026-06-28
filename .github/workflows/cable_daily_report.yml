@@ -30,4 +30,5 @@ jobs:
           COLLECTOR_BOT_TOKEN: ${{ secrets.COLLECTOR_BOT_TOKEN }}
           CABLE_APPS_SCRIPT_URL: ${{ secrets.CABLE_APPS_SCRIPT_URL }}
           CABLE_CHAT_ID: ${{ secrets.CABLE_CHAT_ID }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
         run: python cable_report.py

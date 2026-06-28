@@ -91,7 +91,7 @@ def format_report(stats: dict) -> str:
     return "\n".join(lines)
 
 
-def send_telegram(chat_id: str, text: str) -> bool:
+def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
     """Send message to Telegram group."""
     url  = f"https://api.telegram.org/bot{CABLE_BOT_TOKEN}/sendMessage"
     resp = requests.post(
@@ -99,12 +99,15 @@ def send_telegram(chat_id: str, text: str) -> bool:
         json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
         timeout=15,
     )
-    ok = resp.json().get("ok", False)
+    res_json = resp.json()
+    ok = res_json.get("ok", False)
+    msg_id = None
     if ok:
         print(f"✅ Report sent to {chat_id}")
+        msg_id = res_json.get("result", {}).get("message_id")
     else:
         print(f"❌ Send failed: {resp.text[:200]}", file=sys.stderr)
-    return ok
+    return ok, msg_id
 
 
 def main():
@@ -114,6 +117,14 @@ def main():
         print("❌ COLLECTOR_BOT_TOKEN not set", file=sys.stderr)
         sys.exit(1)
 
+    gas_url = os.getenv("APPS_SCRIPT_URL", "") or CABLE_APPS_SCRIPT_URL
+    if gas_url:
+        try:
+            from delete_old_helper import delete_old_messages_bot
+            delete_old_messages_bot(CABLE_BOT_TOKEN, CABLE_CHAT_ID, gas_url, "CABLE_DAILY_REPORT")
+        except Exception as e:
+            print(f"⚠️ Error deleting old cable report: {e}", file=sys.stderr)
+
     stats = get_stats()
     if stats is None:
         print("⚠️ No stats available, sending fallback message")
@@ -122,7 +133,13 @@ def main():
 
     msg = format_report(stats)
     print("📨 Report:\n" + msg)
-    send_telegram(CABLE_CHAT_ID, msg)
+    ok, msg_id = send_telegram(CABLE_CHAT_ID, msg)
+    if ok and gas_url and msg_id:
+        try:
+            from delete_old_helper import save_msgids
+            save_msgids(gas_url, "CABLE_DAILY_REPORT", [msg_id])
+        except Exception as e:
+            print(f"⚠️ Error saving cable report msgid: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
