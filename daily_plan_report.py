@@ -1024,8 +1024,11 @@ async def main():
                 lines.append(divider)
                 lines.append("📋 FT Plan & Actual Summary:")
                 for emp in sorted(emps, key=lambda e: e.get("name", "")):
-                    name = emp.get("name", "")
                     sys_name = emp.get("sys_name", emp.get("username", ""))
+                    if sys_name and "team leader" in str(sys_name).lower():
+                        continue
+
+                    name = emp.get("name", "")
                     tg_id = str(emp.get("telegram_id", emp.get("tg_id", ""))).replace(".0", "")
 
                     assigned_set = emp_assigned_map.get(tg_id, set())
@@ -1045,9 +1048,9 @@ async def main():
                     # - 🟡 = >0% but <100% completed (report sent)
                     # - 🔴 = Plan assigned, but report not sent (0% completion)
                     # - 🔵 = No plan assigned, but report was sent
-                    # - ⚪ = No plan assigned, and report not sent
+                    # - ⚫ = No plan assigned, and report not sent
                     if not assigned_set:
-                        color = "🔵" if sent_today else "⚪"
+                        color = "🔵" if sent_today else "⚫"
                     else:
                         if sent_today:
                             pct = int((len(done_set) / len(assigned_set)) * 100)
