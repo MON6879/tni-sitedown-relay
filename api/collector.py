@@ -152,7 +152,7 @@ def post_mdg_photo(payload: dict):
         return {"status": "error", "message": "MDG_APPS_SCRIPT_URL not configured"}
     try:
         # connect_timeout=10s, read_timeout=8s — just enough to deliver payload
-        resp = requests.post(MDG_APPS_SCRIPT_URL, json=payload, timeout=(10, 8))
+        resp = requests.post(MDG_APPS_SCRIPT_URL, json=payload, timeout=(10, 20))
         resp.raise_for_status()
         logger.info(f"MDG photo GAS response: {resp.text[:200]}")
         return resp.json()
@@ -245,8 +245,16 @@ def parse_cable_fields(text: str) -> dict:
 
 # ── Detect collector keyword in message ───────────────────────────────────
 def is_collector_msg(text: str) -> bool:
+    """Match keyword at start of any line, case-insensitive, with or without ':'."""
     lower = text.lower()
-    return any(f"{k}:" in lower for k in get_keywords())
+    for k in get_keywords():
+        # Match keyword at start of text or start of any line
+        # Cho phép có hoặc không có ":" sau keyword, hoặc đứng ở cuối dòng/tin nhắn
+        # Ví dụ: "Order: abc", "Order abc", "order:abc", "ORDER", "hello\norder"
+        pattern = r'(?:^|\n)\s*' + re.escape(k) + r'(?:\s*[:\s]|\s*$)'
+        if re.search(pattern, lower):
+            return True
+    return False
 
 
 # ── Main async handler ────────────────────────────────────────────────────
@@ -568,7 +576,17 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
 
     # ── Inventory Report message ─────────────────────────────────────────
     if "inventory fuel" in text.lower():
-        fields = parse_inv_fields(text)
+        # FIX: forward từ Viber → trim text từ dòng đầu có "inventory fuel"
+        lines_inv = text.splitlines()
+        inv_start_idx = next(
+            (i for i, ln in enumerate(lines_inv) if "inventory fuel" in ln.lower()),
+            0
+        )
+        inv_text = "\n".join(lines_inv[inv_start_idx:]).strip()
+        if inv_start_idx > 0:
+            logger.info(f"[INV] Trimmed {inv_start_idx} header line(s) before Inventory section")
+
+        fields = parse_inv_fields(inv_text)
         dg_id = fields.get("dg id", "")
 
         payload = {
@@ -578,7 +596,7 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
             "sender_name": sender_name,
             "sender_id":   sender_id,
             "fields":      fields,
-            "raw":         text,
+            "raw":         inv_text,
         }
 
         result = post_mdg_sheet(payload)
@@ -599,7 +617,18 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
 
     # ── MDG Report message ───────────────────────────────────────────────
     if "mdg" in text.lower():
-        fields = parse_mdg_fields(text)
+        # FIX: forward từ Viber / copy-paste có thể có text thừa trước "MDG ::Report"
+        # → tìm dòng đầu tiên có chữ "MDG" và parse từ đó
+        lines = text.splitlines()
+        mdg_start_idx = next(
+            (i for i, ln in enumerate(lines) if "mdg" in ln.lower()),
+            0  # fallback: dùng toàn bộ text nếu không tìm thấy
+        )
+        mdg_text = "\n".join(lines[mdg_start_idx:]).strip()
+        if mdg_start_idx > 0:
+            logger.info(f"[MDG] Trimmed {mdg_start_idx} header line(s) before MDG section")
+
+        fields = parse_mdg_fields(mdg_text)
         site_id = fields.get("site id", "")
 
         payload = {
@@ -609,7 +638,7 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
             "sender_name": sender_name,
             "sender_id":   sender_id,
             "fields":      fields,
-            "raw":         text,
+            "raw":         mdg_text,   # lưu text đã trim, không lưu phần header thừa
         }
 
         result = post_mdg_sheet(payload)

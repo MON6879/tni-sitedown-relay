@@ -699,3 +699,15 @@ Timeout: 25s (đủ cho GAS cold start)
 
 KHÔNG ĐỤNG: dòng 460-489 trong api/search_bot.py
 ```
+
+### 5. Vercel collector.py — Collector Keyword Matching
+```
+✅ ĐÃ XÁC NHẬN HOẠT ĐỘNG 28/06/2026
+Flow: Nhân viên gửi tin nhắn có từ khóa (Order, Revoke...) -> Bot lưu vào Sheet "Asset order and request"
+File: api/collector.py dòng 245-256 (hàm is_collector_msg)
+Logic: Match từ khóa ở đầu tin nhắn hoặc đầu dòng mới, không phân biệt hoa thường, cho phép có hoặc không có dấu ":"
+Mẫu thử nghiệm: "Order SC/path cord", "Order: SC/path", "ORDER...", "hello\nOrder..."
+
+KHÔNG ĐỤNG: dòng 245-256 trong api/collector.py
+```
+
