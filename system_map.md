@@ -732,4 +732,19 @@ KHÔNG ĐỤNG:
   - Hàm handleDone() dòng 318-380 trong apps_script_collector.js
 ```
 
+### 7. Auto Copy & Delete Processor (auto_copy_processor.js)
+```
+✅ ĐÃ XÁC NHẬN HOẠT ĐỘNG 28/06/2026
+Flow:
+  - Lịch trình: Trigger tự động chạy 22:00 hàng ngày (Myanmar Time)
+  - Spreadsheet cấu hình: 19RBlwehMC6BLoueaTEzsJHMx4puB0CTE5i5x79-uI6c (tab Auto_Copy_Config)
+  - Dữ liệu cấu hình gồm 10 cột (A:J):
+      - Cột A đến I: Link/Tab/Cột điều kiện cho Copy, Paste và Delete Row
+      - Cột J (Sort): Tên sheet + cột cần sort A:Z sau khi paste xong (Ví dụ: "2.1 Your Data solution!D")
+  - Tối ưu hóa: Sử dụng cache ssCache_ để tránh gọi mở file nhiều lần, tăng tốc độ xử lý gấp 5-10 lần khi có 50+ hàng cấu hình.
+
+KHÔNG ĐỤNG:
+  - Toàn bộ file auto_copy_processor.js
+```
+
 
