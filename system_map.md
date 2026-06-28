@@ -100,7 +100,6 @@ Trong `apps_script_collector.js`:
 | [collector.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/api/collector.py) | **Vercel webhook** | Bot thu thập — lưu Order/Revoke... vào Sheet |
 | [cron_send.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/cron_send.py) | **GitHub Actions** | Gửi task remain hàng ngày 17:30 — dùng SEND_BOT cho tất cả |
 | [daily_plan_report.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/daily_plan_report.py) | **GitHub Actions** | Thu thập Daily Plan từ TL → Sheet + gửi report 3Day/7Day/Month 17:30 |
-| [send_now.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/send_now.py) | **GitHub Actions** | Gửi search stats + asset stats + D75:E87 custom |
 | [telegram_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/telegram_bot.py) | ~~GitHub Actions~~ | ⚠️ ĐÃ THAY THẾ bởi `api/search_bot.py` (Vercel webhook) |
 | [apps_script_collector.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_collector.js) | **Apps Script** | Backend xử lý dữ liệu Sheet |
 | [auto_copy_processor.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/auto_copy_processor.js) | **Apps Script** | Tự động xử lý Copy-Paste & Xóa dòng theo file Config lúc 22:00 |
@@ -137,7 +136,6 @@ Trong `apps_script_collector.js`:
 |---|---|---|---|
 | **Daily Task Reminder (17:30 Myanmar)** | `daily_task.yml` | `0 11 * * *` UTC = 17:30 Myanmar | `cron_send.py` |
 | **Daily Plan Report (17:30 Myanmar)** | `daily_plan_report.yml` | `0 11 * * *` UTC = 17:30 Myanmar | `daily_plan_report.py` |
-| Gửi thông báo task | `daily_send.yml` | `30 10 * * *` UTC = 17:00 Myanmar | `send_now.py` |
 | **Botlookup TNI Relay** | `botlookup_relay.yml` | `0,30 22,23 * * *` + `0,30 0-14 * * *` + `0 15 * * *` UTC = 04:30–21:30 Myanmar mỗi 30p | `botlookup_relay.py` |
 | ~~TNI Search Bot 24/7~~ | `tni_search_bot.yml` | **⚠️ ĐÃ TẮT** — chuyển sang Vercel webhook (`api/search_bot.py`) | ~~`telegram_bot.py`~~ |
 | ~~Telegram Daily Send~~ | `telegram_send.yml` | **⚠️ ĐÃ TẮT** — cron cũ `30 17` UTC = 00:00 Myanmar (SAI) | ~~`cron_send.py`~~ |
@@ -504,15 +502,13 @@ SAI:   clasp deploy                 ← tạo deployment mới chưa có quyền
 | # | Cập nhật ở đâu | Dùng cho | Cách cập nhật |
 |---|---|---|---|
 | 1 | **Vercel Environment Variables** | `search_bot.py` (TNI search bot) | `vercel env rm APPS_SCRIPT_URL production --yes` → `Write-Output "URL" \| vercel env add APPS_SCRIPT_URL production` → `vercel --prod --yes` |
-| 2 | **GitHub Secrets** | `botlookup_relay.py`, `daily_send.py`, `telegram_send.py`, `daily_task.py`, `send_teams_telethon.py` | [github.com/.../settings/secrets/actions](https://github.com/phonghdpxd-cmd/tni-bot/settings/secrets/actions) → `APPS_SCRIPT_URL` → Update |
+| 2 | **GitHub Secrets** | `botlookup_relay.py`, `telegram_send.py`, `daily_task.py` | [github.com/.../settings/secrets/actions](https://github.com/phonghdpxd-cmd/tni-bot/settings/secrets/actions) → `APPS_SCRIPT_URL` → Update |
 | 3 | **`.env` local** | Test local | Sửa trực tiếp file `.env` |
 
 **Các workflow GitHub dùng `APPS_SCRIPT_URL`:**
 - `botlookup_relay.yml` — lấy site down, ghi store_site_down, đọc Note B2:B5
-- `daily_send.yml` — báo cáo hàng ngày
 - `telegram_send.yml` — gửi task nhân viên
 - `daily_task.yml` — daily task
-- `send_teams_telethon.yml` — gửi teams
 
 
 

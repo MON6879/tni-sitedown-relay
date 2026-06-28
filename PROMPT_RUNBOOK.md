@@ -12,7 +12,6 @@ Hệ thống tự động gửi báo cáo Telegram cho **4 Teams + Management** 
 | **Tin 1** — Site down list per team | Khi có báo cáo mới vào Col A | `8647102342:AAGwI95-...` | T1/T2/T3/T4 + CONTROL |
 | **Tin 2** — Summary (site/cell/DG/link) | Khi AW4:AZ8 thay đổi | `8647102342:AAGwI95-...` | T1/T2/T3/T4 |
 | **Daily 17:30** — Task remain + WO | GitHub Actions 11:00 UTC | `SEND_BOT 8897800070:...` | Nhân viên + TL + BOD |
-| **Daily 17:00** — Search + Asset stats | GitHub Actions 10:30 UTC | `SEND_BOT` | Tech Dept |
 
 ---
 
@@ -23,15 +22,12 @@ d:\6. AI\1. QLTC\
 ├── Task and WO\                    ← Repo chính: phonghdpxd-cmd/tni-bot
 │   ├── site_down_notify.gs         ← Apps Script: Tin 1 + Tin 2 (site down)
 │   ├── cron_send.py                ← GitHub Actions: Daily task remain 17:30
-│   ├── send_now.py                 ← GitHub Actions: Daily search+asset 17:00
 │   ├── system_map.md               ← Kiến trúc hệ thống
 │   ├── PROMPT_RUNBOOK.md           ← File này
 │   ├── api/collector.py            ← Vercel: Bot thu thập order/revoke
 │   └── .github/workflows/
-│       ├── daily_task.yml          ← ✅ ACTIVE: 0 11 * * * UTC = 17:30 Myanmar
-│       ├── daily_send.yml          ← ✅ ACTIVE: 30 10 * * * UTC = 17:00 Myanmar
-│       └── telegram_send.yml       ← ❌ DISABLED: cron sai (00:00 Myanmar)
-├── QLTC_GAS\                       ← Finance/Settlement system (khác biệt)
+│       └── daily_task.yml          ← ✅ ACTIVE: 0 11 * * * UTC = 17:30 Myanmar
+└── QLTC_GAS\                       ← Finance/Settlement system (khác biệt)
 ├── auto_send_17h30.gs              ← Apps Script: Leader report 17:30
 └── telegram_report_bot.gs          ← Apps Script: Task progress report
 ```
@@ -59,7 +55,7 @@ d:\6. AI\1. QLTC\
 | Bot | Token (4 số đầu) | Dùng cho |
 |---|---|---|
 | Site Down Bot | `8647102342:AAGwI95-...` | site_down_notify.gs |
-| SEND_BOT | `8897800070:AAHc...` | cron_send.py + send_now.py |
+| SEND_BOT | `8897800070:AAHc...` | cron_send.py |
 | TNIREPORTTASK_BOT | `8646913750:AAG3...` | telegram_report_bot.gs |
 | Collector Bot | `8928677923:AAE_...` | api/collector.py |
 
