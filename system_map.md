@@ -103,6 +103,7 @@ Trong `apps_script_collector.js`:
 | [send_now.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/send_now.py) | **GitHub Actions** | Gửi search stats + asset stats + D75:E87 custom |
 | [telegram_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/telegram_bot.py) | ~~GitHub Actions~~ | ⚠️ ĐÃ THAY THẾ bởi `api/search_bot.py` (Vercel webhook) |
 | [apps_script_collector.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_collector.js) | **Apps Script** | Backend xử lý dữ liệu Sheet |
+| [auto_copy_processor.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/auto_copy_processor.js) | **Apps Script** | Tự động xử lý Copy-Paste & Xóa dòng theo file Config lúc 22:00 |
 
 ---
 
