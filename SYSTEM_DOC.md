@@ -146,6 +146,18 @@ Missing: TNI0052, TNI0185, TNI0058
 - One-time check: who read last message in each group
 - Uses Telethon
 
+### 6. `backlog_send.py` — Daily Backlog Report (17:35 Myanmar)
+- **Trigger:** GitHub Actions `daily_task.yml` (runs right after `cron_send.py`)
+- **Schedule:** 17:35 Myanmar = 11:05 UTC
+- **Bot:** `@TNIREPORTTASK_BOT` (SEND_BOT_TOKEN)
+- **What it sends:**
+  - **Report 2 (sent first):** Category/Description backlog details by columns K:L and M:P.
+  - **Report 1 (sent second):** Task progress backlog details by columns C and D:H (appending Team 5 to Team 2).
+  - **Report 3 (sent third):** Generator Materials Summary (KVA filter capacities, oil/coolant plans, stocks and differences) grouped separately by sub-team (e.g., `T3`, `T3 S1` separately), highlighting numbers > 0 with a blue indicator (`🔵`).
+- **Key Features:**
+  - **Message Deletion Isolation:** Deletes its own previous backlog messages (using keys like `BACKLOG_TEAM_T1`, etc.) via the Apps Script helper API before sending new ones, ensuring they are independent and not touched/deleted by `cron_send.py` (freezing).
+  - **No CONTROL Group Send:** Only sends reports to the respective Team groups (T1, T2, T3, T4), never to the CONTROL group.
+
 ---
 
 ## 📡 Telegram Groups & IDs
@@ -203,6 +215,7 @@ Missing: TNI0052, TNI0185, TNI0058
 |---|---|---|---|
 | **17:30** | `cron_send.py` | `daily_task.yml` | Task + Asset + Search reports to all groups |
 | **17:30** | `daily_plan_report.py` | `daily_plan_report.yml` | Daily Plan collection + 3Day/7Day/Month report |
+| **17:35** | `backlog_send.py` | `daily_task.yml` | Daily Backlog reports (Report 2, 1, 3) to team groups |
 | **20:30** | `daily_read_report.py` | `daily_read_report.yml` | Note read status per-person to teams + CONTROL |
 
 ---
