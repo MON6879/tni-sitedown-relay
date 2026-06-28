@@ -711,3 +711,24 @@ Mẫu thử nghiệm: "Order SC/path cord", "Order: SC/path", "ORDER...", "hello
 KHÔNG ĐỤNG: dòng 245-256 trong api/collector.py
 ```
 
+### 6. Asset Collection Logic (GAS & Python)
+```
+✅ ĐÃ XÁC NHẬN HOẠT ĐỘNG 28/06/2026
+Flow:
+  - Tin nhắn chứa keyword (Order, Revoke...) -> api/collector.py gửi POST đến GAS action "add"
+  - GAS apps_script_collector.js:handleAdd(sheet, body) ghi:
+      - Cột A: REF (Số thứ tự tự tăng = row - 1)
+      - Cột B: Date Sent (Thời gian gửi)
+      - Cột C: Telegram ID (ID người gửi)
+      - Cột D: Content (Nội dung tin nhắn gốc)
+      - Cột E: Asset action done (Mặc định trống)
+  - Ảnh gửi kèm -> upload qua action "add_photo" bằng Base64 -> lưu Drive -> ghi link vào cột F–Q (tối đa 12 ảnh)
+  - Xác nhận hoàn thành -> action "done" -> ghi "Done + ngày giờ + tên Admin" vào cột E
+
+KHÔNG ĐỤNG:
+  - Hàm handleAdd() dòng 166-212 trong apps_script_collector.js
+  - Hàm handleAddPhoto() dòng 219-315 trong apps_script_collector.js
+  - Hàm handleDone() dòng 318-380 trong apps_script_collector.js
+```
+
+
