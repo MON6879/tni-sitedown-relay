@@ -130,7 +130,7 @@ function drGatherData(ss) {
   if (logSh && logSh.getLastRow() >= 2) {
     const rows = logSh.getRange(2,1,logSh.getLastRow()-1,5).getValues();
     for (const r of rows) {
-      const dt=str(r[0]), uid=str(r[3]), tni=str(r[4]);  // col D = User ID, col E = TNI Code
+      const dt=dateToStr(r[0]), uid=str(r[3]), tni=str(r[4]);  // col D = User ID, col E = TNI Code
       if (!uid) continue;
       if (!tni.toUpperCase().startsWith("TNI")) continue; // Chỉ đếm tra cứu TNIxxxx
       if (!srch[uid]) srch[uid]={today:0,d1:0,d2:0,week:0,month:0};

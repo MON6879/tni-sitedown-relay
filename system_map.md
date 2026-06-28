@@ -515,21 +515,10 @@ SAI:   clasp deploy                 ← tạo deployment mới chưa có quyền
 
 
 
-### Search Log — Cấu trúc ghi (24/06/2026)
-
-```
-Sheet: Team All Find (SD_SHEET_ID = 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow)
-Tab:   "Search Log"
-Cột:   Date (A) | Time (B) | User Name (C) | User ID (D) | TNI Code (E)
-date:  YYYY-MM-DD (ISO) — Google Sheets đọc đúng
-time:  HH:MM
-Chỉ ghi khi: text Telegram khớp TNIxxxx
-KHÔNG ghi: Info:, Daily, các lệnh khác
-GAS:   handleLogSearch() → mở SD_SHEET_ID (không phải SHEET_ID!) → reset A:B "General" → appendRow
-```
-
-> [!WARNING]
-> `handleLogSearch` phải dùng `SD_SHEET_ID` (Team All Find), **không phải** `ss` (SHEET_ID/Collector) được truyền vào từ `doPost`. Nếu dùng nhầm `ss`, dữ liệu ghi vào sheet Collector và user sẽ không thấy gì cả!
+> [!CAUTION]
+> **ĐOẠN NÀY ĐÃ BỊ XÓA (28/06/2026)** — trước đây có 1 đoạn SAI nói `handleLogSearch` dùng `SD_SHEET_ID`.
+> Thực tế `handleLogSearch` dùng `ss` (= SHEET_ID = Team All Find). Xem đoạn ĐÚNG ở dòng 465-475 phía trên.
+> Đoạn sai đã gây nhầm lẫn nhiều lần. **ĐÃ XÓA VĨNH VIỄN.**
 
 > **Lưu ý `botlookup_relay.py`**: Guard `raw_note` phải check `is_html` (`<!doctype` / `<html`) VÀ `status_code != 200`. Nếu không, HTML 404 từ GAS sẽ bị gửi vào tất cả Telegram groups.
 
@@ -612,11 +601,26 @@ for (let i = 0; i < colC.length; i++) {
 logSheet.getRange(nextRow, 1, 1, 5).setValues([[dateObj, gasTime, userName, userId, tniCode]]);
 ```
 
-### 8. `APPS_SCRIPT_URL` — phải cập nhật CẢ VERCEL lẫn GITHUB SECRET
+### 8. 🔒 `APPS_SCRIPT_URL` trên Vercel — ĐÃ MẤT 2 LẦN (24/06 + 28/06) — ĐÓNG BĂNG!
 ```
-Vercel   → search_bot.py → log_search (Search Log)
-GitHub   → botlookup_relay.py → store_site_down (Site Down col A)
-Thiếu 1 trong 2 → chức năng đó âm thầm không ghi, không báo lỗi!
+⚠️ APPS_SCRIPT_URL bị mất trên Vercel = Search Log CHẾT ÂM THẦM (không báo lỗi gì cả!)
+
+URL hiện tại (ĐÚNG — KHÔNG ĐỔI):
+https://script.google.com/macros/s/AKfycbzGFdnESGcSMt0Of7PrBIOHDXmuLCZsiraGv5iNzWrw4rjdxm8CGBDuVIP8pnPEkAULww/exec
+
+Phải có ở CẢ 3 CHỖ:
+  [x] Vercel Production env var → search_bot.py → log_search (Search Log)
+  [x] GitHub Secret             → botlookup_relay.py → store_site_down
+  [x] .env local                → test local
+
+Khi nào cần kiểm tra:
+  - Sau BẤT KỲ lần `vercel --prod` nào
+  - Sau khi thêm/xóa env var khác trên Vercel  
+  - Khi Search Log ngừng ghi dữ liệu mới
+
+Cách kiểm tra nhanh:
+  npx -y vercel env ls production
+  → phải thấy APPS_SCRIPT_URL trong danh sách!
 ```
 
 ---
@@ -630,3 +634,68 @@ Thiếu 1 trong 2 → chức năng đó âm thầm không ghi, không báo lỗi
 | Data ghi vào row 1017 thay vì 133 | `setNumberFormat("A:B")` làm format cả 1000 ô trống | Dùng scan cột C tìm nextRow |
 | Date hiển thị là số (46190) thay vì 17/06/2026 | `setNumberFormat("General")` xóa format date cũ | Chỉ format dòng mới, dùng Date object |
 | Site Down không ghi vào cột A | `APPS_SCRIPT_URL` trống trong GitHub Secret | Cập nhật GitHub Secret |
+
+### 28/06/2026 — Search Log lần 2 + Date parsing
+| Vấn đề | Nguyên nhân | Fix |
+|---|---|---|
+| Search Log ngừng ghi từ 27/06 | `APPS_SCRIPT_URL` lại bị mất trên Vercel (lần 2!) | Thêm lại env var + redeploy Vercel |
+| Search Stats luôn = 0 | `getValues()` trả Date object, `toString()` cho `"Fri Jun 26..."` → `split("/")` fail → skip tất cả rows | Thêm helper `dateToStr()` — `instanceof Date` → `Utilities.formatDate()` |
+| system_map.md mâu thuẫn | Đoạn 518-532 nói SAI rằng `handleLogSearch` dùng `SD_SHEET_ID` (ngược với đoạn 465-475 ĐÚNG) | Xóa đoạn sai, ghi chú cảnh báo |
+
+---
+
+## 🔒 ĐÓNG BĂNG — Các thành phần ĐÃ HOẠT ĐỘNG (28/06/2026)
+
+> [!CAUTION]
+> Các thành phần dưới đây đã được xác nhận hoạt động đúng. **KHÔNG SỬA** trừ khi có lý do rõ ràng.
+
+### 1. Search Log — GHI (handleLogSearch)
+```
+✅ ĐÃ XÁC NHẬN HOẠT ĐỘNG 28/06/2026
+File:  apps_script_collector.js → handleLogSearch(ss, body)
+Sheet: SHEET_ID = "1Etd2P..." (Team All Find) — dùng ss từ doPost
+Tab:   "Search Log" (GID: 1426553697)
+Ghi:   dateObj (Date object) + gasTime + userName + userId + tniCode
+Scan:  Cột C tìm ô trống đầu tiên (KHÔNG dùng getLastRow)
+Format: dd/MM/yyyy chỉ trên dòng mới
+
+KHÔNG ĐỤNG: dòng 576-614 trong apps_script_collector.js
+```
+
+### 2. Search Log — ĐỌC (dateToStr helper)
+```
+✅ ĐÃ XÁC NHẬN HOẠT ĐỘNG 28/06/2026
+Helper: dateToStr(val) — dòng 566-571 trong apps_script_collector.js
+  - Date object → Utilities.formatDate(val, "Asia/Rangoon", "dd/MM/yyyy")
+  - String      → giữ nguyên
+
+Dùng ở 3 chỗ:
+  1. refreshStats()         — dòng 676
+  2. buildSearchStatsMap()  — dòng 836
+  3. drGatherData()         — 10_DASHBOARD_REPORT.gs dòng 133
+
+KHÔNG ĐỤNG: hàm dateToStr() và 3 chỗ gọi nó
+```
+
+### 3. APPS_SCRIPT_URL trên Vercel
+```
+✅ ĐÃ XÁC NHẬN HOẠT ĐỘNG 28/06/2026
+URL: https://script.google.com/macros/s/AKfycbzGFdnESGcSMt0Of7PrBIOHDXmuLCZsiraGv5iNzWrw4rjdxm8CGBDuVIP8pnPEkAULww/exec
+
+Kiểm tra sau MỖI lần deploy Vercel:
+  npx -y vercel env ls production
+  → PHẢI thấy APPS_SCRIPT_URL!
+
+KHÔNG ĐỤNG: Không xóa, không đổi URL trừ khi GAS deployment thay đổi
+```
+
+### 4. Vercel search_bot.py — log_search flow
+```
+✅ ĐÃ XÁC NHẬN HOẠT ĐỘNG 28/06/2026
+Flow: User gõ TNIxxxx → bot trả kết quả → gọi GAS log_search → ghi Search Log
+File: api/search_bot.py dòng 472-489
+Guard: if APPS_SCRIPT_URL: (dòng 474)
+Timeout: 25s (đủ cho GAS cold start)
+
+KHÔNG ĐỤNG: dòng 460-489 trong api/search_bot.py
+```

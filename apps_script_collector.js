@@ -3,7 +3,10 @@
 // ============================================================
 // Deploy as Web App:
 //   Execute as: Me | Who has access: Anyone
+// v2026-06-26c — CRITICAL FIX: store_site_down routing confirmed in doPost (line 57)
+//                + getNoteB2B5 self-contained + handleStoreSiteDownDirect self-contained
 // ============================================================
+
 
 const SHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8";
 
@@ -556,6 +559,18 @@ function handleGetUsers(ss) {
 }
 
 // ============================================================
+// HELPER: dateToStr — convert Date object hoặc string thành "dd/MM/yyyy"
+// getValues() trả Date object, toString() cho "Fri Jun 26..." → split("/") fail
+// Hàm này xử lý cả 2 kiểu để parse date luôn đúng
+// ============================================================
+function dateToStr(val) {
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, "Asia/Rangoon", "dd/MM/yyyy");
+  }
+  return (val || "").toString().trim();
+}
+
+// ============================================================
 // ACTION: LOG_SEARCH — ghi nhật ký tìm kiếm TNI + cập nhật stats
 // ============================================================
 function handleLogSearch(ss, body) {
@@ -658,7 +673,7 @@ function refreshStats(ss) {
   // Tổng hợp theo user
   const users = {};  // key = userId
   for (const row of data) {
-    const dateVal  = (row[0] || "").toString().trim();
+    const dateVal  = dateToStr(row[0]);
     const userName = (row[2] || "").toString().trim();
     const userId   = (row[3] || "").toString().trim();
     if (!userId) continue;
@@ -818,7 +833,7 @@ function buildSearchStatsMap(ss) {
   const last = logSheet.getLastRow();
   const data = logSheet.getRange(2, 1, last - 1, 4).getValues();
   for (const row of data) {
-    const dateVal = (row[0] || '').toString().trim();
+    const dateVal = dateToStr(row[0]);
     const name = (row[2] || '').toString().trim().toLowerCase();
     if (!name) continue;
     if (!map[name]) map[name] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
@@ -1649,24 +1664,59 @@ function authorizeNow() {
 // ACTION: store_site_down
 // Nhận raw text từ botlookup_relay.py → ghi Cột A → checkAndSend()
 // Payload: { action: "store_site_down", text: "..." }
-// Bypass Telegram bot privacy mode — gọi thẳng GAS webhook
+// ════════════════════════════════════════════════════════════
+// SELF-CONTAINED: inline constants + writeToColumnA logic
+// Không phụ thuộc site_down_notify.gs (2 file có thể ở 2 GAS project)
 // ════════════════════════════════════════════════════════════
 function handleStoreSiteDownDirect(body) {
   try {
-    const text = (body.text || "").trim();
+    var text = (body.text || "").trim();
     if (!text) return json({ status: "error", message: "No text provided" });
 
-    const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
-    const sheet = getSheetByGid(ss, SD_SHEET_GID);
-    if (!sheet) return json({ status: "error", message: "SD sheet not found GID=" + SD_SHEET_GID });
+    // ── Inline constants (không dùng SD_SHEET_ID từ site_down_notify.gs) ──
+    var SD_SHEET_ID_LOCAL  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
+    var SD_SHEET_GID_LOCAL = 0;   // GID=0 là sheet đầu tiên
 
-    writeToColumnA(sheet, text);
-    Logger.log("[store_site_down] ✅ Đã ghi " + text.split("\n").length + " dòng vào Cột A");
+    // ── Mở spreadsheet ──
+    var ss = SpreadsheetApp.openById(SD_SHEET_ID_LOCAL);
+
+    // ── Tìm sheet theo GID (không dùng getSheetByGid từ site_down_notify.gs) ──
+    var sheet = null;
+    var allSheets = ss.getSheets();
+    for (var si = 0; si < allSheets.length; si++) {
+      if (allSheets[si].getSheetId() === SD_SHEET_GID_LOCAL) {
+        sheet = allSheets[si];
+        break;
+      }
+    }
+    // Fallback: nếu không tìm theo GID, dùng sheet đầu tiên
+    if (!sheet) sheet = ss.getSheets()[0];
+    if (!sheet) return json({ status: "error", message: "SD sheet not found" });
+
+    // ── Ghi vào Cột A: xóa cũ → ghi mới từng dòng ──
+    var lines = text.split("\n");
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 0) {
+      sheet.getRange(1, 1, lastRow, 1).clearContent();
+    }
+    var writeData = lines.map(function(line) { return [line]; });
+    if (writeData.length > 0) {
+      sheet.getRange(1, 1, writeData.length, 1).setValues(writeData);
+    }
+    Logger.log("[store_site_down] ✅ Đã ghi " + writeData.length + " dòng vào Cột A (sheet: " + sheet.getName() + ")");
+
     SpreadsheetApp.flush();
     Utilities.sleep(3000);   // chờ công thức Cột C cập nhật
-    checkAndSend();
-    Logger.log("[store_site_down] ✅ checkAndSend() xong");
-    return json({ status: "ok", lines: text.split("\n").length });
+
+    // ── Gọi checkAndSend() nếu cùng GAS project; nếu khác project thì GAS trigger 5p sẽ xử lý ──
+    try {
+      checkAndSend();
+      Logger.log("[store_site_down] ✅ checkAndSend() xong");
+    } catch(callErr) {
+      Logger.log("[store_site_down] ⚠️ checkAndSend() không khả dụng từ project này — GAS trigger 5p sẽ xử lý. Chi tiết: " + callErr.message);
+    }
+
+    return json({ status: "ok", lines: writeData.length, sheet: sheet.getName() });
   } catch(err) {
     Logger.log("[store_site_down] ❌ " + err.message);
     return json({ status: "error", message: err.message });
@@ -1683,20 +1733,97 @@ function handleStoreSiteDownDirect(body) {
 // ════════════════════════════════════════════════════════════
 function getNoteB2B5() {
   try {
-    const ss     = SpreadsheetApp.openById(SD_SHEET_ID);
-    const sheet  = getSheetByGid(ss, SD_SHEET_GID);
+    // Inline constant — không dùng SD_SHEET_ID từ site_down_notify.gs
+    var SD_SHEET_ID_LOCAL  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
+    var SD_SHEET_GID_LOCAL = 0;
+
+    var ss = SpreadsheetApp.openById(SD_SHEET_ID_LOCAL);
+
+    // Tìm sheet theo GID, fallback về sheet đầu tiên
+    var sheet = null;
+    var allSheets = ss.getSheets();
+    for (var si = 0; si < allSheets.length; si++) {
+      if (allSheets[si].getSheetId() === SD_SHEET_GID_LOCAL) {
+        sheet = allSheets[si];
+        break;
+      }
+    }
+    if (!sheet) sheet = ss.getSheets()[0];
     if (!sheet) return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
 
-    const values = sheet.getRange("B2:B5").getValues();
-    const lines  = values
-      .map(row => row[0].toString().trim())
-      .filter(line => line.length > 0);
+    var values = sheet.getRange("B2:B5").getValues();
+    var lines  = values
+      .map(function(row) { return row[0].toString().trim(); })
+      .filter(function(line) { return line.length > 0; });
 
     return ContentService
       .createTextOutput(lines.join("\n"))
       .setMimeType(ContentService.MimeType.TEXT);
   } catch(e) {
+    Logger.log("[getNoteB2B5] ❌ " + e.message);
     return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
+  }
+}
+
+
+
+
+// ============================================================
+// NOTE MESSAGE_IDS — Lưu/đọc message_ids của Note gửi bởi @Phongha79
+// botlookup_relay.py gọi GAS để lưu/đọc, rồi xóa Note cũ qua Telethon
+// ============================================================
+
+/** Lưu Note message_ids — gọi từ botlookup_relay.py */
+function handleSaveNoteMsgIds(body) {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty("SD_NOTE_MSGIDS", JSON.stringify(body.msgids || {}));
+  Logger.log("[Note] 💾 Saved Note msgids: " + JSON.stringify(body.msgids));
+  return json({ status: "ok" });
+}
+
+/** Đọc Note message_ids — gọi từ botlookup_relay.py */
+function handleGetNoteMsgIds() {
+  var props = PropertiesService.getScriptProperties();
+  var raw   = props.getProperty("SD_NOTE_MSGIDS") || "{}";
+  try {
+    return json({ status: "ok", msgids: JSON.parse(raw) });
+  } catch(e) {
+    return json({ status: "ok", msgids: {} });
+  }
+}
+
+// ============================================================
+// GENERIC MESSAGE_IDS — Lưu/đọc message_ids cho Python scripts
+// Python gọi qua HTTP POST: action=save_msgids, body={key, msgids}
+//                    GET: action=get_msgids&key=...
+// Key format: SD_MSGID_{key} — VD: CRON_TEAM_T1, PLAN_CONTROL
+// ============================================================
+
+/** Lưu generic message_ids — gọi từ Python scripts qua doPost */
+function handleSaveMsgIds(body) {
+  var key    = (body.key || "").toString().trim();
+  var msgids = body.msgids || [];
+  if (!key) return json({ status: "error", message: "Missing key" });
+
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty("SD_MSGID_" + key, JSON.stringify(msgids));
+  Logger.log("[MsgIds] 💾 Saved " + key + " = " + JSON.stringify(msgids));
+  return json({ status: "ok", key: key, count: msgids.length });
+}
+
+/** Đọc generic message_ids — gọi từ Python scripts qua doGet */
+function handleGetMsgIds(params) {
+  // params là e.parameter (GET) hoặc body (POST)
+  var key = "";
+  if (params && params.key) key = params.key.toString().trim();
+  if (!key) return json({ status: "error", message: "Missing key" });
+
+  var props = PropertiesService.getScriptProperties();
+  var raw   = props.getProperty("SD_MSGID_" + key) || "[]";
+  try {
+    return json({ status: "ok", key: key, msgids: JSON.parse(raw) });
+  } catch(e) {
+    return json({ status: "ok", key: key, msgids: [] });
   }
 }
 
