@@ -6,4 +6,5 @@
 !appsscript.json
 !daily_report_collector.gs
 !site_down_notify.gs
+!auto_copy_processor.js
 

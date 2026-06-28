@@ -240,6 +240,73 @@ def get_report_data() -> dict:
     return data
 
 
+def get_unified_employees() -> list:
+    """
+    Loads employees from TEAM_SHEET_URL and merges with stats from get_report_data().
+    """
+    employees = []
+    try:
+        resp = requests.get(TEAM_SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+        resp.raise_for_status()
+        df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str, on_bad_lines="skip")
+        
+        for idx in range(3, min(len(df), 59)):
+            row = df.iloc[idx]
+            team = str(row.iloc[0]).strip() if not pd.isna(row.iloc[0]) else ""
+            name = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else ""
+            username = str(row.iloc[2]).strip() if not pd.isna(row.iloc[2]) else ""
+            tg_id = str(row.iloc[4]).strip() if len(row) > 4 and not pd.isna(row.iloc[4]) else ""
+            if tg_id.endswith(".0"): tg_id = tg_id[:-2]
+            
+            if not name and not username: continue
+            
+            tk = team.upper()
+            if "TEAM01" in tk or "TEAM1" in tk: tk = "T1"
+            elif "TEAM02" in tk or "TEAM2" in tk or "TEAM05" in tk or "TEAM5" in tk: tk = "T2"
+            elif "TEAM03" in tk or "TEAM3" in tk: tk = "T3"
+            elif "TEAM04" in tk or "TEAM4" in tk: tk = "T4"
+            else: tk = ""
+            
+            employees.append({
+                "team": tk,
+                "name": name,
+                "sys_name": username,
+                "telegram_id": tg_id,
+                "rank": 17,
+                "close_pct": 0,
+                "wo_remain": 0,
+                "assign_remain": 0,
+                "wo_d0": 0, "wo_d1": 0, "wo_d2": 0,
+                "assign_month_close": 0
+            })
+    except Exception as e:
+        logger.error(f"Error loading unified employees from sheet: {e}")
+        
+    try:
+        report_data = get_report_data()
+        stats_map = {str(emp.get("chat_id", "")).replace(".0", ""): emp for emp in report_data.get("employees", [])}
+        
+        for emp in employees:
+            tid = emp["telegram_id"]
+            if tid in stats_map:
+                s = stats_map[tid]
+                emp["rank"] = s.get("rank", emp["rank"])
+                emp["close_pct"] = s.get("close_pct", emp["close_pct"])
+                emp["wo_remain"] = s.get("wo_remain", emp["wo_remain"])
+                emp["assign_remain"] = s.get("assign_remain", emp["assign_remain"])
+                emp["wo_d0"] = s.get("wo_d0", emp["wo_d0"])
+                emp["wo_d1"] = s.get("wo_d1", emp["wo_d1"])
+                emp["wo_d2"] = s.get("wo_d2", emp["wo_d2"])
+                emp["assign_month_close"] = s.get("assign_month_close", emp["assign_month_close"])
+    except Exception as e:
+        logger.error(f"Error merging employee stats: {e}")
+        
+    return employees
+
+
+
+
+
 def build_emp_compact_line(emp: dict, daily_counts: dict | None = None) -> str:
     """
     Format gọn 1 dòng cho nhân viên:
@@ -277,8 +344,88 @@ def build_emp_compact_line(emp: dict, daily_counts: dict | None = None) -> str:
     return (
         f"{color} {display_name}: rank:{rank} | Close:{close_pct}% "
         f"<{wo_d2}/{wo_d1}/{wo_d0}> | WO remain:{wo_remain} "
-        f"| Task:{assign_mo}:{wo_d2}/{wo_d1}/{wo_d0}{dr_part}"
     )
+
+
+def parse_assigned_tni_per_person(plan_text: str, team_emps: list) -> dict:
+    """
+    Parses a plan text and maps each employee's tg_id to their assigned TNI codes.
+    """
+    assigned = {}
+    emp_patterns = []
+    for emp in team_emps:
+        names_to_try = []
+        username = str(emp.get("sys_name", emp.get("username", ""))).lower()
+        if username.startswith("myt_"):
+            username = username[4:]
+        username = re.sub(r'\d+', '', username)
+        if username:
+            names_to_try.append(username.replace(".", " "))
+            names_to_try.append(username.replace(".", ""))
+        disp_name = str(emp.get("name", "")).lower()
+        if disp_name:
+            names_to_try.append(disp_name)
+        names_to_try = list(set(n.strip() for n in names_to_try if n.strip()))
+        if names_to_try:
+            names_to_try.sort(key=len, reverse=True)
+            pattern_str = r'\b(?:' + '|'.join(re.escape(n) for n in names_to_try) + r')\b'
+            emp_patterns.append((emp, re.compile(pattern_str, re.IGNORECASE)))
+            
+    for line in plan_text.splitlines():
+        line = line.strip()
+        if not line: continue
+        matches = []
+        for emp, pattern in emp_patterns:
+            for match in pattern.finditer(line):
+                matches.append((match.start(), match.end(), emp))
+        if not matches: continue
+        matches.sort(key=lambda x: (x[0], x[1]))
+        for i in range(len(matches)):
+            start_pos = matches[i][0]
+            end_pos = matches[i+1][0] if i + 1 < len(matches) else len(line)
+            segment = line[start_pos:end_pos]
+            tni_codes = extract_tni_codes(segment)
+            if tni_codes:
+                tg_id = str(matches[i][2].get("telegram_id", matches[i][2].get("tg_id", ""))).replace(".0", "")
+                assigned.setdefault(tg_id, set()).update(tni_codes)
+    return assigned
+
+
+def get_employee_completed_tni_today(df_report, target_date: str) -> dict:
+    """
+    Given the df_report dataframe, extracts all completed TNI codes today per employee telegram ID.
+    Returns: { tg_id: set_of_TNI_codes }
+    """
+    completed = {}
+    if df_report is None or df_report.empty:
+        return completed
+        
+    date_idx = 2
+    tg_idx = 17
+    for col_idx, col_name in enumerate(df_report.columns):
+        c_lower = col_name.lower().strip()
+        if "daily report" in c_lower and not ":" in c_lower:
+            date_idx = col_idx
+        elif "telegram id" in c_lower:
+            tg_idx = col_idx
+            
+    for idx, row in df_report.iterrows():
+        date_cell = str(row.iloc[date_idx]).strip() if not pd.isna(row.iloc[date_idx]) else ""
+        tg_id = str(row.iloc[tg_idx]).strip() if len(row) > tg_idx and not pd.isna(row.iloc[tg_idx]) else ""
+        
+        if not tg_id or tg_id.lower() in ("nan", "none"): continue
+        if target_date and date_cell and target_date not in date_cell:
+            continue
+            
+        cid = tg_id.replace(".0", "") if tg_id.endswith(".0") else tg_id
+        
+        # Extract TNI codes from all columns starting after date up to tg_idx
+        report_content = " ".join(str(val) for val in row.iloc[date_idx+1:tg_idx] if not pd.isna(val))
+        codes = extract_tni_codes(report_content)
+        if codes:
+            completed.setdefault(cid, set()).update(codes)
+            
+    return completed
 
 
 # ── Daily Report data from Sheet ────────────────────────────────
@@ -342,19 +489,27 @@ def get_daily_reports_from_sheet(target_date: str) -> dict:
 
         if df.empty:
             logger.info("  📭 Daily report sheet is empty")
-            return team_reports
+            return team_reports, None
 
         logger.info(f"  📊 Daily report rows: {len(df)}")
 
+        # Find column indices dynamically
+        name_idx = 1
+        date_idx = 2
+        tg_idx = 17
+        for col_idx, col_name in enumerate(df.columns):
+            c_lower = col_name.lower().strip()
+            if "tên nhân viên" in c_lower and not ".1" in c_lower:
+                name_idx = col_idx
+            elif "daily report" in c_lower and not ":" in c_lower:
+                date_idx = col_idx
+            elif "telegram id" in c_lower:
+                tg_idx = col_idx
+
         for idx, row in df.iterrows():
-            # Col B (idx 0) = Tên nhân viên
-            # Col C (idx 1) = Daily report (date)
-            # Col D-Q (idx 2-15) = Data fields
-            # Col R (idx 16) = Telegram ID
-            # Col S (idx 17) = Tên nhân viên (formula)
-            emp_name = str(row.iloc[0]).strip() if not pd.isna(row.iloc[0]) else ""
-            date_cell = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else ""
-            tg_id = str(row.iloc[16]).strip() if len(row) > 16 and not pd.isna(row.iloc[16]) else ""
+            emp_name = str(row.iloc[name_idx]).strip() if not pd.isna(row.iloc[name_idx]) else ""
+            date_cell = str(row.iloc[date_idx]).strip() if not pd.isna(row.iloc[date_idx]) else ""
+            tg_id = str(row.iloc[tg_idx]).strip() if len(row) > tg_idx and not pd.isna(row.iloc[tg_idx]) else ""
 
             if emp_name.lower() in ("nan", "none", ""): emp_name = ""
             if tg_id.lower() in ("nan", "none", ""): tg_id = ""
@@ -372,7 +527,9 @@ def get_daily_reports_from_sheet(target_date: str) -> dict:
 
             # Build report text from all non-empty fields
             parts = [f"👤 {emp_name}:" if emp_name else ""]
-            for col_idx in range(2, min(16, len(row))):
+            start_col = date_idx + 1
+            end_col = tg_idx
+            for col_idx in range(start_col, min(end_col, len(row))):
                 val = str(row.iloc[col_idx]).strip() if not pd.isna(row.iloc[col_idx]) else ""
                 if val and val.lower() not in ("nan", "none"):
                     header_name = df.columns[col_idx] if col_idx < len(df.columns) else f"Col{col_idx}"
@@ -384,8 +541,9 @@ def get_daily_reports_from_sheet(target_date: str) -> dict:
 
     except Exception as e:
         logger.error(f"Daily report read error: {e}")
+        return team_reports, None
 
-    return team_reports
+    return team_reports, df
 
 
 def get_employee_report_counts() -> dict:
@@ -431,10 +589,19 @@ def get_employee_report_counts() -> dict:
         if df.empty:
             return counts
 
+        # Find column indices dynamically
+        date_idx = 2
+        tg_idx = 17
+        for col_idx, col_name in enumerate(df.columns):
+            c_lower = col_name.lower().strip()
+            if "daily report" in c_lower and not ":" in c_lower:
+                date_idx = col_idx
+            elif "telegram id" in c_lower:
+                tg_idx = col_idx
+
         for _, row in df.iterrows():
-            # Col C (idx 1) = ngày nộp | Col R (idx 16) = Telegram ID
-            date_raw = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else ""
-            tg_raw   = str(row.iloc[16]).strip() if len(row) > 16 and not pd.isna(row.iloc[16]) else ""
+            date_raw = str(row.iloc[date_idx]).strip() if not pd.isna(row.iloc[date_idx]) else ""
+            tg_raw   = str(row.iloc[tg_idx]).strip() if len(row) > tg_idx and not pd.isna(row.iloc[tg_idx]) else ""
 
             if tg_raw.lower() in ("nan", "none", ""): continue
             if date_raw.lower() in ("nan", "none", ""): continue
@@ -534,13 +701,46 @@ async def scan_group_for_plans(client, chat_id: int, since_utc: datetime) -> lis
 # ── Stats building ─────────────────────────────────────────────
 
 def parse_plan_date(date_str: str) -> datetime | None:
-    """Parse DD/MM/YYYY date string to datetime."""
-    for fmt in ("%d/%m/%Y", "%d/%m/%y"):
+    """Parse various date string formats to datetime."""
+    if not date_str:
+        return None
+    # 1. Try DD/MM/YYYY
+    for fmt in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d"):
         try:
             dt = datetime.strptime(date_str, fmt)
             return dt.replace(tzinfo=MYANMAR_TZ)
         except ValueError:
             continue
+            
+    # 2. Try parsing long string: e.g. "Fri Jun 26 2026 00:00:00 GMT+0630"
+    months = {
+        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+        "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
+    }
+    parts = date_str.split()
+    if len(parts) >= 4:
+        mon = parts[1].lower()[:3]
+        if mon in months:
+            try:
+                day = int(parts[2])
+                month = months[mon]
+                year = int(parts[3])
+                dt = datetime(year, month, day)
+                return dt.replace(tzinfo=MYANMAR_TZ)
+            except ValueError:
+                pass
+                
+    # 3. Try searching for DD/MM/YYYY inside the string
+    m = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', date_str)
+    if m:
+        try:
+            d, m_part, y = m.groups()
+            if len(y) == 2: y = "20" + y
+            dt = datetime(int(y), int(m_part), int(d))
+            return dt.replace(tzinfo=MYANMAR_TZ)
+        except ValueError:
+            pass
+            
     return None
 
 
@@ -669,7 +869,7 @@ async def main():
 
     # ── Step 2: Get Daily Reports from Sheet for comparison ──
     logger.info("📖 Reading Daily Reports from sheet for comparison...")
-    team_reports = get_daily_reports_from_sheet(date_str)
+    team_reports, df_report_raw = get_daily_reports_from_sheet(date_str)
     for gk, reps in team_reports.items():
         logger.info(f"  {gk}: {len(reps)} report entries today")
 
@@ -710,16 +910,11 @@ async def main():
 
     # ── Step 4b: Get employee stats từ Apps Script ──
     logger.info("📊 Fetching employee stats (rank/close/WO remain)...")
-    report_data = get_report_data()
+    unified_employees = get_unified_employees()
     # Gom nhân viên theo team key
     team_emp_map: dict[str, list] = {}  # "T1"→[emp,...]
-    for emp in report_data.get("employees", []):
+    for emp in unified_employees:
         tk = emp.get("team", "")
-        # Chuẩn hoá: MYT_TNI_TEAM01_Dawei → T1
-        if "TEAM01" in tk.upper() or "TEAM1" in tk.upper(): tk = "T1"
-        elif "TEAM02" in tk.upper() or "TEAM2" in tk.upper() or "TEAM05" in tk.upper() or "TEAM5" in tk.upper(): tk = "T2"
-        elif "TEAM03" in tk.upper() or "TEAM3" in tk.upper(): tk = "T3"
-        elif "TEAM04" in tk.upper() or "TEAM4" in tk.upper(): tk = "T4"
         if tk in ("T1","T2","T3","T4"):
             team_emp_map.setdefault(tk, []).append(emp)
     logger.info(f"  📋 Employees mapped: { {k: len(v) for k,v in team_emp_map.items()} }")
@@ -767,17 +962,52 @@ async def main():
             else:
                 lines.append("❌ No Daily Plan submitted today")
 
-            # ── Phần nhân viên: chỉ rank / close% / WO remain / Task Close Month ──
-            lines.append("")
-            lines.append(sub_divider)
+            # ── Phần Consolidated FT Plan & Actual ──
+            emp_completed_map = get_employee_completed_tni_today(df_report_raw, date_str)
+            combined_plan_text = "\n".join(tp.get("content", "") for tp in stats["today_plans"])
+            emp_assigned_map = parse_assigned_tni_per_person(combined_plan_text, emps)
+
             if emps:
-                lines.append(f"📋 Employee Stats ({len(emps)} members):")
-                # Sắp xếp theo rank tăng dần (rank nhỏ = tốt hơn)
-                sorted_emps = sorted(emps, key=lambda e: e.get("rank", 999))
-                for emp in sorted_emps:
-                    lines.append(build_emp_compact_line(emp, daily_counts))
-            else:
-                lines.append("❌ No employee stats available")
+                lines.append(divider)
+                lines.append("📋 FT Plan & Actual Summary:")
+                for emp in sorted(emps, key=lambda e: e.get("name", "")):
+                    name = emp.get("name", "")
+                    sys_name = emp.get("sys_name", emp.get("username", ""))
+                    tg_id = str(emp.get("telegram_id", emp.get("tg_id", ""))).replace(".0", "")
+
+                    assigned_set = emp_assigned_map.get(tg_id, set())
+                    completed_set = emp_completed_map.get(tg_id, set())
+                    done_set = assigned_set & completed_set
+                    remain_set = assigned_set - completed_set
+
+                    if not assigned_set:
+                        color = "⚪"
+                    else:
+                        pct = int((len(done_set) / len(assigned_set)) * 100)
+                        if pct == 100:
+                            color = "🟢"
+                        elif pct > 0:
+                            color = "🟡"
+                        else:
+                            color = "🔴"
+
+                    display_name = f"{name}-{sys_name}" if sys_name else name
+                    lines.append(f"{color} {display_name}")
+
+                    if assigned_set:
+                        pct = int((len(done_set) / len(assigned_set)) * 100)
+                        lines.append(f"   • Plan: {', '.join(sorted(assigned_set))}")
+                        lines.append(f"   • Actual: {', '.join(sorted(done_set)) if done_set else 'None'} (Done: {len(done_set)}/{len(assigned_set)}, {pct}%)")
+                        if remain_set:
+                            lines.append(f"   • Remaining: {', '.join(sorted(remain_set))}")
+                    else:
+                        lines.append("   • Plan: None (No plan assigned today)")
+
+                    dr_part = "3Day: 0/0/0 | 7Day: 0 | Month: 0"
+                    if daily_counts and tg_id in daily_counts:
+                        dc = daily_counts[tg_id]
+                        dr_part = f"3Day: {dc['d2']}/{dc['d1']}/{dc['d0']} | 7Day: {dc['d7']} | Month: {dc['month']}"
+                    lines.append(f"   • Submission: {dr_part}")
 
             lines.append(divider)
 

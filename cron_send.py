@@ -413,6 +413,54 @@ def build_asset_progress_summary(content: str) -> str:
             i += 1
 
     return "\n".join(result)
+def parse_tl(text):
+    if not text:
+        return ""
+    text = text.strip()
+    m_prefix = re.search(r'\*?(Team leader \d+)', text)
+    if not m_prefix:
+        return text
+    prefix = m_prefix.group(1)
+    
+    m_body = re.search(r'Day:.*?(?=\s*=>\s*Manager\s*:)', text)
+    if not m_body:
+        m_body = re.search(r'Day:.*', text)
+    
+    if m_body:
+        body = m_body.group(0).strip()
+        if body.endswith('*'):
+            body = body[:-1].strip()
+        return f"{prefix}: {body}"
+    return text
+
+
+def parse_emp(text):
+    if not text:
+        return ""
+    text = text.strip()
+    m_name = re.search(r'^\*?([^*=]+?)\s*=\s*Site:', text)
+    if not m_name:
+        return text
+    name = m_name.group(1).strip()
+    
+    m_site = re.search(r'Site:\s*\*([^*]+?)\*', text)
+    site_num = m_site.group(1) if m_site else "0"
+    
+    m_wo = re.search(r'<:>\s*(.*?Remain)', text)
+    wo_str = ""
+    if m_wo:
+        wo_str = re.sub(r'\s+', ' ', m_wo.group(1).strip())
+        
+    m_rank = re.search(r'rank:\s*\*([^*]+?)\*', text)
+    rank_num = m_rank.group(1) if m_rank else "0"
+    
+    m_close = re.search(r'Close:\s*\*([^*%]+?%)\*', text)
+    close_pct = m_close.group(1) if m_close else "0%"
+    
+    m_task = re.search(r'Task assign:\s*(\*?\d+\s*=>\s*Task Close Month:\s*\d+:\s*\d+/\d+/\d+)', text)
+    task_str = m_task.group(1) if m_task else ""
+    
+    return f"{name} = Site: *{site_num}*  WO: {wo_str} <=> rank: *{rank_num}* =Close: *{close_pct}* Task assign: {task_str}"
 
 
 def format_employee_report(emp: dict, now_str: str, month_days: int) -> str:
@@ -758,54 +806,33 @@ async def main():
                 tech_messages.append((name, content))
             continue
 
-    # ── 7a. Gộp tin nhắn Team + Asset từng Team → Group Team ──
+    # ── 7a. Gộp tin nhắn Team từng Team → Group Team (Format rút gọn) ──
     if SEND_BOT_TOKEN:
         for gid, members in team_messages.items():
             team_key = GID_TO_TEAM.get(gid, "")
-            t_short = TEAM_SHORT.get(team_key, f"Team")
-            t_icon = TEAM_ICON.get(team_key, "🏷️")
-
-            lines = [
-                f"{t_icon} 𝗥𝗲𝗽𝗼𝗿𝘁 {t_short} – {now_str}",
-                "━" * 22,
-            ]
-
-            # Team Leader trước, FT sau
             tl_list = [(p, n, c) for p, n, c, is_tl in members if is_tl]
             ft_list = [(p, n, c) for p, n, c, is_tl in members if not is_tl]
 
+            team_lines = []
             for prefix, name, content in tl_list:
-                lines.append(f"\n{prefix} 【{name}】")
-                lines.append(content)
+                parsed_tl = parse_tl(content)
+                if parsed_tl:
+                    team_lines.append(parsed_tl)
 
-            if ft_list:
-                lines.append("\n" + "─" * 22)
+            seen_emps = set()
+            CIRCLES = ["🔴", "🔵", "🟢", "🟡", "🟠", "🟣", "⚫", "⚪", "🟤"]
+            emp_idx = 0
+            for prefix, name, content in ft_list:
+                parsed_emp_str = parse_emp(content)
+                if parsed_emp_str:
+                    emp_id = parsed_emp_str.split(" = ")[0].strip()
+                    if emp_id not in seen_emps:
+                        seen_emps.add(emp_id)
+                        color_emoji = CIRCLES[emp_idx % len(CIRCLES)]
+                        team_lines.append(f"{color_emoji} {parsed_emp_str}")
+                        emp_idx += 1
 
-            for i, (prefix, name, content) in enumerate(ft_list):
-                emp_icon = EMP_ICONS[i % len(EMP_ICONS)]
-                lines.append(f"\n{emp_icon} ▸ {name}")
-                lines.append(content)
-
-            # Per-team asset stats + search stats
-            team_asset = build_team_asset_section(team_key, asset_data)
-            team_search = build_team_search_section(team_key, report_data)
-            if team_asset or team_search:
-                lines.append("\n" + "━" * 22)
-            if team_asset:
-                lines.append(team_asset)
-            if team_search:
-                lines.append(team_search)
-
-            # Per-team: ai chưa search hôm nay
-            no_search = build_no_search_list(team_key, report_data)
-            if no_search:
-                lines.append(no_search)
-
-            lines.append("\n" + "━" * 22)
-            lines.append(f"👥 Total: {len(members)} members")
-            lines.append("⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။")
-
-            grp_msg = "\n".join(lines)
+            grp_msg = "\n".join(team_lines)
             groups.setdefault(SEND_BOT_TOKEN, []).append(
                 (0, grp_msg, str(gid), "TEAM_GROUP")
             )
