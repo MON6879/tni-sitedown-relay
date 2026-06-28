@@ -1,5 +1,5 @@
 """
-backlog_send.py — Gửi báo cáo tồn đọng (backlog) hàng ngày vào lúc 17:35 Myanmar.
+backlog_send.py — Gửi báo cáo tồn đọng (backlog) hàng ngày vào lúc 17:10 Myanmar.
 Không gửi lên nhóm CONTROL.
 Không xóa tin cũ (đóng băng tin nhắn).
 """
@@ -156,14 +156,14 @@ def get_subteam_for_row(row):
 
 
 async def main():
-    # ── 1. Đợi đến đúng 17:35 Myanmar ──
+    # ── 1. Đợi đến đúng 17:10 Myanmar ──
     now = datetime.now(TZ_MM)
-    target = now.replace(hour=17, minute=35, second=0, microsecond=0)
+    target = now.replace(hour=17, minute=10, second=0, microsecond=0)
     
-    # Nếu chạy trước 17:35, ngủ cho tới lúc đó
+    # Nếu chạy trước 17:10, ngủ cho tới lúc đó
     if "--now" not in sys.argv and now < target:
         delay = (target - now).total_seconds()
-        logger.info(f"Giờ Myanmar hiện tại: {now.strftime('%H:%M:%S')}. Đang chờ {delay:.1f} giây để gửi báo cáo lúc 17:35...")
+        logger.info(f"Giờ Myanmar hiện tại: {now.strftime('%H:%M:%S')}. Đang chờ {delay:.1f} giây để gửi báo cáo lúc 17:10...")
         await asyncio.sleep(delay)
         
     now = datetime.now(TZ_MM)
