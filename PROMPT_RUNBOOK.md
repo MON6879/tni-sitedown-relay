@@ -215,3 +215,6 @@ FIX: Đã đổi sang HTML format trong sendTelegram():
 | getUpdates trả về rỗng | Tưởng không có tin | Kiểm tra Privacy Mode + deleteWebhook trước |
 | A1 không đổi | Nghĩ hệ thống hỏng | Chạy testTin1Only() để force send |
 | Cron sai timezone | Thêm workflow mới | Tính kỹ: Myanmar = UTC+6:30, 17:30 → 11:00 UTC |
+| GitHub Actions fail 3-5s (đỏ) | Để yên | Chạy `get_session.py` ở local để tạo session mới và update vào Secret `TELEGRAM_SESSION` |
+| Dispatch GitHub 24/7 gây lãng phí | Trigger vô điều kiện từ GAS | Kiểm tra khung giờ hoạt động (04:30 - 21:30 Myanmar) trên GAS trước khi gọi API dispatch |
+

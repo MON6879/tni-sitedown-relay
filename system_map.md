@@ -639,9 +639,16 @@ Cách kiểm tra nhanh:
 | Search Stats luôn = 0 | `getValues()` trả Date object, `toString()` cho `"Fri Jun 26..."` → `split("/")` fail → skip tất cả rows | Thêm helper `dateToStr()` — `instanceof Date` → `Utilities.formatDate()` |
 | system_map.md mâu thuẫn | Đoạn 518-532 nói SAI rằng `handleLogSearch` dùng `SD_SHEET_ID` (ngược với đoạn 465-475 ĐÚNG) | Xóa đoạn sai, ghi chú cảnh báo |
 
+### 29/06/2026 — Botlookup relay workflow & GAS active window check
+| Vấn đề | Nguyên nhân | Fix |
+|---|---|---|
+| GitHub Actions chạy 24/7 lãng phí | GAS gọi API dispatch workflow 30 phút một lần vô điều kiện, kể cả ban đêm | Thêm check khung giờ hoạt động (04:30 - 21:30 Myanmar) vào `relayBotlookupToTNI()` trước khi gọi dispatch |
+| GitHub Actions mất thời gian cài pip | Chưa có cơ chế cache dependencies cho workflow | Thêm cache 'pip' vào `botlookup_relay.yml` và thêm `telethon>=1.30.0` vào `requirements.txt` |
+
 ---
 
-## 🔒 ĐÓNG BĂNG — Các thành phần ĐÃ HOẠT ĐỘNG (28/06/2026)
+## 🔒 ĐÓNG BĂNG — Các thành phần ĐÃ HOẠT ĐỘNG (29/06/2026)
+
 
 > [!CAUTION]
 > Các thành phần dưới đây đã được xác nhận hoạt động đúng. **KHÔNG SỬA** trừ khi có lý do rõ ràng.
