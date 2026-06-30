@@ -915,20 +915,28 @@ async def main():
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
 
-    # ── 8. Gửi tổng asset + mgmt report + search → Group CONTROL SITE ──
-    # (BOD và mọi người xem trên Group này, dùng SEND_BOT vì đã add vào group)
+    # ── 8. Gửi tổng asset → Group CONTROL SITE & Từng Team (Xóa tin cũ) ──
     if asset_msg and SEND_BOT_TOKEN:
-        logger.info("--- Gửi Asset Stats → CONTROL SITE (-5251698940) ---")
-        if APPS_SCRIPT_URL:
-            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_ASSET_CONTROL")
+        ASSET_RECIPIENTS = {
+            "CRON_ASSET_CONTROL": -5251698940,
+            "CRON_ASSET_T1": -5180992881,
+            "CRON_ASSET_T2": -5188855349,
+            "CRON_ASSET_T3": -5183480727,
+            "CRON_ASSET_T4": -5238696719,
+        }
+        logger.info("--- Gửi Asset Stats → CONTROL SITE & TEAM GROUPS ---")
         try:
             async with Bot(token=SEND_BOT_TOKEN) as ctrl_bot:
-                result, msg_ids = await send_msg(ctrl_bot, CONTROL_CHAT_ID, asset_msg, "CONTROL-asset")
-                if result and msg_ids and APPS_SCRIPT_URL:
-                    save_msgids(APPS_SCRIPT_URL, "CRON_ASSET_CONTROL", msg_ids)
-            logger.info("✅ Asset stats → CONTROL SITE")
+                for key, cid in ASSET_RECIPIENTS.items():
+                    if APPS_SCRIPT_URL:
+                        delete_old_messages_bot(SEND_BOT_TOKEN, cid, APPS_SCRIPT_URL, key)
+                    result, msg_ids = await send_msg(ctrl_bot, cid, asset_msg, f"Asset-{key}")
+                    if result and msg_ids and APPS_SCRIPT_URL:
+                        save_msgids(APPS_SCRIPT_URL, key, msg_ids)
+                    await asyncio.sleep(0.4)
+            logger.info("✅ Asset stats → CONTROL SITE & TEAM GROUPS")
         except Exception as e:
-            logger.error(f"❌ Asset stats → CONTROL SITE: {e}")
+            logger.error(f"❌ Asset stats send failed: {e}")
 
     if mgmt_report and SEND_BOT_TOKEN:
         logger.info("--- Gửi mgmt_report (tổng hợp TL) → CONTROL SITE (-5251698940) ---")

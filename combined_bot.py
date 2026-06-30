@@ -106,13 +106,16 @@ async def send_all_tasks():
     # Group tasks by bot token based on sheet row
     # Row 4-32  → @TNIREPORTTASK_BOT
     # Row 33-74 → SEND_BOT_TOKEN (BOD/managers)
-    # Row 75-87 → @TNITECHINICALDEPREPORT_BOT
+    # Row 75-87 → @TNITECHINICALDEPREPORT_BOT (Technical Dept — Gộp gửi lên nhóm CONTROL)
     groups = {}
+    tech_messages = []
     for sheet_row, content, chat_id in tasks:
+        if 75 <= sheet_row <= 87:
+            tech_messages.append((sheet_row, content))
+            continue
+
         if 4 <= sheet_row <= 32 and REPORT_TASK_BOT_TOKEN:
             token = REPORT_TASK_BOT_TOKEN
-        elif 75 <= sheet_row <= 87 and TECHNICAL_DEP_BOT_TOKEN:
-            token = TECHNICAL_DEP_BOT_TOKEN
         elif SEND_BOT_TOKEN:
             token = SEND_BOT_TOKEN
         else:
@@ -148,6 +151,40 @@ async def send_all_tasks():
                     logger.error(f"[Scheduler] ❌ {bot_name} → row{sheet_row} ({chat_id}): {e}")
                     total_fail += 1
                 await asyncio.sleep(0.4)
+
+    # ── Gửi tin nhắn gộp cho Technical Dept (rows 75-87) lên nhóm CONTROL (Xóa tin cũ) ──
+    if tech_messages:
+        tech_bot_token = TECHNICAL_DEP_BOT_TOKEN or SEND_BOT_TOKEN
+        if tech_bot_token:
+            tech_lines = [
+                f"🔧 Technical Dept Report – {now_vn}",
+                "━" * 22,
+            ]
+            for sheet_row, content in tech_messages:
+                tech_lines.append(f"\n• Row {sheet_row}:")
+                tech_lines.append(content)
+            tech_msg = "\n".join(tech_lines)
+
+            CONTROL_CHAT_ID = -5251698940
+            APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL", "")
+
+            # Xóa tin nhắn cũ trên CONTROL
+            if APPS_SCRIPT_URL:
+                try:
+                    from delete_old_helper import delete_old_messages_bot, save_msgids
+                    delete_old_messages_bot(tech_bot_token, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "SCHEDULER_TECHDEP_CONTROL")
+                except Exception as ex:
+                    logger.warning(f"[Scheduler] Lỗi khi xóa tin nhắn Technical cũ: {ex}")
+
+            # Gửi tin nhắn mới
+            try:
+                async with Bot(token=tech_bot_token) as bot:
+                    sent = await bot.send_message(chat_id=CONTROL_CHAT_ID, text=tech_msg)
+                    logger.info(f"[Scheduler] ✅ Gửi báo cáo gộp Technical Dept lên CONTROL")
+                    if APPS_SCRIPT_URL:
+                        save_msgids(APPS_SCRIPT_URL, "SCHEDULER_TECHDEP_CONTROL", [sent.message_id])
+            except Exception as e:
+                logger.error(f"[Scheduler] ❌ Lỗi gửi báo cáo gộp Technical Dept lên CONTROL: {e}")
 
     logger.info(f"[Scheduler] 📊 ✅{total_ok} | ❌{total_fail}")
 
