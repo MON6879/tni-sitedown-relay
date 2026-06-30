@@ -1,7 +1,7 @@
-name: Daily Plan Report (21:00 Myanmar)
+name: Daily Plan Report (20:00 Myanmar)
 
 on:
-  workflow_dispatch:       # Triggered from GAS at 21:00 Myanmar
+  workflow_dispatch:       # Triggered from GAS at 20:00 Myanmar
 
 jobs:
   daily-plan-report:

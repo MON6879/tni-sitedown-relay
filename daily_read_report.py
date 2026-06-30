@@ -248,20 +248,19 @@ async def process_group(client, group_key: str, chat_id: int,
     d2_start = today_start - timedelta(days=2)
     d7_start = today_start - timedelta(days=7)
 
-    # Read window: 18:00 - 20:00 Myanmar per day
-    READ_START_H = 18  # 6PM
-    READ_END_H   = 20  # 8PM
+    # Read cutoff: 20:25 Myanmar per day
+    READ_CUTOFF_H = 20  # 8 PM
+    READ_CUTOFF_M = 25  # 25 min
 
     def in_read_window(read_dt, day_start):
-        """Check if read_dt falls in 18:00-20:00 window of that day."""
+        """Check if read_dt is before or at 20:25 Myanmar cutoff of that day."""
         if read_dt is None:
             return True  # no timestamp → count anyway
         if read_dt.tzinfo is None:
             read_dt = read_dt.replace(tzinfo=timezone.utc)
         read_mm = read_dt.astimezone(MYANMAR_TZ)
-        win_start = day_start.replace(hour=READ_START_H, minute=0)
-        win_end   = day_start.replace(hour=READ_END_H, minute=0)
-        return win_start <= read_mm <= win_end
+        cutoff = day_start.replace(hour=READ_CUTOFF_H, minute=READ_CUTOFF_M)
+        return read_mm <= cutoff
 
     # Per-person tracking: {user_id: {d0:0/1, d1:0/1, d2:0/1, d7:count, month:count}}
     per_person = {m["id"]: {"name": m["name"], "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0}
@@ -369,9 +368,10 @@ async def main():
 
             note_line = f"📝 Note: {r['note_preview']}...\n" if r["note_preview"] else ""
             tl = [
-                f"👁 NOTE READ REPORT — {gk}",
+                f"📋 6. Report — Daily Note Read Report — {gk}",
                 f"📅 {date_str}  |  🕐 {now_str}",
-                f"⏰ Read Window: 18:00–20:00 Myanmar",
+                f"⏰ Read Cutoff: 20:25 Myanmar",
+                f"📌 Shows who read the Note message before the 20:25 Myanmar cutoff time today.",
             ]
             if note_line:
                 tl.append(f"📝 Note: {r['note_preview']}...")
@@ -391,9 +391,10 @@ async def main():
 
         # ── 2. Send consolidated report to CONTROL ──
         lines = [
-            f"👁 NOTE READ REPORT — Summary",
+            f"📋 6. Report — Daily Note Read Report — Summary",
             f"📅 {date_str}  |  🕐 {now_str}",
-            f"⏰ Read Window: 18:00–20:00 Myanmar",
+            f"⏰ Read Cutoff: 20:25 Myanmar",
+            f"📌 Shows who read the Note message before the 20:25 Myanmar cutoff time today.",
             divider,
         ]
 

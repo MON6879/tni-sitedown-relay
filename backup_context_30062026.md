@@ -1,0 +1,55 @@
+# 🗂️ Backup Context — TNI Bot System (30/06/2026)
+
+> ⚠️ **ĐỌC FILE NÀY TRƯỚC KHI SỬA BẤT KỲ THỨ GÌ!**
+> Snapshot: 30/06/2026 14:45 (Myanmar UTC+6:30)
+> Conversation ID: `620dc64e-d895-40fd-b641-670b2b3cc8f2`
+
+---
+
+## 🔴 QUY TẮC BẮT BUỘC
+
+> **Mỗi lần bắt đầu:**
+> 1. Đọc file này TRƯỚC
+> 2. Đọc `system_map.md` cho chi tiết đầy đủ
+> 3. Làm đúng theo thực tế
+> 4. Lưu lại sau khi xong
+>
+> ❌ KHÔNG đoán mò — KHÔNG push nhầm project — KHÔNG sửa file sai
+
+---
+
+## 📍 Workspace
+
+- **Thư mục gốc:** `D:\6. AI\1. QLTC\`
+- **TNI Bot code:** `D:\6. AI\1. QLTC\Task and WO\`
+- **GitHub repo:** `phonghdpxd-cmd/tni-bot` — branch `main`
+
+---
+
+## ✅ Hoàn thành ngày 30/06/2026
+
+### 1. Hệ thống lại Báo cáo từ 1 đến 6
+Đã hệ thống hóa lại các tiêu đề và trình tự gửi báo cáo cuối ngày của các nhóm Telegram (cả nhóm Team và CONTROL) để đảm bảo tính logic và chronological (gửi theo thứ tự thời gian):
+
+| Số hiệu | Tên Báo cáo | File nguồn | Giờ gửi (Myanmar) | Ghi chú / Annotation |
+|---|---|---|---|---|
+| **1. Report** | `Daily Backlog (Category/Description)` | `backlog_send.py` | 17:10 | Chi tiết site phân bổ theo phòng ban (Admin, Asset...) |
+| **2. Report** | `Daily Backlog (Task Progress)` | `backlog_send.py` | 17:10 | Các task tồn đọng chung và Cable Patrol từ các ngày trước |
+| **3. Report** | `Main DG Material Need` | `backlog_send.py` | 17:10 | Nhu cầu vật tư, dầu, nước làm mát của các sub-team |
+| **4. Report** | `Daily EOD Task & Stats` | `cron_send.py` | 17:30 | Tổng hợp kết quả công việc, close rate, rank EOD trong ngày |
+| **5. Report** | `Daily Plan & Results` | `daily_plan_report.py` | **20:00** | So sánh Kế hoạch ngày (Plan) vs Thực tế hoàn thành (Actual) |
+| **6. Report** | `Daily Note Read Report` | `daily_read_report.py` | 20:30 | Danh sách đọc Note với **mốc Cutoff lúc 20:25** |
+
+### 2. Thay đổi quan trọng về Logic
+- **Đổi giờ gửi Plan (`5. Report`)**: Chuyển thời gian chạy `daily_plan_report.py` từ 21:00 về **20:00 Myanmar**. Thay đổi này được cập nhật trong `site_down_notify.gs` (khung quét trigger `19:55–20:25`) và tên workflow trên GitHub Actions.
+- **Bỏ khung giờ đọc Note (`6. Report`)**: Loại bỏ điều kiện chỉ tính lượt đọc Note trong khung `18:00 - 20:00`. Chuyển sang logic **Cutoff lúc 20:25 Myanmar** (bất cứ ai đã đọc tin nhắn trước/tại thời điểm 20:25 đều được tính là đã đọc).
+- **Thứ tự chạy GitHub Actions**: Điều chỉnh thứ tự trong file `daily_task.yml` để chạy `backlog_send.py` (Report 1, 2, 3) trước `cron_send.py` (Report 4) để tin nhắn xuất hiện đúng thứ tự từ trên xuống dưới trên Telegram.
+
+### 3. Sửa lỗi bỏ qua dòng (Bug Fix)
+- Sửa lỗi trong `backlog_send.py` when bỏ qua nhầm dòng 4 và 5 của Google Sheet (làm mất thông tin của `Cable Patrol for (BB)` và `Cable Patrol for (AC)`). Giờ vòng lặp chạy từ dòng 4 (`idx < 3`).
+
+---
+
+## ⚡ Lưu ý quan trọng
+1. **GitHub Actions**: Do các tác vụ này được kích hoạt qua `workflow_dispatch` bởi Google Apps Script (`site_down_notify.gs`), bạn hoàn toàn có thể chạy thủ công trên GitHub UI bất cứ lúc nào bằng cách vào mục **Actions** -> Chọn Workflow tương ứng -> Chọn **Run workflow**.
+2. **Triển khai Google Apps Script**: Khi chỉnh sửa xong, cần copy mã nguồn của `site_down_notify.gs` đè lên Apps Script Editor hiện tại và thực hiện Deploy Version mới để giờ gửi 20:00 Myanmar có hiệu lực.

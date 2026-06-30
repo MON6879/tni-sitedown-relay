@@ -55,14 +55,14 @@ Telegram Groups (per-team + consolidated to CONTROL)
 - **Schedule:** 20:30 Myanmar = 14:00 UTC
 - **API:** Telethon (TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_SESSION)
 - **Tracks:** Who read the **Note message** ("Team leader and Staff control Site down make plan rescue Site not forgot Bring MDG or MBB")
-- **Read Window:** Only counts reads between **18:00–20:00 Myanmar** per day
+- **Read Cutoff:** Counts who read the message before/at the **20:25 Myanmar** cutoff time today
 - **Member Source:** Sheet col E (rows 4-59) for Teams, group participants for CONTROL
 
 #### Per Team Group (T1, T2, T3, T4):
 ```
-👁 NOTE READ REPORT — T1
+📋 6. Report — Daily Note Read Report — T1
 📅 24/06/2026  |  🕐 20:30
-⏰ Read Window: 18:00–20:00 Myanmar
+⏰ Read Cutoff: 20:25 Myanmar
 📝 Note: Team leader and Staff control Site down...
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👥 Team Members: 8  |  ✅ Read: 6  |  ❌ Unread: 2
@@ -213,10 +213,10 @@ Missing: TNI0052, TNI0185, TNI0058
 
 | Time | Script | Workflow | What |
 |---|---|---|---|
-| **17:30** | `cron_send.py` | `daily_task.yml` | Task + Asset + Search reports to all groups |
-| **17:30** | `daily_plan_report.py` | `daily_plan_report.yml` | Daily Plan collection + 3Day/7Day/Month report |
-| **17:10** | `backlog_send.py` | `daily_task.yml` | Daily Backlog reports (Report 2, 1, 3) to team groups |
-| **20:30** | `daily_read_report.py` | `daily_read_report.yml` | Note read status per-person to teams + CONTROL |
+| **17:10** | `backlog_send.py` | `daily_task.yml` | Report 1, 2, 3: Daily Backlog reports to team groups |
+| **17:30** | `cron_send.py` | `daily_task.yml` | Report 4: Daily EOD Task + Asset + Search reports to all groups |
+| **20:00** | `daily_plan_report.py` | `daily_plan_report.yml` | Report 5: Daily Plan collection + Comparison report |
+| **20:30** | `daily_read_report.py` | `daily_read_report.yml` | Report 6: Note read status per-person (Cutoff at 20:25) to teams + CONTROL |
 
 ---
 
@@ -239,7 +239,7 @@ Missing: TNI0052, TNI0185, TNI0058
 1. **Per-person tracking:** Both Search Stats and Note Read use per-person format with 3Day/7Day/Month
 2. **3Day format:** `d2/d1/d0` = day-before-yesterday / yesterday / today
 3. **Deduplication:** Team member lists deduplicate by name (keep highest search count)
-4. **Read Window:** Note reads only count if read between 18:00–20:00 Myanmar (not anytime)
+4. **Read Cutoff:** Note reads only count if read before/at 20:25 Myanmar cutoff time (anytime today prior to 20:25)
 5. **Team members source:** Sheet col E rows 4-59 (not Telegram group participants) — ensures only actual team members are counted
 6. **CONTROL gets consolidated:** All teams + CONTROL data in one message
 7. **Team groups get own report:** Each team only sees their own data

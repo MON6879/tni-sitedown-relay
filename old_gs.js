@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // TNI Site Down Auto-Notification — v3 (Full Auto)
 // ============================================================
 // Flow:
@@ -217,31 +217,20 @@ function checkAndSend() {
 function relayBotlookupToTNI() {
   Logger.log("[relayBotlookupToTNI] Bắt đầu trigger 30p");
 
-  // Đọc giờ Myanmar
-  const myanmarHour = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "H"), 10);
-  const myanmarMin  = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "m"), 10);
-  const currentMinutes = myanmarHour * 60 + myanmarMin;
-
-  // Khung giờ hoạt động: 04:30 đến 21:30 Myanmar Time
-  const activeStart = 4 * 60 + 30;
-  const activeEnd = 21 * 60 + 30;
-
-  if (currentMinutes >= activeStart && currentMinutes <= activeEnd) {
-    // Bước 1: Dispatch GitHub Actions workflow
-    const dispatched = triggerBotlookupRelay();
-    if (dispatched) {
-      Logger.log("[relayBotlookupToTNI] ✅ GitHub Actions đã dispatch — botlookup_relay.py sẽ gọi GAS sau ~2-3p");
-    } else {
-      Logger.log("[relayBotlookupToTNI] ⚠️ Không dispatch được GitHub Actions (thiếu GITHUB_PAT?)");
-    }
+  // Bước 1: Dispatch GitHub Actions workflow
+  const dispatched = triggerBotlookupRelay();
+  if (dispatched) {
+    Logger.log("[relayBotlookupToTNI] ✅ GitHub Actions đã dispatch — botlookup_relay.py sẽ gọi GAS sau ~2-3p");
   } else {
-    Logger.log("[relayBotlookupToTNI] 🌙 Ngoài khung giờ hoạt động (04:30-21:30 Myanmar) — Bỏ qua dispatch GitHub Actions");
+    Logger.log("[relayBotlookupToTNI] ⚠️ Không dispatch được GitHub Actions (thiếu GITHUB_PAT?)");
   }
 
   // Bước 2: Chạy checkAndSend để gửi nếu Cột A đã có data
   checkAndSend();
 
   // Bước 3: 20:00–20:30 Myanmar (~20:01) → dispatch check_read_status (1 lần/ngày)
+  const myanmarHour = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "H"), 10);
+  const myanmarMin  = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "m"), 10);
   const isReadTime  = (myanmarHour === 20 && myanmarMin <= 30);
   if (isReadTime) {
     const todayKey = "READ_CHECK_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
@@ -283,38 +272,6 @@ function relayBotlookupToTNI() {
       }
     } else {
       Logger.log("[relayBotlookupToTNI] ℹ️ daily_task.yml đã dispatch hôm nay rồi — bỏ qua");
-    }
-  }
-
-  // Bước 6: 20:25–20:55 Myanmar → dispatch daily_read_report.yml (1 lần/ngày lúc 20:30)
-  const isReadReportTime = (myanmarHour === 20 && myanmarMin >= 25 && myanmarMin <= 55);
-  if (isReadReportTime) {
-    const readReportKey = "DAILY_READ_REPORT_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
-    const props4        = PropertiesService.getScriptProperties();
-    if (!props4.getProperty(readReportKey)) {
-      const okRead = triggerDailyReadReport();
-      if (okRead) {
-        props4.setProperty(readReportKey, "done");
-        Logger.log("[relayBotlookupToTNI] ✅ Dispatch daily_read_report.yml lúc 20:xx Myanmar");
-      }
-    } else {
-      Logger.log("[relayBotlookupToTNI] ℹ️ daily_read_report.yml đã dispatch hôm nay rồi — bỏ qua");
-    }
-  }
-
-  // Bước 7: 19:55–20:25 Myanmar → dispatch daily_plan_report.yml (1 lần/ngày lúc 20:00)
-  const isPlanReportTime = (myanmarHour === 19 && myanmarMin >= 55) || (myanmarHour === 20 && myanmarMin <= 25);
-  if (isPlanReportTime) {
-    const planReportKey = "DAILY_PLAN_REPORT_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
-    const props5        = PropertiesService.getScriptProperties();
-    if (!props5.getProperty(planReportKey)) {
-      const okPlan = triggerDailyPlanReport();
-      if (okPlan) {
-        props5.setProperty(planReportKey, "done");
-        Logger.log("[relayBotlookupToTNI] ✅ Dispatch daily_plan_report.yml lúc 20:xx Myanmar");
-      }
-    } else {
-      Logger.log("[relayBotlookupToTNI] ℹ️ daily_plan_report.yml đã dispatch hôm nay rồi — bỏ qua");
     }
   }
 }
@@ -378,32 +335,12 @@ function sendTaskRemain() {
       teamTasks[chatId].push({ content, teleId, teamRaw });
     }
 
-    // Tìm team key từ chatId (để dùng làm msgKey)
-    var chatIdToTeam = {};
-    for (var tk in TASK_TEAM_MAP) {
-      chatIdToTeam[TASK_TEAM_MAP[tk]] = tk.toUpperCase();
-    }
-
-    // Xóa tin cũ → Gửi từng task riêng lẻ → Lưu msg_ids mới
+    // Gửi từng task riêng lẻ đến group team (tách biệt để dễ đọc)
     for (const [chatId, tasks] of Object.entries(teamTasks)) {
-      var teamKey = chatIdToTeam[chatId] || chatId;
-      var msgKey = "TASKREMAIN_" + teamKey;
-
-      // Xóa tất cả tin Task cũ trong group này
-      deleteOldMessages_(chatId, msgKey);
-
-      // Gửi từng task + thu thập msg_ids
-      var allNewIds = [];
       Logger.log("[TaskRemain] Gửi " + tasks.length + " task đến group " + chatId);
       for (const task of tasks) {
-        var ids = sendTelegramCollectIds_(chatId, task.content, "[Task][" + task.teamRaw + "]");
-        allNewIds = allNewIds.concat(ids);
+        sendTelegram(chatId, task.content, "[Task][" + task.teamRaw + "]");
         Utilities.sleep(800);   // tránh rate limit
-      }
-
-      // Lưu tất cả msg_ids mới
-      if (allNewIds.length > 0) {
-        saveMsgIds_(msgKey, allNewIds);
       }
     }
 
@@ -484,66 +421,6 @@ function triggerDailyTask() {
     return code === 204;
   } catch(e) {
     Logger.log("[triggerDailyTask] ❌ Lỗi: " + e.message);
-    return false;
-  }
-}
-
-
-// ── Dispatch daily_read_report.yml lúc 20:30 Myanmar
-function triggerDailyReadReport() {
-  try {
-    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
-    if (!pat) {
-      Logger.log("[triggerDailyReadReport] ⚠️ GITHUB_PAT chưa set");
-      return false;
-    }
-    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_read_report.yml/dispatches";
-    const resp = UrlFetchApp.fetch(url, {
-      method: "post",
-      headers: {
-        "Authorization": "Bearer " + pat,
-        "Accept":        "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type":  "application/json"
-      },
-      payload: JSON.stringify({ ref: "main" }),
-      muteHttpExceptions: true
-    });
-    const code = resp.getResponseCode();
-    Logger.log("[triggerDailyReadReport] GitHub API response: " + code);
-    return code === 204;
-  } catch(e) {
-    Logger.log("[triggerDailyReadReport] ❌ Lỗi: " + e.message);
-    return false;
-  }
-}
-
-
-// ── Dispatch daily_plan_report.yml lúc 20:00 Myanmar
-function triggerDailyPlanReport() {
-  try {
-    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
-    if (!pat) {
-      Logger.log("[triggerDailyPlanReport] ⚠️ GITHUB_PAT chưa set");
-      return false;
-    }
-    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_plan_report.yml/dispatches";
-    const resp = UrlFetchApp.fetch(url, {
-      method: "post",
-      headers: {
-        "Authorization": "Bearer " + pat,
-        "Accept":        "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type":  "application/json"
-      },
-      payload: JSON.stringify({ ref: "main" }),
-      muteHttpExceptions: true
-    });
-    const code = resp.getResponseCode();
-    Logger.log("[triggerDailyPlanReport] GitHub API response: " + code);
-    return code === 204;
-  } catch(e) {
-    Logger.log("[triggerDailyPlanReport] ❌ Lỗi: " + e.message);
     return false;
   }
 }
@@ -1025,42 +902,27 @@ function buildAwAzControlMessage(ts, awaz) {
 // Lưu message_ids vào PropertiesService để xóa lần sau
 // ============================================================
 
-/** Lưu danh sách message_ids cho một key */
-function saveMsgIds_(msgKey, messageIds) {
-  var key = "SD_MSGID_" + msgKey;
-  PropertiesService.getScriptProperties().setProperty(key, JSON.stringify(messageIds));
-  Logger.log("[save] 💾 " + msgKey + " = " + JSON.stringify(messageIds));
+/** Ngày hôm nay theo giờ Myanmar (yyyy-MM-dd) */
+function getTodayStr_() {
+  return Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyy-MM-dd");
 }
 
-/** Lấy danh sách message_ids đã lưu — để xóa tin cũ */
+/** Lưu danh sách message_ids cho một key (hỗ trợ multi-chunk) */
+function saveMsgIds_(msgKey, messageIds) {
+  var key = "SD_MSGID_" + msgKey;
+  var val = JSON.stringify(messageIds) + "|" + getTodayStr_();
+  PropertiesService.getScriptProperties().setProperty(key, val);
+}
+
+/** Lấy danh sách message_ids đã lưu (bất kể ngày nào — để xóa tin cũ) */
 function getSavedMsgIds_(msgKey) {
   var key = "SD_MSGID_" + msgKey;
   var val = PropertiesService.getScriptProperties().getProperty(key) || "";
-  if (!val) { Logger.log("[get] " + msgKey + " → trống"); return []; }
-  
-  // Thử parse JSON thuần trước (format mới)
-  try { 
-    var arr = JSON.parse(val);
-    if (Array.isArray(arr)) {
-      Logger.log("[get] 📋 " + msgKey + " → " + JSON.stringify(arr));
-      return arr;
-    }
-  } catch(e) {}
-  
-  // Fallback: format cũ có "|date" → cắt bỏ date
+  if (!val) return [];
   var pipeIdx = val.lastIndexOf("|");
-  if (pipeIdx > 0) {
-    try { 
-      var arr2 = JSON.parse(val.substring(0, pipeIdx));
-      if (Array.isArray(arr2)) {
-        Logger.log("[get] 📋 " + msgKey + " (old format) → " + JSON.stringify(arr2));
-        return arr2;
-      }
-    } catch(e2) {}
-  }
-  
-  Logger.log("[get] ⚠️ " + msgKey + " parse lỗi: " + val);
-  return [];
+  if (pipeIdx === -1) return [];
+  var jsonPart = val.substring(0, pipeIdx);
+  try { return JSON.parse(jsonPart); } catch(e) { return []; }
 }
 
 /** Xóa message_ids đã lưu */
@@ -1226,40 +1088,6 @@ function handleGetNoteMsgIds() {
   }
 }
 
-// ============================================================
-// GENERIC MESSAGE_IDS API — Lưu/đọc message_ids cho Python scripts
-// Python gọi GAS qua HTTP: save_msgids / get_msgids
-// Key format: SD_MSGID_{key} — VD: CRON_TEAM_T1, PLAN_CONTROL, READREPORT_T2
-// ============================================================
-
-/** Lưu generic message_ids — gọi từ Python scripts */
-function handleSaveMsgIds(body) {
-  var key    = (body.key || "").toString().trim();
-  var msgids = body.msgids || [];
-  if (!key) return json({ status: "error", message: "Missing key" });
-
-  var props = PropertiesService.getScriptProperties();
-  props.setProperty("SD_MSGID_" + key, JSON.stringify(msgids));
-  Logger.log("[MsgIds] 💾 Saved " + key + " = " + JSON.stringify(msgids));
-  return json({ status: "ok", key: key, count: msgids.length });
-}
-
-/** Đọc generic message_ids — gọi từ Python scripts */
-function handleGetMsgIds(body) {
-  var key = "";
-  // Hỗ trợ cả GET (e.parameter) và POST (body)
-  if (body && body.key) key = body.key.toString().trim();
-
-  if (!key) return json({ status: "error", message: "Missing key" });
-
-  var props = PropertiesService.getScriptProperties();
-  var raw   = props.getProperty("SD_MSGID_" + key) || "[]";
-  try {
-    return json({ status: "ok", key: key, msgids: JSON.parse(raw) });
-  } catch(e) {
-    return json({ status: "ok", key: key, msgids: [] });
-  }
-}
 
 // ============================================================
 // GỬI TELEGRAM (tự chia nếu > 4000 ký tự)

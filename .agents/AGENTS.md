@@ -9,7 +9,7 @@ Full documentation: see `SYSTEM_DOC.md` in root.
 2. **Team member lists** come from Google Sheet column E, rows 4-59. Do NOT use Telegram group participants for team groups.
 3. **Deduplication by name** is required when listing team members.
 4. **Team 5 is merged into Team 2** (same Telegram group).
-5. **Read Window** for Note messages: 18:00–20:00 Myanmar only.
+5. **Read Cutoff** for Note messages: Check readers up to 20:25 Myanmar cutoff time.
 6. **3Day format:** `d2/d1/d0` (day-before-yesterday / yesterday / today).
 7. **Per-person stats** are required for both Search and Note Read reports.
 8. **CONTROL group** receives consolidated reports (all teams).

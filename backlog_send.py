@@ -211,9 +211,9 @@ async def main():
     team_msg2 = {1: [], 2: [], 3: [], 4: []}
     subteams_dg = {}
 
-    # Bắt đầu duyệt từ dòng 6 (index 5)
+    # Bắt đầu duyệt từ dòng 4 (index 3)
     for idx, row in df.iterrows():
-        if idx < 5:
+        if idx < 3:
             continue
             
         # --- Xử lý Báo cáo 1 & 2 ---
@@ -297,24 +297,26 @@ async def main():
 
             sent_msg_ids = []
 
-            # ── 4a. Gửi Bản tin 2 ──
+            # ── 4a. Gửi Bản tin 2 (Report 1) ──
             lines2 = [
-                f"📋 BACKLOG SUMMARY 2 — {t_name}",
+                f"📋 1. Report — Daily Backlog (Category/Description) — {t_name}",
                 f"📅 {now_str}",
+                f"📌 Shows detailed site assignments and tasks grouped by department (Admin, Asset, etc.) from today/recent plans.",
                 "━━━━━━━━━━━━━━━━━━━━"
             ]
             lines2.extend(team_msg2[t_num])
 
-            if len(lines2) > 3: # Có dữ liệu
+            if len(lines2) > 4: # Có dữ liệu (bao gồm header và annotation)
                 msg2_text = "\n".join(lines2)
                 ok, m_ids = await send_msg(bot, chat_id, msg2_text, f"{t_name} Backlog Msg 2")
                 sent_msg_ids.extend(m_ids)
                 await asyncio.sleep(0.5)
 
-            # ── 4b. Gửi Bản tin 1 ──
+            # ── 4b. Gửi Bản tin 1 (Report 2) ──
             lines1 = [
-                f"📋 BACKLOG SUMMARY 1 — {t_name}",
+                f"📋 2. Report — Daily Backlog (Task Progress) — {t_name}",
                 f"📅 {now_str}",
+                f"📌 Shows pending tasks and general cable patrol backlogs accumulated from previous days.",
                 "━━━━━━━━━━━━━━━━━━━━"
             ]
             if t_num == 2:
@@ -329,13 +331,13 @@ async def main():
             else:
                 lines1.extend(team_msg1[t_num])
 
-            if len(lines1) > 3: # Có dữ liệu
+            if len(lines1) > 4: # Có dữ liệu (bao gồm header và annotation)
                 msg1_text = "\n".join(lines1)
                 ok, m_ids = await send_msg(bot, chat_id, msg1_text, f"{t_name} Backlog Msg 1")
                 sent_msg_ids.extend(m_ids)
                 await asyncio.sleep(0.5)
 
-            # ── 4c. Gửi Bản tin 3 ──
+            # ── 4c. Gửi Bản tin 3 (Report 3) ──
             # Lọc các subteam của team hiện tại
             if t_num == 2:
                 prefixes = ("T2", "T5")
@@ -363,8 +365,9 @@ async def main():
                     return " <+> ".join(parts)
 
                 lines3 = [
-                    f"📋 Main DG material need using for WO — {t_name}",
+                    f"📋 3. Report — Main DG Material Need — {t_name}",
                     f"📅 {now_str}",
+                    f"📌 Shows generator materials, oil, and coolant needs for each sub-team.",
                     "━━━━━━━━━━━━━━━━━━━━"
                 ]
 

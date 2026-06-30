@@ -993,8 +993,9 @@ async def main():
             emps      = team_emp_map.get(group_key, [])  # danh sách nhân viên
 
             lines = [
-                f"📋 DAILY PLAN REPORT — {team_name}",
+                f"📋 5. Report — Daily Plan & Results — {team_name}",
                 f"📅 {date_str}  |  🕐 {now.strftime('%H:%M')}",
+                f"📌 Comparison of today's plan vs actual completed stations.",
                 divider,
                 f"📊 Plan Stats: 3Day: {stats['d2']}/{stats['d1']}/{stats['d0']} "
                 f"| 7Day: {stats['d7']} | Month: {stats['month']}",
@@ -1091,8 +1092,9 @@ async def main():
 
         # ── 5b. Send consolidated report to CONTROL ──
         ctrl_lines = [
-            f"📋 DAILY PLAN REPORT — Summary",
+            f"📋 5. Report — Daily Plan & Results — Summary",
             f"📅 {date_str}  |  🕐 {now.strftime('%H:%M')}",
+            f"📌 Comparison of today's plan vs actual completed stations.",
             divider,
         ]
 

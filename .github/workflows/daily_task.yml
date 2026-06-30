@@ -18,6 +18,11 @@ jobs:
       - name: Install dependencies
         run: pip install python-telegram-bot requests pandas python-dotenv
 
+      - name: Send backlog report
+        env:
+          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+        run: python backlog_send.py
+
       - name: Send task reminders
         env:
           SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
@@ -25,8 +30,3 @@ jobs:
           TECHNICAL_DEP_BOT_TOKEN: ${{ secrets.TECHNICAL_DEP_BOT_TOKEN }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
         run: python cron_send.py
-
-      - name: Send backlog report
-        env:
-          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
-        run: python backlog_send.py

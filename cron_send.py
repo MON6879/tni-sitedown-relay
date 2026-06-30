@@ -808,12 +808,24 @@ async def main():
 
     # ── 7a. Gộp tin nhắn Team từng Team → Group Team (Format rút gọn) ──
     if SEND_BOT_TOKEN:
+        t_names = {
+            1: "Team 1 Dawei",
+            2: "Team 2 Myeik",
+            3: "Team 3 Bokpyin",
+            4: "Team 4 Kawthoung"
+        }
         for gid, members in team_messages.items():
             team_key = GID_TO_TEAM.get(gid, "")
+            t_name = t_names.get(team_key, f"Team {team_key}")
             tl_list = [(p, n, c) for p, n, c, is_tl in members if is_tl]
             ft_list = [(p, n, c) for p, n, c, is_tl in members if not is_tl]
 
-            team_lines = []
+            team_lines = [
+                f"📋 4. Report — Daily EOD Task & Stats — {t_name}",
+                f"📅 {now_str}",
+                f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
+                "━━━━━━━━━━━━━━━━━━━━"
+            ]
             for prefix, name, content in tl_list:
                 parsed_tl = parse_tl(content)
                 if parsed_tl:

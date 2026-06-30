@@ -1,0 +1,379 @@
+﻿diff --git a/api/collector.py b/api/collector.py
+index 5934f88..206f063 100644
+--- a/api/collector.py
++++ b/api/collector.py
+@@ -152,7 +152,7 @@ def post_mdg_photo(payload: dict):
+         return {"status": "error", "message": "MDG_APPS_SCRIPT_URL not configured"}
+     try:
+         # connect_timeout=10s, read_timeout=8s — just enough to deliver payload
+-        resp = requests.post(MDG_APPS_SCRIPT_URL, json=payload, timeout=(10, 8))
++        resp = requests.post(MDG_APPS_SCRIPT_URL, json=payload, timeout=(10, 20))
+         resp.raise_for_status()
+         logger.info(f"MDG photo GAS response: {resp.text[:200]}")
+         return resp.json()
+@@ -245,8 +245,16 @@ def parse_cable_fields(text: str) -> dict:
+ 
+ # ── Detect collector keyword in message ───────────────────────────────────
+ def is_collector_msg(text: str) -> bool:
++    """Match keyword at start of any line, case-insensitive, with or without ':'."""
+     lower = text.lower()
+-    return any(f"{k}:" in lower for k in get_keywords())
++    for k in get_keywords():
++        # Match keyword at start of text or start of any line
++        # Cho phép có hoặc không có ":" sau keyword
++        # Ví dụ: "Order: abc", "Order abc", "order:abc", "ORDER abc"
++        pattern = r'(?:^|\n)\s*' + re.escape(k) + r'\s*[:\s]'
++        if re.search(pattern, lower):
++            return True
++    return False
+ 
+ 
+ # ── Main async handler ────────────────────────────────────────────────────
+@@ -568,7 +576,17 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
+ 
+     # ── Inventory Report message ─────────────────────────────────────────
+     if "inventory fuel" in text.lower():
+-        fields = parse_inv_fields(text)
++        # FIX: forward từ Viber → trim text từ dòng đầu có "inventory fuel"
++        lines_inv = text.splitlines()
++        inv_start_idx = next(
++            (i for i, ln in enumerate(lines_inv) if "inventory fuel" in ln.lower()),
++            0
++        )
++        inv_text = "\n".join(lines_inv[inv_start_idx:]).strip()
++        if inv_start_idx > 0:
++            logger.info(f"[INV] Trimmed {inv_start_idx} header line(s) before Inventory section")
++
++        fields = parse_inv_fields(inv_text)
+         dg_id = fields.get("dg id", "")
+ 
+         payload = {
+@@ -578,7 +596,7 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
+             "sender_name": sender_name,
+             "sender_id":   sender_id,
+             "fields":      fields,
+-            "raw":         text,
++            "raw":         inv_text,
+         }
+ 
+         result = post_mdg_sheet(payload)
+@@ -599,7 +617,18 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
+ 
+     # ── MDG Report message ───────────────────────────────────────────────
+     if "mdg" in text.lower():
+-        fields = parse_mdg_fields(text)
++        # FIX: forward từ Viber / copy-paste có thể có text thừa trước "MDG ::Report"
++        # → tìm dòng đầu tiên có chữ "MDG" và parse từ đó
++        lines = text.splitlines()
++        mdg_start_idx = next(
++            (i for i, ln in enumerate(lines) if "mdg" in ln.lower()),
++            0  # fallback: dùng toàn bộ text nếu không tìm thấy
++        )
++        mdg_text = "\n".join(lines[mdg_start_idx:]).strip()
++        if mdg_start_idx > 0:
++            logger.info(f"[MDG] Trimmed {mdg_start_idx} header line(s) before MDG section")
++
++        fields = parse_mdg_fields(mdg_text)
+         site_id = fields.get("site id", "")
+ 
+         payload = {
+@@ -609,7 +638,7 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
+             "sender_name": sender_name,
+             "sender_id":   sender_id,
+             "fields":      fields,
+-            "raw":         text,
++            "raw":         mdg_text,   # lưu text đã trim, không lưu phần header thừa
+         }
+ 
+         result = post_mdg_sheet(payload)
+diff --git a/api/search_bot.py b/api/search_bot.py
+index 57b98c6..5134e41 100644
+--- a/api/search_bot.py
++++ b/api/search_bot.py
+@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
+ TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip()
+ DAILY_APPS_SCRIPT_URL = os.environ.get("DAILY_APPS_SCRIPT_URL", "").strip()
+ APPS_SCRIPT_URL       = os.environ.get("APPS_SCRIPT_URL", "").strip()
++# Fallback nếu env var bị lỗi (không bắt đầu bằng https://)
++_GAS_FALLBACK = "https://script.google.com/macros/s/AKfycbzGFdnESGcSMt0Of7PrBIOHDXmuLCZsiraGv5iNzWrw4rjdxm8CGBDuVIP8pnPEkAULww/exec"
++if not APPS_SCRIPT_URL.startswith("https://"):
++    logger.warning(f"APPS_SCRIPT_URL invalid ('{APPS_SCRIPT_URL[:30]}'), using fallback")
++    APPS_SCRIPT_URL = _GAS_FALLBACK
+ SPREADSHEET_ID        = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
+ BASE_URL              = (
+     f"https://docs.google.com/spreadsheets/d/"
+@@ -457,27 +462,32 @@ def handle(update: dict) -> None:
+         return
+ 
+     tni = m.group(1).upper()
+-    # ── Ghi log tìm kiếm đồng bộ trước khi chạy tác vụ nặng ──
++
++    # ── Gửi kết quả cho user trước ──────────────────────────────
++    load_all_sheets()
++    result = lookup_tni(tni)
++    for chunk in split_messages(result):
++        tg_send(chat_id, chunk)
++
++    # ── Ghi log SAU KHI gửi kết quả (GAS cold start có thể mất 20-25s) ──
++    # timeout=25 đủ để GAS warm up, không còn bị timeout 15s nữa
+     if APPS_SCRIPT_URL:
+         try:
+             now_mm = datetime.now(TZ_MM)
+-            requests.post(APPS_SCRIPT_URL, json={
++            resp = requests.post(APPS_SCRIPT_URL, json={
+                 "action":    "log_search",
+                 "user_name": first_name or str(user_id),
+                 "user_id":   str(user_id),
+                 "tni_code":  tni,
+-                "date":      now_mm.strftime("%d/%m/%Y"),   # dd/mm/yyyy — khớp format dữ liệu cũ
++                "date":      now_mm.strftime("%d/%m/%Y"),
+                 "time":      now_mm.strftime("%H:%M"),
+                 "date_iso":  now_mm.strftime("%d/%m/%Y"),
+-            }, timeout=15)
++            }, timeout=25)
++            if resp.status_code != 200:
++                logger.error(f"log_search HTTP {resp.status_code}: {resp.text[:100]}")
+         except Exception as e:
+             logger.error(f"log_search failed: {e}")
+ 
+-    load_all_sheets()
+-    result = lookup_tni(tni)
+-    for chunk in split_messages(result):
+-        tg_send(chat_id, chunk)
+-
+ 
+ # ── Vercel entry point ────────────────────────────────────────────────────────
+ class handler(BaseHTTPRequestHandler):
+diff --git a/apps_script_mdg.js b/apps_script_mdg.js
+index 3690958..e9b31de 100644
+--- a/apps_script_mdg.js
++++ b/apps_script_mdg.js
+@@ -1,7 +1,8 @@
+ // ============================================================
+-// APPS SCRIPT — MDG RUN DATA COLLECTOR  v2.2
++// APPS SCRIPT — MDG RUN DATA COLLECTOR  v2.3
+ // Sheet  : MDG Detail  |  Folder : 2.4 Run MDG
+ // Photos : 6 separate columns U-Z with =HYPERLINK() formula
++// v2026-06-26g — ANCHOR approach: text tạo mốc, ảnh tự gắn vào mốc cùng sender
+ // ============================================================
+ 
+ const MDG_SHEET_ID  = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y";
+@@ -94,6 +95,34 @@ const IHEADERS = [
+   "Photo 1","Photo 2","Photo 3","Photo 4","Photo 5","Photo 6",
+   "Photo 7","Photo 8","Photo 9","Photo 10","Photo 11","Photo 12"
+ ];
++// ============================================================
++// ANCHOR HELPERS
++// Mỗi sender có 1 "mốc" = text MDG/INV cuối cùng họ gửi
++// → ảnh tiếp theo tự động gắn vào mốc đó
++// → text mới từ cùng sender → mốc cũ bị thay thế
++// ============================================================
++function saveAnchor_(senderId, ref, row, sheetType) {
++  if (!senderId) return;
++  const val = JSON.stringify({ ref: ref, row: row, sheet: sheetType, ts: Date.now() });
++  PropertiesService.getScriptProperties().setProperty("ANCHOR_" + senderId, val);
++  Logger.log("[ANCHOR] Saved sender=" + senderId + " → " + sheetType + " REF=" + ref + " row=" + row);
++}
++
++function getAnchor_(senderId) {
++  if (!senderId) return null;
++  try {
++    const raw = PropertiesService.getScriptProperties().getProperty("ANCHOR_" + senderId);
++    if (!raw) return null;
++    const anchor = JSON.parse(raw);
++    // Anchor hết hạn sau 12 giờ
++    if (Date.now() - anchor.ts > 12 * 60 * 60 * 1000) {
++      PropertiesService.getScriptProperties().deleteProperty("ANCHOR_" + senderId);
++      return null;
++    }
++    return anchor;
++  } catch(e) { return null; }
++}
++
+ // ============================================================
+ // ENTRY POINTS
+ // ============================================================
+@@ -290,6 +319,9 @@ function mdgAdd(body) {
+ 
+     if (nr%2===0) sh.getRange(nr,1,1,MTOTAL_COLS).setBackground("#EFF3FB");
+     Logger.log("✅ MDG added REF="+ref+" row="+nr);
++    // Lưu anchor → ảnh tiếp theo từ sender này sẽ tự gắn vào đây
++    const sId = String(body.sender_id || "").trim();
++    if (sId) saveAnchor_(sId, ref, nr, "MDG");
+     return json({ status:"ok", ref:ref, row:last });
+   } catch(err) { Logger.log("❌ mdg_add: "+err.message); return json({ status:"error", message:err.message }); }
+ }
+@@ -359,6 +391,9 @@ function invAdd(body) {
+ 
+     if (nr%2===0) sh.getRange(nr,1,1,ITOTAL_COLS).setBackground("#FFF3E0");
+     Logger.log("✅ INV added REF="+ref+" row="+nr);
++    // Lưu anchor → ảnh tiếp theo từ sender này sẽ tự gắn vào đây
++    const sId = String(body.sender_id || "").trim();
++    if (sId) saveAnchor_(sId, ref, nr, "INV");
+     return json({ status:"ok", ref:ref, row:last });
+   } catch(err) { Logger.log("❌ inv_add: "+err.message); return json({ status:"error", message:err.message }); }
+ }
+@@ -400,24 +435,91 @@ function processPhoto(body, modeStr) {
+     const now     = new Date();
+ 
+     // ── Helper: Tìm row mới nhất theo Sender ID trong 30 phút ──
++    // FIX: JS new Date() không hiểu "dd/MM/yyyy" → chuyển sang ISO trước khi parse
++    const parseRecDateTime = (dateStr, timeStr) => {
++      try {
++        // dateStr có thể là "26/06/2026" (string) hoặc Date object (GAS auto-convert)
++        if (dateStr instanceof Date) {
++          // GAS đọc từ sheet trả về Date object → lấy giờ từ timeStr riêng
++          const d = new Date(dateStr);
++          const timeParts = String(timeStr || "00:00").trim().split(":");
++          // Date object từ GAS là UTC, nhưng timeStr là Myanmar time
++          // → tạo lại với timezone Myanmar +06:30
++          const yyyy = d.getUTCFullYear();
++          const MM   = String(d.getUTCMonth() + 1).padStart(2, "0");
++          const dd   = String(d.getUTCDate()).padStart(2, "0");
++          const hh   = String(timeParts[0] || "0").padStart(2, "0");
++          const mm   = String(timeParts[1] || "0").padStart(2, "0");
++          const iso  = `${yyyy}-${MM}-${dd}T${hh}:${mm}:00+06:30`;
++          const d2   = new Date(iso);
++          return isNaN(d2.getTime()) ? null : d2;
++        }
++        // dateStr là string "dd/MM/yyyy" → convert sang ISO với Myanmar timezone
++        const parts = String(dateStr).trim().split("/");
++        if (parts.length === 3) {
++          // Thêm +06:30 để GAS hiểu đây là Myanmar time, không phải UTC
++          const iso = parts[2] + "-" + parts[1] + "-" + parts[0]
++                    + "T" + String(timeStr).trim() + ":00+06:30";
++          const d = new Date(iso);
++          if (!isNaN(d.getTime())) return d;
++        }
++        // Fallback
++        const d2 = new Date(dateStr + " " + timeStr);
++        return isNaN(d2.getTime()) ? null : d2;
++      } catch(e) { return null; }
++    };
++
+     const findLatest = (sh, colSender, colDate, colTime) => {
+       const lr = sh.getLastRow();
+       if (lr < 2) return { row: -1, msDiff: 9999999999 };
+       const sc = sh.getRange(2, colSender, lr-1, 1).getValues();
+-      const dc = sh.getRange(2, colDate, lr-1, 1).getValues();
+-      const tc = sh.getRange(2, colTime, lr-1, 1).getValues();
++      const dc = sh.getRange(2, colDate,   lr-1, 1).getValues();
++      const tc = sh.getRange(2, colTime,   lr-1, 1).getValues();
+       for (let i = sc.length - 1; i >= 0; i--) {
+         if (String(sc[i][0] || "") === senderId) {
+-          try { 
+-            const d = new Date(dc[i][0] + " " + tc[i][0]);
++          const d = parseRecDateTime(dc[i][0], tc[i][0]);
++          if (d) {
+             const diff = now - d;
+             if (diff < 30 * 60 * 1000) return { row: i + 2, msDiff: diff };
+-          } catch(e) {}
++          }
+         }
+       }
+       return { row: -1, msDiff: 9999999999 };
+     };
+ 
++    // FIX race condition: nếu text + photo gởi cùng lúc, row chưa được lưu
++    // → thử lại tối đa 3 lần, cách 4 giây mỗi lần
++    const findLatestWithRetry = (sh, colSender, colDate, colTime, maxTries) => {
++      for (let t = 0; t < maxTries; t++) {
++        const result = findLatest(sh, colSender, colDate, colTime);
++        if (result.row > 0) return result;
++        if (t < maxTries - 1) {
++          Logger.log("[processPhoto] findLatest: row not found, retry " + (t+1) + "/" + maxTries + " after 4s...");
++          Utilities.sleep(4000);
++        }
++      }
++      return { row: -1, msDiff: 9999999999 };
++    };
++
++    // FIX: Tìm bản ghi gần nhất trong 30 phút bất kể sender_id nào
++    // Dùng khi admin gửi ảnh cho báo cáo của nhân viên khác
++    const findLatestAny = (sh, colDate, colTime) => {
++      const lr = sh.getLastRow();
++      if (lr < 2) return { row: -1, msDiff: 9999999999 };
++      const dc = sh.getRange(2, colDate, lr-1, 1).getValues();
++      const tc = sh.getRange(2, colTime, lr-1, 1).getValues();
++      for (let i = dc.length - 1; i >= 0; i--) {
++        const d = parseRecDateTime(dc[i][0], tc[i][0]);
++        if (d) {
++          const diff = now - d;
++          if (diff >= 0 && diff < 30 * 60 * 1000) return { row: i + 2, msDiff: diff };
++        }
++      }
++      return { row: -1, msDiff: 9999999999 };
++    };
++
++
++
+     let targetType = "UNKNOWN";
+     let targetRow = -1;
+     let targetSheet = null;
+@@ -443,29 +545,38 @@ function processPhoto(body, modeStr) {
+           }
+         }
+       }
++      // FIX: thử findLatestAny TRƯỚC (nhanh, < 1s) để tránh timeout Python 8s
++      // Trường hợp ảnh gửi SAU text (vài phút) → tìm thấy ngay lập tức
++      if (targetRow < 0) {
++        targetRow = findLatestAny(sh, dateCol, timeCol).row;
++        if (targetRow > 0) Logger.log("[processPhoto] findLatestAny instant hit → row=" + targetRow);
++      }
++      // Race condition (ảnh gửi CÙNG LÚC text) → retry 2×3s chờ text được lưu
+       if (targetRow < 0 && senderId) {
+-        targetRow = findLatest(sh, senderCol, dateCol, timeCol).row;
++        targetRow = findLatestWithRetry(sh, senderCol, dateCol, timeCol, 2).row;
++      }
++      // Final fallback any sender sau retry
++      if (targetRow < 0) {
++        Logger.log("[processPhoto] Sender " + senderId + " not matched → final findLatestAny");
++        targetRow = findLatestAny(sh, dateCol, timeCol).row;
+       }
+     } else {
+-      // AUTO MODE: tìm sheet nào có báo cáo gần nhất trong 30 phút
+-      const mdgMatch = findLatest(mdgSh, MCOL.SENDER_ID, MCOL.REC_DATE, MCOL.REC_TIME);
+-      const invMatch = findLatest(invSh, ICOL.SENDER_ID, ICOL.REC_DATE, ICOL.REC_TIME);
+-      
+-      if (mdgMatch.row > 0 && invMatch.row > 0) {
+-        if (mdgMatch.msDiff <= invMatch.msDiff) {
+-          targetType = "MDG"; targetRow = mdgMatch.row; targetSheet = mdgSh;
+-        } else {
+-          targetType = "INV"; targetRow = invMatch.row; targetSheet = invSh;
+-        }
+-      } else if (mdgMatch.row > 0) {
+-        targetType = "MDG"; targetRow = mdgMatch.row; targetSheet = mdgSh;
+-      } else if (invMatch.row > 0) {
+-        targetType = "INV"; targetRow = invMatch.row; targetSheet = invSh;
++      // AUTO MODE: dùng anchor (mốc text cuối cùng của sender này)
++      // Text đến trước → saveAnchor_ → ảnh đến → getAnchor_ → gắn vào đúng record
++      // Text mới cùng sender → mốc cũ bị thay, ảnh mới gắn vào text mới
++      const anchor = getAnchor_(senderId);
++      if (anchor) {
++        Logger.log("[AUTO] Anchor found sender=" + senderId + " → " + anchor.sheet + " REF=" + anchor.ref + " row=" + anchor.row);
++        targetType  = anchor.sheet;
++        targetRow   = anchor.row;
++        targetSheet = targetType === "MDG" ? mdgSh : invSh;
++      } else {
++        Logger.log("[AUTO] No anchor for sender=" + senderId + " — photo rejected");
+       }
+     }
+ 
+     if (targetRow < 0) {
+-      return json({ status:"error", message: "Cannot find recent report (within 30 mins) for Sender: " + senderId });
++      return json({ status:"error", message: "No MDG/INV text found for sender " + senderId + ". Please send MDG report text first, then photos." });
+     }
+ 
+     // ── 2. Download photo (3 methods, fallback chain) ─────────
+@@ -566,5 +677,9 @@ function getInvFolder_() {
+   const fi=root.getFoldersByName(INV_PHOTO_DIR);
+   return fi.hasNext()?fi.next():root.createFolder(INV_PHOTO_DIR);
+ }
+-// ── JSON helper: json() lives in apps_script_collector.js (shared) ──
+-// DO NOT redeclare here — GAS global namespace!
++// ============================================================
++// ROUTING: doPost/doGet/json() đều nằm trong apps_script_collector.js
++// (cùng 1 GAS project — không khai báo lại ở đây — sẽ bị conflict!)
++// doPost route MDG actions → doPostMdg_() (line 76-83 of collector)
++// doGet  route MDG GET    → doGetMdg_()  (line 105 of collector)
++// ============================================================
