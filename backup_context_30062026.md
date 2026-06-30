@@ -78,6 +78,10 @@
 ### 4. Sửa lỗi bỏ qua dòng (Bug Fix)
 - Sửa lỗi trong `backlog_send.py` khi bỏ qua nhầm dòng 4 và 5 của Google Sheet (làm mất thông tin của `Cable Patrol for (BB)` và `Cable Patrol for (AC)`). Giờ vòng lặp chạy từ dòng 4 (`idx < 3`).
 
+### 5. Cập nhật Keyword Nhận Diện Daily Report của Chatbot
+- **Hỗ trợ từ khóa "Result"**: Cập nhật hàm `is_daily` trong [search_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/api/search_bot.py) và `is_daily_report` trong [telegram_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/telegram_bot.py) để tự động nhận diện tin nhắn nộp báo cáo chứa từ khóa `"daily"` hoặc `"result"` (không phân biệt hoa thường).
+- **Ánh xạ ngày báo cáo**: Cập nhật hàm `parse_daily_report` để nếu dòng tiêu đề chứa chữ `"result"` hoặc `"daily"` (ví dụ: `Daily Result: 30/06/2026`), giá trị ngày tháng sẽ tự động được gán chính xác vào cột `"Daily report"` trong dữ liệu gửi lên Google Sheet thay vì bị bỏ sót và lấy ngày hiện tại mặc định.
+
 ---
 
 ## ⚡ Lưu ý quan trọng
