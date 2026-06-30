@@ -41,6 +41,13 @@
   - Điều này giúp các lệnh trigger chạy sớm của người dùng lúc **04:08, 04:38...** đi vào hoạt động chính xác và không bị script bỏ qua nữa.
 - **Đồng bộ hóa tài liệu:** Cập nhật lại khung giờ hoạt động mới `04:00 - 21:30 Myanmar` trong các tài liệu hệ thống gồm [PROMPT_RUNBOOK.md](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/PROMPT_RUNBOOK.md) và [system_map.md](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/system_map.md).
 
+### 3. Sửa lỗi trùng lặp biến (SyntaxError: Identifier 'SD_BOT_TOKEN' has already been declared)
+- **Nguyên nhân:** File `apps_script_collector.gs` trên Google Apps Script bị dán nhầm toàn bộ mã nguồn của file `site_down_notify.gs` dẫn đến việc cả hai file đều khai báo biến `SD_BOT_TOKEN` trong cùng một dự án.
+- **Khắc phục:**
+  - Khôi phục file `apps_script_collector.js` chuẩn từ Git ở máy local.
+  - Sử dụng công cụ `clasp push` đẩy đè lại toàn bộ mã nguồn chuẩn lên dự án Apps Script trên Google Sheets để ghi đè, giải quyết triệt để lỗi trùng lặp.
+  - Thêm tạm thời hàm `saveMyTokens()` vào cuối file [site_down_notify.gs](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/site_down_notify.gs) giúp lưu Token ẩn vào Script Properties thành công, sau đó tiến hành Deploy lại Web App phiên bản mới nhất.
+
 ---
 
 ## ⚡ Lưu ý quan trọng
