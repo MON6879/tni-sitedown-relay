@@ -1,7 +1,7 @@
 # 🗂️ Backup Context — TNI Bot System (30/06/2026)
 
 > ⚠️ **ĐỌC FILE NÀY TRƯỚC KHI SỬA BẤT KỲ THỨ GÌ!**
-> Snapshot: 30/06/2026 15:25 (Myanmar UTC+6:30)
+> Snapshot: 30/06/2026 17:30 (Myanmar UTC+6:30)
 > Conversation ID: `620dc64e-d895-40fd-b641-670b2b3cc8f2`
 
 ---
@@ -33,6 +33,7 @@
 
 #### 📋 Danh sách Báo cáo gửi nhóm CONTROL:
 - `📋 1. Report — Technical Dept Task Progress` (từ `cron_send.py` gửi lúc 17:30 và `combined_bot.py` gửi lúc 17:00)
+- `📋 2. Report — Daily BOD Assign — Summary` (từ `daily_bod_assign.py` gửi lúc **17:00**)
 - `📋 4. Report — Daily EOD Task & Stats — Summary` (từ `cron_send.py` gửi lúc 17:30)
 - `📋 5. Report — Daily Plan & Results — Summary` (từ `daily_plan_report.py` gửi lúc **20:00**)
 - `📋 6. Report — Daily Note Read Report — Summary` (từ `daily_read_report.py` gửi lúc 20:30)
@@ -45,7 +46,21 @@
 - `📋 5. Report — Daily Plan & Results` (20:00)
 - `📋 6. Report — Daily Note Read Report` (20:30, Cutoff 20:25)
 
-### 2. Thay đổi quan trọng về Logic & Loại bỏ hoàn toàn tin nhắn Cá nhân
+### 2. Báo cáo mới: BOD-assigned Task Statistics (`📋 2. Report` CONTROL)
+- **File nguồn:** [daily_bod_assign.py](file:///D:/6.%20AI/1.%20QLTC/Task%20and%20WO/daily_bod_assign.py)
+- **Workflow:** [daily_bod_assign.yml](file:///D:/6.%20AI/1.%20QLTC/Task%20and%20WO/.github/workflows/daily_bod_assign.yml)
+- **Giờ gửi:** **17:00 Myanmar** (được trigger tự động từ Google Apps Script).
+- **Tab nguồn:** Tab `BOD assign` trong Google Sheet (tải trực tiếp bằng tham số `sheet=BOD+assign`).
+- **Logic tổng hợp:**
+  - Gom nhóm dữ liệu theo cột A (`Assign Admin` - chức vụ/phòng ban như Admin, Asset, CM, M&E...).
+  - Đếm tổng số task đã giao (`Task assign`).
+  - Đếm số lượng task hoàn thành theo ngày hoàn thành tại cột H (`Dep update Date complete`) theo mốc 3Day (`d2/d1/d0`), 7Day, và Month hiện tại.
+  - Đếm số lượng task hoàn thành nhưng chưa xác nhận (cột H khác rỗng và cột J `Manager Confirm` bằng rỗng).
+  - Định dạng hiển thị kèm chấm màu để dễ phân biệt:
+    `🔵 Admin: Task assign : 10 = 3 day 0/0/0 7 day: 1 Month: 5 Not Yet Cofirm : 3 case`
+- **Xóa tin cũ:** Tự động xóa tin nhắn BOD Assign cũ trên CONTROL trước khi gửi tin mới (dùng key `BOD_ASSIGN_CONTROL`).
+
+### 3. Thay đổi quan trọng về Logic & Loại bỏ hoàn toàn tin nhắn Cá nhân
 - **LOẠI BỎ TOÀN BỘ TIN NHẮN CÁ NHÂN (Hàng 4-87)**:
   - Theo yêu cầu của user, số liệu các đội từ hàng 4 đến 74 đã được gửi đầy đủ vào các nhóm Team, nên **không gửi tin nhắn cá nhân đến từng người** nữa.
   - Đã loại bỏ hoàn toàn logic gửi tin nhắn cá nhân cho các hàng 4-74 (nhân viên, quản lý) và 75-87 (Technical Dept) trong daemon scheduler (`combined_bot.py`).
@@ -60,7 +75,7 @@
   - Tích hợp chức năng tự động xóa tin nhắn Asset cũ trước khi gửi tin mới trong từng nhóm thông qua Apps Script API.
 - **Tính năng Xóa Tin Cũ trên CONTROL**: Đảm bảo tất cả các báo cáo gửi lên CONTROL (gồm báo cáo EOD TLs, báo cáo Asset, báo cáo Tech Dept, báo cáo Plan và báo cáo đọc Note) đều tích hợp chức năng xóa tin nhắn cũ trước khi gửi tin mới.
 
-### 3. Sửa lỗi bỏ qua dòng (Bug Fix)
+### 4. Sửa lỗi bỏ qua dòng (Bug Fix)
 - Sửa lỗi trong `backlog_send.py` khi bỏ qua nhầm dòng 4 và 5 của Google Sheet (làm mất thông tin của `Cable Patrol for (BB)` và `Cable Patrol for (AC)`). Giờ vòng lặp chạy từ dòng 4 (`idx < 3`).
 
 ---
