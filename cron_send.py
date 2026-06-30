@@ -733,7 +733,12 @@ async def main():
 
     # ── 6. Build management report: TL summaries + Technical Dept only ──
     # BOD/Manager chỉ nhận TL Reports + Technical Dept
-    mgmt_parts = [f"📊 Summary Report – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
+    mgmt_parts = [
+        f"📋 4. Report — Daily EOD Task & Stats — Summary",
+        f"📅 {now_str}",
+        f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
+        "━━━━━━━━━━━━━━━━━━━━"
+    ]
     if team_leader_content:
         mgmt_parts.append("👑 Team Leader Reports:")
         for tl in team_leader_content:
@@ -852,7 +857,8 @@ async def main():
     # ── 7b. Gộp Tech Dept → Group CONTROL SITE ──
     if tech_messages and SEND_BOT_TOKEN:
         tech_lines = [
-            f"🔧 Technical Dept Report – {now_str}",
+            f"📋 4. Report — Technical Dept Task Progress",
+            f"📅 {now_str}",
             "━" * 22,
         ]
         if input_task_summary:

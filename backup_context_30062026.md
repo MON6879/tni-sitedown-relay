@@ -1,7 +1,7 @@
 # 🗂️ Backup Context — TNI Bot System (30/06/2026)
 
 > ⚠️ **ĐỌC FILE NÀY TRƯỚC KHI SỬA BẤT KỲ THỨ GÌ!**
-> Snapshot: 30/06/2026 15:00 (Myanmar UTC+6:30)
+> Snapshot: 30/06/2026 15:15 (Myanmar UTC+6:30)
 > Conversation ID: `620dc64e-d895-40fd-b641-670b2b3cc8f2`
 
 ---
@@ -28,17 +28,22 @@
 
 ## ✅ Hoàn thành ngày 30/06/2026
 
-### 1. Hệ thống lại Báo cáo từ 1 đến 6
-Đã hệ thống hóa lại các tiêu đề và trình tự gửi báo cáo cuối ngày của các nhóm Telegram (cả nhóm Team và CONTROL) để đảm bảo tính logic và chronological (gửi theo thứ tự thời gian):
+### 1. Hệ thống lại Báo cáo từ 1 đến 6 & Đánh số nhóm CONTROL
+Đã hệ thống hóa và đánh số hiệu tất cả các báo cáo của nhóm Team và nhóm **CONTROL SITE** để đồng bộ, thống nhất và có trình tự thời gian logic:
 
-| Số hiệu | Tên Báo cáo | File nguồn | Giờ gửi (Myanmar) | Ghi chú / Annotation |
-|---|---|---|---|---|
-| **1. Report** | `Daily Backlog (Category/Description)` | `backlog_send.py` | 17:10 | Chi tiết site phân bổ theo phòng ban (Admin, Asset...) |
-| **2. Report** | `Daily Backlog (Task Progress)` | `backlog_send.py` | 17:10 | Các task tồn đọng chung và Cable Patrol từ các ngày trước |
-| **3. Report** | `Main DG Material Need` | `backlog_send.py` | 17:10 | Nhu cầu vật tư, dầu, nước làm mát của các sub-team |
-| **4. Report** | `Daily EOD Task & Stats` | `cron_send.py` | 17:30 | Tổng hợp kết quả công việc, close rate, rank EOD trong ngày |
-| **5. Report** | `Daily Plan & Results` | `daily_plan_report.py` | **20:00** | So sánh Kế hoạch ngày (Plan) vs Thực tế hoàn thành (Actual) |
-| **6. Report** | `Daily Note Read Report` | `daily_read_report.py` | 20:30 | Danh sách đọc Note với **mốc Cutoff lúc 20:25** |
+#### 📋 Danh sách Báo cáo gửi nhóm CONTROL:
+- `📋 4. Report — Daily EOD Task & Stats — Summary` (từ `cron_send.py` gửi lúc 17:30)
+- `📋 4. Report — Technical Dept Task Progress` (từ `cron_send.py` gửi lúc 17:30 và `combined_bot.py` gửi lúc 17:00)
+- `📋 5. Report — Daily Plan & Results — Summary` (từ `daily_plan_report.py` gửi lúc **20:00**)
+- `📋 6. Report — Daily Note Read Report — Summary` (từ `daily_read_report.py` gửi lúc 20:30)
+
+#### 📋 Danh sách Báo cáo gửi nhóm TEAM:
+- `📋 1. Report — Daily Backlog (Category/Description)` (17:10)
+- `📋 2. Report — Daily Backlog (Task Progress)` (17:10)
+- `📋 3. Report — Main DG Material Need` (17:10)
+- `📋 4. Report — Daily EOD Task & Stats` (17:30)
+- `📋 5. Report — Daily Plan & Results` (20:00)
+- `📋 6. Report — Daily Note Read Report` (20:30, Cutoff 20:25)
 
 ### 2. Thay đổi quan trọng về Logic & Báo cáo phòng ban/Asset
 - **Đổi giờ gửi Plan (`5. Report`)**: Chuyển thời gian chạy `daily_plan_report.py` từ 21:00 về **20:00 Myanmar**. Thay đổi này được cập nhật trong `site_down_notify.gs` (khung quét trigger `19:55–20:25`) và tên workflow trên GitHub Actions.
