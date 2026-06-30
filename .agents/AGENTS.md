@@ -19,9 +19,9 @@ Full documentation: see `SYSTEM_DOC.md` in root.
 ## File Mapping
 | File | Purpose | Trigger |
 |---|---|---|
-| `daily_bod_assign.py` | BOD-assigned task statistics report | 17:00 Myanmar via GitHub Actions |
-| `cron_send.py` | Daily Task + Asset + Search reports | 17:30 Myanmar via GitHub Actions |
-| `daily_read_report.py` | Note read tracking per-person | 20:30 Myanmar via GitHub Actions |
+| `daily_bod_assign.py` | BOD-assigned task statistics report | 17:00 Myanmar via `daily_reports.yml` (`bod_assign`) |
+| `cron_send.py` | Daily Task + Asset + Search reports | 17:30 Myanmar via `daily_reports.yml` (`daily_task`) |
+| `daily_read_report.py` | Note read tracking per-person | 20:30 Myanmar via `daily_reports.yml` (`read_report`) |
 | `apps_script_collector.js` | Data source (local copy of GAS) | Manual deploy |
 | `SYSTEM_DOC.md` | Full system documentation | Reference |
 

@@ -211,13 +211,13 @@ Missing: TNI0052, TNI0185, TNI0058
 
 ## ⏰ Daily Schedule (Myanmar Time)
 
-| Time | Script | Workflow | What |
+| Time | Script | Workflow / Input | What |
 |---|---|---|---|
-| **17:00** | `daily_bod_assign.py` | `daily_bod_assign.yml` | Report 2: BOD-assigned task statistics (Consolidated) to CONTROL |
-| **17:10** | `backlog_send.py` | `daily_task.yml` | Report 1, 2, 3: Daily Backlog reports to team groups |
-| **17:30** | `cron_send.py` | `daily_task.yml` | Report 4: Daily EOD Task + Asset + Search reports to all groups |
-| **20:00** | `daily_plan_report.py` | `daily_plan_report.yml` | Report 5: Daily Plan collection + Comparison report |
-| **20:30** | `daily_read_report.py` | `daily_read_report.yml` | Report 6: Note read status per-person (Cutoff at 20:25) to teams + CONTROL |
+| **17:00** | `daily_bod_assign.py` | `daily_reports.yml` (`bod_assign`) | Report 2: BOD-assigned task statistics (Consolidated) to CONTROL |
+| **17:10** | `backlog_send.py` | `daily_reports.yml` (`daily_task`) | Report 1, 2, 3: Daily Backlog reports to team groups |
+| **17:30** | `cron_send.py` | `daily_reports.yml` (`daily_task`) | Report 4: Daily EOD Task + Asset + Search reports to all groups |
+| **20:00** | `daily_plan_report.py` | `daily_reports.yml` (`plan_report`) | Report 5: Daily Plan collection + Comparison report |
+| **20:30** | `daily_read_report.py` | `daily_reports.yml` (`read_report`) | Report 6: Note read status per-person (Cutoff at 20:25) to teams + CONTROL |
 
 ---
 
