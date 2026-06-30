@@ -222,8 +222,8 @@ function relayBotlookupToTNI() {
   const myanmarMin  = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "m"), 10);
   const currentMinutes = myanmarHour * 60 + myanmarMin;
 
-  // Khung giờ hoạt động: 04:30 đến 21:30 Myanmar Time
-  const activeStart = 4 * 60 + 30;
+  // Khung giờ hoạt động: 04:00 đến 21:30 Myanmar Time
+  const activeStart = 4 * 60;
   const activeEnd = 21 * 60 + 30;
 
   if (currentMinutes >= activeStart && currentMinutes <= activeEnd) {
@@ -235,7 +235,7 @@ function relayBotlookupToTNI() {
       Logger.log("[relayBotlookupToTNI] ⚠️ Không dispatch được GitHub Actions (thiếu GITHUB_PAT?)");
     }
   } else {
-    Logger.log("[relayBotlookupToTNI] 🌙 Ngoài khung giờ hoạt động (04:30-21:30 Myanmar) — Bỏ qua dispatch GitHub Actions");
+    Logger.log("[relayBotlookupToTNI] 🌙 Ngoài khung giờ hoạt động (04:00-21:30 Myanmar) — Bỏ qua dispatch GitHub Actions");
   }
 
   // Bước 2: Chạy checkAndSend để gửi nếu Cột A đã có data

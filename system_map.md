@@ -642,7 +642,7 @@ Cách kiểm tra nhanh:
 ### 29/06/2026 — Botlookup relay workflow & GAS active window check
 | Vấn đề | Nguyên nhân | Fix |
 |---|---|---|
-| GitHub Actions chạy 24/7 lãng phí | GAS gọi API dispatch workflow 30 phút một lần vô điều kiện, kể cả ban đêm | Thêm check khung giờ hoạt động (04:30 - 21:30 Myanmar) vào `relayBotlookupToTNI()` trước khi gọi dispatch |
+| GitHub Actions chạy 24/7 lãng phí | GAS gọi API dispatch workflow 30 phút một lần vô điều kiện, kể cả ban đêm | Thêm check khung giờ hoạt động (04:00 - 21:30 Myanmar) vào `relayBotlookupToTNI()` trước khi gọi dispatch |
 | GitHub Actions mất thời gian cài pip | Chưa có cơ chế cache dependencies cho workflow | Thêm cache 'pip' vào `botlookup_relay.yml` và thêm `telethon>=1.30.0` vào `requirements.txt` |
 
 ---
