@@ -447,195 +447,69 @@ function sendTaskRemain() {
 // HELPER — Dispatch GitHub Actions workflow check_read_status.yml
 // Chạy 1 lần/ngày lúc 17:xx Myanmar → báo cáo ai đọc Note
 // ============================================================
+function triggerDailyWorkflow(reportType, extraInputs) {
+  try {
+    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
+    if (!pat) {
+      Logger.log("[triggerDailyWorkflow] ⚠️ GITHUB_PAT chưa set");
+      return false;
+    }
+    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_reports.yml/dispatches";
+    const inputs = { report_type: reportType };
+    if (extraInputs) {
+      Object.assign(inputs, extraInputs);
+    }
+
+    const resp = UrlFetchApp.fetch(url, {
+      method: "post",
+      headers: {
+        "Authorization": "Bearer " + pat,
+        "Accept":        "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type":  "application/json"
+      },
+      payload: JSON.stringify({
+        ref: "main",
+        inputs: inputs
+      }),
+      muteHttpExceptions: true
+    });
+    const code = resp.getResponseCode();
+    Logger.log("[triggerDailyWorkflow] " + reportType + " GitHub API response: " + code);
+    return code === 204;
+  } catch(e) {
+    Logger.log("[triggerDailyWorkflow] ❌ Lỗi: " + e.message);
+    return false;
+  }
+}
+
 function triggerReadStatusCheck() {
-  try {
-    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
-    if (!pat) {
-      Logger.log("[triggerReadStatusCheck] ⚠️ GITHUB_PAT chưa set");
-      return false;
-    }
-    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/check_read_status.yml/dispatches";
-    const resp = UrlFetchApp.fetch(url, {
-      method: "post",
-      headers: {
-        "Authorization": "Bearer " + pat,
-        "Accept":        "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type":  "application/json"
-      },
-      payload: JSON.stringify({ ref: "main" }),
-      muteHttpExceptions: true
-    });
-    const code = resp.getResponseCode();
-    Logger.log("[triggerReadStatusCheck] GitHub API response: " + code);
-    return code === 204;
-  } catch(e) {
-    Logger.log("[triggerReadStatusCheck] ❌ Lỗi: " + e.message);
-    return false;
-  }
+  return triggerDailyWorkflow("check_read_status");
 }
 
-// ── Dispatch daily_task.yml — báo cáo 17:30 Myanmar (chạy từ GAS thay vì GitHub cron)
+// ── Dispatch daily_task.yml (daily_task) — báo cáo 17:30 Myanmar
 function triggerDailyTask() {
-  try {
-    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
-    if (!pat) {
-      Logger.log("[triggerDailyTask] ⚠️ GITHUB_PAT chưa set");
-      return false;
-    }
-    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_task.yml/dispatches";
-    const resp = UrlFetchApp.fetch(url, {
-      method: "post",
-      headers: {
-        "Authorization": "Bearer " + pat,
-        "Accept":        "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type":  "application/json"
-      },
-      payload: JSON.stringify({ ref: "main" }),
-      muteHttpExceptions: true
-    });
-    const code = resp.getResponseCode();
-    Logger.log("[triggerDailyTask] GitHub API response: " + code);
-    return code === 204;
-  } catch(e) {
-    Logger.log("[triggerDailyTask] ❌ Lỗi: " + e.message);
-    return false;
-  }
+  return triggerDailyWorkflow("daily_task");
 }
 
-
-// ── Dispatch daily_read_report.yml lúc 20:30 Myanmar
+// ── Dispatch daily_read_report.yml (read_report) lúc 20:30 Myanmar
 function triggerDailyReadReport() {
-  try {
-    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
-    if (!pat) {
-      Logger.log("[triggerDailyReadReport] ⚠️ GITHUB_PAT chưa set");
-      return false;
-    }
-    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_read_report.yml/dispatches";
-    const resp = UrlFetchApp.fetch(url, {
-      method: "post",
-      headers: {
-        "Authorization": "Bearer " + pat,
-        "Accept":        "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type":  "application/json"
-      },
-      payload: JSON.stringify({ ref: "main" }),
-      muteHttpExceptions: true
-    });
-    const code = resp.getResponseCode();
-    Logger.log("[triggerDailyReadReport] GitHub API response: " + code);
-    return code === 204;
-  } catch(e) {
-    Logger.log("[triggerDailyReadReport] ❌ Lỗi: " + e.message);
-    return false;
-  }
+  return triggerDailyWorkflow("read_report");
 }
 
-
-// ── Dispatch daily_plan_report.yml lúc 20:00 Myanmar
+// ── Dispatch daily_plan_report.yml (plan_report) lúc 20:00 Myanmar
 function triggerDailyPlanReport() {
-  try {
-    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
-    if (!pat) {
-      Logger.log("[triggerDailyPlanReport] ⚠️ GITHUB_PAT chưa set");
-      return false;
-    }
-    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_plan_report.yml/dispatches";
-    const resp = UrlFetchApp.fetch(url, {
-      method: "post",
-      headers: {
-        "Authorization": "Bearer " + pat,
-        "Accept":        "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type":  "application/json"
-      },
-      payload: JSON.stringify({ ref: "main" }),
-      muteHttpExceptions: true
-    });
-    const code = resp.getResponseCode();
-    Logger.log("[triggerDailyPlanReport] GitHub API response: " + code);
-    return code === 204;
-  } catch(e) {
-    Logger.log("[triggerDailyPlanReport] ❌ Lỗi: " + e.message);
-    return false;
-  }
+  return triggerDailyWorkflow("plan_report");
 }
 
-
-// ── Dispatch daily_bod_assign.yml lúc 17:00 Myanmar
+// ── Dispatch daily_bod_assign.yml (bod_assign) lúc 17:00 Myanmar
 function triggerDailyBodAssign() {
-  try {
-    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
-    if (!pat) {
-      Logger.log("[triggerDailyBodAssign] ⚠️ GITHUB_PAT chưa set");
-      return false;
-    }
-    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_bod_assign.yml/dispatches";
-    const resp = UrlFetchApp.fetch(url, {
-      method: "post",
-      headers: {
-        "Authorization": "Bearer " + pat,
-        "Accept":        "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type":  "application/json"
-      },
-      payload: JSON.stringify({ ref: "main" }),
-      muteHttpExceptions: true
-    });
-    const code = resp.getResponseCode();
-    Logger.log("[triggerDailyBodAssign] GitHub API response: " + code);
-    return code === 204;
-  } catch(e) {
-    Logger.log("[triggerDailyBodAssign] ❌ Lỗi: " + e.message);
-    return false;
-  }
+  return triggerDailyWorkflow("bod_assign");
 }
 
-
-// ============================================================
-// HELPER — Dispatch GitHub Actions workflow botlookup_relay.yml
-// Yêu cầu: Script Property "GITHUB_PAT" = Personal Access Token
-//   có scope: repo + workflow
-// Cách tạo PAT: github.com/settings/tokens → Generate new token (classic)
-//   → chọn scope "repo" và "workflow"
-// Cách lưu: GAS Editor → Project Settings → Script Properties
-//   → thêm key "GITHUB_PAT" = token value
-// ============================================================
+// ── Dispatch botlookup_relay.yml (botlookup_relay) từ GAS
 function triggerBotlookupRelay() {
-  try {
-    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
-    if (!pat) {
-      Logger.log("[triggerBotlookupRelay] ⚠️ GITHUB_PAT chưa set trong Script Properties");
-      return false;
-    }
-
-    const owner    = "phonghdpxd-cmd";
-    const repo     = "tni-bot";
-    const workflow = "botlookup_relay.yml";
-    const url      = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow}/dispatches`;
-
-    const resp = UrlFetchApp.fetch(url, {
-      method: "post",
-      headers: {
-        "Authorization": "Bearer " + pat,
-        "Accept":        "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "Content-Type":  "application/json"
-      },
-      payload: JSON.stringify({ ref: "main", inputs: { skip_delay: "1" } }),
-      muteHttpExceptions: true
-    });
-
-    const code = resp.getResponseCode();
-    Logger.log("[triggerBotlookupRelay] GitHub API response: " + code);
-    return code === 204;   // 204 No Content = thành công
-  } catch(e) {
-    Logger.log("[triggerBotlookupRelay] ❌ Lỗi: " + e.message);
-    return false;
-  }
+  return triggerDailyWorkflow("botlookup_relay", { skip_delay: "1" });
 }
 
 
