@@ -857,7 +857,7 @@ async def main():
     # ── 7b. Gộp Tech Dept → Group CONTROL SITE ──
     if tech_messages and SEND_BOT_TOKEN:
         tech_lines = [
-            f"📋 4. Report — Technical Dept Task Progress",
+            f"📋 1. Report — Technical Dept Task Progress",
             f"📅 {now_str}",
             "━" * 22,
         ]

@@ -152,7 +152,7 @@ async def send_all_tasks():
         tech_bot_token = TECHNICAL_DEP_BOT_TOKEN or SEND_BOT_TOKEN
         if tech_bot_token:
             tech_lines = [
-                f"📋 4. Report — Technical Dept Task Progress",
+                f"📋 1. Report — Technical Dept Task Progress",
                 f"📅 {now_vn}",
                 "━" * 22,
             ]

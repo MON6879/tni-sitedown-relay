@@ -1,7 +1,7 @@
 # 🗂️ Backup Context — TNI Bot System (30/06/2026)
 
 > ⚠️ **ĐỌC FILE NÀY TRƯỚC KHI SỬA BẤT KỲ THỨ GÌ!**
-> Snapshot: 30/06/2026 15:20 (Myanmar UTC+6:30)
+> Snapshot: 30/06/2026 15:25 (Myanmar UTC+6:30)
 > Conversation ID: `620dc64e-d895-40fd-b641-670b2b3cc8f2`
 
 ---
@@ -32,8 +32,8 @@
 Đã hệ thống hóa và đánh số hiệu tất cả các báo cáo của nhóm Team và nhóm **CONTROL SITE** để đồng bộ, thống nhất và có trình tự thời gian logic:
 
 #### 📋 Danh sách Báo cáo gửi nhóm CONTROL:
+- `📋 1. Report — Technical Dept Task Progress` (từ `cron_send.py` gửi lúc 17:30 và `combined_bot.py` gửi lúc 17:00)
 - `📋 4. Report — Daily EOD Task & Stats — Summary` (từ `cron_send.py` gửi lúc 17:30)
-- `📋 4. Report — Technical Dept Task Progress` (từ `cron_send.py` gửi lúc 17:30 và `combined_bot.py` gửi lúc 17:00)
 - `📋 5. Report — Daily Plan & Results — Summary` (từ `daily_plan_report.py` gửi lúc **20:00**)
 - `📋 6. Report — Daily Note Read Report — Summary` (từ `daily_read_report.py` gửi lúc 20:30)
 
