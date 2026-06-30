@@ -1463,7 +1463,7 @@ function writeAssetStatsLog(ss, stats, grandTotal, actionTypes, teams) {
 // Sheet: SEND_TELEGRAM | Cột B=Tên | C=Nội dung | D=Chat ID | E=Kết quả
 // ============================================================
 
-const TG_SEND_TOKEN  = '8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A';
+const TG_SEND_TOKEN  = PropertiesService.getScriptProperties().getProperty("SEND_BOT_TOKEN") || "";
 const SEND_TAB_NAME  = 'SEND_TELEGRAM';
 
 function onOpen() {

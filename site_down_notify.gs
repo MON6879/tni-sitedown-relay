@@ -11,7 +11,7 @@
 // ============================================================
 
 // ── Bot ─────────────────────────────────────────────────────
-const SD_BOT_TOKEN = "8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI";
+const SD_BOT_TOKEN = PropertiesService.getScriptProperties().getProperty("SD_BOT_TOKEN") || "";
 
 // ── Group Chat IDs ───────────────────────────────────────────
 const SD_GROUPS = {
