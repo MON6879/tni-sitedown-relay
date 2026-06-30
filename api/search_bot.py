@@ -265,9 +265,18 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
             val   = line[colon + 1:].strip()
             matched = None
             label_l = label.lower()
-            for f in fields:
-                if f.lower() in label_l or label_l in f.lower():
-                    matched = f; break
+            
+            # Nếu label chứa chữ "result" hoặc "daily", tự động khớp với "Daily report"
+            if "result" in label_l or "daily" in label_l:
+                for f in fields:
+                    if f.lower() == "daily report":
+                        matched = f
+                        break
+            
+            if not matched:
+                for f in fields:
+                    if f.lower() in label_l or label_l in f.lower():
+                        matched = f; break
             if matched:
                 flush(); cur_key = matched
                 cur_val = [val] if val else []
@@ -277,7 +286,8 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
     return result
 
 def is_daily(text: str) -> bool:
-    return "daily" in text.lower()
+    text_l = text.lower()
+    return "daily" in text_l or "result" in text_l
 
 def send_daily_template(chat_id: int) -> None:
     fields = fetch_daily_fields()

@@ -317,11 +317,20 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
             # Tìm field khớp (không phân biệt hoa thường)
             matched = None
             label_l = label.lower()
-            for f in fields:
-                f_l = f.lower()
-                if f_l in label_l or label_l in f_l:
-                    matched = f
-                    break
+            
+            # Nếu label chứa chữ "result" hoặc "daily", tự động khớp với "Daily report"
+            if "result" in label_l or "daily" in label_l:
+                for f in fields:
+                    if f.lower() == "daily report":
+                        matched = f
+                        break
+            
+            if not matched:
+                for f in fields:
+                    f_l = f.lower()
+                    if f_l in label_l or label_l in f_l:
+                        matched = f
+                        break
             if matched:
                 flush()
                 cur_key = matched
@@ -336,8 +345,9 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
 
 
 def is_daily_report(text: str) -> bool:
-    """Có chữ 'daily' (không phân biệt hoa thường) là daily report."""
-    return "daily" in text.lower()
+    """Có chữ 'daily' hoặc 'result' (không phân biệt hoa thường) là daily report."""
+    text_l = text.lower()
+    return "daily" in text_l or "result" in text_l
 
 
 async def cmd_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
