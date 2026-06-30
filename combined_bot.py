@@ -114,14 +114,9 @@ async def send_all_tasks():
             tech_messages.append((sheet_row, content))
             continue
 
-        if 4 <= sheet_row <= 32 and REPORT_TASK_BOT_TOKEN:
-            token = REPORT_TASK_BOT_TOKEN
-        elif SEND_BOT_TOKEN:
-            token = SEND_BOT_TOKEN
-        else:
-            logger.warning(f"[Scheduler] ⚠️ No bot token for row {sheet_row}")
-            continue
-        groups.setdefault(token, []).append((sheet_row, content, chat_id))
+        # Bỏ gửi cá nhân cho các hàng từ 4 đến 74 theo yêu cầu của user
+        # Số liệu đã được gửi trực tiếp vào các nhóm Team/CONTROL qua cron_send.py
+        continue
 
     total_ok = total_fail = 0
     for token, items in groups.items():

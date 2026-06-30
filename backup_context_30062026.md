@@ -1,7 +1,7 @@
 # 🗂️ Backup Context — TNI Bot System (30/06/2026)
 
 > ⚠️ **ĐỌC FILE NÀY TRƯỚC KHI SỬA BẤT KỲ THỨ GÌ!**
-> Snapshot: 30/06/2026 15:15 (Myanmar UTC+6:30)
+> Snapshot: 30/06/2026 15:20 (Myanmar UTC+6:30)
 > Conversation ID: `620dc64e-d895-40fd-b641-670b2b3cc8f2`
 
 ---
@@ -45,13 +45,16 @@
 - `📋 5. Report — Daily Plan & Results` (20:00)
 - `📋 6. Report — Daily Note Read Report` (20:30, Cutoff 20:25)
 
-### 2. Thay đổi quan trọng về Logic & Báo cáo phòng ban/Asset
+### 2. Thay đổi quan trọng về Logic & Loại bỏ hoàn toàn tin nhắn Cá nhân
+- **LOẠI BỎ TOÀN BỘ TIN NHẮN CÁ NHÂN (Hàng 4-87)**:
+  - Theo yêu cầu của user, số liệu các đội từ hàng 4 đến 74 đã được gửi đầy đủ vào các nhóm Team, nên **không gửi tin nhắn cá nhân đến từng người** nữa.
+  - Đã loại bỏ hoàn toàn logic gửi tin nhắn cá nhân cho các hàng 4-74 (nhân viên, quản lý) và 75-87 (Technical Dept) trong daemon scheduler (`combined_bot.py`).
+  - Toàn bộ hệ thống hiện tại **KHÔNG còn gửi bất kỳ tin nhắn cá nhân nào nữa**.
 - **Đổi giờ gửi Plan (`5. Report`)**: Chuyển thời gian chạy `daily_plan_report.py` từ 21:00 về **20:00 Myanmar**. Thay đổi này được cập nhật trong `site_down_notify.gs` (khung quét trigger `19:55–20:25`) và tên workflow trên GitHub Actions.
 - **Bỏ khung giờ đọc Note (`6. Report`)**: Loại bỏ điều kiện chỉ tính lượt đọc Note trong khung `18:00 - 20:00`. Chuyển sang logic **Cutoff lúc 20:25 Myanmar** (bất cứ ai đã đọc tin nhắn trước/tại thời điểm 20:25 đều được tính là đã đọc).
 - **Thứ tự chạy GitHub Actions**: Điều chỉnh thứ tự trong file `daily_task.yml` để chạy `backlog_send.py` (Report 1, 2, 3) trước `cron_send.py` (Report 4) để tin nhắn xuất hiện đúng thứ tự từ trên xuống dưới trên Telegram.
-- **Gộp tin nhắn phòng ban (rows 75-87)**:
-  - Loại bỏ hoàn toàn tính năng gửi tin nhắn cá nhân từng người đối với Technical Dept (hàng 75-87) trong daemon scheduler (`combined_bot.py`).
-  - Gộp tất cả task của Technical Dept thành một tin nhắn báo cáo duy nhất và gửi lên nhóm **CONTROL SITE** sử dụng bot `TECHNICAL_DEP_BOT_TOKEN`/`SEND_BOT_TOKEN` với chức năng tự động xóa tin nhắn cũ (`SCHEDULER_TECHDEP_CONTROL`).
+- **Gộp tin nhắn phòng ban (rows 75-87) lên CONTROL**:
+  - Gộp tất cả task của Technical Dept thành một tin nhắn báo cáo duy nhất và gửi lên nhóm **CONTROL SITE** sử dụng bot với chức năng tự động xóa tin nhắn cũ (`SCHEDULER_TECHDEP_CONTROL`).
 - **Gửi Báo cáo Asset tổng hợp cho Từng Team + CONTROL**:
   - Chỉnh sửa `cron_send.py` để tin nhắn tổng hợp Asset (`asset_msg`) được gửi đồng thời lên nhóm **CONTROL SITE** và **tất cả 4 nhóm Team** (T1, T2, T3, T4).
   - Tích hợp chức năng tự động xóa tin nhắn Asset cũ trước khi gửi tin mới trong từng nhóm thông qua Apps Script API.
