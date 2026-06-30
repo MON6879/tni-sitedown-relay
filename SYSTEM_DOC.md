@@ -213,6 +213,7 @@ Missing: TNI0052, TNI0185, TNI0058
 
 | Time | Script | Workflow | What |
 |---|---|---|---|
+| **17:00** | `daily_bod_assign.py` | `daily_bod_assign.yml` | Report 2: BOD-assigned task statistics (Consolidated) to CONTROL |
 | **17:10** | `backlog_send.py` | `daily_task.yml` | Report 1, 2, 3: Daily Backlog reports to team groups |
 | **17:30** | `cron_send.py` | `daily_task.yml` | Report 4: Daily EOD Task + Asset + Search reports to all groups |
 | **20:00** | `daily_plan_report.py` | `daily_plan_report.yml` | Report 5: Daily Plan collection + Comparison report |

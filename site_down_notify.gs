@@ -257,6 +257,22 @@ function relayBotlookupToTNI() {
     }
   }
 
+  // Bước 3b: 16:55–17:25 Myanmar → dispatch daily_bod_assign.yml (1 lần/ngày lúc 17:00)
+  const isBodAssignTime = (myanmarHour === 16 && myanmarMin >= 55) || (myanmarHour === 17 && myanmarMin <= 25);
+  if (isBodAssignTime) {
+    const bodAssignKey = "DAILY_BOD_ASSIGN_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+    const props6       = PropertiesService.getScriptProperties();
+    if (!props6.getProperty(bodAssignKey)) {
+      const okBod = triggerDailyBodAssign();
+      if (okBod) {
+        props6.setProperty(bodAssignKey, "done");
+        Logger.log("[relayBotlookupToTNI] ✅ Dispatch daily_bod_assign.yml lúc 17:00 Myanmar");
+      }
+    } else {
+      Logger.log("[relayBotlookupToTNI] ℹ️ daily_bod_assign.yml đã dispatch hôm nay rồi — bỏ qua");
+    }
+  }
+
   // Bước 4: 17:25–17:55 Myanmar → gửi Task Remain (1 lần/ngày)
   const isTaskTime = (myanmarHour === 17 && myanmarMin >= 25 && myanmarMin <= 55);
   if (isTaskTime) {
@@ -544,6 +560,36 @@ function triggerDailyPlanReport() {
     return code === 204;
   } catch(e) {
     Logger.log("[triggerDailyPlanReport] ❌ Lỗi: " + e.message);
+    return false;
+  }
+}
+
+
+// ── Dispatch daily_bod_assign.yml lúc 17:00 Myanmar
+function triggerDailyBodAssign() {
+  try {
+    const pat = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
+    if (!pat) {
+      Logger.log("[triggerDailyBodAssign] ⚠️ GITHUB_PAT chưa set");
+      return false;
+    }
+    const url = "https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/daily_bod_assign.yml/dispatches";
+    const resp = UrlFetchApp.fetch(url, {
+      method: "post",
+      headers: {
+        "Authorization": "Bearer " + pat,
+        "Accept":        "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type":  "application/json"
+      },
+      payload: JSON.stringify({ ref: "main" }),
+      muteHttpExceptions: true
+    });
+    const code = resp.getResponseCode();
+    Logger.log("[triggerDailyBodAssign] GitHub API response: " + code);
+    return code === 204;
+  } catch(e) {
+    Logger.log("[triggerDailyBodAssign] ❌ Lỗi: " + e.message);
     return false;
   }
 }
