@@ -134,6 +134,12 @@ function doPostSiteDown(e) {
     if (!msg) return okJson({ status: "no_message" });
     const chatId = msg.chat.id.toString();
     const text   = (msg.text || msg.caption || "").trim();
+
+    // Ignore bot messages and report messages to prevent self-triggering
+    if (text.startsWith("📋") || (msg.from && msg.from.is_bot)) {
+      return okJson({ status: "ignored_bot_or_report" });
+    }
+
     if (chatId !== SD_GROUPS.CONTROL || !isSiteDownReport(text))
       return okJson({ status: "ignored" });
     const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
@@ -141,7 +147,7 @@ function doPostSiteDown(e) {
     if (sheet) { writeToColumnA(sheet, text); SpreadsheetApp.flush(); Utilities.sleep(3000); checkAndSend(); }
     return okJson({ status: "ok" });
   } catch (err) {
-    Logger.log("\u274c doPost error: " + err.message);
+    Logger.log("❌ doPost error: " + err.message);
     return okJson({ status: "error", message: err.message });
   }
 }
