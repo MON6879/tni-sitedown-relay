@@ -18,9 +18,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ── Config ────────────────────────────────────────────────────────────────────
-TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip()
-DAILY_APPS_SCRIPT_URL = os.environ.get("DAILY_APPS_SCRIPT_URL", "").strip()
-APPS_SCRIPT_URL       = os.environ.get("APPS_SCRIPT_URL", "").strip()
+TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
+DAILY_APPS_SCRIPT_URL = os.environ.get("DAILY_APPS_SCRIPT_URL", "").strip().strip("\ufeff")
+APPS_SCRIPT_URL       = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 SPREADSHEET_ID        = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
 BASE_URL              = (
     f"https://docs.google.com/spreadsheets/d/"
