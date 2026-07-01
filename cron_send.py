@@ -284,6 +284,55 @@ def build_team_asset_section(team_key: str, asset_data: dict) -> str:
     )
 
 
+def build_team_asset_msg(team_key, now_str, asset_data):
+    """Build asset stats message for a single team."""
+    if not asset_data.get("actionTypes") or not team_key:
+        return ""
+
+    action_types = asset_data.get("actionTypes", [])
+    stats = asset_data.get("stats", {})
+    
+    TEAM_SHORT = {
+        "MYT_TNI_TEAM01_Dawei": "Team1(Dawei)",
+        "MYT_TNI_TEAM02_Myeik": "Team2(Myeik)",
+        "MYT_TNI_TEAM03_Bokpyin": "Team3(Bokpyin)",
+        "MYT_TNI_TEAM04_Kawthoung": "Team4(Kawthoung)",
+    }
+    t_name = TEAM_SHORT.get(team_key, team_key)
+
+    def fmt(s):
+        """Total /Done — space trước / để Telegram tự highlight xanh"""
+        return f"{s.get('total',0)} /{s.get('done',0)}"
+
+    def fmt_period(s):
+        return (
+            f"3Day: {s.get('d2',0)} /{s.get('done_d2',0)}"
+            f" | {s.get('d1',0)} /{s.get('done_d1',0)}"
+            f" | {s.get('d0',0)} /{s.get('done_d0',0)}"
+            f"  7Day: {s.get('d6',0)} /{s.get('done_d6',0)}"
+            f"  Month: {s.get('d15',0)} /{s.get('done_d15',0)}"
+        )
+
+    PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15"]
+
+    parts = [f"{at}: {fmt(stats.get(at,{}).get(team_key,{}))}" for at in action_types]
+    
+    # Calculate period totals for this team
+    team_total = {k: 0 for k in PERIOD_KEYS}
+    for at in action_types:
+        s = stats.get(at, {}).get(team_key, {})
+        for k in PERIOD_KEYS:
+            team_total[k] += s.get(k, 0)
+
+    lines = [
+        f"📦 Asset Stats – {t_name} – {now_str}",
+        "━━━━━━━━━━━━━━━━━━━━",
+        " | ".join(parts),
+        f"   📅 {fmt_period(team_total)}"
+    ]
+    return "\n".join(lines)
+
+
 INPUT_TASK_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
     "/gviz/tq?tqx=out:csv&gid=1755404595"
@@ -930,13 +979,28 @@ async def main():
             "CRON_ASSET_T3": -5183480727,
             "CRON_ASSET_T4": -5238696719,
         }
+        KEY_TO_TEAM = {
+            "CRON_ASSET_T1": "MYT_TNI_TEAM01_Dawei",
+            "CRON_ASSET_T2": "MYT_TNI_TEAM02_Myeik",
+            "CRON_ASSET_T3": "MYT_TNI_TEAM03_Bokpyin",
+            "CRON_ASSET_T4": "MYT_TNI_TEAM04_Kawthoung",
+        }
         logger.info("--- Gửi Asset Stats → CONTROL SITE & TEAM GROUPS ---")
         try:
             async with Bot(token=SEND_BOT_TOKEN) as ctrl_bot:
                 for key, cid in ASSET_RECIPIENTS.items():
+                    if key == "CRON_ASSET_CONTROL":
+                        msg_to_send = asset_msg
+                    else:
+                        tkey = KEY_TO_TEAM.get(key)
+                        msg_to_send = build_team_asset_msg(tkey, now_str, asset_data)
+
+                    if not msg_to_send:
+                        continue
+
                     if APPS_SCRIPT_URL:
                         delete_old_messages_bot(SEND_BOT_TOKEN, cid, APPS_SCRIPT_URL, key)
-                    result, msg_ids = await send_msg(ctrl_bot, cid, asset_msg, f"Asset-{key}")
+                    result, msg_ids = await send_msg(ctrl_bot, cid, msg_to_send, f"Asset-{key}")
                     if result and msg_ids and APPS_SCRIPT_URL:
                         save_msgids(APPS_SCRIPT_URL, key, msg_ids)
                     await asyncio.sleep(0.4)
