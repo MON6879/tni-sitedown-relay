@@ -85,7 +85,7 @@ function doPost(e) {
 
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
-    return json({ status: "error", message: err.message });
+    return json({ status: "error", message: err.message, stack: err.stack });
   }
 }
 
@@ -590,22 +590,24 @@ function handleLogSearch(ss, body) {
   let logSheet = ss.getSheetByName(SEARCH_LOG_TAB);
   if (!logSheet) {
     logSheet = ss.insertSheet(SEARCH_LOG_TAB);
-    logSheet.appendRow(["Date", "Time", "User Name", "User ID", "TNI Code"]);
-    logSheet.getRange(1, 1, 1, 5).setFontWeight("bold")
+    logSheet.appendRow(["REF", "Date", "Time", "User Name", "User ID", "TNI Code"]);
+    logSheet.getRange(1, 1, 1, 6).setFontWeight("bold")
             .setBackground("#34A853").setFontColor("#FFFFFF");
   }
 
-  // Tìm dòng trống đầu tiên bằng cách quét cột C (User Name) — KHÔNG dùng getLastRow()
-  // vì getLastRow() tính cả dòng chỉ có format → bị sai vị trí
-  const SCAN_LIMIT = 600;
-  const colC = logSheet.getRange(2, 3, SCAN_LIMIT, 1).getValues();
-  let nextRow = SCAN_LIMIT + 2; // fallback nếu 600 dòng đều có data
-  for (let i = 0; i < colC.length; i++) {
-    if (!colC[i][0] || colC[i][0].toString().trim() === "") {
-      nextRow = i + 2; // +2: bù 0-index và header row
-      break;
+  // Tính REF bằng cách quét giá trị cột A hiện tại để tìm số lớn nhất (tránh lỗi dòng trống hoặc bị xóa hàng)
+  const lastRow = logSheet.getLastRow();
+  let maxRef = 0;
+  if (lastRow > 1) {
+    const refValues = logSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < refValues.length; i++) {
+      const val = parseInt(refValues[i][0], 10);
+      if (!isNaN(val) && val > maxRef) {
+        maxRef = val;
+      }
     }
   }
+  const ref = String(maxRef + 1).padStart(5, "0");
 
   // Lấy ngày giờ từ GAS (Myanmar UTC+6:30)
   const TZ      = "Asia/Rangoon";
@@ -613,16 +615,16 @@ function handleLogSearch(ss, body) {
   const dateObj = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
   const gasTime = Utilities.formatDate(nowDate, TZ, "HH:mm");
 
-  // Ghi vào đúng dòng tiếp theo — chỉ format dòng mới, không đụng gì dòng khác
-  logSheet.getRange(nextRow, 1, 1, 5).setValues([[dateObj, gasTime, userName, userId, tniCode]]);
-  logSheet.getRange(nextRow, 1).setNumberFormat("dd/MM/yyyy");
-  logSheet.getRange(nextRow, 2).setNumberFormat("HH:mm");
-
-
+  // Chèn dòng mới tại dòng 2 (ngay dưới header) để tìm kiếm mới nhất luôn nằm ở đầu
+  logSheet.insertRowBefore(2);
+  logSheet.getRange(2, 1).setValue(ref).setFontWeight("bold").setHorizontalAlignment("center");
+  logSheet.getRange(2, 2, 1, 5).setValues([[dateObj, gasTime, userName, userId, tniCode]]);
+  logSheet.getRange(2, 2).setNumberFormat("dd/MM/yyyy");
+  logSheet.getRange(2, 3).setNumberFormat("HH:mm");
 
   // Cập nhật Search Stats
   refreshStats(ss);
-  return json({ status: "ok" });
+  return json({ status: "ok", ref: ref });
 }
 
 // ============================================================
@@ -640,9 +642,9 @@ function handleCleanSearchLog(ss) {
     logSheet.deleteRows(133, maxRows - 132);
   }
 
-  // Khôi phục format dd/MM/yyyy cho cột A rows 2-132
-  logSheet.getRange(2, 1, 131, 1).setNumberFormat("dd/MM/yyyy");
-  logSheet.getRange(2, 2, 131, 1).setNumberFormat("HH:mm");
+  // Khôi phục format dd/MM/yyyy cho cột B rows 2-132 (cột B là Date, cột C là Time)
+  logSheet.getRange(2, 2, 131, 1).setNumberFormat("dd/MM/yyyy");
+  logSheet.getRange(2, 3, 131, 1).setNumberFormat("HH:mm");
 
   return json({ status: "ok", deleted_rows: deleted, remaining: logSheet.getLastRow() });
 }
@@ -656,10 +658,10 @@ function refreshStats(ss) {
   const logSheet = ss.getSheetByName(SEARCH_LOG_TAB);
   if (!logSheet || logSheet.getLastRow() < 2) return;
 
-  // Đọc toàn bộ log (bỏ header)
+  // Đọc toàn bộ log (bỏ header) — 6 cột (REF, Date, Time, UserName, UserID, TNICode)
   const lastRow = logSheet.getLastRow();
-  const data    = logSheet.getRange(2, 1, lastRow - 1, 5).getValues();
-  // Cols: 0=Date, 1=Time, 2=UserName, 3=UserID, 4=TNICode
+  const data    = logSheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  // Cols: 0=REF, 1=Date, 2=Time, 3=UserName, 4=UserID, 5=TNICode
 
   // Ngày hôm nay (Rangoon UTC+6:30)
   const now     = new Date();
@@ -673,9 +675,9 @@ function refreshStats(ss) {
   // Tổng hợp theo user
   const users = {};  // key = userId
   for (const row of data) {
-    const dateVal  = dateToStr(row[0]);
-    const userName = (row[2] || "").toString().trim();
-    const userId   = (row[3] || "").toString().trim();
+    const dateVal  = dateToStr(row[1]); // Cột B (Date) -> index 1
+    const userName = (row[3] || "").toString().trim(); // Cột D (UserName) -> index 3
+    const userId   = (row[4] || "").toString().trim(); // Cột E (UserID) -> index 4
     if (!userId) continue;
 
     if (!users[userId]) {
@@ -712,13 +714,15 @@ function refreshStats(ss) {
   const statLast = statsSheet.getLastRow();
   if (statLast >= 2) statsSheet.getRange(2, 1, statLast - 1, 1).clearContent();
 
-  // Ghi từng dòng tổng hợp
-  let writeRow = 2;
+  // Ghi từng dòng tổng hợp bằng batch setValues để tránh chậm/timeout
+  const output = [];
   for (const uid of Object.keys(users)) {
     const u = users[uid];
     const summary = `${u.name} & ${uid} & Day:${u.d2}/${u.d1}/${u.today} & Week:${u.week} & Month:${u.month}`;
-    statsSheet.getRange(writeRow, 1).setValue(summary);
-    writeRow++;
+    output.push([summary]);
+  }
+  if (output.length > 0) {
+    statsSheet.getRange(2, 1, output.length, 1).setValues(output);
   }
 }
 

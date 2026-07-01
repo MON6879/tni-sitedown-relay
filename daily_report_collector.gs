@@ -11,29 +11,28 @@
 // ================================================================
 
 // ─── CẤU HÌNH ─────────────────────────────────────────────────
-const DAILY_SHEET_ID   = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y";
+const DR_SHEET_ID_NEW   = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y";
 const DAILY_SHEET_NAME = "Daily report and Bussiness";
 const ID_TG_TAB        = "ID Telegram";   // Tab chứa Name ↔ Telegram ID
 const DRIVE_PARENT     = "1 VCM BRANCH TNI";
 const DRIVE_FOLDER     = "2.5 Daily report and Businesstrip Telegram";
 const TIMEZONE         = "Asia/Yangon";   // UTC+6:30
 
-// ─── CỘT (1-indexed) ──────────────────────────────────────────
-// A=1   → template (giữ nguyên)
-// B=2   → Tên nhân viên (auto lookup)
-// C-Q   → 15 cột dữ liệu (đồng bộ từ cột A)
+// ─── CỘT (1-indexed) sau khi xóa cột template A cũ ──────────────────
+// A=1   → số thứ tự (REF)
+// B=2   → Tên nhân viên (lookup qua ARRAYFORMULA)
+// C-Q   → 15 cột dữ liệu (bắt đầu từ cột C, tương ứng index 2)
 // R=18  → Telegram ID người gửi
-// S=19  → Tên nhân viên (lookup)
-// T-Y   → 6 ảnh Google Drive
-const COL_REF          = 2;   // B  → số thứ tự (REF)
+// S-X   → 6 ảnh Google Drive (cột 19 đến 24)
+const COL_REF          = 1;   // A  → số thứ tự (REF)
 const COL_DATA_START   = 3;   // C
 const NUM_DATA_COLS    = 15;  // C → Q
 const COL_TG_ID        = 18;  // R
-const COL_EMP_NAME     = 19;  // S
-const COL_PHOTO_START  = 20;  // T
-const NUM_PHOTO_COLS   = 6;   // T → Y
-const DR_TOTAL_COLS    = 25;  // A → Y
-const TEMPLATE_ROWS    = 15;  // số dòng template (A1:A15)
+const COL_EMP_NAME     = 2;   // B  → Tên nhân viên
+const COL_PHOTO_START  = 19;  // S
+const NUM_PHOTO_COLS   = 6;   // S → X
+const DR_TOTAL_COLS    = 24;  // A → X
+const TEMPLATE_ROWS    = 0;   // Không còn dòng template A1:A15 nữa
 
 // ================================================================
 //  ENTRY POINTS
@@ -51,7 +50,7 @@ function doPostDaily_(e) {
     if (body.action === "get_daily_reports")  return handleGetDailyReports(body);
     return jsonOut({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
-    return jsonOut({ status: "error", message: err.message });
+    return jsonOut({ status: "error", message: err.message, stack: err.stack });
   }
 }
 
@@ -61,7 +60,7 @@ function doGetDaily_(e) {
     if (action === "get_fields") return handleGetFields();
     return jsonOut({ status: "ok", message: "Daily Report Collector running" });
   } catch (err) {
-    return jsonOut({ status: "error", message: err.message });
+    return jsonOut({ status: "error", message: err.message, stack: err.stack });
   }
 }
 
@@ -70,17 +69,17 @@ function doGetDaily_(e) {
 //  Loại bỏ số thứ tự và dấu ":" ở cuối
 // ================================================================
 function handleGetFields() {
-  const ss    = SpreadsheetApp.openById(DAILY_SHEET_ID);
+  const ss    = SpreadsheetApp.openById(DR_SHEET_ID_NEW);
   const sheet = ss.getSheetByName(DAILY_SHEET_NAME);
   if (!sheet) return jsonOut({ status: "error", message: "Sheet not found: " + DAILY_SHEET_NAME });
 
-  const vals = sheet.getRange("A1:A15").getValues().flat();
+  // Đọc danh sách field trực tiếp từ header hàng 1 (cột B đến P)
+  const vals = sheet.getRange(1, COL_DATA_START, 1, NUM_DATA_COLS).getValues()[0];
   const fields = [];
 
   for (const v of vals) {
     const s = String(v || "").trim();
     if (!s) continue;
-    // Lấy phần trước ":" → loại bỏ số dẫn đầu "1. " / "11 " / "Daily report: ..."
     let name = s.indexOf(":") > -1 ? s.substring(0, s.indexOf(":")).trim() : s;
     name = name.replace(/^\d+\.?\s+/, "").trim();
     if (name) fields.push(name);
@@ -94,42 +93,39 @@ function handleGetFields() {
 //  Gọi thủ công khi cột A thay đổi
 // ================================================================
 function handleSyncHeaders() {
-  const ss    = SpreadsheetApp.openById(DAILY_SHEET_ID);
+  const ss    = SpreadsheetApp.openById(DR_SHEET_ID_NEW);
   const sheet = ss.getSheetByName(DAILY_SHEET_NAME);
   if (!sheet) return jsonOut({ status: "error", message: "Sheet not found" });
 
-  const result = getFieldsFromColA_(sheet);
-
-  // Ghi header C1:Q1
-  const headerRow = result.slice(0, NUM_DATA_COLS);
-  while (headerRow.length < NUM_DATA_COLS) headerRow.push("");
+  // Định dạng hàng 1 cho các cột dữ liệu (C đến Q) mà không ghi đè nội dung
   sheet.getRange(1, COL_DATA_START, 1, NUM_DATA_COLS)
-       .setValues([headerRow])
        .setFontWeight("bold")
        .setBackground("#D9E1F2");
 
-  // Cột B header = REF (số thứ tự dòng dữ liệu)
+  // Cột A header = REF (số thứ tự dòng dữ liệu)
   sheet.getRange(1, COL_REF).setValue("REF").setFontWeight("bold").setBackground("#D9EAD3");
 
-  // Cột R = Telegram ID, Cột S = Tên nhân viên (công thức tự động)
+  // Cột B header = Tên nhân viên (công thức tự động)
+  sheet.getRange(1, COL_EMP_NAME).setValue("Tên nhân viên").setFontWeight("bold").setBackground("#D9EAD3");
+
+  // Cột R = Telegram ID (cột 18)
   sheet.getRange(1, COL_TG_ID).setValue("Telegram ID").setFontWeight("bold").setBackground("#FCE4D6");
-  sheet.getRange(1, COL_EMP_NAME).setValue("Tên nhân viên").setFontWeight("bold").setBackground("#FCE4D6");
 
   // ARRAYFORMULA tự động lấy tên từ tab 'ID Telegram' (Cột E = TG ID, Cột B = Tên)
-  // Ghi vào S2 — áp dụng cho toàn bộ cột S mãi mãi
+  // Ghi vào B2 — áp dụng cho toàn bộ cột B mãi mãi (dựa vào cột R = Telegram ID)
   const arrayFormula =
     "=ARRAYFORMULA(IF(R2:R=\"\",,IFERROR(INDEX('ID Telegram'!B:B," +
     "MATCH(TEXT(R2:R,\"0\"),'ID Telegram'!E:E,0)),\"?\")))"; 
   sheet.getRange(2, COL_EMP_NAME).setFormula(arrayFormula);
 
-  // Cột T → Y = Photo 1-6
+  // Cột S → X = Photo 1-6 (cột 19 đến 24)
   const photoHeaders = [["Photo 1","Photo 2","Photo 3","Photo 4","Photo 5","Photo 6"]];
   sheet.getRange(1, COL_PHOTO_START, 1, NUM_PHOTO_COLS)
        .setValues(photoHeaders)
        .setFontWeight("bold")
        .setBackground("#E2EFDA");
 
-  return jsonOut({ status: "ok", synced: headerRow.filter(Boolean).length });
+  return jsonOut({ status: "ok", message: "Headers synced and formatted successfully" });
 }
 
 // ================================================================
@@ -137,7 +133,7 @@ function handleSyncHeaders() {
 //  Payload: { action, telegram_id, fields:{fieldName:value,...} }
 // ================================================================
 function handleDailyAdd(body) {
-  const ss    = SpreadsheetApp.openById(DAILY_SHEET_ID);
+  const ss    = SpreadsheetApp.openById(DR_SHEET_ID_NEW);
   const sheet = ss.getSheetByName(DAILY_SHEET_NAME);
   if (!sheet) return jsonOut({ status: "error", message: "Sheet not found" });
 
@@ -169,22 +165,34 @@ function handleDailyAdd(body) {
   row[COL_TG_ID - 1]      = tgId;   // R = Telegram ID
   // Col S (COL_EMP_NAME) được ARRAYFORMULA tự điền — không ghi đè
 
-  // Tính REF: đếm số dòng dữ liệu đã có (bựa qua TEMPLATE_ROWS dòng template)
+  // Tính REF bằng cách quét giá trị cột A hiện tại để tìm số lớn nhất (tránh lỗi dòng trống hoặc khi bị xóa hàng)
   const lastRow = sheet.getLastRow();
-  const ref     = String(Math.max(0, lastRow - TEMPLATE_ROWS) + 1).padStart(5, "0");
+  let maxRef = 0;
+  if (lastRow > 1) {
+    const refValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < refValues.length; i++) {
+      const val = parseInt(refValues[i][0], 10);
+      if (!isNaN(val) && val > maxRef) {
+        maxRef = val;
+      }
+    }
+  }
+  const ref = String(maxRef + 1).padStart(5, "0");
+  row[COL_REF - 1] = ref; // Ghi REF vào cột A (index 0)
 
-  sheet.appendRow(row);
-  const rowNum = sheet.getLastRow();
+  // Chèn dòng mới tại dòng 2 (ngay dưới header) để báo cáo mới nhất luôn ở đầu
+  sheet.insertRowBefore(2);
 
-  // Ghi REF vào cột B
-  const refCell = sheet.getRange(rowNum, COL_REF);
-  refCell.setValue(ref);
-  refCell.setFontWeight("bold").setHorizontalAlignment("center");
+  // Ghi dữ liệu vào dòng 2. Để tránh ghi đè làm hỏng ARRAYFORMULA tại cột B (COL_EMP_NAME = 2):
+  // 1) Ghi cột A (REF)
+  sheet.getRange(2, 1).setValue(ref).setFontWeight("bold").setHorizontalAlignment("center");
+  // 2) Ghi cột C->R (cột 3 đến 18). Cột B (index 1) bỏ qua không ghi đè.
+  sheet.getRange(2, 3, 1, 16).setValues([row.slice(2, 18)]);
+  // 3) Ghi cột S->X (cột 19 đến 24)
+  sheet.getRange(2, 19, 1, 6).setValues([row.slice(18, 24)]);
 
-  // Màu xen kẽ
-  const bg = rowNum % 2 === 0 ? "#EBF3FB" : "#FFFFFF";
-  sheet.getRange(rowNum, 1, 1, DR_TOTAL_COLS).setBackground(bg);
-  refCell.setBackground("#D9EAD3"); // giữ màu xanh REF
+  // Màu nền cho dòng dữ liệu mới
+  sheet.getRange(2, 1, 1, DR_TOTAL_COLS).setBackground("#EBF3FB");
 
   // Attach ảnh pending (nếu người dùng đã gửi ảnh trước text)
   const props   = PropertiesService.getScriptProperties();
@@ -192,13 +200,13 @@ function handleDailyAdd(body) {
   const pending = JSON.parse(props.getProperty(pKey) || "[]");
   if (pending.length > 0) {
     pending.slice(0, NUM_PHOTO_COLS).forEach((link, idx) => {
-      sheet.getRange(rowNum, COL_PHOTO_START + idx).setValue(link);
+      sheet.getRange(2, COL_PHOTO_START + idx).setValue(link);
     });
     props.deleteProperty(pKey);
   }
 
-  Logger.log("✅ Daily row added: REF:" + ref + " row=" + rowNum + " tgId=" + tgId);
-  return jsonOut({ status: "ok", row: rowNum, ref: ref, name: tgId });
+  Logger.log("✅ Daily row added to row 2: REF:" + ref + " tgId=" + tgId);
+  return jsonOut({ status: "ok", row: 2, ref: ref, name: tgId });
 }
 
 // ================================================================
@@ -234,7 +242,7 @@ function handleDailyPhoto(body) {
   const driveLink = "https://drive.google.com/file/d/" + file.getId() + "/view";
 
   // 4. Tìm dòng gần nhất của tgId và gắn link vào cột T→Y
-  const ss    = SpreadsheetApp.openById(DAILY_SHEET_ID);
+  const ss    = SpreadsheetApp.openById(DR_SHEET_ID_NEW);
   const sheet = ss.getSheetByName(DAILY_SHEET_NAME);
   const data  = sheet.getDataRange().getValues();
   let attached = false;
@@ -314,21 +322,7 @@ function getOrCreateDailyFolder_(tgId) {
   return subIt.hasNext() ? subIt.next() : main.createFolder(tgId);
 }
 
-// ================================================================
-//  HELPER — đọc cột A và trích xuất danh sách tên field
-// ================================================================
-function getFieldsFromColA_(sheet) {
-  const vals = sheet.getRange("A1:A15").getValues().flat();
-  return vals
-    .map(v => {
-      const s = String(v || "").trim();
-      if (!s) return null;
-      let name = s.indexOf(":") > -1 ? s.substring(0, s.indexOf(":")).trim() : s;
-      name = name.replace(/^\d+\.?\s+/, "").trim();
-      return name || null;
-    })
-    .filter(Boolean);
-}
+
 
 // ================================================================
 //  OUTPUT JSON
@@ -355,7 +349,7 @@ function testGetFields() {
 }
 
 function testLookup() {
-  const ss = SpreadsheetApp.openById(DAILY_SHEET_ID);
+  const ss = SpreadsheetApp.openById(DR_SHEET_ID_NEW);
   Logger.log("Name: " + lookupEmployeeName_(ss, "6859790680"));
 }
 
@@ -372,7 +366,7 @@ const DAILY_PLAN_TAB = "Team leader assign Plan";
  */
 function handleStoreDailyPlan(body) {
   try {
-    const ss = SpreadsheetApp.openById(DAILY_SHEET_ID);
+    const ss = SpreadsheetApp.openById(DR_SHEET_ID_NEW);
     let sheet = ss.getSheetByName(DAILY_PLAN_TAB);
     if (!sheet) {
       sheet = ss.insertSheet(DAILY_PLAN_TAB);
@@ -424,7 +418,7 @@ function handleStoreDailyPlan(body) {
  */
 function handleGetDailyPlans() {
   try {
-    const ss = SpreadsheetApp.openById(DAILY_SHEET_ID);
+    const ss = SpreadsheetApp.openById(DR_SHEET_ID_NEW);
     const sheet = ss.getSheetByName(DAILY_PLAN_TAB);
     if (!sheet || sheet.getLastRow() < 2) {
       return jsonOut({ status: "ok", plans: [] });
@@ -459,7 +453,7 @@ function handleGetDailyPlans() {
  */
 function handleGetDailyReports(body) {
   try {
-    const ss = SpreadsheetApp.openById(DAILY_SHEET_ID);
+    const ss = SpreadsheetApp.openById(DR_SHEET_ID_NEW);
     const sheet = ss.getSheetByName(DAILY_SHEET_NAME);
     if (!sheet || sheet.getLastRow() < 2) {
       return jsonOut({ status: "ok", reports: [] });

@@ -506,7 +506,8 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         tok_ok  = "SET" if TOKEN else "MISSING"
         gas_ok  = "SET" if DAILY_APPS_SCRIPT_URL else "MISSING"
-        msg = f"TNI Search Bot OK | TOKEN:{tok_ok} | DAILY_GAS:{gas_ok}"
+        log_ok  = "SET" if APPS_SCRIPT_URL else "MISSING"
+        msg = f"TNI Search Bot OK | TOKEN:{tok_ok} | DAILY_GAS:{gas_ok} | APPS_SCRIPT_URL:{log_ok}"
         self.send_response(200)
         self.end_headers()
         self.wfile.write(msg.encode())

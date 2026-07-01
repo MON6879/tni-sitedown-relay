@@ -1128,6 +1128,7 @@ function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
 // ============================================================
 
 /** Lưu Note message_ids — gọi từ botlookup_relay.py */
+/*
 function handleSaveNoteMsgIds(body) {
   var props = PropertiesService.getScriptProperties();
   props.setProperty("SD_NOTE_MSGIDS", JSON.stringify(body.msgids || {}));
@@ -1135,7 +1136,6 @@ function handleSaveNoteMsgIds(body) {
   return json({ status: "ok" });
 }
 
-/** Đọc Note message_ids — gọi từ botlookup_relay.py */
 function handleGetNoteMsgIds() {
   var props = PropertiesService.getScriptProperties();
   var raw   = props.getProperty("SD_NOTE_MSGIDS") || "{}";
@@ -1146,13 +1146,6 @@ function handleGetNoteMsgIds() {
   }
 }
 
-// ============================================================
-// GENERIC MESSAGE_IDS API — Lưu/đọc message_ids cho Python scripts
-// Python gọi GAS qua HTTP: save_msgids / get_msgids
-// Key format: SD_MSGID_{key} — VD: CRON_TEAM_T1, PLAN_CONTROL, READREPORT_T2
-// ============================================================
-
-/** Lưu generic message_ids — gọi từ Python scripts */
 function handleSaveMsgIds(body) {
   var key    = (body.key || "").toString().trim();
   var msgids = body.msgids || [];
@@ -1164,10 +1157,8 @@ function handleSaveMsgIds(body) {
   return json({ status: "ok", key: key, count: msgids.length });
 }
 
-/** Đọc generic message_ids — gọi từ Python scripts */
 function handleGetMsgIds(body) {
   var key = "";
-  // Hỗ trợ cả GET (e.parameter) và POST (body)
   if (body && body.key) key = body.key.toString().trim();
 
   if (!key) return json({ status: "error", message: "Missing key" });
@@ -1180,6 +1171,7 @@ function handleGetMsgIds(body) {
     return json({ status: "ok", key: key, msgids: [] });
   }
 }
+*/
 
 // ============================================================
 // GỬI TELEGRAM (tự chia nếu > 4000 ký tự)
@@ -1535,4 +1527,11 @@ function testGetUpdatesRaw() {
     Logger.log("#" + i + " update_id=" + u.update_id + " | chat=" + chatId + " | " + txt);
   });
   Logger.log("CONTROL group ID cần match: " + SD_GROUPS.CONTROL);
+}
+
+function saveMyTokens() {
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty("SD_BOT_TOKEN", "8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI");
+  props.setProperty("SEND_BOT_TOKEN", "8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A");
+  Logger.log("✅ Đã lưu thành công SD_BOT_TOKEN và SEND_BOT_TOKEN!");
 }
