@@ -489,7 +489,7 @@ def handle(update: dict) -> None:
         tg_send(chat_id, chunk)
 
 
-# ── Vercel entry point ────────────────────────────────────────────────────────
+# ── Vercel entry point (redeploy triggered) ──────────────────────────────────
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
