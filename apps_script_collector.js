@@ -594,6 +594,7 @@ function handleLogSearch(ss, body) {
     logSheet.getRange(1, 1, 1, 6).setFontWeight("bold")
             .setBackground("#34A853").setFontColor("#FFFFFF");
   }
+  logSheet.setFrozenRows(1);
 
   // Tính REF bằng cách quét giá trị cột A hiện tại để tìm số lớn nhất (tránh lỗi dòng trống hoặc bị xóa hàng)
   const lastRow = logSheet.getLastRow();
@@ -709,6 +710,7 @@ function refreshStats(ss) {
     statsSheet.getRange(1, 1).setFontWeight("bold")
               .setBackground("#4285F4").setFontColor("#FFFFFF");
   }
+  statsSheet.setFrozenRows(1);
 
   // Xóa dữ liệu cũ (từ hàng 2 trở đi)
   const statLast = statsSheet.getLastRow();
