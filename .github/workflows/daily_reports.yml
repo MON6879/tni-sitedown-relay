@@ -50,7 +50,7 @@ jobs:
           TECHNICAL_DEP_BOT_TOKEN: ${{ secrets.TECHNICAL_DEP_BOT_TOKEN }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
         run: |
-          python backlog_send.py
+          python backlog_send.py --now
           python cron_send.py
 
       - name: Report 5 — Daily Plan & Results
