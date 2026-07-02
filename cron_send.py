@@ -851,12 +851,6 @@ async def main():
         f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
         "━━━━━━━━━━━━━━━━━━━━"
     ]
-    if team_leader_content:
-        mgmt_parts.append("👑 Team Leader Reports:")
-        for tl in team_leader_content:
-            raw = (tl.get("content") or "").strip()
-            if raw:
-                mgmt_parts.append(f"\n🏷️ {tl['team']}:\n{raw}")
     # search_msg và asset_msg gửi KÈM với mgmt_report
     if search_msg:
         mgmt_parts.append("━" * 20)
