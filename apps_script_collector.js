@@ -839,8 +839,8 @@ function buildSearchStatsMap(ss) {
   const last = logSheet.getLastRow();
   const data = logSheet.getRange(2, 1, last - 1, 4).getValues();
   for (const row of data) {
-    const dateVal = dateToStr(row[0]);
-    const name = (row[2] || '').toString().trim().toLowerCase();
+    const dateVal = dateToStr(row[1]); // Cột B (Date) -> index 1
+    const name = (row[3] || '').toString().trim().toLowerCase(); // Cột D (UserName) -> index 3
     if (!name) continue;
     if (!map[name]) map[name] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     const u = map[name];

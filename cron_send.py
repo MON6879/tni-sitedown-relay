@@ -110,7 +110,10 @@ def build_search_summary(now_str, report_data):
 
     lines = [f"🔍 Search Stats – {now_str}"]
     for ts in team_summary:
-        tm = TEAM_SHORT.get(ts.get("team", ""), ts.get("team", ""))
+        t_key = ts.get("team", "")
+        if t_key not in TEAM_SHORT:
+            continue  # Bỏ qua các team test/không hợp lệ
+        tm = TEAM_SHORT[t_key]
         lines.append(
             f"🏷️ {tm}: "
             f"3Day:{ts.get('d2',0)}/{ts.get('d1',0)}/{ts.get('today',0)} "
