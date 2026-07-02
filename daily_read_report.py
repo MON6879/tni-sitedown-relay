@@ -134,10 +134,13 @@ def get_team_members_from_sheet() -> dict:
                 continue
 
             name = col_b
-            result.setdefault(group_key, []).append({
-                "name": name,
-                "chat_id": int(cid),
-            })
+            chat_id = int(cid)
+            result.setdefault(group_key, [])
+            if not any(m["chat_id"] == chat_id for m in result[group_key]):
+                result[group_key].append({
+                    "name": name,
+                    "chat_id": chat_id,
+                })
 
         print(f"  📋 Sheet: {sum(len(v) for v in result.values())} members across {len(result)} teams")
         for gk, members in result.items():
