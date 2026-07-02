@@ -157,6 +157,8 @@ function doPostSiteDown(e) {
 // KIỂM TRA có phải báo cáo site down không
 // ============================================================
 function isSiteDownReport(text) {
+  if (!text) return false;
+  if (text.startsWith("📋")) return false; // Bỏ qua tất cả báo cáo bắt đầu bằng 📋
   return /site down/i.test(text) &&
          (/tanintharyi/i.test(text) || /\bTNI\b/.test(text) || /TNI\d{4}/.test(text)) &&
          /\d{2}\/\d{2}\/\d{4}/i.test(text);
