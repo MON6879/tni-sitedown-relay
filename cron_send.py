@@ -1058,44 +1058,21 @@ async def main():
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
 
-    # ── 8. Gửi tổng asset → Group CONTROL SITE & Từng Team (Xóa tin cũ) ──
-    if asset_msg and SEND_BOT_TOKEN:
-        if APPS_SCRIPT_URL:
-            delete_old_messages_bot(SEND_BOT_TOKEN, -5251698940, APPS_SCRIPT_URL, "CRON_ASSET_CONTROL")
-        ASSET_RECIPIENTS = {
-            "CRON_ASSET_T1": -5180992881,
-            "CRON_ASSET_T2": -5188855349,
-            "CRON_ASSET_T3": -5183480727,
-            "CRON_ASSET_T4": -5238696719,
-        }
-        KEY_TO_TEAM = {
-            "CRON_ASSET_T1": "MYT_TNI_TEAM01_Dawei",
-            "CRON_ASSET_T2": "MYT_TNI_TEAM02_Myeik",
-            "CRON_ASSET_T3": "MYT_TNI_TEAM03_Bokpyin",
-            "CRON_ASSET_T4": "MYT_TNI_TEAM04_Kawthoung",
-        }
-        logger.info("--- Gửi Asset Stats → CONTROL SITE & TEAM GROUPS ---")
+    # ── 8. Xóa các tin nhắn asset cũ lẻ loi ở CONTROL SITE & các Team ──
+    if SEND_BOT_TOKEN and APPS_SCRIPT_URL:
+        logger.info("--- Xóa các tin nhắn asset cũ ---")
         try:
-            async with Bot(token=SEND_BOT_TOKEN) as ctrl_bot:
-                for key, cid in ASSET_RECIPIENTS.items():
-                    if key == "CRON_ASSET_CONTROL":
-                        msg_to_send = asset_msg
-                    else:
-                        tkey = KEY_TO_TEAM.get(key)
-                        msg_to_send = build_team_asset_msg(tkey, now_str, asset_data)
-
-                    if not msg_to_send:
-                        continue
-
-                    if APPS_SCRIPT_URL:
-                        delete_old_messages_bot(SEND_BOT_TOKEN, cid, APPS_SCRIPT_URL, key)
-                    result, msg_ids = await send_msg(ctrl_bot, cid, msg_to_send, f"Asset-{key}")
-                    if result and msg_ids and APPS_SCRIPT_URL:
-                        save_msgids(APPS_SCRIPT_URL, key, msg_ids)
-                    await asyncio.sleep(0.4)
-            logger.info("✅ Asset stats → CONTROL SITE & TEAM GROUPS")
+            delete_old_messages_bot(SEND_BOT_TOKEN, -5251698940, APPS_SCRIPT_URL, "CRON_ASSET_CONTROL")
+            ASSET_DELETE_RECIPIENTS = {
+                "CRON_ASSET_T1": -5180992881,
+                "CRON_ASSET_T2": -5188855349,
+                "CRON_ASSET_T3": -5183480727,
+                "CRON_ASSET_T4": -5238696719,
+            }
+            for key, cid in ASSET_DELETE_RECIPIENTS.items():
+                delete_old_messages_bot(SEND_BOT_TOKEN, cid, APPS_SCRIPT_URL, key)
         except Exception as e:
-            logger.error(f"❌ Asset stats send failed: {e}")
+            logger.error(f"❌ Xóa asset stats cũ thất bại: {e}")
 
     if mgmt_report and SEND_BOT_TOKEN:
         logger.info("--- Gửi mgmt_report (tổng hợp TL) → CONTROL SITE (-5251698940) ---")
