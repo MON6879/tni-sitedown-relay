@@ -882,6 +882,7 @@ function fetchReportSheet() {
 
   for (let i = 0; i < data.length; i++) {
     const row  = data[i];
+    const sheetRow = i + 1; // 1-indexed row number
     const team = (row[0] || '').toString().trim();
     const name = (row[1] || '').toString().trim();
     const colC = (row[2] || '').toString().trim();
@@ -896,16 +897,28 @@ function fetchReportSheet() {
     // Bo qua team "All WO" (gia)
     if (team === 'All WO') continue;
 
-    if (/Team leader/i.test(colC)) {
-      // Doi truong: co team, ten, noi dung
-      leaders.push({ team: team, name: name, content: cont, chat_id: colE, sys_name: colF });
-    } else if (team && name) {
-      // Nhan vien: co ca team va ten - lay chat_id tu cot E
-      employees.push({ team: team, name: name, content: cont, chat_id: colE, sys_name: colF });
-    } else if (colE && /^\d{5,}$/.test(colE.trim())) {
-      // Quan ly: co ID cot E la so (Telegram ID dang so, khong phai "-")
-      const mgName = name || team || colC || ('ID:' + colE);
-      managers.push({ role: colC || 'Manager', name: mgName, chat_id: colE.trim() });
+    const isTeamRow = (sheetRow >= 4 && sheetRow <= 59);
+    const isTechRow = (sheetRow >= 75 && sheetRow <= 87);
+
+    if (isTeamRow || isTechRow) {
+      // Chỉ lấy các dòng có tên Team hợp lệ bắt đầu bằng MYT_TNI cho nhóm Team
+      if (isTeamRow && !team.toUpperCase().startsWith("MYT_TNI")) {
+        continue;
+      }
+      
+      if (/Team leader/i.test(colC)) {
+        // Doi truong: co team, ten, noi dung
+        leaders.push({ team: team, name: name, content: cont, chat_id: colE, sys_name: colF });
+      } else if (team && name) {
+        // Nhan vien: co ca team va ten - lay chat_id tu cot E
+        employees.push({ team: team, name: name, content: cont, chat_id: colE, sys_name: colF });
+      }
+    } else if (sheetRow >= 63 && sheetRow <= 69) {
+      if (colE && /^\d{5,}$/.test(colE.trim())) {
+        // Quan ly: co ID cot E la so (Telegram ID dang so, khong phai "-")
+        const mgName = name || team || colC || ('ID:' + colE);
+        managers.push({ role: colC || 'Manager', name: mgName, chat_id: colE.trim() });
+      }
     }
   }
   return { employees: employees, leaders: leaders, managers: managers };
