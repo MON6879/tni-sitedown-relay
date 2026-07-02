@@ -861,25 +861,44 @@ async def main():
                 tech_messages.append((name, content))
             continue
 
-    # ── 7a. Gộp tin nhắn Team từng Team → Group Team (Format rút gọn) ──
+    # ── 7a. Gộp tin nhắn 4 Team → Báo cáo Consolidated gửi vào Control ──
     if SEND_BOT_TOKEN:
         t_names = {
-            1: "Team 1 Dawei",
-            2: "Team 2 Myeik",
-            3: "Team 3 Bokpyin",
-            4: "Team 4 Kawthoung"
+            "MYT_TNI_TEAM01_Dawei": "Team 1 Dawei",
+            "MYT_TNI_TEAM02_Myeik": "Team 2 Myeik",
+            "MYT_TNI_TEAM03_Bokpyin": "Team 3 Bokpyin",
+            "MYT_TNI_TEAM04_Kawthoung": "Team 4 Kawthoung",
         }
-        for gid, members in team_messages.items():
-            team_key = GID_TO_TEAM.get(gid, "")
-            t_name = t_names.get(team_key, f"Team {team_key}")
+        
+        consolidated_parts = [
+            f"📋 4. Report — Daily EOD Task & Stats — Consolidated",
+            f"📅 {now_str}",
+            f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
+        ]
+
+        # Sắp xếp theo thứ tự Team 1 -> Team 4
+        ordered_teams = [
+            "MYT_TNI_TEAM01_Dawei",
+            "MYT_TNI_TEAM02_Myeik",
+            "MYT_TNI_TEAM03_Bokpyin",
+            "MYT_TNI_TEAM04_Kawthoung"
+        ]
+
+        for team_key in ordered_teams:
+            gid = TEAM_GROUPS.get(team_key)
+            if not gid:
+                continue
+            members = team_messages.get(gid, [])
+            if not members:
+                continue
+
+            t_name = t_names.get(team_key, team_key)
             tl_list = [(p, n, c) for p, n, c, is_tl in members if is_tl]
             ft_list = [(p, n, c) for p, n, c, is_tl in members if not is_tl]
 
             team_lines = [
-                f"📋 4. Report — Daily EOD Task & Stats — {t_name}",
-                f"📅 {now_str}",
-                f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
-                "━━━━━━━━━━━━━━━━━━━━"
+                f"━━━━━━━━━━━━━━━━━━━━",
+                f"🏷️ *{t_name}*",
             ]
             for prefix, name, content in tl_list:
                 parsed_tl = parse_tl(content)
@@ -898,11 +917,13 @@ async def main():
                         color_emoji = CIRCLES[emp_idx % len(CIRCLES)]
                         team_lines.append(f"{color_emoji} {parsed_emp_str}")
                         emp_idx += 1
+            
+            consolidated_parts.append("\n".join(team_lines))
 
-            grp_msg = "\n".join(team_lines)
-            groups.setdefault(SEND_BOT_TOKEN, []).append(
-                (0, grp_msg, str(gid), "TEAM_GROUP")
-            )
+        grp_msg = "\n".join(consolidated_parts)
+        groups.setdefault(SEND_BOT_TOKEN, []).append(
+            (0, grp_msg, CONTROL_CHAT_ID, "CONSOLIDATED_EOD")
+        )
 
     # ── 7b. Gộp Tech Dept → Group CONTROL SITE ──
     if tech_messages and SEND_BOT_TOKEN:
@@ -942,6 +963,8 @@ async def main():
             delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
         # TECH_GROUP → CONTROL
         delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_CONTROL")
+        # CONSOLIDATED_EOD → CONTROL
+        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_EOD_CONTROL")
 
     # ── Gửi tất cả messages ──
     collected_msgids = {}  # key → list[int], gom msg_ids theo GAS key
@@ -956,6 +979,8 @@ async def main():
                     # Xác định GAS key từ label + chat_id
                     if label == "TECH_GROUP":
                         gas_key = "CRON_TECHDEP_CONTROL"
+                    elif label == "CONSOLIDATED_EOD":
+                        gas_key = "CRON_EOD_CONTROL"
                     else:
                         gas_key = CHATID_TO_KEY.get(str(cid), "")
                     if gas_key and msg_ids:
