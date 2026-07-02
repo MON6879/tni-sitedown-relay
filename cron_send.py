@@ -339,54 +339,116 @@ INPUT_TASK_URL = (
 )
 
 
-def get_input_task_summary() -> str:
+def get_input_task_summary(today: datetime) -> str:
     """
     Đọc sheet Input task (gid=1755404595) và tổng hợp theo từng Dep:
-      Col B = Dep assign (Admin/Asset/CM/M&E/PM/Finance/Transmission)
-      Col J = Team leader update Date complete (đã hoàn thành nếu không trống)
-    Kết quả: mỗi Dep hiển thị Total | Done | Remain
+      Admin: Assign: 2 | Progress 0/0/0 7day: 0  Month 0 | Not yet confirm: 1
     """
     try:
-        resp = requests.get(
-            INPUT_TASK_URL,
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=20,
-        )
-        resp.raise_for_status()
+        # Fetch với retry
+        resp = None
+        for attempt in range(3):
+            try:
+                resp = requests.get(
+                    INPUT_TASK_URL,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=20,
+                )
+                resp.raise_for_status()
+                break
+            except Exception as e:
+                if attempt == 2:
+                    raise e
+                    
         df = pd.read_csv(
             io.StringIO(resp.text),
             header=0,  # dòng 1 là header
             dtype=str,
             on_bad_lines="skip",
         )
-        # Cột B = index 1, Cột J = index 9
+        df.columns = [c.strip() for c in df.columns]
+        
         COL_DEP = 1
         COL_DONE = 9
-        stats = {}  # dep -> {"total": int, "done": int}
+        COL_CONF = 12
+        
+        # Mốc thời gian (loại bỏ tzinfo để so sánh với ngày parse từ csv)
+        today = today.replace(tzinfo=None)
+        day1 = today - timedelta(days=1)
+        day2 = today - timedelta(days=2)
+        day3 = today - timedelta(days=3)
+        day7 = today - timedelta(days=7)
+        
+        def parse_date(val):
+            if pd.isna(val):
+                return None
+            val_str = str(val).strip()
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y"):
+                try:
+                    return datetime.strptime(val_str.split()[0], fmt)
+                except ValueError:
+                    continue
+            return None
+
+        stats = {}
         for _, row in df.iterrows():
             dep = str(row.iloc[COL_DEP]).strip() if not pd.isna(row.iloc[COL_DEP]) else ""
             if not dep or dep.lower() in ("", "nan", "dep assign", "sum"):
                 continue
-            done_val = str(row.iloc[COL_DONE]).strip() if not pd.isna(row.iloc[COL_DONE]) else ""
-            is_done = done_val not in ("", "nan", "0", "-")
+                
+            j_val = row.iloc[COL_DONE]
+            j_date = parse_date(j_val)
+            j_date_str = str(j_val).strip() if not pd.isna(j_val) else ""
+            
+            m_val = row.iloc[COL_CONF]
+            m_conf = str(m_val).strip() if not pd.isna(m_val) else ""
+            is_confirmed = m_conf != "" and m_conf != "0"
+            
             if dep not in stats:
-                stats[dep] = {"total": 0, "done": 0}
-            stats[dep]["total"] += 1
-            if is_done:
-                stats[dep]["done"] += 1
-
+                stats[dep] = {
+                    "assign": 0,
+                    "done_d3": 0,
+                    "done_d2": 0,
+                    "done_d1": 0,
+                    "done_7d": 0,
+                    "done_month": 0,
+                    "not_yet_confirm": 0
+                }
+                
+            s = stats[dep]
+            s["assign"] += 1
+            
+            if j_date_str != "":
+                # Chỉ tính các task có ngày hoàn thành nằm trong tháng hiện tại
+                is_in_month = (j_date is not None) and (j_date.year == today.year) and (j_date.month == today.month)
+                
+                if is_confirmed:
+                    if j_date is not None:
+                        if j_date.date() == day3.date():
+                            s["done_d3"] += 1
+                        elif j_date.date() == day2.date():
+                            s["done_d2"] += 1
+                        elif j_date.date() == day1.date():
+                            s["done_d1"] += 1
+                        
+                        if j_date >= day7:
+                            s["done_7d"] += 1
+                        if is_in_month:
+                            s["done_month"] += 1
+                else:
+                    if is_in_month:
+                        s["not_yet_confirm"] += 1
+                        
         if not stats:
             return ""
-
+            
         lines = ["📋 Input Task by Dep:"]
-        grand_total = grand_done = 0
-        for dep, s in sorted(stats.items()):
-            t, d = s["total"], s["done"]
-            r = t - d
-            grand_total += t
-            grand_done += d
-            lines.append(f"  • {dep}: ✅{d}/{t} | ⏳Remain:{r}")
-        lines.append(f"  → Total: ✅{grand_done}/{grand_total} | ⏳{grand_total - grand_done}")
+        for dep in sorted(stats.keys()):
+            s = stats[dep]
+            progress = f"{s['done_d3']}/{s['done_d2']}/{s['done_d1']}"
+            lines.append(
+                f"  • {dep}: Assign: {s['assign']} | Progress {progress} 7day: {s['done_7d']}  Month {s['done_month']} | Not yet confirm: {s['not_yet_confirm']}"
+            )
         return "\n".join(lines)
     except Exception as e:
         logger.warning(f"get_input_task_summary failed: {e}")
@@ -766,7 +828,7 @@ async def main():
     leaders_data = report_data.get("leaders", [])
 
     # ── 5. Fetch Input Task summary ──
-    input_task_summary = get_input_task_summary()
+    input_task_summary = get_input_task_summary(now)
     logger.info("Input task summary: OK" if input_task_summary else "Input task summary: empty")
 
     # ── 5.5 Team→employees mapping (dùng khi gửi riêng lẻ cho TL) ──
