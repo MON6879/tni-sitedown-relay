@@ -837,10 +837,10 @@ function buildSearchStatsMap(ss) {
   const msWeek = 7 * 86400000;
   const msMonth = 30 * 86400000;
   const last = logSheet.getLastRow();
-  const data = logSheet.getRange(2, 1, last - 1, 4).getValues();
+  const data = logSheet.getRange(2, 1, last - 1, 10).getValues(); // Đọc 10 cột để lấy cột J
   for (const row of data) {
     const dateVal = dateToStr(row[1]); // Cột B (Date) -> index 1
-    const name = (row[3] || '').toString().trim().toLowerCase(); // Cột D (UserName) -> index 3
+    const name = (row[9] || '').toString().trim().toLowerCase(); // Cột J (Tên nhân viên sạch) -> index 9
     if (!name) continue;
     if (!map[name]) map[name] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     const u = map[name];
