@@ -214,7 +214,7 @@ async def get_reader_ids_with_time(client, chat_id: int, msg_id: int) -> dict:
 
 
 async def process_group(client, group_key: str, chat_id: int,
-                        me_id: int, team_sheet_members: dict) -> dict | None:
+                        me_id: int, team_sheet_members: dict, cycle_start: datetime, cycle_end: datetime) -> dict | None:
     """Process 1 group: check Note reads over 3Day/7Day/Month. Returns data dict."""
     print(f"\n[{group_key}] chat_id={chat_id}")
 
@@ -234,15 +234,15 @@ async def process_group(client, group_key: str, chat_id: int,
         print(f"  ⚠️  No members found — skip")
         return None
 
-    # Get Note messages from last 30 days
-    since_month = days_ago_utc(30)
-    note_msgs = await get_note_msgs_period(client, chat_id, since_month)
+    # Get Note messages from last 35 days (to cover the full cycle and rolling 7-day stats)
+    since_date = days_ago_utc(35)
+    note_msgs = await get_note_msgs_period(client, chat_id, since_date)
 
     if not note_msgs:
-        print(f"  ℹ️  No Note messages found in last 30 days — skip")
+        print(f"  ℹ️  No Note messages found in last 35 days — skip")
         return None
 
-    print(f"  📨 Found {len(note_msgs)} Note messages in last 30 days")
+    print(f"  📨 Found {len(note_msgs)} Note messages in last 35 days")
 
     # Categorize by period
     now_mm = datetime.now(MYANMAR_TZ)
@@ -251,19 +251,16 @@ async def process_group(client, group_key: str, chat_id: int,
     d2_start = today_start - timedelta(days=2)
     d7_start = today_start - timedelta(days=7)
 
-    # Read cutoff: 20:25 Myanmar per day
-    READ_CUTOFF_H = 20  # 8 PM
-    READ_CUTOFF_M = 25  # 25 min
-
     def in_read_window(read_dt, day_start):
-        """Check if read_dt is before or at 20:25 Myanmar cutoff of that day."""
+        """Check if read_dt is between 17:30 and 20:30 Myanmar cutoff of that day."""
         if read_dt is None:
             return True  # no timestamp → count anyway
         if read_dt.tzinfo is None:
             read_dt = read_dt.replace(tzinfo=timezone.utc)
         read_mm = read_dt.astimezone(MYANMAR_TZ)
-        cutoff = day_start.replace(hour=READ_CUTOFF_H, minute=READ_CUTOFF_M)
-        return read_mm <= cutoff
+        start_time = day_start.replace(hour=17, minute=30, second=0, microsecond=0)
+        end_time = day_start.replace(hour=20, minute=30, second=0, microsecond=0)
+        return start_time <= read_mm <= end_time
 
     # Per-person tracking: {user_id: {d0:0/1, d1:0/1, d2:0/1, d7:count, month:count}}
     per_person = {m["id"]: {"name": m["name"], "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0}
@@ -278,20 +275,24 @@ async def process_group(client, group_key: str, chat_id: int,
             if uid not in per_person:
                 continue
             pp = per_person[uid]
-            pp["month"] += 1
+
+            # Only count if read during 17:30 - 20:30 of that message's day
+            msg_day_start = dt_mm.replace(hour=0, minute=0, second=0, microsecond=0)
+            if not in_read_window(read_dt, msg_day_start):
+                continue
+
+            if cycle_start <= dt_mm <= cycle_end:
+                pp["month"] += 1
 
             if dt_mm >= d7_start:
                 pp["d7"] += 1
 
             if dt_mm >= d2_start and dt_mm < d1_start:
-                if in_read_window(read_dt, d2_start):
-                    pp["d2"] = 1
+                pp["d2"] = 1
             elif dt_mm >= d1_start and dt_mm < today_start:
-                if in_read_window(read_dt, d1_start):
-                    pp["d1"] = 1
+                pp["d1"] = 1
             elif dt_mm >= today_start:
-                if in_read_window(read_dt, today_start):
-                    pp["d0"] = 1
+                pp["d0"] = 1
 
         if dt_mm >= today_start and today_note_msg is None:
             today_note_msg = msg
@@ -322,6 +323,37 @@ async def process_group(client, group_key: str, chat_id: int,
     }
 
 
+def get_cycle_range(now_mm: datetime) -> tuple[datetime, datetime]:
+    """
+    Calculate the cycle from the 21st of the previous month to the 20th of the current month
+    (or current 21st to next 20th, depending on the current date).
+    """
+    if now_mm.day <= 20:
+        if now_mm.month == 1:
+            start_year = now_mm.year - 1
+            start_month = 12
+        else:
+            start_year = now_mm.year
+            start_month = now_mm.month - 1
+        
+        end_year = now_mm.year
+        end_month = now_mm.month
+    else:
+        start_year = now_mm.year
+        start_month = now_mm.month
+        
+        if now_mm.month == 12:
+            end_year = now_mm.year + 1
+            end_month = 1
+        else:
+            end_year = now_mm.year
+            end_month = now_mm.month + 1
+            
+    start_dt = datetime(start_year, start_month, 21, 0, 0, 0, tzinfo=MYANMAR_TZ)
+    end_dt = datetime(end_year, end_month, 20, 23, 59, 59, tzinfo=MYANMAR_TZ)
+    return start_dt, end_dt
+
+
 async def main():
     print(f"[{myanmar_now()}] 🚀 Daily Note Read Report starting...")
 
@@ -335,10 +367,15 @@ async def main():
         me = await client.get_me()
         print(f"[{myanmar_now()}] 🔑 Logged in: @{me.username} ({me.first_name})")
 
+        now_mm = datetime.now(MYANMAR_TZ)
+        cycle_start, cycle_end = get_cycle_range(now_mm)
+        cycle_str = f"{cycle_start.strftime('%d/%m/%y')}-{cycle_end.strftime('%d/%m/%y')}"
+        cycle_short_str = f"{cycle_start.strftime('%d/%m')}-{cycle_end.strftime('%d/%m')}"
+
         # Collect data from all groups
         all_results = {}  # group_key -> data
         for group_key, chat_id in GROUPS.items():
-            data = await process_group(client, group_key, chat_id, me.id, team_sheet_members)
+            data = await process_group(client, group_key, chat_id, me.id, team_sheet_members, cycle_start, cycle_end)
             if data:
                 all_results[group_key] = data
 
@@ -346,7 +383,6 @@ async def main():
             print("⚠️  No data to report")
             return
 
-        now_mm = datetime.now(MYANMAR_TZ)
         date_str = now_mm.strftime("%d/%m/%Y")
         now_str  = myanmar_now()
         divider  = "━" * 30
@@ -373,8 +409,9 @@ async def main():
             tl = [
                 f"📋 6. Report — Daily Note Read Report — {gk}",
                 f"📅 {date_str}  |  🕐 {now_str}",
-                f"⏰ Read Cutoff: 20:25 Myanmar",
-                f"📌 Shows who read the Note message before the 20:25 Myanmar cutoff time today.",
+                f"⏰ Read Window: 17:30 - 20:30 Myanmar",
+                f"📅 Cycle: {cycle_str}",
+                f"📌 Shows who read the Note message during the active window (17:30 - 20:30) today.",
             ]
             if note_line:
                 tl.append(f"📝 Note: {r['note_preview']}...")
@@ -396,8 +433,9 @@ async def main():
         lines = [
             f"📋 6. Report — Daily Note Read Report — Summary",
             f"📅 {date_str}  |  🕐 {now_str}",
-            f"⏰ Read Cutoff: 20:25 Myanmar",
-            f"📌 Shows who read the Note message before the 20:25 Myanmar cutoff time today.",
+            f"⏰ Read Window: 17:30 - 20:30 Myanmar",
+            f"📅 Cycle: {cycle_str}",
+            f"📌 Shows who read the Note message during the active window (17:30 - 20:30) today.",
             divider,
         ]
 

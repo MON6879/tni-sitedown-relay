@@ -250,6 +250,8 @@ function relayBotlookupToTNI() {
   checkAndSend();
 
   // Bước 3: 20:00–20:30 Myanmar (~20:01) → dispatch check_read_status (1 lần/ngày)
+  // ĐÃ TẮT: Theo yêu cầu của User (Xóa tin hình 1 không cần)
+  /*
   const isReadTime  = (myanmarHour === 20 && myanmarMin <= 30);
   if (isReadTime) {
     const todayKey = "READ_CHECK_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
@@ -264,6 +266,7 @@ function relayBotlookupToTNI() {
       Logger.log("[relayBotlookupToTNI] ℹ️ check_read_status đã chạy hôm nay rồi — bỏ qua");
     }
   }
+  */
 
   // Bước 3b: 16:55–17:25 Myanmar → dispatch daily_bod_assign.yml (1 lần/ngày lúc 17:00)
   const isBodAssignTime = (myanmarHour === 16 && myanmarMin >= 55) || (myanmarHour === 17 && myanmarMin <= 25);

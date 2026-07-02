@@ -207,6 +207,19 @@ async def main():
         "coolant_plan": [("8KVA", "CF"), ("12KVA", "CG"), ("30KVA", "CH"), ("12DKVA", "CI"), ("8.TIP", "CJ")]
     }
 
+    # Filter kva_cols to only keep columns that have a valid header in row 4 (index 3) of df
+    filtered_kva_cols = {}
+    for key, cols in kva_cols.items():
+        filtered_cols = []
+        for kva_name, col_let in cols:
+            c_idx = col_letter_to_index(col_let)
+            if c_idx < len(df.columns):
+                # Row 4 of the sheet corresponds to index 3 in df (since index 0 is row 1)
+                header_val = df.iloc[3, c_idx] if len(df) > 3 else None
+                if is_valid(header_val):
+                    filtered_cols.append((kva_name, col_let))
+        filtered_kva_cols[key] = filtered_cols
+
     team_msg1 = {1: [], 2: [], 3: [], 4: [], 5: []}
     team_msg2 = {1: [], 2: [], 3: [], 4: []}
     subteams_dg = {}
@@ -266,7 +279,7 @@ async def main():
             sd = subteams_dg[subteam]
             
             # KVA sums
-            for key, cols in kva_cols.items():
+            for key, cols in filtered_kva_cols.items():
                 for kva_name, col_let in cols:
                     c_idx = col_letter_to_index(col_let)
                     val = to_float(row.iloc[c_idx]) if c_idx < len(row) else 0.0
@@ -354,9 +367,10 @@ async def main():
                     val_str = str(int(val)) if val.is_integer() else f"{val:.1f}"
                     return val_str
 
-                def fmt_kva(kva_dict):
+                def fmt_kva(cat_key, kva_dict):
                     parts = []
-                    for kva in ["8KVA", "12KVA", "30KVA", "12DKVA", "8.TIP"]:
+                    cols = filtered_kva_cols.get(cat_key, [])
+                    for kva, _ in cols:
                         val = int(kva_dict.get(kva, 0.0))
                         if val > 0:
                             parts.append(f"🔵 {kva}: {val}")
@@ -374,12 +388,12 @@ async def main():
                 for subteam in matched_subteams:
                     sd = subteams_dg[subteam]
                     lines3.append(f"\n📍 SUB-TEAM: {subteam}")
-                    lines3.append(f"⚙️ Sum DG KVA Need change Oil Filter:\n   • {fmt_kva(sd['oil_filter'])}")
-                    lines3.append(f"⚙️ Sum DG KVA Need change Fuel Filter:\n   • {fmt_kva(sd['fuel_filter'])}")
-                    lines3.append(f"⚙️ Sum DG KVA Need change Air Filter:\n   • {fmt_kva(sd['air_filter'])}")
-                    lines3.append(f"🛢️ Sum DG KVA Need change Oil:\n   • {fmt_kva(sd['oil_plan'])}")
+                    lines3.append(f"⚙️ Sum DG KVA Need change Oil Filter:\n   • {fmt_kva('oil_filter', sd['oil_filter'])}")
+                    lines3.append(f"⚙️ Sum DG KVA Need change Fuel Filter:\n   • {fmt_kva('fuel_filter', sd['fuel_filter'])}")
+                    lines3.append(f"⚙️ Sum DG KVA Need change Air Filter:\n   • {fmt_kva('air_filter', sd['air_filter'])}")
+                    lines3.append(f"🛢️ Sum DG KVA Need change Oil:\n   • {fmt_kva('oil_plan', sd['oil_plan'])}")
                     lines3.append(f"   👉 Sum Need: {fmt_f(sd['oil_sum_need'])} L | Have at Team: {fmt_f(sd['oil_have'])} L | Diff: {fmt_f(sd['oil_diff'])} L")
-                    lines3.append(f"❄️ Sum DG KVA Need change water Coolant:\n   • {fmt_kva(sd['coolant_plan'])}")
+                    lines3.append(f"❄️ Sum DG KVA Need change water Coolant:\n   • {fmt_kva('coolant_plan', sd['coolant_plan'])}")
                     lines3.append(f"   👉 Sum Need: {fmt_f(sd['coolant_sum_need'])} L | Have at Team: {fmt_f(sd['coolant_have'])} L | Diff: {fmt_f(sd['coolant_diff'])} L")
 
                 msg3_text = "\n".join(lines3)
