@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from telegram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from delete_old_helper import delete_old_messages_bot, save_msgids
 
 # ===================== CẤU HÌNH =====================
 logging.basicConfig(
@@ -35,13 +36,13 @@ SEND_BOT_TOKEN = os.getenv("SEND_BOT_TOKEN")
 SHEET_URL      = (
     "https://docs.google.com/spreadsheets/d/"
     "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
-    "/gviz/tq?tqx=out:csv&gid=133591305"
+    "/export?format=csv&gid=133591305"
 )
 SEND_HOUR   = int(os.getenv("SEND_HOUR",   "17"))
 SEND_MINUTE = int(os.getenv("SEND_MINUTE", "30"))
 COL_CONTENT = 3   # Cột D
 COL_CHAT_ID = 4   # Cột E
-HEADER_ROWS = 2
+HEADER_ROWS = 3
 
 # 2 bot gửi nhân viên theo dải row
 # @TNIREPORTTASK_BOT → E4:E32 (row 4-32, offset from header=2 → data row 2-30)
@@ -79,6 +80,62 @@ def safe_val(row, idx: int) -> str:
         return ""
 
 
+async def send_msg(bot, cid, text, label=""):
+    """Send message, handle >4096 char limit with retries."""
+    MAX = 4000
+    def chunk_text(t):
+        parts, current = [], ""
+        for line in t.split("\n"):
+            while len(line) > MAX:
+                segment = line[:MAX]
+                if current:
+                    parts.append(current)
+                    current = ""
+                parts.append(segment)
+                line = line[MAX:]
+            if len(current) + len(line) + 1 > MAX:
+                parts.append(current)
+                current = line
+            else:
+                current += ("\n" if current else "") + line
+        if current:
+            parts.append(current)
+        return parts
+
+    async def send_with_retry(chunk_text_p):
+        for attempt in range(3):
+            try:
+                # Custom timeout to be more resilient
+                sent = await bot.send_message(
+                    chat_id=cid, 
+                    text=chunk_text_p, 
+                    read_timeout=20, 
+                    write_timeout=20
+                )
+                return sent
+            except Exception as e:
+                if attempt == 2:
+                    raise e
+                logger.warning(f"[send_msg] Retrying {label} due to error: {e}")
+                await asyncio.sleep(1.0)
+
+    msg_ids = []
+    try:
+        if len(text) <= MAX:
+            sent = await send_with_retry(text)
+            msg_ids.append(sent.message_id)
+        else:
+            for p in chunk_text(text):
+                if p.strip():
+                    sent = await send_with_retry(p)
+                    msg_ids.append(sent.message_id)
+                    await asyncio.sleep(0.3)
+        return True, msg_ids
+    except Exception as e:
+        logger.error(f"❌ {label} → {cid}: {e}")
+        return False, msg_ids
+
+
 async def send_all_tasks():
     now_vn = datetime.now(TZ_VN).strftime("%d/%m/%Y %H:%M")
     logger.info(f"[Scheduler] 🚀 Bắt đầu gửi – {now_vn}")
@@ -97,92 +154,95 @@ async def send_all_tasks():
     for idx, row in df.iterrows():
         content     = safe_val(row, COL_CONTENT)
         chat_id_raw = safe_val(row, COL_CHAT_ID)
-        if not content or not chat_id_raw or chat_id_raw == "-":
+        sheet_row = idx + HEADER_ROWS + 1  # convert df index → actual sheet row
+        if not content:
             continue
         chat_id = chat_id_raw[:-2] if chat_id_raw.endswith(".0") else chat_id_raw
-        sheet_row = idx + HEADER_ROWS + 1  # convert df index → actual sheet row
         tasks.append((sheet_row, content, chat_id))
 
-    # Group tasks by bot token based on sheet row
-    # Row 4-32  → @TNIREPORTTASK_BOT
-    # Row 33-74 → SEND_BOT_TOKEN (BOD/managers)
-    # Row 75-87 → @TNITECHINICALDEPREPORT_BOT (Technical Dept — Gộp gửi lên nhóm CONTROL)
-    groups = {}
+    # Group tasks by role/row range
+    emp_messages = []
+    mgmt_messages = []
     tech_messages = []
     for sheet_row, content, chat_id in tasks:
-        if 75 <= sheet_row <= 87:
+        if 4 <= sheet_row <= 32:
+            emp_messages.append((sheet_row, content))
+        elif 33 <= sheet_row <= 74:
+            mgmt_messages.append((sheet_row, content))
+        elif 75 <= sheet_row <= 87:
             tech_messages.append((sheet_row, content))
-            continue
 
-        # Bỏ gửi cá nhân cho các hàng từ 4 đến 74 theo yêu cầu của user
-        # Số liệu đã được gửi trực tiếp vào các nhóm Team/CONTROL qua cron_send.py
-        continue
+    CONTROL_CHAT_ID = -5251698940
+    APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL", "")
 
-    total_ok = total_fail = 0
-    for token, items in groups.items():
-        # Identify which bot
-        if token == REPORT_TASK_BOT_TOKEN:
-            bot_name = "@TNIREPORTTASK_BOT"
-        elif token == TECHNICAL_DEP_BOT_TOKEN:
-            bot_name = "@TNITECHINICALDEPREPORT_BOT"
-        else:
-            bot_name = "SEND_BOT"
-        logger.info(f"[Scheduler] --- {bot_name}: {len(items)} messages ---")
+    # ── Gửi tin nhắn gộp cho Technical Dept (rows 75-87) lên nhóm CONTROL ──
+    if tech_messages and SEND_BOT_TOKEN:
+        tech_lines = [
+            f"📋 1. Report — Technical Dept Task Progress",
+            f"📅 {now_vn}",
+            "━" * 22,
+        ]
+        for sheet_row, content in tech_messages:
+            tech_lines.append(f"\n• Row {sheet_row}:")
+            tech_lines.append(content)
+        tech_msg = "\n".join(tech_lines)
 
-        async with Bot(token=token) as bot:
-            for sheet_row, content, chat_id in items:
-                message = (
-                    f"📋 ကျန်ရှိသောလုပ်ငန်းများ သတိပေးချက် – {now_vn}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"{content}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"⏰ ကျေးဇူးပြု၍ အမြန်ဆောင်ရွက်ပေးပါ။"
-                )
-                try:
-                    await bot.send_message(chat_id=chat_id, text=message)
-                    logger.info(f"[Scheduler] ✅ {bot_name} → row{sheet_row} ({chat_id})")
-                    total_ok += 1
-                except Exception as e:
-                    logger.error(f"[Scheduler] ❌ {bot_name} → row{sheet_row} ({chat_id}): {e}")
-                    total_fail += 1
-                await asyncio.sleep(0.4)
+        if APPS_SCRIPT_URL:
+            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "SCHEDULER_TECHDEP_CONTROL")
+        try:
+            async with Bot(token=SEND_BOT_TOKEN) as bot:
+                success, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, tech_msg, "Technical")
+                logger.info(f"[Scheduler] ✅ Gửi báo cáo gộp Technical Dept lên CONTROL")
+                if success and msg_ids and APPS_SCRIPT_URL:
+                    save_msgids(APPS_SCRIPT_URL, "SCHEDULER_TECHDEP_CONTROL", msg_ids)
+        except Exception as e:
+            logger.error(f"[Scheduler] ❌ Lỗi gửi báo cáo gộp Technical Dept lên CONTROL: {e}")
 
-    # ── Gửi tin nhắn gộp cho Technical Dept (rows 75-87) lên nhóm CONTROL (Xóa tin cũ) ──
-    if tech_messages:
-        tech_bot_token = TECHNICAL_DEP_BOT_TOKEN or SEND_BOT_TOKEN
-        if tech_bot_token:
-            tech_lines = [
-                f"📋 1. Report — Technical Dept Task Progress",
-                f"📅 {now_vn}",
-                "━" * 22,
-            ]
-            for sheet_row, content in tech_messages:
-                tech_lines.append(f"\n• Row {sheet_row}:")
-                tech_lines.append(content)
-            tech_msg = "\n".join(tech_lines)
+    # ── Gửi tin nhắn gộp cho Employees (rows 4-32) lên nhóm CONTROL ──
+    if emp_messages and SEND_BOT_TOKEN:
+        emp_lines = [
+            f"📋 3. Report — Employees Task Progress",
+            f"📅 {now_vn}",
+            "━" * 22,
+        ]
+        for sheet_row, content in emp_messages:
+            emp_lines.append(f"\n• Row {sheet_row}:")
+            emp_lines.append(content)
+        emp_msg = "\n".join(emp_lines)
 
-            CONTROL_CHAT_ID = -5251698940
-            APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL", "")
+        if APPS_SCRIPT_URL:
+            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "SCHEDULER_EMP_CONTROL")
+        try:
+            async with Bot(token=SEND_BOT_TOKEN) as bot:
+                success, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, emp_msg, "Employees")
+                logger.info(f"[Scheduler] ✅ Gửi báo cáo gộp Employees lên CONTROL")
+                if success and msg_ids and APPS_SCRIPT_URL:
+                    save_msgids(APPS_SCRIPT_URL, "SCHEDULER_EMP_CONTROL", msg_ids)
+        except Exception as e:
+            logger.error(f"[Scheduler] ❌ Lỗi gửi báo cáo gộp Employees lên CONTROL: {e}")
 
-            # Xóa tin nhắn cũ trên CONTROL
-            if APPS_SCRIPT_URL:
-                try:
-                    from delete_old_helper import delete_old_messages_bot, save_msgids
-                    delete_old_messages_bot(tech_bot_token, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "SCHEDULER_TECHDEP_CONTROL")
-                except Exception as ex:
-                    logger.warning(f"[Scheduler] Lỗi khi xóa tin nhắn Technical cũ: {ex}")
+    # ── Gửi tin nhắn gộp cho Management (rows 33-74) lên nhóm CONTROL ──
+    if mgmt_messages and SEND_BOT_TOKEN:
+        mgmt_lines = [
+            f"📋 7. Report — Management Task Progress",
+            f"📅 {now_vn}",
+            "━" * 22,
+        ]
+        for sheet_row, content in mgmt_messages:
+            mgmt_lines.append(f"\n• Row {sheet_row}:")
+            mgmt_lines.append(content)
+        mgmt_msg = "\n".join(mgmt_lines)
 
-            # Gửi tin nhắn mới
-            try:
-                async with Bot(token=tech_bot_token) as bot:
-                    sent = await bot.send_message(chat_id=CONTROL_CHAT_ID, text=tech_msg)
-                    logger.info(f"[Scheduler] ✅ Gửi báo cáo gộp Technical Dept lên CONTROL")
-                    if APPS_SCRIPT_URL:
-                        save_msgids(APPS_SCRIPT_URL, "SCHEDULER_TECHDEP_CONTROL", [sent.message_id])
-            except Exception as e:
-                logger.error(f"[Scheduler] ❌ Lỗi gửi báo cáo gộp Technical Dept lên CONTROL: {e}")
-
-    logger.info(f"[Scheduler] 📊 ✅{total_ok} | ❌{total_fail}")
+        if APPS_SCRIPT_URL:
+            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "SCHEDULER_MGMT_CONTROL")
+        try:
+            async with Bot(token=SEND_BOT_TOKEN) as bot:
+                success, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, mgmt_msg, "Management")
+                logger.info(f"[Scheduler] ✅ Gửi báo cáo gộp Management lên CONTROL")
+                if success and msg_ids and APPS_SCRIPT_URL:
+                    save_msgids(APPS_SCRIPT_URL, "SCHEDULER_MGMT_CONTROL", msg_ids)
+        except Exception as e:
+            logger.error(f"[Scheduler] ❌ Lỗi gửi báo cáo gộp Management lên CONTROL: {e}")
 
 
 # ══════════════════════════════════════════════════

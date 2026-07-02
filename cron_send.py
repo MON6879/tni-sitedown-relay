@@ -749,7 +749,8 @@ async def main():
             team_leader_content.append({"team": team_name, "name": col_b, "content": content})
 
         is_team_row = 4 <= sheet_row <= 59
-        if not is_team_row and (not cid or cid == "-" or not cid.lstrip("-").isdigit()):
+        is_tech_row = 75 <= sheet_row <= 87
+        if not is_team_row and not is_tech_row and (not cid or cid == "-" or not cid.lstrip("-").isdigit()):
             continue
 
         all_rows.append((sheet_row, content, cid, col_c, safe(row, COL_A), col_b))
@@ -972,8 +973,9 @@ async def main():
 
     # ── 8. Gửi tổng asset → Group CONTROL SITE & Từng Team (Xóa tin cũ) ──
     if asset_msg and SEND_BOT_TOKEN:
+        if APPS_SCRIPT_URL:
+            delete_old_messages_bot(SEND_BOT_TOKEN, -5251698940, APPS_SCRIPT_URL, "CRON_ASSET_CONTROL")
         ASSET_RECIPIENTS = {
-            "CRON_ASSET_CONTROL": -5251698940,
             "CRON_ASSET_T1": -5180992881,
             "CRON_ASSET_T2": -5188855349,
             "CRON_ASSET_T3": -5183480727,

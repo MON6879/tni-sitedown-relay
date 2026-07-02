@@ -752,4 +752,21 @@ KHÔNG ĐỤNG:
   - Toàn bộ file auto_copy_processor.js
 ```
 
+### 8. Task Reminder Consolidation & Asset Double Send Fix (02/07/2026)
+```
+✅ ĐÃ XÁC NHẬN HOẠT ĐỘNG 02/07/2026
+Flow:
+  - Sửa lỗi Asset gửi 2 lần ở CONTROL: loại bỏ "CRON_ASSET_CONTROL" khỏi ASSET_RECIPIENTS trong cron_send.py.
+  - Cho phép Technical Dept (rows 75-87) bypass Chat ID check trong cron_send.py để luôn gộp báo cáo gửi CONTROL.
+  - Chuyển đổi combined_bot.py (Render worker) từ gửi cá nhân sang gửi báo cáo gộp cho 3 nhóm chính lên CONTROL:
+      - Employees (dòng 4-32) -> 📋 3. Report — Employees Task Progress
+      - Management (dòng 33-74) -> 📋 7. Report — Management Task Progress
+      - Technical Dept (dòng 75-87) -> 📋 1. Report — Technical Dept Task Progress
+  - Sử dụng SHEET_URL dạng /export?format=csv và HEADER_ROWS = 3 để đảm bảo chính xác dòng cho combined_bot.py.
+  - Sử dụng hàm bổ trợ send_msg tự động split tin nhắn dài vượt 4000 ký tự với retry/timeout.
+
+KHÔNG ĐỤNG:
+  - Logic gửi gộp và xóa tin cũ trong combined_bot.py và cron_send.py
+```
+
 
