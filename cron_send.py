@@ -684,15 +684,11 @@ def parse_emp_metrics(text: str) -> dict:
     m_name = re.search(r'^(\*?[^\n=]+?)\s*=\s*Site:', text.strip())
     raw_name = m_name.group(1).strip() if m_name else "?"
 
-    # Rút gọn tên: "Real Name-myt_username" → "Real Name"
-    n = raw_name.lstrip("*-").strip()
-    m_real = re.match(r'^(.+?)-myt_', n, re.IGNORECASE)
-    if m_real:
-        name_short = m_real.group(1).strip()
-    elif n.lower().startswith("myt_"):
-        name_short = n[4:]
-    else:
-        name_short = n
+    # Rút gọn tên: chỉ bỏ "--" hoặc "*" đầu dòng, giữ nguyên phần còn lại
+    # VD: "--myt_khantchaw.nyo" → "myt_khantchaw.nyo"
+    #     "Khant Chaw Nyo-myt_naingmyo.htun" → giữ nguyên
+    name_short = raw_name.lstrip("*-").strip()
+
 
     site      = _num(r'Site:\s*/?([\d]+)')
     rank      = _num(r'\brank:\s*/?([\d]+)')          # NV: lowercase 'rank'
