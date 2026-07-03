@@ -22,9 +22,15 @@
 ### 03/07/2026
 | File | Thay đổi | Lý do |
 |---|---|---|
-| `cron_send.py` | Điều kiện lọc row 4-59: bắt buộc **cột A có tên team VÀ cột D có nội dung** (xóa exception team leader bypass cột A) | Team Leader không có cột A vẫn quả qua filter |
+| `cron_send.py` | Điều kiện lọc row 4-59: bắt buộc **cột A có tên team VÀ cột D có nội dung** | Team Leader không có cột A vẫn lọt qua filter |
+| `cron_send.py` | **Row 33-59 (TL)**: xác định team từ số trong **Cột C** (`Team leader 1/2/3/4`) thay vì cột A | TL không hiện trong báo cáo vì mất logic đọc cột C |
 | `.github/workflows/daily_reports.yml` | Thêm cron tự động `30 10 * * *` UTC = **17:00 Myanmar** cho `daily_task`; tách riêng cable_report giữ `0 11` UTC | daily_task trước chỉ chạy tay |
 | `SYSTEM_DOC.md` | Cập nhật giờ `cron_send.py`: 17:30 → 17:00 Myanmar, UTC 11:00 → 10:30 | Đồng bộ với workflow |
+
+**Quy tắc routing rows 4-59 (đã xác nhận):**
+- Row 4-32 (NV): team = **Cột A**
+- Row 33-59 (TL): team = số trong **Cột C** (`Team leader 1` → Team1, ...)
+- Cả hai: bắt buộc Cột A ≠ trống VÀ Cột D ≠ trống
 
 ---
 
