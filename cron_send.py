@@ -1079,7 +1079,16 @@ async def main():
         if "TEAM04" in ts or "TEAM 4" in ts or "TEAM4" in ts: return -5238696719
         return None
 
+    last_nv_team = None  # carry-forward team cho NV rows có cột A trống
+
     for sheet_row, content, cid, col_c, col_a_val, col_b in all_rows:
+        # ── Carry-forward: NV rows 4-32 — nếu cột A trống dùng team cuối biết ──
+        if 4 <= sheet_row <= 32:
+            if col_a_val:
+                last_nv_team = col_a_val   # cập nhật team hiện tại
+            elif last_nv_team:
+                col_a_val = last_nv_team   # dùng team của dòng trước
+
         # ── 2 điều kiện bắt buộc (rows 4-59): Cột A có tên team VÀ Cột D có nội dung ──
         if 4 <= sheet_row <= 59:
             if not col_a_val:
@@ -1224,6 +1233,30 @@ async def main():
                 (0, team_msg, str(gid), "TEAM_GROUP")
             )
 
+            # ── Message 2: Nguyên nội dung cột D (gửi sau bản phân tích) ──
+            full_lines = [
+                f"📓 4b. Full Report — {t_name}",
+                f"📅 {now_str}",
+                "━" * 22,
+            ]
+            # TL full col D
+            for prefix, name, content in tl_list:
+                if content:
+                    full_lines.append(f"🟧 {content}")
+                    full_lines.append("─" * 18)
+            # NV full col D
+            seen_full = set()
+            for prefix, name, content in ft_list:
+                if content and name not in seen_full:
+                    seen_full.add(name)
+                    full_lines.append(content)
+                    full_lines.append("─" * 18)
+            full_lines.append("━" * 22)
+
+            full_msg = "\n".join(full_lines)
+            groups.setdefault(SEND_BOT_TOKEN, []).append(
+                (0, full_msg, str(gid), "TEAM_GROUP_FULL")
+            )
         # Build và gửi bảng so sánh TL vào CONTROL
         grp_msg = build_tl_comparison(all_tl_metrics, now_str)
         if grp_msg:
