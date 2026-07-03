@@ -1004,7 +1004,7 @@ async def main():
             
             consolidated_parts.append("\n".join(team_lines))
 
-            # ── 2. Tạo báo cáo chi tiết gửi riêng vào từng nhóm Team ──
+            # ── 2. Tạo báo cáo chi tiết gửi riêng vào từng nhóm Team (giữ nguyên cột D đầy đủ) ──
             team_lines_indiv = [
                 f"📋 4. Report — Daily EOD Task & Stats — {t_name}",
                 f"📅 {now_str}",
@@ -1012,21 +1012,17 @@ async def main():
                 "━━━━━━━━━━━━━━━━━━━━"
             ]
             for prefix, name, content in tl_list:
-                parsed_tl = parse_tl(content)
-                if parsed_tl:
-                    team_lines_indiv.append(parsed_tl)
+                if content:
+                    team_lines_indiv.append(f"👤 {content}")
 
             seen_emps_indiv = set()
             emp_idx_indiv = 0
             for prefix, name, content in ft_list:
-                parsed_emp_str = parse_emp(content)
-                if parsed_emp_str:
-                    emp_id = parsed_emp_str.split(" = ")[0].strip()
-                    if emp_id not in seen_emps_indiv:
-                        seen_emps_indiv.add(emp_id)
-                        color_emoji = CIRCLES[emp_idx_indiv % len(CIRCLES)]
-                        team_lines_indiv.append(f"{color_emoji} {parsed_emp_str}")
-                        emp_idx_indiv += 1
+                if content and name not in seen_emps_indiv:
+                    seen_emps_indiv.add(name)
+                    color_emoji = CIRCLES[emp_idx_indiv % len(CIRCLES)]
+                    team_lines_indiv.append(f"{color_emoji} {content}")
+                    emp_idx_indiv += 1
 
             # Thêm thống kê Asset và Search riêng cho từng Team
             team_asset = build_team_asset_section(team_key, asset_data)
