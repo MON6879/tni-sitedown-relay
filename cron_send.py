@@ -921,12 +921,20 @@ async def main():
 
         # ── Rows 4-59: Gom FT + TL vào Group Team ──
         if 4 <= sheet_row <= 59:
-            # Cột A xác định team (bắt buộc); col_c dùng để nhận dạng TL
-            team_val = col_a_val
+            is_tl = 33 <= sheet_row <= 59 and bool(col_c and "team leader" in col_c.lower())
+
+            if is_tl:
+                # Team Leader (rows 33-59): xác định team từ SỐ trong Cột C
+                # Cột C = "Team leader 1" / "Team leader 2" / ...
+                m_tl = re.search(r'team\s*leader\s*(\d+)', col_c, re.IGNORECASE)
+                tl_num = int(m_tl.group(1)) if m_tl else 0
+                team_val = TEAM_BY_NUMBER.get(tl_num, col_a_val)
+            else:
+                # Nhân viên (rows 4-32): xác định team từ Cột A
+                team_val = col_a_val
 
             target_gid = get_target_group(team_val)
             if target_gid:
-                is_tl = 33 <= sheet_row <= 59 and bool(col_c and "team leader" in col_c.lower())
                 name = col_b or col_c or f"NV row{sheet_row}"
                 team_messages.setdefault(target_gid, []).append(
                     ("👑" if is_tl else "👤", name, content, is_tl)
