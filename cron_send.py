@@ -127,18 +127,41 @@ def build_search_summary(now_str, report_data):
     return "\n".join(lines)
 
 
+def get_current_cycle_str() -> str:
+    now = datetime.now(TZ_MM)
+    if now.day <= 20:
+        end_date = now.replace(day=20)
+        prev_month = now.month - 1
+        prev_year = now.year
+        if prev_month == 0:
+            prev_month = 12
+            prev_year -= 1
+        start_date = now.replace(year=prev_year, month=prev_month, day=21)
+    else:
+        start_date = now.replace(day=21)
+        next_month = now.month + 1
+        next_year = now.year
+        if next_month == 13:
+            next_month = 1
+            next_year += 1
+        end_date = now.replace(year=next_year, month=next_month, day=20)
+        
+    return f"{start_date.strftime('%d/%m/%y')}-{end_date.strftime('%d/%m/%y')}"
+
+
 def build_team_search_section(team_key: str, report_data: dict) -> str:
     """Build search stats section for a specific team."""
     team_summary = report_data.get("teamSummary", [])
     if not team_summary or not team_key:
         return ""
 
+    cycle_str = get_current_cycle_str()
     for ts in team_summary:
         if ts.get("team", "") == team_key:
             return (
                 f"🔍 Search: "
                 f"3Day:{ts.get('d2',0)}/{ts.get('d1',0)}/{ts.get('today',0)} "
-                f"7Day:{ts.get('week',0)} Month:{ts.get('month',0)}"
+                f"7Day:{ts.get('week',0)} Month:{ts.get('month',0)} ({cycle_str})"
             )
     return ""
 
@@ -275,10 +298,11 @@ def build_team_asset_section(team_key: str, asset_data: dict) -> str:
         for k in PERIOD_KEYS:
             team_total[k] += s.get(k, 0)
 
+    cycle_str = get_current_cycle_str()
     period_line = (
         f"3Day: {team_total.get('d2',0)}/{team_total.get('d1',0)}/{team_total.get('d0',0)}"
         f"  7Day: {team_total.get('d6',0)}"
-        f"  Month: {team_total.get('d15',0)}"
+        f"  Month: {team_total.get('d15',0)} ({cycle_str})"
     )
 
     return (
@@ -1013,6 +1037,8 @@ async def main():
                 team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
             if team_asset:
                 team_lines_indiv.append(team_asset)
+            if team_asset and (team_search or no_search):
+                team_lines_indiv.append("────────────────────")
             if team_search:
                 team_lines_indiv.append(team_search)
             if no_search:
