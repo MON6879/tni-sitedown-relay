@@ -28,6 +28,13 @@
 | `.github/workflows/daily_reports.yml` | Thêm cron tự động `30 10 * * *` UTC = **17:00 Myanmar** cho `daily_task`; tách riêng cable_report giữ `0 11` UTC | daily_task trước chỉ chạy tay |
 | `SYSTEM_DOC.md` | Cập nhật giờ `cron_send.py`: 17:30 → 17:00 Myanmar, UTC 11:00 → 10:30 | Đồng bộ với workflow |
 
+### 04/07/2026
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `daily_read_report.py` | **Staff sheet** (GID 1684930643): đọc col A=EmpID, C=TelegramID, F=Tên, M=Team, N=rỗng→active. Phân loại in_group vs not_in_group | Master list chính xác thay vì chỉ dùng participants |
+| `daily_read_report.py` | Báo cáo hiện `⚠️ Not in Group yet (N members):` cuối mỗi team section | Thấy ngay ai chưa tham gia nhóm |
+| `daily_plan_report.py` | **`colorize_bullets()`**: thay `• [Category]` bằng vuông màu theo category. Trùng tên = trùng màu | Dễ nhìn hơn trong CONTROL report |
+
 **Quy tắc routing rows 4-59 (đã xác nhận):**
 - Row 4-32 (NV): team = **Cột A**
 - Row 33-59 (TL): team = số trong **Cột C** (`Team leader 1` → Team1, ...)
