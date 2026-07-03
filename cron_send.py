@@ -573,32 +573,43 @@ def parse_tl(text):
 
 
 def parse_emp(text):
+    """
+    Trích xuất format ngắn cho báo cáo Control.
+
+    Input (cột D):
+      --myt_aunglwin.phyo = Site:  /15 : 'TNI0201: 8KVA+...TNI0055 <> Day: 12 of the month= /1
+      WO Close/ 7day: /1 Close => 3Day: 0 /0 /0 =>/23 WO Remain <=> rank: /23 =Close: /4%
+      /TARGET50%  /LostTARGET=> /WO /Overdue /FOT /NOT /Close: /17  < + > Task assign: /6
+      => Task Close Month: /0 => 3Day Close: 0/0/0 : TNI0035 , ... =>  M&E : 3/P: 0 ...
+
+    Output:
+      --myt_aunglwin.phyo = Site: /15 <> Day: 12 of the month= /1 WO Close/ 7day: /1 Close
+      => 3Day: 0 /0 /0 =>/23 WO Remain <=> rank: /23 =Close: /4% /TARGET50% /LostTARGET=>
+      /WO /Overdue /FOT /NOT /Close: /17 < + > Task assign: /6 => Task Close Month: /0
+      => 3Day Close: 0/0/0
+    """
     if not text:
         return ""
     text = text.strip()
-    m_name = re.search(r'^\*?([^*=]+?)\s*=\s*Site:', text)
+
+    # Lấy tên (trước "= Site:")
+    m_name = re.search(r'^(\*?[^=\n]+?)\s*=\s*Site:', text)
     if not m_name:
         return text
     name = m_name.group(1).strip()
-    
-    m_site = re.search(r'Site:\s*\*([^*]+?)\*', text)
-    site_num = m_site.group(1) if m_site else "0"
-    
-    m_wo = re.search(r'<:>\s*(.*?Remain)', text)
-    wo_str = ""
-    if m_wo:
-        wo_str = re.sub(r'\s+', ' ', m_wo.group(1).strip())
-        
-    m_rank = re.search(r'rank:\s*\*([^*]+?)\*', text)
-    rank_num = m_rank.group(1) if m_rank else "0"
-    
-    m_close = re.search(r'Close:\s*\*([^*%]+?%)\*', text)
-    close_pct = m_close.group(1) if m_close else "0%"
-    
-    m_task = re.search(r'Task assign:\s*(\*?\d+\s*=>\s*Task Close Month:\s*\d+:\s*\d+/\d+/\d+)', text)
-    task_str = m_task.group(1) if m_task else ""
-    
-    return f"{name} = Site: *{site_num}*  WO: {wo_str} <=> rank: *{rank_num}* =Close: *{close_pct}* Task assign: {task_str}"
+
+    # Lấy số site (/15, /0, v.v.)
+    m_site = re.search(r'Site:\s*(/?\d+)', text)
+    site_num = m_site.group(1) if m_site else "?"
+
+    # Lấy nội dung từ "<>" đến hết "3Day Close: X/X/X" — bỏ danh sách TNI và dep stats cuối
+    m_body = re.search(r'(<>.*?3Day Close:\s*\d+/\d+/\d+)', text, re.DOTALL)
+    if m_body:
+        body = re.sub(r'\s+', ' ', m_body.group(1)).strip()
+        return f"{name} = Site: {site_num} {body}"
+
+    # Fallback: trả về tên + site
+    return f"{name} = Site: {site_num}"
 
 
 def format_employee_report(emp: dict, now_str: str, month_days: int) -> str:
