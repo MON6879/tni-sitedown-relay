@@ -194,6 +194,42 @@ def extract_tni_codes(text: str) -> set:
     return set(re.findall(r'TNI\d{3,5}(?:_\d+)?', text, re.IGNORECASE))
 
 
+# Mỗi category một màu vuông cố định — trùng tên category = trùng màu
+CATEGORY_SQUARES = {
+    "admin":        "🟦",   # xanh dương
+    "asset":        "🟧",   # cam
+    "m&e":          "🟩",   # xanh lá
+    "pm":           "🟨",   # vàng
+    "cm":           "🟥",   # đỏ
+    "construction": "🟣",   # tím
+    "noc":          "⬛",   # đen
+    "technical":    "🟦",   # xanh dương
+    "site":         "🟩",   # xanh lá
+}
+
+
+def colorize_bullets(text: str) -> str:
+    """
+    Thay dấu '•' bằng vuông màu theo category.
+    Input:  • [Admin] repair CCTV: TNI0006
+    Output: 🟦 [Admin] repair CCTV: TNI0006
+
+    Cùng category = cùng màu vuông (ví dụ: [Asset] luôn là 🟧).
+    """
+    if not text:
+        return text
+
+    def replace_bullet(m):
+        cat_raw = m.group(1).strip()
+        cat_lo  = cat_raw.lower()
+        for key, sq in CATEGORY_SQUARES.items():
+            if key in cat_lo:
+                return f"{sq} [{cat_raw}]"
+        return f"▪️ [{cat_raw}]"  # fallback vuông nhỏ
+
+    return re.sub(r'•\s*\[([^\]]+)\]', replace_bullet, text)
+
+
 # ── Apps Script calls ───────────────────────────────────────────
 
 def call_apps_script(payload: dict, timeout: int = 30) -> dict:
@@ -1159,7 +1195,7 @@ async def main():
             for team_name, content in team_today_contents:
                 ctrl_lines.append(sub_divider)
                 ctrl_lines.append(f"🏷️ {team_name}:")
-                ctrl_lines.append(content)
+                ctrl_lines.append(colorize_bullets(content))  # • [Admin] → vuông màu
 
         ctrl_lines.append(divider)
 

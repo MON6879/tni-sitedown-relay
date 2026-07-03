@@ -53,7 +53,7 @@ TEAM_TO_GROUP = {
     "TEAM04": "T4", "TEAM 4": "T4", "TEAM4": "T4",
 }
 
-# Sheet config
+# Sheet config — Task remain (GID 133591305)
 SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
 SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
@@ -61,6 +61,18 @@ SHEET_URL = (
 )
 HEADER_ROWS = 3
 COL_A, COL_B, COL_C, COL_E = 0, 1, 2, 4
+
+# Staff sheet config (GID 1684930643) — nguồn chính xác danh sách nhân viên
+STAFF_SHEET_URL = (
+    f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
+    "/export?format=csv&gid=1684930643"
+)
+# Col indices trong Staff sheet (0-based)
+S_COL_ID   = 0   # A: Employee ID
+S_COL_TID  = 2   # C: Telegram User ID (số không đổi dù đổi username)
+S_COL_NAME = 5   # F: Tên nhân viên
+S_COL_TEAM = 12  # M: Team (Team 1/2/3/4)
+S_COL_EXIT = 13  # N: Ngày nghỉ / inactive — RỔNG = còn làm việc (active)
 
 # Keywords to identify Note message
 NOTE_KEYWORDS = ["team leader", "site down", "make plan", "rescue", "mdg", "mbb"]
@@ -152,8 +164,83 @@ def get_team_members_from_sheet() -> dict:
     return result
 
 
+def get_staff_from_staff_sheet() -> dict:
+    """
+    Đọc Staff sheet (GID 1684930643) — nguồn chính xác danh sách nhân viên.
+    Filter: col N trống = còn làm việc (active). Col N có giá trị = đã nghỉ.
+    Col C = Telegram User ID (số ngày vĩnh viễn, không đổi dù đổi username).
+
+    Returns: { group_key: [ {"name": str, "telegram_id": int|None, "emp_id": str}, ... ] }
+    """
+    result = {}
+    try:
+        resp = requests.get(STAFF_SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+        resp.raise_for_status()
+        df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str, on_bad_lines="skip")
+
+        for idx in range(1, len(df)):  # bỏ dòng header (row 0)
+            row = df.iloc[idx]
+
+            def safe_col(col_idx, _row=row):
+                if col_idx >= len(_row):
+                    return ""
+                v = str(_row.iloc[col_idx]).strip() if not pd.isna(_row.iloc[col_idx]) else ""
+                return "" if v.lower() in ("nan", "none", "") else v
+
+            # Col N: có giá trị = đã nghỉ → bỏ qua
+            if safe_col(S_COL_EXIT):
+                continue
+
+            emp_id  = safe_col(S_COL_ID)
+            tid_raw = safe_col(S_COL_TID)
+            name    = safe_col(S_COL_NAME)
+            team    = safe_col(S_COL_TEAM)
+
+            if not name or not team:
+                continue
+
+            # Map team string → group key
+            team_up = team.upper().replace(" ", "")
+            group_key = None
+            for pattern, gk in TEAM_TO_GROUP.items():
+                if pattern.replace(" ", "") in team_up:
+                    group_key = gk
+                    break
+            if not group_key:
+                m_num = re.search(r'(\d+)', team)
+                if m_num:
+                    mapping = {"1": "T1", "2": "T2", "3": "T3", "4": "T4", "5": "T2"}
+                    group_key = mapping.get(m_num.group(1))
+
+            if not group_key:
+                continue
+
+            # Parse Telegram User ID (col C)
+            tid_clean = tid_raw.replace(".0", "") if tid_raw.endswith(".0") else tid_raw
+            telegram_id = int(tid_clean) if tid_clean.lstrip("-").isdigit() else None
+
+            result.setdefault(group_key, [])
+            # Dedup theo tên
+            if not any(s["name"] == name for s in result[group_key]):
+                result[group_key].append({
+                    "name":        name,
+                    "telegram_id": telegram_id,
+                    "emp_id":      emp_id,
+                })
+
+        total = sum(len(v) for v in result.values())
+        print(f"  📋 Staff sheet: {total} active staff across {len(result)} teams")
+        for gk, members in result.items():
+            in_grp = sum(1 for s in members if s["telegram_id"])
+            print(f"     {gk}: {len(members)} staff | {in_grp} have Telegram ID")
+
+    except Exception as e:
+        print(f"  ❌ Staff sheet read error: {e}")
+
+    return result
+
 async def get_all_members(client, chat_id: int, me_id: int) -> list[dict]:
-    """Get all members in group (excluding bots and self) — for CONTROL."""
+    """Get all members in group (excluding bots and self)."""
     try:
         participants = await client.get_participants(chat_id)
         members = []
@@ -214,25 +301,44 @@ async def get_reader_ids_with_time(client, chat_id: int, msg_id: int) -> dict:
 
 
 async def process_group(client, group_key: str, chat_id: int,
-                        me_id: int, team_sheet_members: dict, cycle_start: datetime, cycle_end: datetime) -> dict | None:
-    """Process 1 group: check Note reads over 3Day/7Day/Month. Returns data dict."""
+                        me_id: int, staff_by_team: dict, cycle_start: datetime, cycle_end: datetime) -> dict | None:
+    """Process 1 group: check Note reads. Returns data dict."""
     print(f"\n[{group_key}] chat_id={chat_id}")
 
-    # Get member list: sheet for teams, participants for CONTROL
-    if group_key in team_sheet_members:
-        sheet_list = team_sheet_members[group_key]
-        members = [{"id": m["chat_id"], "name": m["name"]} for m in sheet_list]
-        print(f"  📋 Using sheet members: {len(members)}")
+    # Lấy danh sách staff từ Staff sheet cho team này
+    staff_list = staff_by_team.get(group_key, [])
+
+    # Lấy participants thực tế của nhóm Telegram
+    group_participants = await get_all_members(client, chat_id, me_id)
+    participant_ids = {p["id"] for p in group_participants}
+    print(f"  👥 Group participants: {len(participant_ids)}")
+
+    # Phân loại: in_group (có Telegram ID và đã join) vs not_in_group (chưa join)
+    in_group_members   = []
+    not_in_group_names = []
+
+    if group_key == "CONTROL":
+        # CONTROL: dùng toàn bộ participants, không giới hạn theo staff list
+        in_group_members = [{"id": p["id"], "name": p["name"]} for p in group_participants]
     else:
-        members = await get_all_members(client, chat_id, me_id)
-        print(f"  👥 Using group participants: {len(members)}")
+        for s in staff_list:
+            tid  = s.get("telegram_id")
+            name = s["name"]
+            if tid and tid in participant_ids:
+                in_group_members.append({"id": tid, "name": name})
+            else:
+                not_in_group_names.append(name)
 
-    member_ids = {m["id"] for m in members}
-    member_count = len(members)
+    members      = in_group_members
+    member_ids   = {m["id"] for m in members}
+    # Total = toàn bộ staff (cả chưa join)
+    member_count = len(staff_list) if group_key != "CONTROL" else len(members)
 
-    if member_count == 0:
-        print(f"  ⚠️  No members found — skip")
+    if len(members) == 0:
+        print(f"  ⚠️  No members in group — skip")
         return None
+
+    print(f"  📋 In group: {len(members)} | Not in group yet: {len(not_in_group_names)}")
 
     # Get Note messages from last 35 days (to cover the full cycle and rolling 7-day stats)
     since_date = days_ago_utc(35)
@@ -319,6 +425,7 @@ async def process_group(client, group_key: str, chat_id: int,
         "per_member": per_member,
         "today_read": today_read,
         "today_unread": today_unread,
+        "not_in_group": not_in_group_names,   # danh sách tên chưa join nhóm
         "note_preview": (today_note_msg.message or "")[:60].replace("\n", " ") if today_note_msg else "",
     }
 
@@ -357,9 +464,9 @@ def get_cycle_range(now_mm: datetime) -> tuple[datetime, datetime]:
 async def main():
     print(f"[{myanmar_now()}] 🚀 Daily Note Read Report starting...")
 
-    # Read team members from sheet (col E, rows 4-59)
-    print(f"[{myanmar_now()}] 📋 Reading team members from sheet...")
-    team_sheet_members = get_team_members_from_sheet()
+    # Read staff from Staff sheet (nguồn chính xác danh sách nhân viên)
+    print(f"[{myanmar_now()}] 📋 Reading staff list from Staff sheet...")
+    staff_by_team = get_staff_from_staff_sheet()
 
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
@@ -375,7 +482,7 @@ async def main():
         # Collect data from all groups
         all_results = {}  # group_key -> data
         for group_key, chat_id in GROUPS.items():
-            data = await process_group(client, group_key, chat_id, me.id, team_sheet_members, cycle_start, cycle_end)
+            data = await process_group(client, group_key, chat_id, me.id, staff_by_team, cycle_start, cycle_end)
             if data:
                 all_results[group_key] = data
 
@@ -422,6 +529,13 @@ async def main():
             tl.extend(member_lines(r["per_member"]))
             tl.append(divider)
 
+            # Phần "Chưa có trong nhóm" — highlight cuối report
+            if r.get("not_in_group"):
+                tl.append(f"⚠️ Not in Group yet ({len(r['not_in_group'])} members):")
+                for name in r["not_in_group"]:
+                    tl.append(f"  • {name}")
+                tl.append("")
+
             chat_id = GROUPS[gk]
             await delete_old_messages_telethon(client, chat_id, GAS_URL, f"READREPORT_{gk}")
             sent = await client.send_message(chat_id, "\n".join(tl))
@@ -453,6 +567,13 @@ async def main():
                 f"✅ {r['cnt_d0']}  ❌ {len(r['today_unread'])}"
             )
             lines.extend(member_lines(r["per_member"]))
+
+            # Phần "Chưa có trong nhóm" cho CONTROL
+            if r.get("not_in_group"):
+                lines.append(f"⚠️ Not in Group yet ({len(r['not_in_group'])} members):")
+                for name in r["not_in_group"]:
+                    lines.append(f"  • {name}")
+
             lines.append("")
 
         lines.append(divider)
