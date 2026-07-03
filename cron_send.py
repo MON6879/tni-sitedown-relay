@@ -50,8 +50,8 @@ TEAM_SHORT = {
     "MYT_TNI_TEAM03_Bokpyin":   "Team3 Bokpyin",
     "MYT_TNI_TEAM04_Kawthoung": "Team4 Kawthoung",
 }
-# Icon theo số thứ tự nhân viên trong team
-EMP_ICONS = ["🔵","🟢","🟡","🟠","🔴","🟣","⚪","🔶","🔷","🔸","🔹","💠"]
+# Icon vuông màu cho Technical Dept (mỗi dept 1 màu cố định)
+EMP_ICONS = ["🟧","🟦","🟩","🟨","🟥","🟣","⬜","🟧","🟦","🟩","🟨","🟥"]
 
 
 def safe(row, idx):
@@ -1037,7 +1037,7 @@ async def main():
             for prefix, name, content in ft_list:
                 if content and name not in seen_emps_indiv:
                     seen_emps_indiv.add(name)
-                    team_lines_indiv.append(f"▪️ {content}")
+                    team_lines_indiv.append(content)  # NV: trơn, không emoji
 
             # Thêm thống kê Asset và Search riêng cho từng Team
             team_asset = build_team_asset_section(team_key, asset_data)
@@ -1080,8 +1080,8 @@ async def main():
             tech_lines.append("─" * 22)
 
         for i, (name, content) in enumerate(tech_messages):
-            emp_icon = EMP_ICONS[i % len(EMP_ICONS)]
-            tech_lines.append(f"\n{emp_icon} ▸ 【{name}】")
+            dept_icon = EMP_ICONS[i % len(EMP_ICONS)]  # Vuông màu cố định theo dept
+            tech_lines.append(f"\n{dept_icon} 【{name}】")
             tech_lines.append(content)
 
         tech_lines.append("\n" + "━" * 22)
