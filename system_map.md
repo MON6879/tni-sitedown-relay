@@ -5,6 +5,29 @@
 
 ---
 
+## ⚠️ QUY TẮc LÀM VIỆC BẮT BUỘC
+
+> [!CAUTION]
+> **Sau mỗi lần sửa code — PHẢI thực hiện đủ 3 bước sau:**
+> 1. **Lưu dự phòng** — tạo file `backup_context_DDMMYYYY.md` ghi lại nội dung thay đổi
+> 2. **Cập nhật `system_map.md`** — ghi vào Changelog bên dưới
+> 3. **Đóng băng (commit + push)** — `git add ... ; git commit -m "..." ; git push`
+>
+> Không được dừng lại ở bước nào. Bot trên GitHub Actions chỉ chạy file đã push lên!
+
+---
+
+## 📅 CHANGELOG
+
+### 03/07/2026
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `cron_send.py` | Điều kiện lọc row 4-59: bắt buộc **cột A có tên team VÀ cột D có nội dung** (xóa exception team leader bypass cột A) | Team Leader không có cột A vẫn quả qua filter |
+| `.github/workflows/daily_reports.yml` | Thêm cron tự động `30 10 * * *` UTC = **17:00 Myanmar** cho `daily_task`; tách riêng cable_report giữ `0 11` UTC | daily_task trước chỉ chạy tay |
+| `SYSTEM_DOC.md` | Cập nhật giờ `cron_send.py`: 17:30 → 17:00 Myanmar, UTC 11:00 → 10:30 | Đồng bộ với workflow |
+
+---
+
 ## 📊 Google Sheets — HAI SPREADSHEET RIÊNG BIỆT
 
 > [!CAUTION]
@@ -98,8 +121,8 @@ Trong `apps_script_collector.js`:
 |---|---|---|
 | [search_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/api/search_bot.py) | **Vercel webhook** | Bot tra cứu TNI + Daily Report — 24/7 miễn phí |
 | [collector.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/api/collector.py) | **Vercel webhook** | Bot thu thập — lưu Order/Revoke... vào Sheet |
-| [cron_send.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/cron_send.py) | **GitHub Actions** | Gửi task remain hàng ngày 17:30 — dùng SEND_BOT cho tất cả |
-| [daily_plan_report.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/daily_plan_report.py) | **GitHub Actions** | Thu thập Daily Plan từ TL → Sheet + gửi report 3Day/7Day/Month 17:30 |
+| [cron_send.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/cron_send.py) | **GitHub Actions** | Gửi task remain hàng ngày **17:00** — dùng SEND_BOT cho tất cả. ĐK: cột A có team VÀ cột D có nội dung |
+| [daily_plan_report.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/daily_plan_report.py) | **GitHub Actions** | Thu thập Daily Plan từ TL → Sheet + gửi report 3Day/7Day/Month |
 | [telegram_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/telegram_bot.py) | ~~GitHub Actions~~ | ⚠️ ĐÃ THAY THẾ bởi `api/search_bot.py` (Vercel webhook) |
 | [apps_script_collector.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_collector.js) | **Apps Script** | Backend xử lý dữ liệu Sheet |
 | [auto_copy_processor.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/auto_copy_processor.js) | **Apps Script** | Tự động xử lý Copy-Paste & Xóa dòng theo file Config lúc 22:00 |
@@ -134,8 +157,9 @@ Trong `apps_script_collector.js`:
 
 | Workflow | File | Schedule | Script |
 |---|---|---|---|
-| **Daily Task Reminder (17:30 Myanmar)** | `daily_task.yml` | `0 11 * * *` UTC = 17:30 Myanmar | `cron_send.py` |
-| **Daily Plan Report (17:30 Myanmar)** | `daily_plan_report.yml` | `0 11 * * *` UTC = 17:30 Myanmar | `daily_plan_report.py` |
+| **Daily Task Reminder (17:00 Myanmar)** | `daily_reports.yml` (`daily_task`) | `30 10 * * *` UTC = **17:00 Myanmar** | `backlog_send.py` + `cron_send.py` |
+| **Cable Daily Report (17:30 Myanmar)** | `daily_reports.yml` (`cable_report`) | `0 11 * * *` UTC = 17:30 Myanmar | `cable_report.py` |
+| **Daily Plan Report** | `daily_reports.yml` (`plan_report`) | workflow_dispatch | `daily_plan_report.py` |
 | **Botlookup TNI Relay** | `botlookup_relay.yml` | `0,30 22,23 * * *` + `0,30 0-14 * * *` + `0 15 * * *` UTC = 04:30–21:30 Myanmar mỗi 30p | `botlookup_relay.py` |
 | ~~TNI Search Bot 24/7~~ | `tni_search_bot.yml` | **⚠️ ĐÃ TẮT** — chuyển sang Vercel webhook (`api/search_bot.py`) | ~~`telegram_bot.py`~~ |
 | ~~Telegram Daily Send~~ | `telegram_send.yml` | **⚠️ ĐÃ TẮT** — cron cũ `30 17` UTC = 00:00 Myanmar (SAI) | ~~`cron_send.py`~~ |
