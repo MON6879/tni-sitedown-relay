@@ -920,7 +920,7 @@ async def main():
                 tech_messages.append((name, content))
             continue
 
-    # ── 7a. Gộp tin nhắn 4 Team → Báo cáo Consolidated gửi vào Control ──
+    # ── 7a. Gộp tin nhắn 4 Team → Báo cáo Consolidated gửi vào Control & Gửi riêng từng Team ──
     if SEND_BOT_TOKEN:
         t_names = {
             "MYT_TNI_TEAM01_Dawei": "Team 1 Dawei",
@@ -955,6 +955,7 @@ async def main():
             tl_list = [(p, n, c) for p, n, c, is_tl in members if is_tl]
             ft_list = [(p, n, c) for p, n, c, is_tl in members if not is_tl]
 
+            # ── 1. Tạo dữ liệu cho báo cáo gộp gửi CONTROL ──
             team_lines = [
                 f"━━━━━━━━━━━━━━━━━━━━",
                 f"🏷️ *{t_name}*",
@@ -978,6 +979,52 @@ async def main():
                         emp_idx += 1
             
             consolidated_parts.append("\n".join(team_lines))
+
+            # ── 2. Tạo báo cáo chi tiết gửi riêng vào từng nhóm Team ──
+            team_lines_indiv = [
+                f"📋 4. Report — Daily EOD Task & Stats — {t_name}",
+                f"📅 {now_str}",
+                f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
+                "━━━━━━━━━━━━━━━━━━━━"
+            ]
+            for prefix, name, content in tl_list:
+                parsed_tl = parse_tl(content)
+                if parsed_tl:
+                    team_lines_indiv.append(parsed_tl)
+
+            seen_emps_indiv = set()
+            emp_idx_indiv = 0
+            for prefix, name, content in ft_list:
+                parsed_emp_str = parse_emp(content)
+                if parsed_emp_str:
+                    emp_id = parsed_emp_str.split(" = ")[0].strip()
+                    if emp_id not in seen_emps_indiv:
+                        seen_emps_indiv.add(emp_id)
+                        color_emoji = CIRCLES[emp_idx_indiv % len(CIRCLES)]
+                        team_lines_indiv.append(f"{color_emoji} {parsed_emp_str}")
+                        emp_idx_indiv += 1
+
+            # Thêm thống kê Asset và Search riêng cho từng Team
+            team_asset = build_team_asset_section(team_key, asset_data)
+            team_search = build_team_search_section(team_key, report_data)
+            no_search = build_no_search_list(team_key, report_data)
+
+            if team_asset or team_search or no_search:
+                team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
+            if team_asset:
+                team_lines_indiv.append(team_asset)
+            if team_search:
+                team_lines_indiv.append(team_search)
+            if no_search:
+                team_lines_indiv.append(no_search)
+
+            team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
+            team_lines_indiv.append(f"👥 Total: {len(members)} members")
+
+            team_msg = "\n".join(team_lines_indiv)
+            groups.setdefault(SEND_BOT_TOKEN, []).append(
+                (0, team_msg, str(gid), "TEAM_GROUP")
+            )
 
         grp_msg = "\n".join(consolidated_parts)
         groups.setdefault(SEND_BOT_TOKEN, []).append(
