@@ -583,12 +583,18 @@ def parse_tl_metrics(text: str) -> dict:
     task_assign = _num(r'All Assign:\s*/?([\d]+)')
     task_close  = _num(r'All task Close:\s*/?([\d]+)')
 
-    # Close color
-    try:
-        pct = float(close_pct)
-        color = "🟢" if pct >= 50 else ("🟡" if pct >= 30 else "🔴")
-    except Exception:
-        color = "⚫"
+    # Màu: dùng LostTARGET flag từ sheet (sheet đã tính theo tuần)
+    if "/LostTARGET" in text:
+        color = "🔴"   # Sheet xác nhận lost target
+    elif "/HitTARGET" in text:
+        color = "🟢"   # Hit target
+    else:
+        # Fallback theo % nếu flag không có trong text
+        try:
+            color = "🟢" if float(close_pct) >= 50 else "🟡"
+        except Exception:
+            color = "⚫"
+
 
     return {
         "team_num":   team_num,
