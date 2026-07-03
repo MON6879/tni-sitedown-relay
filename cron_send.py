@@ -1114,7 +1114,9 @@ async def main():
 
             target_gid = get_target_group(team_val)
             if target_gid:
-                name = col_b or col_c or f"NV row{sheet_row}"
+                # Dùng col_c (username Telegram — unique mỗi người) làm key
+                # col_b (tên thật) có thể trùng (ví dụ: nhiều người tên Win Htet Aung)
+                name = col_c or col_b or f"NV row{sheet_row}"
                 team_messages.setdefault(target_gid, []).append(
                     ("👑" if is_tl else "👤", name, content, is_tl)
                 )
@@ -1184,11 +1186,12 @@ async def main():
                     team_lines_indiv.append(f"🟧 {content}")
 
             # NV: parse_emp_metrics → compact 1 dòng với 🔺 prefix
-            seen_emps_indiv = set()
+            # Dedup theo username (col_c) — unique mỗi người
+            seen_emps_indiv = set()   # set of username
             emp_rows = []
             for prefix, name, content in ft_list:
                 if content and name not in seen_emps_indiv:
-                    seen_emps_indiv.add(name)
+                    seen_emps_indiv.add(name)   # name = col_c (username)
                     m = parse_emp_metrics(content)
                     if m:
                         emp_rows.append(m)
@@ -1244,11 +1247,11 @@ async def main():
                 if content:
                     full_lines.append(f"🟧 {content}")
                     full_lines.append("─" * 18)
-            # NV full col D
+            # NV full col D — dedup theo username
             seen_full = set()
             for prefix, name, content in ft_list:
                 if content and name not in seen_full:
-                    seen_full.add(name)
+                    seen_full.add(name)   # name = col_c (username)
                     full_lines.append(content)
                     full_lines.append("─" * 18)
             full_lines.append("━" * 22)
