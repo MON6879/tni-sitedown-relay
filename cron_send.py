@@ -664,6 +664,77 @@ def parse_tl(text):
     return text.strip() if text else ""
 
 
+def parse_emp_metrics(text: str) -> dict:
+    """
+    Trích các chỉ số chính từ cột D của NV.
+    Format compact gửi vào Team group: một dòng/NV với 🔺 prefix.
+
+    Input: '--myt_aunglwin.phyo = Site:  /15 : TNI... <> Day /13...'
+    Output dict: name_short, rank, site, wo_month, wo_7day, three_day,
+                 wo_remain, overdue, task_assign, task_close, color
+    """
+    if not text:
+        return {}
+
+    def _num(pattern, default="?"):
+        m = re.search(pattern, text, re.IGNORECASE)
+        return m.group(1).strip() if m else default
+
+    # Tên NV (trước "= Site:")
+    m_name = re.search(r'^(\*?[^\n=]+?)\s*=\s*Site:', text.strip())
+    raw_name = m_name.group(1).strip() if m_name else "?"
+
+    # Rút gọn tên: "Real Name-myt_username" → "Real Name"
+    n = raw_name.lstrip("*-").strip()
+    m_real = re.match(r'^(.+?)-myt_', n, re.IGNORECASE)
+    if m_real:
+        name_short = m_real.group(1).strip()
+    elif n.lower().startswith("myt_"):
+        name_short = n[4:]
+    else:
+        name_short = n
+
+    site      = _num(r'Site:\s*/?([\d]+)')
+    rank      = _num(r'\brank:\s*/?([\d]+)')          # NV: lowercase 'rank'
+    close_pct = _num(r'=?Close:\s*/?([\d.]+)%')       # NV: '=Close:'
+    wo_month  = _num(r'=\s*/?([\d]+)\s*WO Close')     # giống TL
+    wo_7day   = _num(r'7day:\s*/?([\d]+)\s*Close')
+    wo_remain = _num(r'/?([\d]+)\s*WO Remain')
+    overdue   = _num(r'/NOT\s*/Close:\s*/?([\d]+)')
+    task_assign = _num(r'Task assign:\s*/?([\d]+)')    # NV: 'Task assign'
+    task_close  = _num(r'Task Close Month:\s*/?([\d]+)')
+
+    # 3Day WO (lấn xuất hiện đầu tiên = WO, không phải Task)
+    m_3d = re.search(r'3Day:\s*(\d+)\s*/?(\d+)\s*/?(\d+)', text, re.IGNORECASE)
+    three_day = f"{m_3d.group(1)}/{m_3d.group(2)}/{m_3d.group(3)}" if m_3d else "?/?/?"
+
+    # Màu tam giác: dùng LostTARGET flag từ sheet
+    if "/LostTARGET" in text:
+        color = "🔺"  # tam giác đỏ — Lost Target
+    elif "/HitTARGET" in text:
+        color = "🔹"  # hình thỏ xành — Hit Target
+    else:
+        try:
+            color = "🔹" if float(close_pct) >= 50 else "🔺"
+        except Exception:
+            color = "🔸"  # fallback
+
+    return {
+        "name_short":   name_short,
+        "site":         site,
+        "rank":         rank,
+        "close_pct":    close_pct,
+        "color":        color,
+        "wo_month":     wo_month,
+        "wo_7day":      wo_7day,
+        "three_day":    three_day,
+        "wo_remain":    wo_remain,
+        "overdue":      overdue,
+        "task_assign":  task_assign,
+        "task_close":   task_close,
+    }
+
+
 def parse_emp(text):
     """
     Trích xuất format ngắn cho báo cáo Control.
@@ -1107,11 +1178,31 @@ async def main():
                 if content:
                     team_lines_indiv.append(f"🟧 {content}")
 
+            # NV: parse_emp_metrics → compact 1 dòng với 🔺 prefix
             seen_emps_indiv = set()
+            emp_rows = []
             for prefix, name, content in ft_list:
                 if content and name not in seen_emps_indiv:
                     seen_emps_indiv.add(name)
-                    team_lines_indiv.append(content)  # NV: trơn, không emoji
+                    m = parse_emp_metrics(content)
+                    if m:
+                        emp_rows.append(m)
+
+            if emp_rows:
+                team_lines_indiv.append("─" * 20)
+                team_lines_indiv.append("👷 FT Staff Summary:")
+                # Header gợi nhớ
+                team_lines_indiv.append("Name | Rk | Site | Mo | 7D | 3Day | OVD | Task")
+                team_lines_indiv.append("─" * 38)
+                for em in emp_rows:
+                    team_lines_indiv.append(
+                        f"{em['color']} {em['name_short']}: "
+                        f"Rk/{em['rank']} Site/{em['site']} "
+                        f"Mo/{em['wo_month']} 7D/{em['wo_7day']} "
+                        f"3D:{em['three_day']} "
+                        f"OVD/{em['overdue']} "
+                        f"Task:{em['task_assign']}/{em['task_close']}"
+                    )
 
             # Thêm thống kê Asset và Search riêng cho từng Team
             team_asset = build_team_asset_section(team_key, asset_data)
