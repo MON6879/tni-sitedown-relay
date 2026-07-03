@@ -23,7 +23,8 @@
 | File | Thay đổi | Lý do |
 |---|---|---|
 | `cron_send.py` | Điều kiện lọc row 4-59: bắt buộc **cột A có tên team VÀ cột D có nội dung** | Team Leader không có cột A vẫn lọt qua filter |
-| `cron_send.py` | **Viết lại `parse_emp`**: trích `Site: /N <> Day:...3Day Close: X/X/X` — bỏ danh sách TNI dài và dep stats cuối. Regex cũ tìm `*value*` không match format `/value` → ra toàn `0` | Control report hiện `Site: *0* WO: <=> rank: *0*` |
+| `cron_send.py` | **Viết lại `parse_emp`**: trích `Site: /N <> Day:...3Day Close: X/X/X` — bỏ danh sách TNI dài và dep stats cuối | Control hiện `Site: *0* <=> rank: *0*` |
+| `cron_send.py` | **Style emoji**: TL=🟧 (cố định), NV=trơn (không emoji), Tech Dept=vuông màu mỗi dept | Dễ đọc hơn, bỏ xanh/xanh lá luân phiên |
 | `.github/workflows/daily_reports.yml` | Thêm cron tự động `30 10 * * *` UTC = **17:00 Myanmar** cho `daily_task`; tách riêng cable_report giữ `0 11` UTC | daily_task trước chỉ chạy tay |
 | `SYSTEM_DOC.md` | Cập nhật giờ `cron_send.py`: 17:30 → 17:00 Myanmar, UTC 11:00 → 10:30 | Đồng bộ với workflow |
 
