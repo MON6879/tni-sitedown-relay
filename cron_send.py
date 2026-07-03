@@ -1004,23 +1004,20 @@ async def main():
                 f"━━━━━━━━━━━━━━━━━━━━",
                 f"🏷️ *{t_name}*",
             ]
+            # TL: 🟧 (cam) — phân biệt Admin/Leader
             for prefix, name, content in tl_list:
                 parsed_tl = parse_tl(content)
                 if parsed_tl:
-                    team_lines.append(parsed_tl)
+                    team_lines.append(f"🟧 {parsed_tl}")
 
             seen_emps = set()
-            CIRCLES = ["🔵", "🟢"]
-            emp_idx = 0
             for prefix, name, content in ft_list:
                 parsed_emp_str = parse_emp(content)
                 if parsed_emp_str:
                     emp_id = parsed_emp_str.split(" = ")[0].strip()
                     if emp_id not in seen_emps:
                         seen_emps.add(emp_id)
-                        color_emoji = CIRCLES[emp_idx % len(CIRCLES)]
-                        team_lines.append(f"{color_emoji} {parsed_emp_str}")
-                        emp_idx += 1
+                        team_lines.append(f"▪️ {parsed_emp_str}")
             
             consolidated_parts.append("\n".join(team_lines))
 
@@ -1031,18 +1028,16 @@ async def main():
                 f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
                 "━━━━━━━━━━━━━━━━━━━━"
             ]
+            # TL: 🟧 trước, nổi bật phía trên cùng
             for prefix, name, content in tl_list:
                 if content:
-                    team_lines_indiv.append(f"👤 {content}")
+                    team_lines_indiv.append(f"🟧 {content}")
 
             seen_emps_indiv = set()
-            emp_idx_indiv = 0
             for prefix, name, content in ft_list:
                 if content and name not in seen_emps_indiv:
                     seen_emps_indiv.add(name)
-                    color_emoji = CIRCLES[emp_idx_indiv % len(CIRCLES)]
-                    team_lines_indiv.append(f"{color_emoji} {content}")
-                    emp_idx_indiv += 1
+                    team_lines_indiv.append(f"▪️ {content}")
 
             # Thêm thống kê Asset và Search riêng cho từng Team
             team_asset = build_team_asset_section(team_key, asset_data)
