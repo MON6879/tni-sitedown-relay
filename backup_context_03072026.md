@@ -50,7 +50,32 @@ if 4 <= sheet_row <= 59:
 
 ---
 
-### Commits hôm nay
+### 4. `cron_send.py` — Viết lại `parse_emp` (Control report format)
+**Vấn đề:** Hàm `parse_emp` cũ dùng regex `Site: *value*` / `rank: *value*` nhưng data thực tế dùng format `/value` (không có dấu `*`) → tất cả match thất bại → ra `Site: *0* WO: <=> rank: *0* =Close: *0%*`.
+
+**Fix:** Regex mới:
+```python
+# Lấy tên (trước "= Site:")
+m_name = re.search(r'^(\*?[^=\n]+?)\s*=\s*Site:', text)
+# Lấy số site
+m_site = re.search(r'Site:\s*(/?\d+)', text)
+# Lấy body từ "<>" đến "3Day Close: X/X/X" — bỏ TNI list và dep stats
+m_body = re.search(r'(<>.*?3Day Close:\s*\d+/\d+/\d+)', text, re.DOTALL)
+```
+
+**Output đúng (Control):**
+```
+--myt_aunglwin.phyo = Site: /15 <> Day: 12 of the month= /1 WO Close/ 7day: /1
+Close => 3Day: 0 /0 /0 =>/23 WO Remain <=> rank: /23 =Close: /4% /TARGET50%
+/LostTARGET=> /WO /Overdue /FOT /NOT /Close: /17 < + > Task assign: /6
+=> Task Close Month: /0 => 3Day Close: 0/0/0
+```
+
+---
+
+### Commits hôm nay (đầy đủ)
 1. `521cd66` — fix: strict col A+D filter; auto cron daily_task 17:00 Myanmar
 2. `c5f5e48` — docs: add mandatory backup+freeze rules and changelog to system_map
 3. `b272be6` — fix: restore col C team routing for TL rows 33-59
+4. `fa4af9b` — docs: update changelog TL routing fix + backup context 03/07/2026
+5. `69d6fac` — fix: rewrite parse_emp to extract /value format for Control report
