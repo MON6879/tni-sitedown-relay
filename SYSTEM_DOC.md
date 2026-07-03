@@ -10,7 +10,7 @@
 ```
 Google Sheets (Data Source)
     ↓ CSV export / Apps Script API
-cron_send.py (17:30 Myanmar)          ← GitHub Actions: daily_task.yml
+cron_send.py (17:00 Myanmar)          ← GitHub Actions: daily_reports.yml (daily_task)
     ↓ Bot API (SEND_BOT_TOKEN)
 Telegram Groups (T1, T2, T3, T4, CONTROL)
 
@@ -23,9 +23,9 @@ Telegram Groups (per-team + consolidated to CONTROL)
 
 ## 📁 Core Files
 
-### 1. `cron_send.py` — Daily Task Report (17:30 Myanmar)
+### 1. `cron_send.py` — Daily Task Report (17:00 Myanmar)
 - **Trigger:** GitHub Actions `daily_task.yml` (workflow_dispatch from GAS relay)
-- **Schedule:** 17:30 Myanmar = 11:00 UTC
+- **Schedule:** 17:00 Myanmar = 10:30 UTC
 - **Bot:** `@TNIREPORTTASK_BOT` (SEND_BOT_TOKEN)
 - **What it sends:**
 
@@ -215,7 +215,7 @@ Missing: TNI0052, TNI0185, TNI0058
 |---|---|---|---|
 | **17:00** | `daily_bod_assign.py` | `daily_reports.yml` (`bod_assign`) | Report 2: BOD-assigned task statistics (Consolidated) to CONTROL |
 | **17:10** | `backlog_send.py` | `daily_reports.yml` (`daily_task`) | Report 1, 2, 3: Daily Backlog reports to team groups |
-| **17:30** | `cron_send.py` | `daily_reports.yml` (`daily_task`) | Report 4: Daily EOD Task + Asset + Search reports to all groups |
+| **17:00** | `cron_send.py` | `daily_reports.yml` (`daily_task`) | Report 4: Daily EOD Task + Asset + Search reports to all groups |
 | **20:00** | `daily_plan_report.py` | `daily_reports.yml` (`plan_report`) | Report 5: Daily Plan collection + Comparison report |
 | **20:30** | `daily_read_report.py` | `daily_reports.yml` (`read_report`) | Report 6: Note read status per-person (Cutoff at 20:25) to teams + CONTROL |
 

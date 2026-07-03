@@ -910,22 +910,23 @@ async def main():
         return None
 
     for sheet_row, content, cid, col_c, col_a_val, col_b in all_rows:
-        # ── Kiểm tra Cột A: rows 4-59 phải có Team, nếu trống thì bỏ qua ──
-        if sheet_row <= 59 and not col_a_val and not (col_c and "team leader" in col_c.lower()):
-            logger.debug(f"  Skip row{sheet_row}: Cột A trống (không có team)")
-            continue
+        # ── 2 điều kiện bắt buộc (rows 4-59): Cột A có tên team VÀ Cột D có nội dung ──
+        if 4 <= sheet_row <= 59:
+            if not col_a_val:
+                logger.debug(f"  Skip row{sheet_row}: Cột A trống (không có tên team)")
+                continue
+            if not content:
+                logger.debug(f"  Skip row{sheet_row}: Cột D trống (không có nội dung)")
+                continue
 
         # ── Rows 4-59: Gom FT + TL vào Group Team ──
         if 4 <= sheet_row <= 59:
+            # Cột A xác định team (bắt buộc); col_c dùng để nhận dạng TL
             team_val = col_a_val
-            if 33 <= sheet_row <= 59 and col_c and "team leader" in col_c.lower():
-                m_tl = re.search(r'team\s*leader\s*(\d+)', col_c, re.IGNORECASE)
-                tl_num = int(m_tl.group(1)) if m_tl else 0
-                team_val = TEAM_BY_NUMBER.get(tl_num, col_a_val)
 
             target_gid = get_target_group(team_val)
-            if target_gid and content:
-                is_tl = 33 <= sheet_row <= 59
+            if target_gid:
+                is_tl = 33 <= sheet_row <= 59 and bool(col_c and "team leader" in col_c.lower())
                 name = col_b or col_c or f"NV row{sheet_row}"
                 team_messages.setdefault(target_gid, []).append(
                     ("👑" if is_tl else "👤", name, content, is_tl)

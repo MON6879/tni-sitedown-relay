@@ -2,7 +2,8 @@ name: Unified Daily Reports
 
 on:
   schedule:
-    - cron: '0 11 * * *'  # 17:30 Myanmar / 11:00 UTC (Runs Cable Daily Report)
+    - cron: '30 10 * * *'  # 17:00 Myanmar / 10:30 UTC → daily_task (cron_send.py)
+    - cron: '0 11 * * *'   # 17:30 Myanmar / 11:00 UTC → cable_report
   workflow_dispatch:
     inputs:
       report_type:
@@ -43,7 +44,9 @@ jobs:
         run: python daily_bod_assign.py
 
       - name: Reports 1, 2, 3, 4 — Daily Backlog & Task Reminders
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'daily_task'
+        if: |
+          (github.event_name == 'schedule' && github.event.schedule == '30 10 * * *') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'daily_task')
         env:
           SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
           REPORT_TASK_BOT_TOKEN: ${{ secrets.REPORT_TASK_BOT_TOKEN }}
@@ -93,7 +96,9 @@ jobs:
         run: python botlookup_relay.py
 
       - name: Task — Cable Daily Report (Cron or Manual)
-        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'cable_report')
+        if: |
+          (github.event_name == 'schedule' && github.event.schedule == '0 11 * * *') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'cable_report')
         env:
           COLLECTOR_BOT_TOKEN: ${{ secrets.COLLECTOR_BOT_TOKEN }}
           CABLE_APPS_SCRIPT_URL: ${{ secrets.CABLE_APPS_SCRIPT_URL }}
