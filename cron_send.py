@@ -551,25 +551,111 @@ def build_asset_progress_summary(content: str) -> str:
             i += 1
 
     return "\n".join(result)
-def parse_tl(text):
+def parse_tl_metrics(text: str) -> dict:
+    """
+    Trích các chỉ số chính từ cột D của Team Leader để build bảng so sánh.
+    Input: "Team leader 1 Rank: /4 => Close: /10.8% ..."
+    """
     if not text:
+        return {}
+
+    def _num(pattern, default="?"):
+        m = re.search(pattern, text, re.IGNORECASE)
+        return m.group(1).strip() if m else default
+
+    # Team number
+    m_tl = re.search(r'Team\s*leader\s*(\d+)', text, re.IGNORECASE)
+    team_num = m_tl.group(1) if m_tl else "?"
+
+    rank       = _num(r'Rank:\s*/?([\d]+)')
+    close_pct  = _num(r'Close:\s*/?([\d.]+)%')
+    hit_target = "/LostTARGET" not in text
+
+    wo_month   = _num(r'=\s*/?([\d]+)\s*WO Close')
+    wo_7day    = _num(r'7day:\s*/?([\d]+)\s*Close')
+    # 3Day: d2 /d1 /d0
+    m_3d = re.search(r'3Day:\s*(\d+)\s*/?(\d+)\s*/?(\d+)', text)
+    three_day  = f"{m_3d.group(1)}/{m_3d.group(2)}/{m_3d.group(3)}" if m_3d else "?/?/?"
+
+    wo_remain  = _num(r'/?([\d]+)\s*WO Remain')
+    overdue    = _num(r'/NOT\s*/Close:\s*/?([\d]+)')
+
+    task_assign = _num(r'All Assign:\s*/?([\d]+)')
+    task_close  = _num(r'All task Close:\s*/?([\d]+)')
+
+    # Close color
+    try:
+        pct = float(close_pct)
+        color = "🟢" if pct >= 50 else ("🟡" if pct >= 30 else "🔴")
+    except Exception:
+        color = "⚫"
+
+    return {
+        "team_num":   team_num,
+        "rank":       rank,
+        "close_pct":  close_pct,
+        "color":      color,
+        "hit_target": hit_target,
+        "wo_month":   wo_month,
+        "wo_7day":    wo_7day,
+        "three_day":  three_day,
+        "wo_remain":  wo_remain,
+        "overdue":    overdue,
+        "task_assign": task_assign,
+        "task_close":  task_close,
+        "full_text":   text.strip(),
+    }
+
+
+def build_tl_comparison(metrics_list: list, now_str: str) -> str:
+    """
+    Tạo bảng so sánh TL từ danh sách metrics. Gửi vào CONTROL.
+    Thứ tự: bảng tóm tắt đầu, sau đó chi tiết đầy đủ cột D từng TL.
+    """
+    if not metrics_list:
         return ""
-    text = text.strip()
-    m_prefix = re.search(r'\*?(Team leader \d+)', text)
-    if not m_prefix:
-        return text
-    prefix = m_prefix.group(1)
-    
-    m_body = re.search(r'Day:.*?(?=\s*=>\s*Manager\s*:)', text)
-    if not m_body:
-        m_body = re.search(r'Day:.*', text)
-    
-    if m_body:
-        body = m_body.group(0).strip()
-        if body.endswith('*'):
-            body = body[:-1].strip()
-        return f"{prefix}: {body}"
-    return text
+
+    lines = [
+        f"📋 4. Report — TL Comparison — {now_str}",
+        f"📌 Target: 50% WO Close",
+        "━" * 22,
+        # Header bảng
+        f"{'T':<3} {'Rk':<4} {'Close%':<9} {'Mo':>4} {'7D':>4} {'3Day':>7} {'Rem':>5} {'OVD':>5} {'Task A/C':>9}",
+        "─" * 52,
+    ]
+
+    for m in metrics_list:
+        tgt = "✅" if m["hit_target"] else "🛑"
+        lines.append(
+            f"{m['color']}T{m['team_num']:<2} "
+            f"#{m['rank']:<3} "
+            f"{m['close_pct']:>5}%{tgt} "
+            f"{m['wo_month']:>4} "
+            f"{m['wo_7day']:>4} "
+            f"{m['three_day']:>7} "
+            f"{m['wo_remain']:>5} "
+            f"{m['overdue']:>5} "
+            f"{m['task_assign']:>4}/{m['task_close']:<4}"
+        )
+
+    lines.append("─" * 52)
+    lines.append("🟢 >=50%Hit 🟡 >=30% 🔴 <30%Lost")
+    lines.append("━" * 22)
+
+    # Chi tiết đầy đủ cột D từng TL
+    lines.append("📝 Full Detail per TL:")
+    for m in metrics_list:
+        lines.append("─" * 22)
+        lines.append(f"🟧 Team leader {m['team_num']}:")
+        lines.append(m["full_text"])
+
+    lines.append("━" * 22)
+    return "\n".join(lines)
+
+
+def parse_tl(text):
+    """Legacy — giữ lại cho Team group report. Trả về full text của TL."""
+    return text.strip() if text else ""
 
 
 def parse_emp(text):
@@ -973,11 +1059,8 @@ async def main():
             "MYT_TNI_TEAM04_Kawthoung": "Team 4 Kawthoung",
         }
         
-        consolidated_parts = [
-            f"📋 4. Report — Daily EOD Task & Stats — Consolidated",
-            f"📅 {now_str}",
-            f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
-        ]
+        # Dict thu thập metrics từng TL theo thứ tự Team 1-4
+        all_tl_metrics = []   # list[dict] — có thể nhiều TL cùng team (Team 5 ⇒ Team 2)
 
         # Sắp xếp theo thứ tự Team 1 -> Team 4
         ordered_teams = [
@@ -999,27 +1082,12 @@ async def main():
             tl_list = [(p, n, c) for p, n, c, is_tl in members if is_tl]
             ft_list = [(p, n, c) for p, n, c, is_tl in members if not is_tl]
 
-            # ── 1. Tạo dữ liệu cho báo cáo gộp gửi CONTROL ──
-            team_lines = [
-                f"━━━━━━━━━━━━━━━━━━━━",
-                f"🏷️ *{t_name}*",
-            ]
-            # TL: 🟧 (cam) — phân biệt Admin/Leader
+            # Control: chỉ TL, thu thập metrics + full col D
             for prefix, name, content in tl_list:
-                parsed_tl = parse_tl(content)
-                if parsed_tl:
-                    team_lines.append(f"🟧 {parsed_tl}")
-
-            seen_emps = set()
-            for prefix, name, content in ft_list:
-                parsed_emp_str = parse_emp(content)
-                if parsed_emp_str:
-                    emp_id = parsed_emp_str.split(" = ")[0].strip()
-                    if emp_id not in seen_emps:
-                        seen_emps.add(emp_id)
-                        team_lines.append(f"▪️ {parsed_emp_str}")
-            
-            consolidated_parts.append("\n".join(team_lines))
+                if content:
+                    m = parse_tl_metrics(content)
+                    if m:
+                        all_tl_metrics.append(m)
 
             # ── 2. Tạo báo cáo chi tiết gửi riêng vào từng nhóm Team (giữ nguyên cột D đầy đủ) ──
             team_lines_indiv = [
@@ -1063,10 +1131,12 @@ async def main():
                 (0, team_msg, str(gid), "TEAM_GROUP")
             )
 
-        grp_msg = "\n".join(consolidated_parts)
-        groups.setdefault(SEND_BOT_TOKEN, []).append(
-            (0, grp_msg, CONTROL_CHAT_ID, "CONSOLIDATED_EOD")
-        )
+        # Build và gửi bảng so sánh TL vào CONTROL
+        grp_msg = build_tl_comparison(all_tl_metrics, now_str)
+        if grp_msg:
+            groups.setdefault(SEND_BOT_TOKEN, []).append(
+                (0, grp_msg, CONTROL_CHAT_ID, "CONSOLIDATED_EOD")
+            )
 
     # ── 7b. Gộp Tech Dept → Group CONTROL SITE ──
     if (tech_messages or input_task_summary) and SEND_BOT_TOKEN:
