@@ -178,23 +178,26 @@ def get_no_id_members(bot_token: str = "") -> dict:
         return {}
 
     # Mapping col N → team_key (và group chat_id để check membership)
+    # Map col M values: 'Team 01' -> team_key (Team 05 gộp vào Team 2)
     TEAM_N_MAP = {
-        "01": ("MYT_TNI_TEAM01_Dawei",     -5180992881),
-        "02": ("MYT_TNI_TEAM02_Myeik",     -5188855349),
-        "03": ("MYT_TNI_TEAM03_Bokpyin",   -5183480727),
-        "04": ("MYT_TNI_TEAM04_Kawthoung", -5238696719),
-        "05": ("MYT_TNI_TEAM02_Myeik",     -5188855349),  # Team 5 ⇒ Team 2
+        "Team 01": ("MYT_TNI_TEAM01_Dawei",     -5180992881),
+        "Team 02": ("MYT_TNI_TEAM02_Myeik",     -5188855349),
+        "Team 03": ("MYT_TNI_TEAM03_Bokpyin",   -5183480727),
+        "Team 04": ("MYT_TNI_TEAM04_Kawthoung", -5238696719),
+        "Team 05": ("MYT_TNI_TEAM02_Myeik",     -5188855349),  # Team 5 ⇒ Team 2
     }
 
     # Collect: no_id và candidates cần check
     no_id_map:   dict = {}   # team_key -> [name]
     check_list:  list = []   # [(name, user_id_int, team_key, group_chat_id)]
 
-    for _, row in df.iterrows():
+    for idx_r, row in df.iterrows():
+        if idx_r == 0:
+            continue  # bỏ qua header row
         try:
             col_a = str(row.iloc[0]).strip()  if not pd.isna(row.iloc[0])  else ""
             col_f = str(row.iloc[5]).strip()  if not pd.isna(row.iloc[5])  else ""
-            col_n = str(row.iloc[13]).strip() if not pd.isna(row.iloc[13]) else ""
+            col_n = str(row.iloc[12]).strip() if not pd.isna(row.iloc[12]) else ""
         except (IndexError, Exception):
             continue
 
@@ -203,13 +206,11 @@ def get_no_id_members(bot_token: str = "") -> dict:
         if not col_f or col_f.lower() in ("nan", ""):
             continue
 
-        # Xác định team từ col_n
+        # Xác định team từ col_n — exact match với 'Team 01'...'Team 05'
         team_key = None; group_cid = None
-        col_n_up = col_n.upper()
-        for suffix, (tk, gcid) in TEAM_N_MAP.items():
-            if f"TEAM {suffix}" in col_n_up or f"TEAM{suffix}" in col_n_up or col_n_up.endswith(suffix):
-                team_key = tk; group_cid = gcid
-                break
+        col_n_strip = col_n.strip()
+        if col_n_strip in TEAM_N_MAP:
+            team_key, group_cid = TEAM_N_MAP[col_n_strip]
         if not team_key:
             continue
 
@@ -242,12 +243,19 @@ def get_no_id_members(bot_token: str = "") -> dict:
             except Exception:
                 pass  # bỏ qua nếu lỗi network
 
+    # Gom has_id theo team
+    has_id_map: dict = {}
+    for name, uid, tk, gcid in check_list:
+        has_id_map.setdefault(tk, []).append(name)
+
+    all_teams = set(list(no_id_map.keys()) + list(not_in_group_map.keys()) + list(has_id_map.keys()))
     return {
         tk: {
             "no_id":        no_id_map.get(tk, []),
             "not_in_group": not_in_group_map.get(tk, []),
+            "has_id":       has_id_map.get(tk, []),
         }
-        for tk in set(list(no_id_map.keys()) + list(not_in_group_map.keys()))
+        for tk in all_teams
     }
 
 
@@ -281,33 +289,51 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
 
     result_lines = []
 
-    # ══ PHẦN 1: Search Stats — NV có ID ══
+    # ══ PHẦN 1: Search Stats — NV có ID (tên từ Staff sheet col F) ══
     all_members = list(report_data.get("employees", [])) + list(report_data.get("leaders", []))
-    team_members = [e for e in all_members if e.get("team", "") == team_key]
+    # Build lookup: tên (lower) -> search stats
+    search_lookup: dict = {}
+    for e in all_members:
+        if e.get("team", "") == team_key:
+            nm = e.get("name", "").strip()
+            if nm:
+                search_lookup[nm.lower()] = e
 
-    if team_members:
-        seen: dict = {}
-        for e in team_members:
-            name = e.get("name", "?")
-            if name not in seen or e.get("search_today", 0) > seen[name].get("search_today", 0):
-                seen[name] = e
-        team_members = list(seen.values())
-        team_members.sort(key=lambda e: (1 if e.get("search_today", 0) > 0 else 0, e.get("name", "")))
+    # Lấy danh sách NV có ID từ Staff sheet (col F)
+    staff_has_id: list = []
+    if no_id_members:
+        team_info_temp = no_id_members.get(team_key, {})
+        staff_has_id = list(team_info_temp.get("has_id", []))
 
-        not_searched_count = sum(1 for e in team_members if e.get("search_today", 0) == 0)
+    # Fallback: nếu Staff sheet không trả has_id thì dùng report_data
+    if not staff_has_id:
+        team_members_fb = [e for e in all_members if e.get("team", "") == team_key]
+        seen_fb: dict = {}
+        for e in team_members_fb:
+            nm2 = e.get("name", "?")
+            if nm2 not in seen_fb or e.get("search_today", 0) > seen_fb[nm2].get("search_today", 0):
+                seen_fb[nm2] = e
+        staff_has_id = [e.get("name", "?") for e in seen_fb.values()]
+
+    if staff_has_id:
+        not_searched_count = 0
+        search_lines = []
+        for name in sorted(set(staff_has_id)):
+            e_data = search_lookup.get(name.lower(), {})
+            d0 = e_data.get("search_today", 0)
+            d1 = e_data.get("search_d1", 0)
+            d2 = e_data.get("search_d2", 0)
+            w  = e_data.get("search_week", 0)
+            m  = e_data.get("search_month", 0)
+            icon = "✅" if d0 > 0 else "❌"
+            if d0 == 0:
+                not_searched_count += 1
+            search_lines.append(f"  {icon} {name}: 3Day:{d2}/{d1}/{d0} 7Day:{w} Month:{m}")
+
         result_lines.append(
             f"🔍 Part 1 — Search Stats ({not_searched_count} not searched today):"
         )
-        for e in team_members:
-            name = e.get("name", "?")
-            d0 = e.get("search_today", 0)
-            d1 = e.get("search_d1", 0)
-            d2 = e.get("search_d2", 0)
-            w  = e.get("search_week", 0)
-            m  = e.get("search_month", 0)
-            icon = "✅" if d0 > 0 else "❌"
-            result_lines.append(f"  {icon} {name}: 3Day:{d2}/{d1}/{d0} 7Day:{w} Month:{m}")
-
+        result_lines.extend(search_lines)
     # ══ PHẦN 2 & 3: từ Staff sheet ══
     if no_id_members:
         team_info = no_id_members.get(team_key, {})
