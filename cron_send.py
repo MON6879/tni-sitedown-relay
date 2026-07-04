@@ -264,7 +264,7 @@ def get_no_id_members(bot_token: str = "") -> dict:
     }
 
 
-def build_team_search_section(team_key: str, report_data: dict) -> str:
+def build_team_search_section(team_key: str, report_data: dict, now_str: str = "") -> str:
     """Build search stats section for a specific team."""
     team_summary = report_data.get("teamSummary", [])
     if not team_summary or not team_key:
@@ -273,11 +273,15 @@ def build_team_search_section(team_key: str, report_data: dict) -> str:
     cycle_str = get_current_cycle_str()
     for ts in team_summary:
         if ts.get("team", "") == team_key:
-
+            d2 = ts.get('d2', 0)
+            d1 = ts.get('d1', 0)
+            d0 = ts.get('today', 0)
+            w  = ts.get('week', 0)
+            m  = ts.get('month', 0)
             return (
-                f"🔍 Search: "
-                f"3Day:{ts.get('d2',0)}/{ts.get('d1',0)}/{ts.get('today',0)} "
-                f"7Day:{ts.get('week',0)} Month:{ts.get('month',0)} ({cycle_str})"
+                f"🔍 Search TNIxxxx click here @SEARCHTNITASKWOBOT "
+                f"and Start if New FT write /myid : {now_str}\n"
+                f"   Total: 3Day:{d2}/{d1}/{d0} 7Day:{w} Month:{m} ({cycle_str})"
             )
     return ""
 
@@ -1367,7 +1371,8 @@ async def main():
 
             # Thêm thống kê Asset và Search riêng cho từng Team
             team_asset = build_team_asset_section(team_key, asset_data)
-            team_search = build_team_search_section(team_key, report_data)
+            team_search = build_team_search_section(team_key, report_data, now_str)
+
             no_search = build_no_search_list(team_key, report_data, no_id_members)
 
 
