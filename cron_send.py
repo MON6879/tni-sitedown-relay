@@ -270,65 +270,68 @@ def build_team_search_section(team_key: str, report_data: dict) -> str:
 
 
 def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict | None = None) -> str:
-    """Per-person search stats for a team (rows 4-59) with 3Day/7Day/Month.
-    Appends '\u2753 Name: Not Have ID telegram' for NV chưa có ID Telegram."""
+    """
+    3 phần trong search section theo team:
+    1. Search Stats  — NV có ID: ai đã/chưa search TNIxxxx hôm nay
+    2. Not in Group  — NV có ID nhưng chưa join nhóm Telegram
+    3. No ID         — NV chưa có ID Telegram
+    """
     if not team_key:
         return ""
 
-    # Combine employees (FT) + leaders (TL) — covers rows 4-59
+    result_lines = []
+
+    # ══ PHẦN 1: Search Stats — NV có ID ══
     all_members = list(report_data.get("employees", [])) + list(report_data.get("leaders", []))
-    if not all_members:
-        return ""
-
     team_members = [e for e in all_members if e.get("team", "") == team_key]
-    if not team_members:
-        return ""
 
-    # Deduplicate by name (keep first occurrence with highest search count)
-    seen = {}
-    for e in team_members:
-        name = e.get("name", "?")
-        if name not in seen or e.get("search_today", 0) > seen[name].get("search_today", 0):
-            seen[name] = e
-    team_members = list(seen.values())
+    if team_members:
+        seen: dict = {}
+        for e in team_members:
+            name = e.get("name", "?")
+            if name not in seen or e.get("search_today", 0) > seen[name].get("search_today", 0):
+                seen[name] = e
+        team_members = list(seen.values())
+        team_members.sort(key=lambda e: (1 if e.get("search_today", 0) > 0 else 0, e.get("name", "")))
 
-    # Sort: not searched today first, then by name
-    team_members.sort(key=lambda e: (1 if e.get("search_today", 0) > 0 else 0, e.get("name", "")))
+        not_searched_count = sum(1 for e in team_members if e.get("search_today", 0) == 0)
+        result_lines.append(
+            f"🔍 Part 1 — Search Stats ({not_searched_count} not searched today):"
+        )
+        for e in team_members:
+            name = e.get("name", "?")
+            d0 = e.get("search_today", 0)
+            d1 = e.get("search_d1", 0)
+            d2 = e.get("search_d2", 0)
+            w  = e.get("search_week", 0)
+            m  = e.get("search_month", 0)
+            icon = "✅" if d0 > 0 else "❌"
+            result_lines.append(f"  {icon} {name}: 3Day:{d2}/{d1}/{d0} 7Day:{w} Month:{m}")
 
-    lines = []
-    not_searched_count = 0
-    for e in team_members:
-        name = e.get("name", "?")
-        d0 = e.get("search_today", 0)
-        d1 = e.get("search_d1", 0)
-        d2 = e.get("search_d2", 0)
-        w  = e.get("search_week", 0)
-        m  = e.get("search_month", 0)
-        icon = "✅" if d0 > 0 else "❌"
-        if d0 == 0:
-            not_searched_count += 1
-        lines.append(f"  {icon} {name}: 3Day:{d2}/{d1}/{d0} 7Day:{w} Month:{m}")
-
-    header = f"\U0001f50d Search per member ({not_searched_count} not searched today):"
-    result_lines = [header] + lines
-
-    # Thêm cảnh báo từ Staff sheet (theo team)
+    # ══ PHẦN 2 & 3: từ Staff sheet ══
     if no_id_members:
         team_info = no_id_members.get(team_key, {})
-        # NV chưa có ID Telegram
-        no_id_list = team_info.get("no_id", [])
-        if no_id_list:
-            result_lines.append("  \u2015 Chưa có ID Telegram:")
-            for nm in sorted(set(no_id_list)):
-                result_lines.append(f"  \u2753 {nm}: Not Have ID telegram")
-        # NV có ID nhưng chưa vào Group
-        not_in_group = team_info.get("not_in_group", [])
-        if not_in_group:
-            result_lines.append("  \u2015 Có ID nhưng chưa join Group:")
-            for nm in sorted(set(not_in_group)):
-                result_lines.append(f"  \u2753 {nm}: Not in Group")
 
-    return "\n".join(result_lines)
+        # Phần 2 — Có ID nhưng chưa join Group
+        not_in_group = sorted(set(team_info.get("not_in_group", [])))
+        if not_in_group:
+            result_lines.append(
+                f"👥 Part 2 — Not in Group ({len(not_in_group)} members):"
+            )
+            for nm in not_in_group:
+                result_lines.append(f"  ⚠️ {nm}: Not in Group")
+
+        # Phần 3 — Chưa có ID Telegram
+        no_id_list = sorted(set(team_info.get("no_id", [])))
+        if no_id_list:
+            result_lines.append(
+                f"🆔 Part 3 — No ID Telegram ({len(no_id_list)} members):"
+            )
+            for nm in no_id_list:
+                result_lines.append(f"  ❓ {nm}: Not Have ID telegram")
+
+    return "\n".join(result_lines) if result_lines else ""
+
 
 
 def build_asset_msg(now_str, asset_data):
