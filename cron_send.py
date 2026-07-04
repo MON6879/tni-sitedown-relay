@@ -195,22 +195,27 @@ def get_no_id_members(bot_token: str = "") -> dict:
         if idx_r == 0:
             continue  # bỏ qua header row
         try:
-            col_a = str(row.iloc[0]).strip()  if not pd.isna(row.iloc[0])  else ""
-            col_f = str(row.iloc[5]).strip()  if not pd.isna(row.iloc[5])  else ""
-            col_n = str(row.iloc[12]).strip() if not pd.isna(row.iloc[12]) else ""
+            col_a   = str(row.iloc[0]).strip()  if not pd.isna(row.iloc[0])  else ""
+            col_f   = str(row.iloc[5]).strip()  if not pd.isna(row.iloc[5])  else ""
+            col_m   = str(row.iloc[12]).strip() if not pd.isna(row.iloc[12]) else ""
+            col_n_s = str(row.iloc[13]).strip() if not pd.isna(row.iloc[13]) else ""
         except (IndexError, Exception):
             continue
 
-        if not col_n or col_n.lower() in ("nan", "", "resign"):
+        # Chỉ lấy NV khi col N (index 13) TRỐNG — nếu có Probation/Resign thì bỏ
+        if col_n_s and col_n_s.lower() not in ("nan", ""):
             continue
+        # col M phải có team info
+        if not col_m or col_m.lower() in ("nan", ""):
+            continue
+        # col F phải có tên
         if not col_f or col_f.lower() in ("nan", ""):
             continue
 
-        # Xác định team từ col_n — exact match với 'Team 01'...'Team 05'
+        # Xác định team từ col_m — exact match với 'Team 01'...'Team 05'
         team_key = None; group_cid = None
-        col_n_strip = col_n.strip()
-        if col_n_strip in TEAM_N_MAP:
-            team_key, group_cid = TEAM_N_MAP[col_n_strip]
+        if col_m in TEAM_N_MAP:
+            team_key, group_cid = TEAM_N_MAP[col_m]
         if not team_key:
             continue
 
