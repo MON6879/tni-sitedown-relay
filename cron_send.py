@@ -1197,7 +1197,7 @@ async def main():
                 team_lines_indiv.append("─" * 38)
                 for em in emp_rows:
                     team_lines_indiv.append(
-                        f"{em['color']} {em['name_short']}: "
+                        f"▸ {em['name_short']}: "
                         f"Rk/{em['rank']} Site/{em['site']} "
                         f"Mo/{em['wo_month']} 7D/{em['wo_7day']} "
                         f"3D:{em['three_day']} "
