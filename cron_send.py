@@ -1079,16 +1079,7 @@ async def main():
         if "TEAM04" in ts or "TEAM 4" in ts or "TEAM4" in ts: return -5238696719
         return None
 
-    last_nv_team = None  # carry-forward team cho NV rows có cột A trống
-
     for sheet_row, content, cid, col_c, col_a_val, col_b in all_rows:
-        # ── Carry-forward: NV rows 4-32 — nếu cột A trống dùng team cuối biết ──
-        if 4 <= sheet_row <= 32:
-            if col_a_val:
-                last_nv_team = col_a_val   # cập nhật team hiện tại
-            elif last_nv_team:
-                col_a_val = last_nv_team   # dùng team của dòng trước
-
         # ── 2 điều kiện bắt buộc (rows 4-59): Cột A có tên team VÀ Cột D có nội dung ──
         if 4 <= sheet_row <= 59:
             if not col_a_val:
