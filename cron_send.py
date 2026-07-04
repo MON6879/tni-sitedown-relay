@@ -1197,7 +1197,7 @@ async def main():
                 team_lines_indiv.append("─" * 38)
                 for em in emp_rows:
                     team_lines_indiv.append(
-                        f"▸ {em['name_short']}: "
+                        f"{em['color']} {em['name_short']}: "
                         f"Rk/{em['rank']} Site/{em['site']} "
                         f"Mo/{em['wo_month']} 7D/{em['wo_7day']} "
                         f"3D:{em['three_day']} "
@@ -1240,10 +1240,12 @@ async def main():
                 if content:
                     full_lines.append(f"🟧 {content}")
                     full_lines.append("─" * 18)
-            # NV full col D — không dedup (mỗi dòng = 1 người)
+            # NV full col D — không dedup, thêm màu đầu dòng theo LostTARGET
             for prefix, name, content in ft_list:
                 if content:
-                    full_lines.append(content)
+                    nv_color = "🔴" if "/LostTARGET" in content else "🟢"
+
+                    full_lines.append(f"{nv_color} {content}")
                     full_lines.append("─" * 18)
             full_lines.append("━" * 22)
 
