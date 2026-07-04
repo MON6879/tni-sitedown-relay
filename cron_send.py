@@ -27,6 +27,10 @@ SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
     "/export?format=csv&gid=133591305"
 )
+STAFF_SHEET_URL = (
+    f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
+    "/export?format=csv&gid=1684930643"
+)
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 HEADER_ROWS = 3  # rows 1-3 là header (row 3 có 'export sms')
 COL_A, COL_B, COL_C, COL_D, COL_E = 0, 1, 2, 3, 4
@@ -149,6 +153,104 @@ def get_current_cycle_str() -> str:
     return f"{start_date.strftime('%d/%m/%y')}-{end_date.strftime('%d/%m/%y')}"
 
 
+def get_no_id_members(bot_token: str = "") -> dict:
+    """
+    Đọc Staff sheet (gid=1684930643):
+    - Col A (index 0): Telegram user_id (nếu trống = chưa có ID)
+    - Col F (index 5): Tên nhân viên
+    - Col N (index 13): Team assignment (nếu có nội dung = đang trong team)
+
+    Trả về dict: team_key -> {
+        "no_id":       [name, ...],   # chưa có ID Telegram
+        "not_in_group":[name, ...],   # có ID nhưng chưa join group
+    }
+    """
+    try:
+        resp = requests.get(
+            STAFF_SHEET_URL,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=20,
+        )
+        resp.raise_for_status()
+        df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str, on_bad_lines="skip")
+    except Exception as e:
+        logger.warning(f"get_no_id_members: cannot fetch Staff sheet: {e}")
+        return {}
+
+    # Mapping col N → team_key (và group chat_id để check membership)
+    TEAM_N_MAP = {
+        "01": ("MYT_TNI_TEAM01_Dawei",     -5180992881),
+        "02": ("MYT_TNI_TEAM02_Myeik",     -5188855349),
+        "03": ("MYT_TNI_TEAM03_Bokpyin",   -5183480727),
+        "04": ("MYT_TNI_TEAM04_Kawthoung", -5238696719),
+        "05": ("MYT_TNI_TEAM02_Myeik",     -5188855349),  # Team 5 ⇒ Team 2
+    }
+
+    # Collect: no_id và candidates cần check
+    no_id_map:   dict = {}   # team_key -> [name]
+    check_list:  list = []   # [(name, user_id_int, team_key, group_chat_id)]
+
+    for _, row in df.iterrows():
+        try:
+            col_a = str(row.iloc[0]).strip()  if not pd.isna(row.iloc[0])  else ""
+            col_f = str(row.iloc[5]).strip()  if not pd.isna(row.iloc[5])  else ""
+            col_n = str(row.iloc[13]).strip() if not pd.isna(row.iloc[13]) else ""
+        except (IndexError, Exception):
+            continue
+
+        if not col_n or col_n.lower() in ("nan", "", "resign"):
+            continue
+        if not col_f or col_f.lower() in ("nan", ""):
+            continue
+
+        # Xác định team từ col_n
+        team_key = None; group_cid = None
+        col_n_up = col_n.upper()
+        for suffix, (tk, gcid) in TEAM_N_MAP.items():
+            if f"TEAM {suffix}" in col_n_up or f"TEAM{suffix}" in col_n_up or col_n_up.endswith(suffix):
+                team_key = tk; group_cid = gcid
+                break
+        if not team_key:
+            continue
+
+        # Phân loại
+        id_clean = col_a.replace(".0", "").strip() if col_a else ""
+        if not id_clean or id_clean.lower() in ("nan", "", "0"):
+            # Chưa có ID
+            no_id_map.setdefault(team_key, []).append(col_f)
+        else:
+            # Có ID → xếp vào danh sách cần check group
+            try:
+                check_list.append((col_f, int(id_clean), team_key, group_cid))
+            except ValueError:
+                pass
+
+    # Check group membership qua getChatMember
+    not_in_group_map: dict = {}
+    if bot_token and check_list:
+        for name, uid, tk, gcid in check_list:
+            try:
+                r = requests.get(
+                    f"https://api.telegram.org/bot{bot_token}/getChatMember",
+                    params={"chat_id": gcid, "user_id": uid},
+                    timeout=8,
+                )
+                data = r.json()
+                status = data.get("result", {}).get("status", "")
+                if status in ("left", "kicked", ""):
+                    not_in_group_map.setdefault(tk, []).append(name)
+            except Exception:
+                pass  # bỏ qua nếu lỗi network
+
+    return {
+        tk: {
+            "no_id":        no_id_map.get(tk, []),
+            "not_in_group": not_in_group_map.get(tk, []),
+        }
+        for tk in set(list(no_id_map.keys()) + list(not_in_group_map.keys()))
+    }
+
+
 def build_team_search_section(team_key: str, report_data: dict) -> str:
     """Build search stats section for a specific team."""
     team_summary = report_data.get("teamSummary", [])
@@ -158,6 +260,7 @@ def build_team_search_section(team_key: str, report_data: dict) -> str:
     cycle_str = get_current_cycle_str()
     for ts in team_summary:
         if ts.get("team", "") == team_key:
+
             return (
                 f"🔍 Search: "
                 f"3Day:{ts.get('d2',0)}/{ts.get('d1',0)}/{ts.get('today',0)} "
@@ -166,8 +269,9 @@ def build_team_search_section(team_key: str, report_data: dict) -> str:
     return ""
 
 
-def build_no_search_list(team_key: str, report_data: dict) -> str:
-    """Per-person search stats for a team (rows 4-59) with 3Day/7Day/Month."""
+def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict | None = None) -> str:
+    """Per-person search stats for a team (rows 4-59) with 3Day/7Day/Month.
+    Appends '\u2753 Name: Not Have ID telegram' for NV chưa có ID Telegram."""
     if not team_key:
         return ""
 
@@ -205,8 +309,26 @@ def build_no_search_list(team_key: str, report_data: dict) -> str:
             not_searched_count += 1
         lines.append(f"  {icon} {name}: 3Day:{d2}/{d1}/{d0} 7Day:{w} Month:{m}")
 
-    header = f"🔍 Search per member ({not_searched_count} not searched today):"
-    return header + "\n" + "\n".join(lines)
+    header = f"\U0001f50d Search per member ({not_searched_count} not searched today):"
+    result_lines = [header] + lines
+
+    # Thêm cảnh báo từ Staff sheet (theo team)
+    if no_id_members:
+        team_info = no_id_members.get(team_key, {})
+        # NV chưa có ID Telegram
+        no_id_list = team_info.get("no_id", [])
+        if no_id_list:
+            result_lines.append("  \u2015 Chưa có ID Telegram:")
+            for nm in sorted(set(no_id_list)):
+                result_lines.append(f"  \u2753 {nm}: Not Have ID telegram")
+        # NV có ID nhưng chưa vào Group
+        not_in_group = team_info.get("not_in_group", [])
+        if not_in_group:
+            result_lines.append("  \u2015 Có ID nhưng chưa join Group:")
+            for nm in sorted(set(not_in_group)):
+                result_lines.append(f"  \u2753 {nm}: Not in Group")
+
+    return "\n".join(result_lines)
 
 
 def build_asset_msg(now_str, asset_data):
@@ -1021,6 +1143,10 @@ async def main():
     # ── 4. Get search/report stats ──
     report_data = get_report_data()
     search_msg = build_search_summary(now_str, report_data)
+
+    # ── 4b. Staff sheet: NV chưa có ID / chưa vào Group ──
+    no_id_members = get_no_id_members(bot_token=SEND_BOT_TOKEN or "")
+    logger.info(f"Staff check: {sum(len(v.get('no_id',[]))+len(v.get('not_in_group',[])) for v in no_id_members.values())} issue(s) found")
     month_days = report_data.get("month_days", 0)
     leaders_data = report_data.get("leaders", [])
 
@@ -1208,7 +1334,8 @@ async def main():
             # Thêm thống kê Asset và Search riêng cho từng Team
             team_asset = build_team_asset_section(team_key, asset_data)
             team_search = build_team_search_section(team_key, report_data)
-            no_search = build_no_search_list(team_key, report_data)
+            no_search = build_no_search_list(team_key, report_data, no_id_members)
+
 
             if team_asset or team_search or no_search:
                 team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
