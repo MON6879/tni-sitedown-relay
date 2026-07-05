@@ -91,16 +91,10 @@ def get_asset_stats():
 
 def get_report_data():
     """Get search stats from Apps Script (employees, leaders, teamSummary, grandTotal)."""
-    # DEBUG: log URL suffix to verify correct deployment
-    url_suffix = APPS_SCRIPT_URL[-20:] if APPS_SCRIPT_URL else "EMPTY"
-    logger.info(f"DEBUG get_report_data URL ends with: ...{url_suffix}")
     data = call_apps_script({"action": "get_report_data"}, timeout=120)
-    # DEBUG: log all top-level keys
-    logger.info(f"DEBUG get_report_data response keys: {list(data.keys())}")
     if data.get("status") != "ok":
         logger.warning(f"get_report_data failed: {data.get('message', 'unknown')}")
         return {}
-    logger.info(f"DEBUG get_report_data searchStats present: {'searchStats' in data}, keys count: {len(data.get('searchStats', {}))}")
     return data
 
 
@@ -311,7 +305,7 @@ def build_team_search_section(team_key: str, report_data: dict, now_str: str = "
     return (
         f"🔍 Search TNIxxxx click here @SEARCHTNITASKWOBOT "
         f"and Start if New FT write /myid : {now_str}\n"
-        f"   Total: 3Day:{d2_total}/{d1_total}/{d0_total} 7Day:{w_total} Month:{m_total} ({cycle_str})"
+        f"   Total: 3Day: {d2_total} /{d1_total} /{d0_total}  7Day: /{w_total}  Month: /{m_total} ({cycle_str})"
     )
 
 
@@ -373,7 +367,7 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
             icon = "✅" if d0 > 0 else "❌"
             if d0 == 0:
                 not_searched_count += 1
-            search_lines.append(f"  {icon} {name}: 3Day:{d2}/{d1}/{d0} 7Day:{w} Month:{m}")
+            search_lines.append(f"  {icon} {name}: 3Day: {d2} /{d1} /{d0}  7Day: /{w}  Month: /{m}")
 
         result_lines.append(
             f"🔍 Part 1 — Search Stats ({not_searched_count} not searched today):"
@@ -1226,13 +1220,6 @@ async def main():
     # ── 4b. Staff sheet: NV chưa có ID / chưa vào Group ──
     no_id_members = get_no_id_members(bot_token=SEND_BOT_TOKEN or "")
     logger.info(f"Staff check: {sum(len(v.get('no_id',[]))+len(v.get('not_in_group',[])) for v in no_id_members.values())} issue(s) found")
-
-    # DEBUG: check has_id format
-    for tk, info in no_id_members.items():
-        has_id_list = info.get("has_id", [])
-        if has_id_list:
-            sample = has_id_list[0]
-            logger.info(f"DEBUG has_id[{tk}]: count={len(has_id_list)}, sample={sample}, type={type(sample)}")
     month_days = report_data.get("month_days", 0)
     leaders_data = report_data.get("leaders", [])
 
