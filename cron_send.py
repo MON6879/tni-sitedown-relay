@@ -248,10 +248,10 @@ def get_no_id_members(bot_token: str = "") -> dict:
             except Exception:
                 pass  # bỏ qua nếu lỗi network
 
-    # Gom has_id theo team
+    # Gom has_id theo team — luu ca ten (col F) va uid (Telegram ID)
     has_id_map: dict = {}
     for name, uid, tk, gcid in check_list:
-        has_id_map.setdefault(tk, []).append(name)
+        has_id_map.setdefault(tk, []).append({"name": name, "uid": str(uid)})
 
     all_teams = set(list(no_id_map.keys()) + list(not_in_group_map.keys()) + list(has_id_map.keys()))
     return {
@@ -300,15 +300,15 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
 
     # ══ PHẦN 1: Search Stats — NV có ID (tên từ Staff sheet col F) ══
     all_members = list(report_data.get("employees", [])) + list(report_data.get("leaders", []))
-    # Build lookup: tên (lower) -> search stats
-    search_lookup: dict = {}
+    # Build lookup: chat_id (UserID) -> search stats (match chinh xac bang ID)
+    search_lookup_by_id: dict = {}
     for e in all_members:
         if e.get("team", "") == team_key:
-            nm = e.get("name", "").strip()
-            if nm:
-                search_lookup[nm.lower()] = e
+            cid = str(e.get("chat_id", "")).strip()
+            if cid:
+                search_lookup_by_id[cid] = e
 
-    # Lấy danh sách NV có ID từ Staff sheet (col F)
+    # Lấy danh sách NV có ID từ Staff sheet (col F) — giờ là list of {name, uid}
     staff_has_id: list = []
     if no_id_members:
         team_info_temp = no_id_members.get(team_key, {})
@@ -320,15 +320,28 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
         seen_fb: dict = {}
         for e in team_members_fb:
             nm2 = e.get("name", "?")
+            uid2 = str(e.get("chat_id", "")).strip()
             if nm2 not in seen_fb or e.get("search_today", 0) > seen_fb[nm2].get("search_today", 0):
                 seen_fb[nm2] = e
-        staff_has_id = [e.get("name", "?") for e in seen_fb.values()]
+        staff_has_id = [{"name": e.get("name", "?"), "uid": str(e.get("chat_id", ""))} for e in seen_fb.values()]
 
     if staff_has_id:
         not_searched_count = 0
         search_lines = []
-        for name in sorted(set(staff_has_id)):
-            e_data = search_lookup.get(name.lower(), {})
+        # Sort by name — hỗ trợ cả dict {name, uid} và string cũ
+        def _get_name(item):
+            return item["name"] if isinstance(item, dict) else item
+        def _get_uid(item):
+            return item.get("uid", "") if isinstance(item, dict) else ""
+        seen_names = set()
+        for item in sorted(staff_has_id, key=lambda x: _get_name(x)):
+            name = _get_name(item)
+            uid = _get_uid(item)
+            if name in seen_names:
+                continue
+            seen_names.add(name)
+            # Match bằng UserID trước, fallback tên
+            e_data = search_lookup_by_id.get(uid, {}) if uid else {}
             d0 = e_data.get("search_today", 0)
             d1 = e_data.get("search_d1", 0)
             d2 = e_data.get("search_d2", 0)
