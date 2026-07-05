@@ -840,12 +840,11 @@ function buildSearchStatsMap(ss) {
   const data = logSheet.getRange(2, 1, last - 1, 6).getValues(); // Doc 6 cot A-F
   for (const row of data) {
     const dateVal = dateToStr(row[1]); // Cot B (Date) -> index 1
-    // Cot D (UserName) -> index 3, xoa emoji de khop ten nhan vien
-    const rawName = (row[3] || '').toString().trim();
-    const name = rawName.replace(/[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\uFE00-\uFE0F\u200D\u{1F1E0}-\u{1F1FF}]/gu, '').trim().toLowerCase();
-    if (!name) continue;
-    if (!map[name]) map[name] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
-    const u = map[name];
+    // Cot E (UserID) -> index 4: dung UserID lam key de match chinh xac
+    const userId = (row[4] || '').toString().trim();
+    if (!userId) continue;
+    if (!map[userId]) map[userId] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const u = map[userId];
     const parts = dateVal.split('/');
     if (parts.length !== 3) continue;
     const rowDate = new Date(+parts[2], +parts[1]-1, +parts[0]);
@@ -858,6 +857,7 @@ function buildSearchStatsMap(ss) {
   }
   return map;
 }
+
 
 
 // ============================================================
@@ -941,7 +941,7 @@ function handleRefreshGeneral(ss) {
   gen.appendRow(['Team', 'Nhan vien', 'Hom nay', 'Hom qua', 'Hom kia', 'Tuan', 'Thang']);
   gen.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
   for (const emp of employees) {
-    const s = statsMap[emp.name.toLowerCase()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const s = statsMap[(emp.chat_id || '').toString().trim()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     gen.appendRow([emp.team, emp.name, s.today, s.d1, s.d2, s.week, s.month]);
   }
   gen.setColumnWidth(1, 200);
@@ -1096,7 +1096,7 @@ function handleGetReportData(ss) {
   // ── Search team stats ──
   const teamStats = {};
   for (const emp of employees) {
-    const s = statsMap[emp.name.toLowerCase()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const s = statsMap[(emp.chat_id || '').toString().trim()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     if (!teamStats[emp.team]) teamStats[emp.team] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     const t = teamStats[emp.team];
     t.today += s.today; t.d1 += s.d1; t.d2 += s.d2; t.week += s.week; t.month += s.month;
@@ -1140,7 +1140,7 @@ function handleGetReportData(ss) {
   // ── Build employee result ──
   // Tính rank toàn bộ NV rồi sắp xếp để gán rank số thứ tự
   const empWithWo = employees.map(emp => {
-    const s = statsMap[emp.name.toLowerCase()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const s = statsMap[(emp.chat_id || '').toString().trim()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     const chatId = emp.chat_id || cfgIdMap[emp.name.toLowerCase()] || '';
     const wo = parseWoFromContent(emp.content);
     const close_pct = calcClosePct(wo.wo_total, wo.wo_month_close);
@@ -1167,7 +1167,7 @@ function handleGetReportData(ss) {
   // Sắp xếp leader theo % close để gán rank
   const ldWithScore = leaders.map(ld => {
     const wo = parseWoFromContent(ld.content);
-    const s = statsMap[ld.name.toLowerCase()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const s = statsMap[(ld.chat_id || '').toString().trim()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     // Đọc thêm từ TL content: "3-Day Result: 11/0/0/0" → member_count / eod_today / eod_d1 / eod_d2
     const eodM = ld.content.match(/3-Day\s*Result\s*:\s*(\d+)\/(\d+)\/(\d+)\/(\d+)/i);
     const member_count   = eodM ? parseInt(eodM[1]) || 0 : 0;
