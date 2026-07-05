@@ -91,10 +91,16 @@ def get_asset_stats():
 
 def get_report_data():
     """Get search stats from Apps Script (employees, leaders, teamSummary, grandTotal)."""
+    # DEBUG: log URL suffix to verify correct deployment
+    url_suffix = APPS_SCRIPT_URL[-20:] if APPS_SCRIPT_URL else "EMPTY"
+    logger.info(f"DEBUG get_report_data URL ends with: ...{url_suffix}")
     data = call_apps_script({"action": "get_report_data"}, timeout=120)
+    # DEBUG: log all top-level keys
+    logger.info(f"DEBUG get_report_data response keys: {list(data.keys())}")
     if data.get("status") != "ok":
         logger.warning(f"get_report_data failed: {data.get('message', 'unknown')}")
         return {}
+    logger.info(f"DEBUG get_report_data searchStats present: {'searchStats' in data}, keys count: {len(data.get('searchStats', {}))}")
     return data
 
 
