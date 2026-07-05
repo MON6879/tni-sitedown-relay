@@ -343,6 +343,13 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
                 seen_fb[nm2] = e
         staff_has_id = [{"name": e.get("name", "?"), "uid": str(e.get("chat_id", ""))} for e in seen_fb.values()]
 
+    # Lấy danh sách Not in Group + No ID để loại khỏi Part 1
+    exclude_names = set()
+    if no_id_members:
+        ti = no_id_members.get(team_key, {})
+        exclude_names.update(ti.get("not_in_group", []))
+        exclude_names.update(ti.get("no_id", []))
+
     if staff_has_id:
         not_searched_count = 0
         search_lines = []
@@ -357,6 +364,9 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
             if name in seen_names:
                 continue
             seen_names.add(name)
+            # Bỏ qua người Not in Group hoặc No ID — hiển thị riêng ở Part 2/3
+            if name in exclude_names:
+                continue
             # Match trực tiếp bằng UserID từ GAS searchStats
             s = raw_search_stats.get(uid, {}) if uid else {}
             d0 = s.get("today", 0)
