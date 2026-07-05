@@ -30,6 +30,8 @@ GID_SITE = "1095689918"
 GID_TASK = "1755404595"
 GID_WO   = "1429089905"
 GID_INFO = "171059303"   # Tab: Name Site / Site / Cable / Gpon / DIA
+GID_TEAM_SUM = "893574714"  # Tab: Tên Sum WO (Team Leader search)
+GID_TL_WAITCD = "1110926116"  # Tab: Team leader Wait CD + Not Close
 
 TZ_MM    = timezone(timedelta(hours=6, minutes=30))   # Myanmar UTC+6:30
 MAX_LEN  = 4096
@@ -68,7 +70,7 @@ def tg_send(chat_id: int, text: str, parse_mode: str = "HTML") -> None:
             requests.post(
                 f"{TG_API}/sendMessage",
                 json={"chat_id": chat_id, "text": chunk, "parse_mode": parse_mode},
-                timeout=15,
+                timeout=60,
             )
         except Exception as ex:
             logger.error(f"tg_send error: {ex}")
@@ -196,6 +198,241 @@ def split_messages(text: str) -> list:
     if current: chunks.append(current)
     return chunks
 
+def split_by_site_blocks(blocks: list[str]) -> list[str]:
+    """Ghép các site block lại thành tin nhắn, mỗi tin <= MAX_LEN.
+    Mỗi block là 1 site hoàn chỉnh — không bao giờ bị cắt giữa chừng."""
+    messages, current = [], ""
+    for block in blocks:
+        candidate = (current + "\n" + block) if current else block
+        if len(candidate) <= MAX_LEN:
+            current = candidate
+        else:
+            if current:
+                messages.append(current)
+            # Nếu 1 block > MAX_LEN, dùng split_messages để chia nhỏ
+            if len(block) > MAX_LEN:
+                messages.extend(split_messages(block))
+                current = ""
+            else:
+                current = block
+    if current:
+        messages.append(current)
+    return messages
+
+
+# ── Team Leader search (T1/T2/T3/T4) ─────────────────────────────────────
+def lookup_team(team_code: str) -> list[str]:
+    """Tra cứu tất cả site thuộc team (T1/T2/T3/T4) từ sheet Tên Sum WO.
+    Trả về list tin nhắn (đã chia nhỏ theo site block)."""
+    team_code_upper = team_code.upper()
+    team_names = {
+        "T1": "Team 1 — Dawei",
+        "T2": "Team 2 — Myeik",
+        "T3": "Team 3 — Bokpyin",
+        "T4": "Team 4 — Kawthoung",
+    }
+    team_label = team_names.get(team_code_upper, team_code_upper)
+
+    try:
+        df = fetch_csv(GID_TEAM_SUM)
+    except Exception as ex:
+        logger.error(f"lookup_team fetch error: {ex}")
+        return [f"❌ Error loading data: {html.escape(str(ex)[:80])}"]
+
+    if df is None or df.empty:
+        return ["❌ No data available."]
+
+    # Lọc rows theo cột F (index 5) = team code
+    site_blocks = []
+    for _, row in df.iterrows():
+        col_f = safe(row, 5).strip().upper()
+        # Khớp chính xác T1, T2, T3, T4 (bỏ qua "Team Leader T2" etc.)
+        if col_f != team_code_upper:
+            continue
+
+        site_id  = safe(row, 0)  # Cột A = Site ID
+        task_raw = safe(row, 2)  # Cột C = Task info
+        wo_raw   = safe(row, 3)  # Cột D = WO info
+
+        if not site_id or site_id == "0":
+            continue
+
+        lines = [f"━━━━━━━━━━━━━━━━━━━━\n📍 <b>{html.escape(site_id)}</b>"]
+
+        # ── Task section ──
+        lines.append("\n📋 <b>Task:</b>")
+        if task_raw and task_raw.lower() != "no see":
+            tasks = [t.strip() for t in task_raw.split("|=***=|") if t.strip()]
+            for t in tasks:
+                lines.append(f"  • {html.escape(t)}")
+        else:
+            lines.append("  • No task")
+
+        # ── WO section ──
+        lines.append("\n🔧 <b>WO:</b>")
+        if wo_raw:
+            wos = [w.strip() for w in wo_raw.split("|=***=|") if w.strip()]
+            for w in wos:
+                lines.append(f"  • {html.escape(w)}")
+        else:
+            lines.append("  • No WO")
+
+        site_blocks.append("\n".join(lines))
+
+    if not site_blocks:
+        return [f"❌ No sites found for <b>{html.escape(team_code_upper)}</b>"]
+
+    # Header
+    now_mm = datetime.now(TZ_MM)
+    header = (
+        f"🔍 <b>{html.escape(team_label)}</b> — "
+        f"{len(site_blocks)} sites\n"
+        f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}\n"
+    )
+
+    # Ghép header vào block đầu tiên
+    site_blocks[0] = header + site_blocks[0]
+    # Thêm footer vào block cuối
+    site_blocks[-1] = site_blocks[-1] + "\n━━━━━━━━━━━━━━━━━━━━"
+
+    return split_by_site_blocks(site_blocks)
+
+
+# ── Not Close search (T1notclose / T2notclose / ...) ─────────────────────────
+def lookup_notclose(team_code: str) -> list[str]:
+    """Tra cứu WO chưa close của team từ sheet 'Team leader Wait CD + Not Close'.
+    Lọc theo cột H (index 7). Hiển thị cột B,C,E,F,G (bỏ D)."""
+    tag = f"{team_code.upper()}NOTCLOSE"  # e.g. "T1NOTCLOSE"
+    team_names = {
+        "T1": "Team 1 — Dawei",
+        "T2": "Team 2 — Myeik",
+        "T3": "Team 3 — Bokpyin",
+        "T4": "Team 4 — Kawthoung",
+    }
+    team_label = team_names.get(team_code.upper(), team_code.upper())
+
+    try:
+        df = fetch_csv(GID_TL_WAITCD)
+    except Exception as ex:
+        logger.error(f"lookup_notclose fetch error: {ex}")
+        return [f"❌ Error loading data: {html.escape(str(ex)[:80])}"]
+
+    if df is None or df.empty:
+        return ["❌ No data available."]
+
+    entries = []
+    for _, row in df.iterrows():
+        col_h = safe(row, 7).strip().upper()  # Cột H = filter tag
+        if col_h != tag:
+            continue
+
+        wo_code  = safe(row, 1)   # B: WO Code
+        wo_desc  = safe(row, 2)   # C: WO Description
+        staff    = safe(row, 4)   # E: Assigned staff
+        amount   = safe(row, 5)   # F: Amount/Score
+        wo_date  = safe(row, 6)   # G: Date
+
+        if not wo_code:
+            continue
+
+        line = f"  • {html.escape(wo_code)}\n"
+        line += f"    {html.escape(wo_desc)}\n"
+        parts = []
+        if staff:  parts.append(f"👤 {html.escape(staff)}")
+        if amount:
+            amt_icon = "🔴" if amount.startswith("-") else "🟢"
+            parts.append(f"{amt_icon} {html.escape(amount)}")
+        if wo_date: parts.append(f"📅 {html.escape(wo_date)}")
+        if parts:
+            line += f"    {' | '.join(parts)}"
+        entries.append(line)
+
+    if not entries:
+        return [f"❌ No WO Not Close found for <b>{html.escape(team_code.upper())}</b>"]
+
+    now_mm = datetime.now(TZ_MM)
+    header = (
+        f"🔴 <b>{html.escape(team_label)} — WO Not Close</b>\n"
+        f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}\n"
+        f"📊 Total: {len(entries)} WOs\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+    )
+
+    # Ghép entries, mỗi entry là 1 block
+    blocks = []
+    for entry in entries:
+        blocks.append(entry)
+
+    # Build full text và split
+    full_text = header + "\n".join(blocks) + "\n━━━━━━━━━━━━━━━━━━━━"
+    return split_messages(full_text)
+
+
+# ── Wait CD search (T1waitcd / T2waitcd / ...) ───────────────────────────────
+def lookup_waitcd(team_code: str) -> list[str]:
+    """Tra cứu WO đang chờ CD của team từ sheet 'Team leader Wait CD + Not Close'.
+    Lọc theo cột AM (index 38). Hiển thị cột AG,AH,AJ,AK,AL (bỏ AI)."""
+    tag = f"{team_code.upper()}WAITCD"  # e.g. "T1WAITCD"
+    team_names = {
+        "T1": "Team 1 — Dawei",
+        "T2": "Team 2 — Myeik",
+        "T3": "Team 3 — Bokpyin",
+        "T4": "Team 4 — Kawthoung",
+    }
+    team_label = team_names.get(team_code.upper(), team_code.upper())
+
+    try:
+        df = fetch_csv(GID_TL_WAITCD)
+    except Exception as ex:
+        logger.error(f"lookup_waitcd fetch error: {ex}")
+        return [f"❌ Error loading data: {html.escape(str(ex)[:80])}"]
+
+    if df is None or df.empty:
+        return ["❌ No data available."]
+
+    entries = []
+    for _, row in df.iterrows():
+        col_am = safe(row, 38).strip().upper()  # Cột AM = filter tag
+        if col_am != tag:
+            continue
+
+        wo_code   = safe(row, 32)  # AG: WO Code
+        wo_desc   = safe(row, 33)  # AH: WO Description
+        # AI (34): Team name — SKIP
+        start_dt  = safe(row, 35)  # AJ: Start date
+        end_dt    = safe(row, 36)  # AK: End date
+        amount    = safe(row, 37)  # AL: Amount/Score
+
+        if not wo_code:
+            continue
+
+        line = f"  • {html.escape(wo_code)}\n"
+        line += f"    {html.escape(wo_desc)}\n"
+        parts = []
+        if start_dt: parts.append(f"🕐 {html.escape(start_dt)}")
+        if end_dt:   parts.append(f"🕑 {html.escape(end_dt)}")
+        if amount:
+            amt_icon = "🔴" if amount.startswith("-") else "🟢"
+            parts.append(f"{amt_icon} {html.escape(amount)}")
+        if parts:
+            line += f"    {' | '.join(parts)}"
+        entries.append(line)
+
+    if not entries:
+        return [f"❌ No WO Wait CD found for <b>{html.escape(team_code.upper())}</b>"]
+
+    now_mm = datetime.now(TZ_MM)
+    header = (
+        f"🟡 <b>{html.escape(team_label)} — WO Wait CD</b>\n"
+        f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}\n"
+        f"📊 Total: {len(entries)} WOs\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+    )
+
+    full_text = header + "\n".join(entries) + "\n━━━━━━━━━━━━━━━━━━━━"
+    return split_messages(full_text)
+
+
 # ── Info lookup (Site/Cable/Gpon/DIA) ─────────────────────────────────────
 def get_info(tni: str) -> dict | None:
     """Tìm TNI trong sheet gid=171059303, trả về Site/Cable/Gpon/DIA."""
@@ -239,7 +476,7 @@ def fetch_daily_fields() -> list[str]:
     if not DAILY_APPS_SCRIPT_URL:
         return DAILY_FIELDS_DEFAULT
     try:
-        resp = requests.get(DAILY_APPS_SCRIPT_URL + "?action=get_fields", timeout=15)
+        resp = requests.get(DAILY_APPS_SCRIPT_URL + "?action=get_fields", timeout=60)
         data = resp.json()
         if data.get("status") == "ok" and data.get("fields"):
             _daily_fields    = data["fields"]
@@ -381,6 +618,9 @@ def handle(update: dict) -> None:
                 "👋 <b>TNI Search Bot</b>\n\n"
                 "• Gõ mã <code>TNI...</code> để tra cứu Task/WO\n"
                 "• <code>Info: TNI...</code> tra cứu Site/Cable/DIA\n"
+                "• <code>T1</code> <code>T2</code> <code>T3</code> <code>T4</code> — xem Task/WO theo Team\n"
+                "• <code>T1notclose</code> — WO chưa Close của Team\n"
+                "• <code>T1waitcd</code> — WO chờ CD của Team\n"
                 "• Gửi báo cáo có chữ <b>Daily</b> để lưu\n"
                 "• /daily — xem mẫu báo cáo")
 
@@ -401,7 +641,7 @@ def handle(update: dict) -> None:
                         "reg_by":     first_name,
                         "user_id":    str(user_id),
                         "user_name":  first_name,
-                    }, timeout=15)
+                    }, timeout=60)
                     res = r.json()
                     if res.get("status") == "ok":
                         msg_extra = "\n✅ Saved"
@@ -427,6 +667,9 @@ def handle(update: dict) -> None:
                 "📖 <b>Hướng dẫn</b>\n\n"
                 "• Gõ mã TNI (vd: <code>TNI0009</code>) → tra cứu Site/Task/WO\n"
                 "• <code>Info: TNI0009</code> → tra cứu Site/Cable/Gpon/DIA\n"
+                "• <code>T1</code> <code>T2</code> <code>T3</code> <code>T4</code> → xem Task/WO theo Team\n"
+                "• <code>T1notclose</code> → WO chưa Close (T1-T4)\n"
+                "• <code>T1waitcd</code> → WO chờ CD (T1-T4)\n"
                 "• Gửi báo cáo Daily → tự lưu vào Sheet\n"
                 "• /daily → xem mẫu báo cáo\n"
                 "• /reload → cập nhật dữ liệu\n"
@@ -436,6 +679,51 @@ def handle(update: dict) -> None:
     # ── DAILY REPORT ────────────────────────────────────────────────────────
     if is_daily(text):
         submit_daily(chat_id, user_id, first_name, text)
+        return
+
+    # ── TEAM LEADER SEARCH (T1/T2/T3/T4) ──────────────────────────────────
+    team_match = re.match(r"^(T[1-4])$", text.strip(), re.IGNORECASE)
+    if team_match:
+        team_code = team_match.group(1).upper()
+        logger.info(f"Team lookup: {team_code} | chat={chat_id}")
+        tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)}</b> data...")
+        try:
+            messages = lookup_team(team_code)
+            for msg in messages:
+                tg_send(chat_id, msg)
+        except Exception as err:
+            logger.error(f"Team lookup error [{team_code}]: {err}")
+            tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
+        return
+
+    # ── NOT CLOSE SEARCH (T1notclose / T2notclose / ...) ──────────────────
+    nc_match = re.match(r"^(T[1-4])notclose$", text.strip(), re.IGNORECASE)
+    if nc_match:
+        team_code = nc_match.group(1).upper()
+        logger.info(f"NotClose lookup: {team_code} | chat={chat_id}")
+        tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)} Not Close</b> data...")
+        try:
+            messages = lookup_notclose(team_code)
+            for msg in messages:
+                tg_send(chat_id, msg)
+        except Exception as err:
+            logger.error(f"NotClose lookup error [{team_code}]: {err}")
+            tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
+        return
+
+    # ── WAIT CD SEARCH (T1waitcd / T2waitcd / ...) ────────────────────────
+    wc_match = re.match(r"^(T[1-4])waitcd$", text.strip(), re.IGNORECASE)
+    if wc_match:
+        team_code = wc_match.group(1).upper()
+        logger.info(f"WaitCD lookup: {team_code} | chat={chat_id}")
+        tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)} Wait CD</b> data...")
+        try:
+            messages = lookup_waitcd(team_code)
+            for msg in messages:
+                tg_send(chat_id, msg)
+        except Exception as err:
+            logger.error(f"WaitCD lookup error [{team_code}]: {err}")
+            tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
     # ── INFO: TNIxxxx — tra cứu Site/Cable/Gpon/DIA ────────────────────────
@@ -479,7 +767,7 @@ def handle(update: dict) -> None:
                 "date":      now_mm.strftime("%d/%m/%Y"),   # dd/mm/yyyy — khớp format dữ liệu cũ
                 "time":      now_mm.strftime("%H:%M"),
                 "date_iso":  now_mm.strftime("%d/%m/%Y"),
-            }, timeout=15)
+            }, timeout=60)
         except Exception as e:
             logger.error(f"log_search failed: {e}")
 
