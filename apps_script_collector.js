@@ -1232,7 +1232,8 @@ function handleGetReportData(ss) {
     managers: managers,
     teamSummary: teamSummary,
     grandTotal: grandTotal,
-    assignByDep: assignByDep
+    assignByDep: assignByDep,
+    searchStats: statsMap
   });
 }
 

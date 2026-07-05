@@ -264,26 +264,50 @@ def get_no_id_members(bot_token: str = "") -> dict:
     }
 
 
-def build_team_search_section(team_key: str, report_data: dict, now_str: str = "") -> str:
-    """Build search stats section for a specific team."""
-    team_summary = report_data.get("teamSummary", [])
-    if not team_summary or not team_key:
+def build_team_search_section(team_key: str, report_data: dict, now_str: str = "", no_id_members: dict | None = None) -> str:
+    """Build search stats section for a specific team — tính Total từ searchStats + Staff UIDs."""
+    if not team_key:
         return ""
 
+    raw_search_stats = report_data.get("searchStats", {})
     cycle_str = get_current_cycle_str()
-    for ts in team_summary:
-        if ts.get("team", "") == team_key:
-            d2 = ts.get('d2', 0)
-            d1 = ts.get('d1', 0)
-            d0 = ts.get('today', 0)
-            w  = ts.get('week', 0)
-            m  = ts.get('month', 0)
-            return (
-                f"🔍 Search TNIxxxx click here @SEARCHTNITASKWOBOT "
-                f"and Start if New FT write /myid : {now_str}\n"
-                f"   Total: 3Day:{d2}/{d1}/{d0} 7Day:{w} Month:{m} ({cycle_str})"
-            )
-    return ""
+
+    # Lấy UIDs của NV trong team từ Staff Sheet
+    team_uids = []
+    if no_id_members:
+        team_info = no_id_members.get(team_key, {})
+        for item in team_info.get("has_id", []):
+            uid = item.get("uid", "") if isinstance(item, dict) else ""
+            if uid:
+                team_uids.append(uid)
+
+    # Tính tổng search cho team từ searchStats
+    d0_total = d1_total = d2_total = w_total = m_total = 0
+    for uid in team_uids:
+        s = raw_search_stats.get(uid, {})
+        d0_total += s.get("today", 0)
+        d1_total += s.get("d1", 0)
+        d2_total += s.get("d2", 0)
+        w_total  += s.get("week", 0)
+        m_total  += s.get("month", 0)
+
+    # Fallback: nếu không có Staff data thì dùng teamSummary cũ
+    if not team_uids:
+        for ts in report_data.get("teamSummary", []):
+            if ts.get("team", "") == team_key:
+                d2_total = ts.get('d2', 0)
+                d1_total = ts.get('d1', 0)
+                d0_total = ts.get('today', 0)
+                w_total  = ts.get('week', 0)
+                m_total  = ts.get('month', 0)
+                break
+
+    return (
+        f"🔍 Search TNIxxxx click here @SEARCHTNITASKWOBOT "
+        f"and Start if New FT write /myid : {now_str}\n"
+        f"   Total: 3Day:{d2_total}/{d1_total}/{d0_total} 7Day:{w_total} Month:{m_total} ({cycle_str})"
+    )
+
 
 
 def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict | None = None) -> str:
@@ -298,37 +322,30 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
 
     result_lines = []
 
-    # ══ PHẦN 1: Search Stats — NV có ID (tên từ Staff sheet col F) ══
-    all_members = list(report_data.get("employees", [])) + list(report_data.get("leaders", []))
-    # Build lookup: chat_id (UserID) -> search stats (match chinh xac bang ID)
-    search_lookup_by_id: dict = {}
-    for e in all_members:
-        if e.get("team", "") == team_key:
-            cid = str(e.get("chat_id", "")).strip()
-            if cid:
-                search_lookup_by_id[cid] = e
+    # ══ PHẦN 1: Search Stats — match Search Log UserID → Staff Sheet UserID → tên col F ══
+    # searchStats từ GAS: { "userId": {today, d1, d2, week, month}, ... }
+    raw_search_stats = report_data.get("searchStats", {})
 
-    # Lấy danh sách NV có ID từ Staff sheet (col F) — giờ là list of {name, uid}
+    # Lấy danh sách NV có ID từ Staff sheet (col F) — list of {name, uid}
     staff_has_id: list = []
     if no_id_members:
         team_info_temp = no_id_members.get(team_key, {})
         staff_has_id = list(team_info_temp.get("has_id", []))
 
-    # Fallback: nếu Staff sheet không trả has_id thì dùng report_data
+    # Fallback: nếu Staff sheet không trả has_id thì dùng report_data employees
     if not staff_has_id:
+        all_members = list(report_data.get("employees", [])) + list(report_data.get("leaders", []))
         team_members_fb = [e for e in all_members if e.get("team", "") == team_key]
         seen_fb: dict = {}
         for e in team_members_fb:
             nm2 = e.get("name", "?")
-            uid2 = str(e.get("chat_id", "")).strip()
-            if nm2 not in seen_fb or e.get("search_today", 0) > seen_fb[nm2].get("search_today", 0):
+            if nm2 not in seen_fb:
                 seen_fb[nm2] = e
         staff_has_id = [{"name": e.get("name", "?"), "uid": str(e.get("chat_id", ""))} for e in seen_fb.values()]
 
     if staff_has_id:
         not_searched_count = 0
         search_lines = []
-        # Sort by name — hỗ trợ cả dict {name, uid} và string cũ
         def _get_name(item):
             return item["name"] if isinstance(item, dict) else item
         def _get_uid(item):
@@ -340,13 +357,13 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
             if name in seen_names:
                 continue
             seen_names.add(name)
-            # Match bằng UserID trước, fallback tên
-            e_data = search_lookup_by_id.get(uid, {}) if uid else {}
-            d0 = e_data.get("search_today", 0)
-            d1 = e_data.get("search_d1", 0)
-            d2 = e_data.get("search_d2", 0)
-            w  = e_data.get("search_week", 0)
-            m  = e_data.get("search_month", 0)
+            # Match trực tiếp bằng UserID từ GAS searchStats
+            s = raw_search_stats.get(uid, {}) if uid else {}
+            d0 = s.get("today", 0)
+            d1 = s.get("d1", 0)
+            d2 = s.get("d2", 0)
+            w  = s.get("week", 0)
+            m  = s.get("month", 0)
             icon = "✅" if d0 > 0 else "❌"
             if d0 == 0:
                 not_searched_count += 1
@@ -356,6 +373,7 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
             f"🔍 Part 1 — Search Stats ({not_searched_count} not searched today):"
         )
         result_lines.extend(search_lines)
+
     # ══ PHẦN 2 & 3: từ Staff sheet ══
     if no_id_members:
         team_info = no_id_members.get(team_key, {})
@@ -1384,7 +1402,7 @@ async def main():
 
             # Thêm thống kê Asset và Search riêng cho từng Team
             team_asset = build_team_asset_section(team_key, asset_data)
-            team_search = build_team_search_section(team_key, report_data, now_str)
+            team_search = build_team_search_section(team_key, report_data, now_str, no_id_members)
 
             no_search = build_no_search_list(team_key, report_data, no_id_members)
 
