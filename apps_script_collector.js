@@ -837,10 +837,12 @@ function buildSearchStatsMap(ss) {
   const msWeek = 7 * 86400000;
   const msMonth = 30 * 86400000;
   const last = logSheet.getLastRow();
-  const data = logSheet.getRange(2, 1, last - 1, 10).getValues(); // Đọc 10 cột để lấy cột J
+  const data = logSheet.getRange(2, 1, last - 1, 6).getValues(); // Doc 6 cot A-F
   for (const row of data) {
-    const dateVal = dateToStr(row[1]); // Cột B (Date) -> index 1
-    const name = (row[9] || '').toString().trim().toLowerCase(); // Cột J (Tên nhân viên sạch) -> index 9
+    const dateVal = dateToStr(row[1]); // Cot B (Date) -> index 1
+    // Cot D (UserName) -> index 3, xoa emoji de khop ten nhan vien
+    const rawName = (row[3] || '').toString().trim();
+    const name = rawName.replace(/[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\uFE00-\uFE0F\u200D\u{1F1E0}-\u{1F1FF}]/gu, '').trim().toLowerCase();
     if (!name) continue;
     if (!map[name]) map[name] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     const u = map[name];
@@ -857,7 +859,9 @@ function buildSearchStatsMap(ss) {
   return map;
 }
 
+
 // ============================================================
+
 // HELPER: fetchReportSheet
 // ============================================================
 function fetchReportSheet() {
