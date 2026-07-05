@@ -1213,9 +1213,20 @@ async def main():
     report_data = get_report_data()
     search_msg = build_search_summary(now_str, report_data)
 
+    # DEBUG: check searchStats
+    ss_keys = list(report_data.get("searchStats", {}).keys())
+    logger.info(f"DEBUG searchStats keys ({len(ss_keys)}): {ss_keys[:5]}")
+
     # ── 4b. Staff sheet: NV chưa có ID / chưa vào Group ──
     no_id_members = get_no_id_members(bot_token=SEND_BOT_TOKEN or "")
     logger.info(f"Staff check: {sum(len(v.get('no_id',[]))+len(v.get('not_in_group',[])) for v in no_id_members.values())} issue(s) found")
+
+    # DEBUG: check has_id format
+    for tk, info in no_id_members.items():
+        has_id_list = info.get("has_id", [])
+        if has_id_list:
+            sample = has_id_list[0]
+            logger.info(f"DEBUG has_id[{tk}]: count={len(has_id_list)}, sample={sample}, type={type(sample)}")
     month_days = report_data.get("month_days", 0)
     leaders_data = report_data.get("leaders", [])
 
