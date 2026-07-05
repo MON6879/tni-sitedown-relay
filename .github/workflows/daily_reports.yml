@@ -23,6 +23,10 @@ on:
         required: false
         default: '1'
 
+concurrency:
+  group: telethon-session
+  cancel-in-progress: false
+
 jobs:
   run-report:
     runs-on: ubuntu-latest
