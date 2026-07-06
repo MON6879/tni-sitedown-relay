@@ -221,20 +221,27 @@ def get_no_id_members(bot_token: str = "") -> dict:
 
         # Phân loại
         id_clean = col_a.replace(".0", "").strip() if col_a else ""
+        # Đọc cột L (index 11) = Position
+        try:
+            col_l = str(row.iloc[11]).strip() if not pd.isna(row.iloc[11]) else ""
+        except (IndexError, Exception):
+            col_l = ""
+        is_leader = col_l.upper() == "FOT TEAM LEADER"
+
         if not id_clean or id_clean.lower() in ("nan", "", "0"):
             # Chưa có ID
             no_id_map.setdefault(team_key, []).append(col_f)
         else:
             # Có ID → xếp vào danh sách cần check group
             try:
-                check_list.append((col_f, int(id_clean), team_key, group_cid))
+                check_list.append((col_f, int(id_clean), team_key, group_cid, is_leader))
             except ValueError:
                 pass
 
     # Check group membership qua getChatMember
     not_in_group_map: dict = {}
     if bot_token and check_list:
-        for name, uid, tk, gcid in check_list:
+        for name, uid, tk, gcid, is_leader in check_list:
             try:
                 r = requests.get(
                     f"https://api.telegram.org/bot{bot_token}/getChatMember",
@@ -250,15 +257,19 @@ def get_no_id_members(bot_token: str = "") -> dict:
 
     # Gom has_id theo team — luu ca ten (col F) va uid (Telegram ID)
     has_id_map: dict = {}
-    for name, uid, tk, gcid in check_list:
+    leaders_map: dict = {}  # team_key -> [{name, uid}]
+    for name, uid, tk, gcid, is_leader in check_list:
         has_id_map.setdefault(tk, []).append({"name": name, "uid": str(uid)})
+        if is_leader:
+            leaders_map.setdefault(tk, []).append({"name": name, "uid": str(uid)})
 
-    all_teams = set(list(no_id_map.keys()) + list(not_in_group_map.keys()) + list(has_id_map.keys()))
+    all_teams = set(list(no_id_map.keys()) + list(not_in_group_map.keys()) + list(has_id_map.keys()) + list(leaders_map.keys()))
     return {
         tk: {
             "no_id":        no_id_map.get(tk, []),
             "not_in_group": not_in_group_map.get(tk, []),
             "has_id":       has_id_map.get(tk, []),
+            "leaders":      leaders_map.get(tk, []),
         }
         for tk in all_teams
     }
@@ -308,6 +319,38 @@ def build_team_search_section(team_key: str, report_data: dict, now_str: str = "
         f"   Total: 3Day: {d2_total} /{d1_total} /{d0_total}  7Day: /{w_total}  Month: /{m_total} ({cycle_str})"
     )
 
+
+
+# ── Team Leader search stats ──────────────────────────────────────────────────
+def build_tl_search_section(team_key: str, report_data: dict, no_id_members: dict | None = None) -> str:
+    """Hiển thị stats search của Team Leader (FOT Team Leader) — đặt trước phần NV."""
+    if not team_key or not no_id_members:
+        return ""
+
+    team_info = no_id_members.get(team_key, {})
+    leaders = team_info.get("leaders", [])
+    if not leaders:
+        return ""
+
+    raw_search_stats = report_data.get("searchStats", {})
+
+    # Sort A-Z theo tên
+    leaders_sorted = sorted(leaders, key=lambda x: x.get("name", ""))
+
+    lines = ["👑 Team Leader Search:"]
+    for tl in leaders_sorted:
+        name = tl.get("name", "?")
+        uid = tl.get("uid", "")
+        s = raw_search_stats.get(uid, {}) if uid else {}
+        d0 = s.get("today", 0)
+        d1 = s.get("d1", 0)
+        d2 = s.get("d2", 0)
+        w  = s.get("week", 0)
+        m  = s.get("month", 0)
+        icon = "✅" if d0 > 0 else "❌"
+        lines.append(f"  {icon} {name}: 3Day: {d2} /{d1} /{d0}  7Day: /{w}  Month: /{m}")
+
+    return "\n".join(lines)
 
 
 def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict | None = None) -> str:
@@ -1417,18 +1460,20 @@ async def main():
             # Thêm thống kê Asset và Search riêng cho từng Team
             team_asset = build_team_asset_section(team_key, asset_data)
             team_search = build_team_search_section(team_key, report_data, now_str, no_id_members)
-
+            tl_search = build_tl_search_section(team_key, report_data, no_id_members)
             no_search = build_no_search_list(team_key, report_data, no_id_members)
 
 
-            if team_asset or team_search or no_search:
+            if team_asset or team_search or tl_search or no_search:
                 team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
             if team_asset:
                 team_lines_indiv.append(team_asset)
-            if team_asset and (team_search or no_search):
+            if team_asset and (team_search or tl_search or no_search):
                 team_lines_indiv.append("────────────────────")
             if team_search:
                 team_lines_indiv.append(team_search)
+            if tl_search:
+                team_lines_indiv.append(tl_search)
             if no_search:
                 team_lines_indiv.append(no_search)
 
