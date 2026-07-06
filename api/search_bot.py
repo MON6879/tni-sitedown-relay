@@ -193,18 +193,9 @@ def lookup_tni(tni: str) -> str:
         if not col_g:
             continue
 
-        # Format: ~ TNIxxxx <+> Task: ... <+> WO: ...
-        # Tách theo <+> để hiển thị từng phần
-        parts = [p.strip() for p in col_g.split("<+>") if p.strip()]
-
-        lines = [f"🔍 <b>{e(tni_upper)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
-        for part in parts:
-            # Bỏ ~ ở đầu nếu có
-            clean = part.lstrip("~ ").strip()
-            if clean:
-                lines.append(f"• {e(clean)}")
-        lines.append("━━━━━━━━━━━━━━━━━━━━")
-        return "\n".join(lines)
+        # Hiển thị nguyên nội dung cột G
+        clean = col_g.strip().lstrip("~ ").strip()
+        return f"🔍 <b>{e(tni_upper)}</b>\n━━━━━━━━━━━━━━━━━━━━\n{e(clean)}\n━━━━━━━━━━━━━━━━━━━━"
 
     return f"❌ No data found for <b>{e(tni_upper)}</b>"
 
