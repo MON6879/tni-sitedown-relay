@@ -28,12 +28,12 @@ SHEET_URL = (
 # Timezone Myanmar
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 
-# Vuông chéo (diamond) màu cố định cho mỗi Dep — đồng cỡ lớn
+# Trái tim màu cố định cho mỗi Dep (9 màu, đồng cỡ)
 DEP_SQUARES = {
-    "admin": "🔷", "asset": "🔶", "cm": "🔶", "fbb": "🔶",
-    "finance": "🔷", "hr": "🔶", "m&e": "🔶", "manager": "🔷",
-    "pm": "🔷", "transmission": "🔷", "construction": "🔶",
-    "noc": "🔷", "technical": "🔷",
+    "admin": "💙", "asset": "💚", "cm": "💛", "fbb": "🧡",
+    "finance": "💜", "hr": "❤️", "m&e": "🤎", "manager": "🤍",
+    "pm": "🖤", "transmission": "💙", "construction": "🧡",
+    "noc": "🖤", "technical": "💙",
 }
 
 def parse_date(val):
