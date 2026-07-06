@@ -734,6 +734,149 @@ def get_input_task_summary(today: datetime) -> str:
         return ""
 
 
+def get_input_task_detail(today: datetime) -> list:
+    """
+    Đọc sheet Input task (gid=1755404595) và build chi tiết theo Dep → Team → Loại task.
+    Trả về list[str] — mỗi Dep là 1 message riêng.
+
+    Format:
+      🟡 CM 06/07/2026
+      Team 01
+      Request Export material : total : 28  Progress 3 day: 0/0/0, 7 day: 0, Month: 0
+      Team 02
+      Request Export material : total : 14  Progress 3 day: 0/0/0, 7 day: 0, Month: 0
+    """
+    # Chấm tròn màu cố định cho Dep
+    DEP_CIRCLES = {
+        "admin": "🔵", "asset": "🟢", "cm": "🟡", "fbb": "🟠",
+        "finance": "🟣", "hr": "🔴", "m&e": "🟤", "manager": "⚪",
+        "pm": "⚫", "transmission": "🔵", "construction": "🟠",
+        "construction projects": "🟠", "noc": "⚫", "technical": "🔵",
+    }
+    try:
+        resp = None
+        for attempt in range(3):
+            try:
+                resp = requests.get(
+                    INPUT_TASK_URL,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=20,
+                )
+                resp.raise_for_status()
+                break
+            except Exception as e:
+                if attempt == 2:
+                    raise e
+
+        df = pd.read_csv(
+            io.StringIO(resp.text),
+            header=0,
+            dtype=str,
+            on_bad_lines="skip",
+        )
+        df.columns = [c.strip() for c in df.columns]
+
+        # Cột: B(1)=Dep assign, D(3)=Task type, F(5)=Team, J(9)=Date complete, M(12)=Confirm
+        COL_DEP = 1
+        COL_TASK = 3
+        COL_TEAM = 5
+        COL_DONE = 9
+
+        today_naive = today.replace(tzinfo=None)
+        day0 = today_naive.date()
+        day1 = (today_naive - timedelta(days=1)).date()
+        day2 = (today_naive - timedelta(days=2)).date()
+        day7 = (today_naive - timedelta(days=7))
+        date_str = today.strftime("%d/%m/%Y")
+
+        def parse_date(val):
+            if pd.isna(val):
+                return None
+            val_str = str(val).strip()
+            for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y"):
+                try:
+                    return datetime.strptime(val_str.split()[0], fmt)
+                except ValueError:
+                    continue
+            return None
+
+        # Nhóm theo (dep, team, task_type) → {total, d0, d1, d2, d7, month}
+        groups = {}
+        for _, row in df.iterrows():
+            if len(row) < 10:
+                continue
+            dep = str(row.iloc[COL_DEP]).strip() if not pd.isna(row.iloc[COL_DEP]) else ""
+            if not dep or dep.lower() in ("", "nan", "dep assign", "sum"):
+                continue
+            task_type = str(row.iloc[COL_TASK]).strip() if not pd.isna(row.iloc[COL_TASK]) else ""
+            if not task_type or task_type.lower() in ("nan", ""):
+                continue
+
+            # Team — thử cột F(5), fallback cột G(6)
+            team = ""
+            if len(row) > COL_TEAM and not pd.isna(row.iloc[COL_TEAM]):
+                team = str(row.iloc[COL_TEAM]).strip()
+            if (not team or team.lower() in ("nan", "")) and len(row) > 6 and not pd.isna(row.iloc[6]):
+                team = str(row.iloc[6]).strip()
+            if not team or team.lower() in ("nan", ""):
+                team = "Office"
+
+            j_date = parse_date(row.iloc[COL_DONE]) if len(row) > COL_DONE else None
+
+            key = (dep, team, task_type)
+            if key not in groups:
+                groups[key] = {"total": 0, "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0}
+
+            g = groups[key]
+            g["total"] += 1
+
+            if j_date is not None:
+                jd = j_date.date()
+                if jd == day0:
+                    g["d0"] += 1
+                elif jd == day1:
+                    g["d1"] += 1
+                elif jd == day2:
+                    g["d2"] += 1
+                if j_date >= day7:
+                    g["d7"] += 1
+                if jd.year == day0.year and jd.month == day0.month:
+                    g["month"] += 1
+
+        if not groups:
+            return []
+
+        # Sắp xếp và nhóm theo Dep → Team → Task type
+        dep_data = {}
+        for (dep, team, task_type), g in groups.items():
+            if dep not in dep_data:
+                dep_data[dep] = {}
+            if team not in dep_data[dep]:
+                dep_data[dep][team] = []
+            dep_data[dep][team].append((task_type, g))
+
+        # Build messages — mỗi Dep là 1 message
+        messages = []
+        for dep in sorted(dep_data.keys()):
+            circle = DEP_CIRCLES.get(dep.lower().strip(), "▪️")
+            lines = [f"{circle} {dep} {date_str}"]
+
+            teams = dep_data[dep]
+            for team in sorted(teams.keys()):
+                lines.append(team)
+                for task_type, g in sorted(teams[team], key=lambda x: x[0]):
+                    progress = f"{g['d2']}/{g['d1']}/{g['d0']}"
+                    lines.append(
+                        f"{task_type} : total : {g['total']}  Progress 3 day: {progress}, "
+                        f"7 day: {g['d7']}, Month: {g['month']}"
+                    )
+            messages.append("\n".join(lines))
+
+        return messages
+    except Exception as e:
+        logger.warning(f"get_input_task_detail failed: {e}")
+        return []
+
 def build_asset_progress_summary(content: str) -> str:
     """
     Chèn dòng tổng hợp ngay SAU header section (vd: "CM 06/06/2026").
@@ -1298,9 +1441,11 @@ async def main():
     month_days = report_data.get("month_days", 0)
     leaders_data = report_data.get("leaders", [])
 
-    # ── 5. Fetch Input Task summary ──
+    # ── 5. Fetch Input Task summary + detail ──
     input_task_summary = get_input_task_summary(now)
     logger.info("Input task summary: OK" if input_task_summary else "Input task summary: empty")
+    input_task_detail = get_input_task_detail(now)
+    logger.info(f"Input task detail: {len(input_task_detail)} dept messages")
 
     # ── 5.5 Team→employees mapping (dùng khi gửi riêng lẻ cho TL) ──
     TEAM_BY_NUMBER = {
@@ -1562,6 +1707,21 @@ async def main():
             (0, tech_msg, CONTROL_CHAT_ID, "TECH_GROUP")
         )
 
+    # ── 7c. Gửi Input Task Detail (chi tiết Dep→Team→TaskType) → CONTROL ──
+    if input_task_detail and SEND_BOT_TOKEN:
+        full_detail = "\n\n".join(input_task_detail)
+        detail_msg = (
+            f"📋 5. Report — Technical Dep Assign to Team\n"
+            f"📅 {now_str}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{full_detail}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 Total: {len(input_task_detail)} departments"
+        )
+        groups.setdefault(SEND_BOT_TOKEN, []).append(
+            (0, detail_msg, CONTROL_CHAT_ID, "TECHDEP_DETAIL")
+        )
+
     # ── Mapping chat_id → GAS key để delete-old / save-new ──
     CHATID_TO_KEY = {
         "-5180992881": "CRON_TEAM_T1",
@@ -1576,6 +1736,8 @@ async def main():
             delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
         # TECH_GROUP → CONTROL
         delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_CONTROL")
+        # TECHDEP_DETAIL → CONTROL
+        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_DETAIL")
         # CONSOLIDATED_EOD → CONTROL
         delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_EOD_CONTROL")
 
@@ -1592,6 +1754,8 @@ async def main():
                     # Xác định GAS key từ label + chat_id
                     if label == "TECH_GROUP":
                         gas_key = "CRON_TECHDEP_CONTROL"
+                    elif label == "TECHDEP_DETAIL":
+                        gas_key = "CRON_TECHDEP_DETAIL"
                     elif label == "CONSOLIDATED_EOD":
                         gas_key = "CRON_EOD_CONTROL"
                     else:
