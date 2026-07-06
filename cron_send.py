@@ -1711,7 +1711,7 @@ async def main():
     if input_task_detail and SEND_BOT_TOKEN:
         full_detail = "\n\n".join(input_task_detail)
         detail_msg = (
-            f"📋 5. Report — Technical Dep Assign to Team\n"
+            f"📋 8. Report — Technical Dep Assign to Team\n"
             f"📅 {now_str}\n"
             f"━━━━━━━━━━━━━━━━━━━━━━\n"
             f"{full_detail}\n"
