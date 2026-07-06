@@ -713,12 +713,12 @@ def get_input_task_summary(today: datetime) -> str:
         if not stats:
             return ""
             
-        # Vuông chéo (diamond) màu cố định cho mỗi Dep
+        # Vuông chéo (diamond) màu cố định cho mỗi Dep — đồng cỡ lớn
         DEP_SQUARES = {
-            "admin": "🔷", "asset": "🔶", "cm": "🔸", "fbb": "🔶",
-            "finance": "💠", "hr": "♦️", "m&e": "🔸", "manager": "🔹",
-            "pm": "🔷", "transmission": "🔷", "construction": "💠",
-            "noc": "🔹", "technical": "🔷",
+            "admin": "🔷", "asset": "🔶", "cm": "🔶", "fbb": "🔶",
+            "finance": "🔷", "hr": "🔶", "m&e": "🔶", "manager": "🔷",
+            "pm": "🔷", "transmission": "🔷", "construction": "🔶",
+            "noc": "🔷", "technical": "🔷",
         }
         lines = ["📋 Input Task by Dep:"]
         for dep in sorted(stats.keys()):
