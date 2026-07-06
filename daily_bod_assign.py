@@ -28,8 +28,13 @@ SHEET_URL = (
 # Timezone Myanmar
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 
-# Danh sách icon chấm màu cho các phòng ban khác nhau
-COLOR_DOTS = ["🔵", "🟢", "🟡", "🟠", "🟣", "🔴", "🟤", "⚪", "⚫"]
+# Vuông chéo (diamond) màu cố định cho mỗi Dep
+DEP_SQUARES = {
+    "admin": "🔷", "asset": "🔶", "cm": "🔸", "fbb": "🔶",
+    "finance": "💠", "hr": "♦️", "m&e": "🔸", "manager": "🔹",
+    "pm": "🔷", "transmission": "🔷", "construction": "💠",
+    "noc": "🔹", "technical": "🔷",
+}
 
 def parse_date(val):
     if pd.isna(val):
@@ -164,7 +169,7 @@ async def main():
     total_assigned_all = total_d0 = total_d1 = total_d2 = total_d7 = total_month = total_unconfirmed = 0
 
     for i, (role, s) in enumerate(sorted_stats):
-        dot = COLOR_DOTS[i % len(COLOR_DOTS)]
+        dot = DEP_SQUARES.get(role.lower().strip(), "🔹")
         # Định dạng chuẩn theo yêu cầu:
         # Admin: Task assign : 10 = 3 day 0/0/0 7 day: 1 Month: 5 Not Yet Cofirm : 3 case
         lines.append(

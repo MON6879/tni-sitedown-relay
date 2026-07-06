@@ -713,12 +713,20 @@ def get_input_task_summary(today: datetime) -> str:
         if not stats:
             return ""
             
+        # Vuông chéo (diamond) màu cố định cho mỗi Dep
+        DEP_SQUARES = {
+            "admin": "🔷", "asset": "🔶", "cm": "🔸", "fbb": "🔶",
+            "finance": "💠", "hr": "♦️", "m&e": "🔸", "manager": "🔹",
+            "pm": "🔷", "transmission": "🔷", "construction": "💠",
+            "noc": "🔹", "technical": "🔷",
+        }
         lines = ["📋 Input Task by Dep:"]
         for dep in sorted(stats.keys()):
             s = stats[dep]
             progress = f"{s['done_d3']}/{s['done_d2']}/{s['done_d1']}"
+            sq = DEP_SQUARES.get(dep.lower().strip(), "▪️")
             lines.append(
-                f"  • {dep}: Assign: {s['assign']} | Progress {progress} 7day: {s['done_7d']}  Month {s['done_month']} | Not yet confirm: {s['not_yet_confirm']}"
+                f"  {sq} {dep}: Assign: {s['assign']} | Progress {progress} 7day: {s['done_7d']}  Month {s['done_month']} | Not yet confirm: {s['not_yet_confirm']}"
             )
         return "\n".join(lines)
     except Exception as e:
