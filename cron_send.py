@@ -737,6 +737,7 @@ def get_input_task_summary(today: datetime) -> str:
 def build_asset_progress_summary(content: str) -> str:
     """
     Chèn dòng tổng hợp ngay SAU header section (vd: "CM 06/06/2026").
+    Thêm chấm tròn màu cho mỗi Dep header.
 
     Input (cú pháp cũ):
       CM 06/06/2026
@@ -747,12 +748,19 @@ def build_asset_progress_summary(content: str) -> str:
       ...
 
     Output:
-      CM 06/06/2026
+      🟡 CM 06/06/2026
       📊 Tổng: Total:61 | 3day:0/0/0 | 7day:0 | Month:0
       Team 01
       Request Export material : total : 28  Progress 3 day: 0/0/0, 7 day: 0, Month: 0
       ...
     """
+    # Chấm tròn màu cố định cho Dep header (Technical Dep report)
+    DEP_CIRCLES = {
+        "admin": "🔵", "asset": "🟢", "cm": "🟡", "fbb": "🟠",
+        "finance": "🟣", "hr": "🔴", "m&e": "🟤", "manager": "⚪",
+        "pm": "⚫", "transmission": "🔵", "construction": "🟠",
+        "construction projects": "🟠", "noc": "⚫", "technical": "🔵",
+    }
     # Pattern nhận biết dòng data có số liệu: "total : X  Progress 3 day: a/b/c, 7 day: d, Month: e"
     data_pat = re.compile(
         r'total\s*:\s*(\d+).*?3\s*day\s*:\s*(\d+)/(\d+)/(\d+).*?7\s*day\s*:\s*(\d+).*?Month\s*:\s*(\d+)',
@@ -769,9 +777,15 @@ def build_asset_progress_summary(content: str) -> str:
     i = 0
     while i < len(lines):
         line = lines[i]
-        if header_pat.match(line.strip()):
-            # Đây là header section → tính tổng cho toàn bộ section phía dưới
-            result.append(line)
+        hm = header_pat.match(line.strip())
+        if hm:
+            # Thêm chấm tròn màu cho header
+            dep_name = hm.group(1).strip()
+            circle = DEP_CIRCLES.get(dep_name.lower(), "")
+            if circle:
+                result.append(f"{circle} {line.strip()}")
+            else:
+                result.append(line)
             # Gom các dòng dữ liệu của section này (đến header tiếp theo hoặc hết)
             j = i + 1
             section_lines = []
