@@ -718,7 +718,7 @@ def get_input_task_summary(today: datetime) -> str:
             "admin": "💙", "asset": "💚", "cm": "💛", "fbb": "🧡",
             "finance": "💜", "hr": "❤️", "m&e": "🤎", "manager": "🤍",
             "pm": "🖤", "transmission": "💙", "construction": "🧡",
-            "noc": "🖤", "technical": "💙",
+            "construction projects": "🧡", "noc": "🖤", "technical": "💙",
         }
         lines = ["📋 Input Task by Dep:"]
         for dep in sorted(stats.keys()):

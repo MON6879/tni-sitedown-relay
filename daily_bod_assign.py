@@ -33,7 +33,7 @@ DEP_SQUARES = {
     "admin": "💙", "asset": "💚", "cm": "💛", "fbb": "🧡",
     "finance": "💜", "hr": "❤️", "m&e": "🤎", "manager": "🤍",
     "pm": "🖤", "transmission": "💙", "construction": "🧡",
-    "noc": "🖤", "technical": "💙",
+    "construction projects": "🧡", "noc": "🖤", "technical": "💙",
 }
 
 def parse_date(val):
