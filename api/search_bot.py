@@ -170,19 +170,43 @@ def get_wos(tni: str) -> list:
     return wos
 
 def lookup_tni(tni: str) -> str:
+    """Tra cứu TNIxxxx từ cột G (nội dung gộp sẵn) trong sheet Tên Sum WO.
+    Cột A (index 0) = Site ID, cột G (index 6) = nội dung gộp."""
     def e(s): return html.escape(str(s))
-    lines = [f"🔍 <b>{e(tni)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
-    site_info = get_site_info(tni)
-    if site_info:
-        lines.append(f"\n📍 <b>Site Info</b>\n{e(site_info)}")
-    tasks = get_tasks(tni)
-    lines.append(f"\n📋 <b>Task ({len(tasks)})</b>")
-    lines += [f"• {e(t)}" for t in tasks] if tasks else ["• No see"]
-    wos = get_wos(tni)
-    lines.append(f"\n🔧 <b>WO ({len(wos)})</b>")
-    lines += [f"• {e(w)}" for w in wos] if wos else ["• No see"]
-    lines.append("━━━━━━━━━━━━━━━━━━━━")
-    return "\n".join(lines)
+    tni_upper = tni.upper()
+
+    try:
+        df = fetch_csv(GID_TEAM_SUM)
+    except Exception as ex:
+        logger.error(f"lookup_tni fetch error: {ex}")
+        return f"❌ Error loading data: {e(str(ex)[:80])}"
+
+    if df is None or df.empty:
+        return "❌ No data available."
+
+    # Tìm row có cột A = TNI code
+    for _, row in df.iterrows():
+        col_a = safe(row, 0).strip().upper()
+        if col_a != tni_upper:
+            continue
+        col_g = safe(row, 6)  # Cột G = nội dung gộp sẵn
+        if not col_g:
+            continue
+
+        # Format: ~ TNIxxxx <+> Task: ... <+> WO: ...
+        # Tách theo <+> để hiển thị từng phần
+        parts = [p.strip() for p in col_g.split("<+>") if p.strip()]
+
+        lines = [f"🔍 <b>{e(tni_upper)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
+        for part in parts:
+            # Bỏ ~ ở đầu nếu có
+            clean = part.lstrip("~ ").strip()
+            if clean:
+                lines.append(f"• {e(clean)}")
+        lines.append("━━━━━━━━━━━━━━━━━━━━")
+        return "\n".join(lines)
+
+    return f"❌ No data found for <b>{e(tni_upper)}</b>"
 
 def split_messages(text: str) -> list:
     chunks, current = [], ""
@@ -782,7 +806,6 @@ def handle(update: dict) -> None:
         except Exception as e:
             logger.error(f"log_search failed: {e}")
 
-    load_all_sheets()
     result = lookup_tni(tni)
     for chunk in split_messages(result):
         tg_send(chat_id, chunk)
