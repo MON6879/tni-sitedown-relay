@@ -223,7 +223,7 @@ def split_by_site_blocks(blocks: list[str]) -> list[str]:
 # ── Team Leader search (T1/T2/T3/T4) ─────────────────────────────────────
 def lookup_team(team_code: str) -> list[str]:
     """Tra cứu tất cả site thuộc team (T1/T2/T3/T4) từ sheet Tên Sum WO.
-    Trả về list tin nhắn (đã chia nhỏ theo site block)."""
+    Đọc trực tiếp cột G (index 6) — nội dung đã gộp sẵn."""
     team_code_upper = team_code.upper()
     team_names = {
         "T1": "Team 1 — Dawei",
@@ -242,57 +242,47 @@ def lookup_team(team_code: str) -> list[str]:
     if df is None or df.empty:
         return ["❌ No data available."]
 
-    # Lọc rows theo cột F (index 5) = team code
-    site_blocks = []
+    # Gom tất cả nội dung cột G từ các row có cột F = team code
+    raw_entries = []
     for _, row in df.iterrows():
         col_f = safe(row, 5).strip().upper()
-        # Khớp chính xác T1, T2, T3, T4 (bỏ qua "Team Leader T2" etc.)
         if col_f != team_code_upper:
             continue
+        col_g = safe(row, 6)  # Cột G = nội dung gộp sẵn
+        if col_g:
+            raw_entries.append(col_g)
 
-        site_id  = safe(row, 0)  # Cột A = Site ID
-        task_raw = safe(row, 2)  # Cột C = Task info
-        wo_raw   = safe(row, 3)  # Cột D = WO info
-
-        if not site_id or site_id == "0":
-            continue
-
-        lines = [f"━━━━━━━━━━━━━━━━━━━━\n📍 <b>{html.escape(site_id)}</b>"]
-
-        # ── Task section ──
-        lines.append("\n📋 <b>Task:</b>")
-        if task_raw and task_raw.lower() != "no see":
-            tasks = [t.strip() for t in task_raw.split("|=***=|") if t.strip()]
-            for t in tasks:
-                lines.append(f"  • {html.escape(t)}")
-        else:
-            lines.append("  • No task")
-
-        # ── WO section ──
-        lines.append("\n🔧 <b>WO:</b>")
-        if wo_raw:
-            wos = [w.strip() for w in wo_raw.split("|=***=|") if w.strip()]
-            for w in wos:
-                lines.append(f"  • {html.escape(w)}")
-        else:
-            lines.append("  • No WO")
-
-        site_blocks.append("\n".join(lines))
-
-    if not site_blocks:
+    if not raw_entries:
         return [f"❌ No sites found for <b>{html.escape(team_code_upper)}</b>"]
+
+    # Gộp tất cả rồi tách theo ~ cho mỗi site
+    full_raw = " ".join(raw_entries)
+    sites = [s.strip() for s in full_raw.split("~") if s.strip()]
 
     # Header
     now_mm = datetime.now(TZ_MM)
     header = (
         f"🔍 <b>{html.escape(team_label)}</b> — "
-        f"{len(site_blocks)} sites\n"
+        f"{len(sites)} sites\n"
         f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
     )
 
-    # Ghép header vào block đầu tiên
+    # Build site blocks — mỗi site 1 block
+    site_blocks = []
+    for site_text in sites:
+        # Tách <+> thành các dòng riêng với bullet
+        parts = [p.strip() for p in site_text.split("<+>") if p.strip()]
+        lines = []
+        for p in parts:
+            lines.append(f"• {html.escape(p)}")
+        site_blocks.append("\n".join(lines))
+
+    if not site_blocks:
+        return [f"❌ No sites found for <b>{html.escape(team_code_upper)}</b>"]
+
+    # Ghép header vào block đầu
     site_blocks[0] = header + site_blocks[0]
-    # Thêm footer vào block cuối
     site_blocks[-1] = site_blocks[-1] + "\n━━━━━━━━━━━━━━━━━━━━"
 
     return split_by_site_blocks(site_blocks)
@@ -322,49 +312,35 @@ def lookup_notclose(team_code: str) -> list[str]:
 
     entries = []
     for _, row in df.iterrows():
-        col_h = safe(row, 7).strip().upper()  # Cột H = filter tag
-        if col_h != tag:
+        col_ar = safe(row, 43).strip().upper()  # Cột AR = filter tag
+        if col_ar != tag:
             continue
-
-        wo_code  = safe(row, 1)   # B: WO Code
-        wo_desc  = safe(row, 2)   # C: WO Description
-        staff    = safe(row, 4)   # E: Assigned staff
-        amount   = safe(row, 5)   # F: Amount/Score
-        wo_date  = safe(row, 6)   # G: Date
-
-        if not wo_code:
-            continue
-
-        line = f"  • {html.escape(wo_code)}\n"
-        line += f"    {html.escape(wo_desc)}\n"
-        parts = []
-        if staff:  parts.append(f"👤 {html.escape(staff)}")
-        if amount:
-            amt_icon = "🔴" if amount.startswith("-") else "🟢"
-            parts.append(f"{amt_icon} {html.escape(amount)}")
-        if wo_date: parts.append(f"📅 {html.escape(wo_date)}")
-        if parts:
-            line += f"    {' | '.join(parts)}"
-        entries.append(line)
+        col_as = safe(row, 44)  # Cột AS = nội dung gộp sẵn
+        if col_as:
+            entries.append(col_as)
 
     if not entries:
         return [f"❌ No WO Not Close found for <b>{html.escape(team_code.upper())}</b>"]
+
+    # Gộp tất cả rồi tách theo ~ cho mỗi WO
+    full_raw = " ".join(entries)
+    items = [s.strip() for s in full_raw.split("~") if s.strip()]
 
     now_mm = datetime.now(TZ_MM)
     header = (
         f"🔴 <b>{html.escape(team_label)} — WO Not Close</b>\n"
         f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}\n"
-        f"📊 Total: {len(entries)} WOs\n"
+        f"📊 Total: {len(items)} WOs\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
     )
 
-    # Ghép entries, mỗi entry là 1 block
-    blocks = []
-    for entry in entries:
-        blocks.append(entry)
+    # Mỗi item hiển thị nguyên, tách | thành dòng mới
+    lines = []
+    for item in items:
+        parts = [p.strip() for p in item.split("|") if p.strip()]
+        lines.append("• " + "\n  ".join(html.escape(p) for p in parts))
 
-    # Build full text và split
-    full_text = header + "\n".join(blocks) + "\n━━━━━━━━━━━━━━━━━━━━"
+    full_text = header + "\n".join(lines) + "\n━━━━━━━━━━━━━━━━━━━━"
     return split_messages(full_text)
 
 
@@ -392,44 +368,34 @@ def lookup_waitcd(team_code: str) -> list[str]:
 
     entries = []
     for _, row in df.iterrows():
-        col_am = safe(row, 38).strip().upper()  # Cột AM = filter tag
-        if col_am != tag:
+        col_ao = safe(row, 40).strip().upper()  # Cột AO = filter tag
+        if col_ao != tag:
             continue
-
-        wo_code   = safe(row, 32)  # AG: WO Code
-        wo_desc   = safe(row, 33)  # AH: WO Description
-        # AI (34): Team name — SKIP
-        start_dt  = safe(row, 35)  # AJ: Start date
-        end_dt    = safe(row, 36)  # AK: End date
-        amount    = safe(row, 37)  # AL: Amount/Score
-
-        if not wo_code:
-            continue
-
-        line = f"  • {html.escape(wo_code)}\n"
-        line += f"    {html.escape(wo_desc)}\n"
-        parts = []
-        if start_dt: parts.append(f"🕐 {html.escape(start_dt)}")
-        if end_dt:   parts.append(f"🕑 {html.escape(end_dt)}")
-        if amount:
-            amt_icon = "🔴" if amount.startswith("-") else "🟢"
-            parts.append(f"{amt_icon} {html.escape(amount)}")
-        if parts:
-            line += f"    {' | '.join(parts)}"
-        entries.append(line)
+        col_ap = safe(row, 41)  # Cột AP = nội dung gộp sẵn
+        if col_ap:
+            entries.append(col_ap)
 
     if not entries:
         return [f"❌ No WO Wait CD found for <b>{html.escape(team_code.upper())}</b>"]
+
+    # Gộp tất cả rồi tách theo ~ cho mỗi WO
+    full_raw = " ".join(entries)
+    items = [s.strip() for s in full_raw.split("~") if s.strip()]
 
     now_mm = datetime.now(TZ_MM)
     header = (
         f"🟡 <b>{html.escape(team_label)} — WO Wait CD</b>\n"
         f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}\n"
-        f"📊 Total: {len(entries)} WOs\n"
+        f"📊 Total: {len(items)} WOs\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
     )
 
-    full_text = header + "\n".join(entries) + "\n━━━━━━━━━━━━━━━━━━━━"
+    lines = []
+    for item in items:
+        parts = [p.strip() for p in item.split("|") if p.strip()]
+        lines.append("• " + "\n  ".join(html.escape(p) for p in parts))
+
+    full_text = header + "\n".join(lines) + "\n━━━━━━━━━━━━━━━━━━━━"
     return split_messages(full_text)
 
 
