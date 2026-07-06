@@ -337,7 +337,7 @@ def build_tl_search_section(team_key: str, report_data: dict, no_id_members: dic
     # Sort A-Z theo tên
     leaders_sorted = sorted(leaders, key=lambda x: x.get("name", ""))
 
-    lines = ["👑 Team Leader Search:"]
+    lines = ["👑 Team Leader Search: T1 | T1notclose | T1waitcd @SEARCHTNITASKWOBOT"]
     for tl in leaders_sorted:
         name = tl.get("name", "?")
         uid = tl.get("uid", "")
