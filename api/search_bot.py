@@ -242,15 +242,15 @@ def lookup_team(team_code: str) -> list[str]:
     if df is None or df.empty:
         return ["❌ No data available."]
 
-    # Gom tất cả nội dung cột G từ các row có cột F = team code
+    # Gom nội dung cột I từ các row có cột H = team code
     raw_entries = []
     for _, row in df.iterrows():
-        col_f = safe(row, 5).strip().upper()
-        if col_f != team_code_upper:
+        col_h = safe(row, 7).strip().upper()  # Cột H = filter tag
+        if col_h != team_code_upper:
             continue
-        col_g = safe(row, 6)  # Cột G = nội dung gộp sẵn
-        if col_g:
-            raw_entries.append(col_g)
+        col_i = safe(row, 8)  # Cột I = nội dung gộp sẵn
+        if col_i:
+            raw_entries.append(col_i)
 
     if not raw_entries:
         return [f"❌ No sites found for <b>{html.escape(team_code_upper)}</b>"]
