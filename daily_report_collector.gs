@@ -402,9 +402,23 @@ function handleStoreDailyPlan(body) {
       }
     }
 
-    const refNum = lastRow;
-    const ref = "DP-" + String(refNum).padStart(3, "0");
-    sheet.appendRow([ref, date, team, content, report, comparison]);
+    // Tính REF bằng cách quét max existing (giống Daily report)
+    let maxRef = 0;
+    if (lastRow >= 2) {
+      const refValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (let i = 0; i < refValues.length; i++) {
+        const m = String(refValues[i][0]).match(/(\d+)/);
+        if (m) {
+          const val = parseInt(m[1], 10);
+          if (!isNaN(val) && val > maxRef) maxRef = val;
+        }
+      }
+    }
+    const ref = "DP-" + String(maxRef + 1).padStart(3, "0");
+
+    // Chèn dòng mới tại dòng 2 (newest first, giống Daily report and Bussiness)
+    sheet.insertRowBefore(2);
+    sheet.getRange(2, 1, 1, 6).setValues([[ref, date, team, content, report, comparison]]);
 
     return jsonOut({ status: "ok", ref: ref });
   } catch (err) {

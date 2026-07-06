@@ -243,6 +243,52 @@ def parse_cable_fields(text: str) -> dict:
     return result
 
 
+# ── Daily Plan detection ──────────────────────────────────────────────────
+def is_daily_plan(text: str) -> bool:
+    """Detect plan message: first line has 'plan', text has date d/m/yyyy."""
+    if not text:
+        return False
+    first_line = text.strip().split("\n")[0].lower()
+    has_plan = "plan" in first_line
+    has_date = bool(re.search(r'\d{1,2}/\d{1,2}/\d{2,4}', text))
+    return has_plan and has_date
+
+
+def parse_plan_fields(text: str) -> tuple:
+    """Extract (date, team, content) from plan message."""
+    lines = text.strip().split("\n")
+    # Date: tìm ngày trong toàn bộ text
+    date_str = ""
+    date_m = re.search(r'(\d{1,2}/\d{1,2}/\d{2,4})', text)
+    if date_m:
+        parts = date_m.group(1).split("/")
+        if len(parts) == 3:
+            d, m, y = parts
+            if len(y) == 2:
+                y = "20" + y
+            date_str = f"{d.zfill(2)}/{m.zfill(2)}/{y}"
+    # Team: tìm Team + số
+    team_str = ""
+    team_m = re.search(r'Team\s*0?([1-5])', text, re.IGNORECASE)
+    if team_m:
+        team_str = f"Team {team_m.group(1)}"
+    # Content: mọi thứ sau dòng header (dòng đầu có 'plan') và dòng team
+    team_line_idx = 0
+    for i, line in enumerate(lines[1:], 1):
+        if re.match(r'^\s*Team\s*0?[1-5]\s*$', line.strip(), re.IGNORECASE):
+            team_line_idx = i
+            break
+    start_idx = max(1, team_line_idx + 1 if team_line_idx > 0 else 1)
+    content_lines = []
+    for i in range(start_idx, len(lines)):
+        line = lines[i].strip()
+        if not content_lines and not line:
+            continue
+        content_lines.append(lines[i])
+    content = "\n".join(content_lines).strip()
+    return date_str, team_str, content
+
+
 # ── Detect collector keyword in message ───────────────────────────────────
 def is_collector_msg(text: str) -> bool:
     """Match keyword at start of any line, case-insensitive, with or without ':'."""
@@ -850,6 +896,33 @@ async def handle(data: dict):
                 await bot.send_message(chat_id, f"⚠️ Error: {err}", parse_mode="HTML")
             return
 
+
+        # ── Daily Plan → store to Team leader assign Plan sheet ─────────
+        if is_daily_plan(text):
+            date_str, team_str, content = parse_plan_fields(text)
+            if date_str and team_str:
+                result = post_sheet({
+                    "action":      "store_daily_plan",
+                    "date":        date_str,
+                    "team":        team_str,
+                    "content":     content or text,
+                    "daily_report": "",
+                    "comparison":  "",
+                })
+                status = result.get("status", "")
+                if status == "ok":
+                    ref = result.get("ref", "?")
+                    dup = result.get("duplicate", False)
+                    icon = "⏭️" if dup else "📋"
+                    await bot.send_message(
+                        chat_id,
+                        f"{icon} Plan {'updated' if dup else 'saved'}"
+                        f" — REF:{ref} | {team_str} | {date_str}",
+                    )
+                else:
+                    err = html.escape(result.get("message", "unknown")[:80])
+                    await bot.send_message(chat_id, f"⚠️ Plan save failed: {err}", parse_mode="HTML")
+                return
 
         # ── Collector commands ─────────────────────────────────────────────
         if is_collector_msg(text):
