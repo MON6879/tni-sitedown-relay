@@ -1,9 +1,13 @@
 """
 daily_plan_report.py
 ====================
-Run at 17:30 Myanmar — collect "Daily Plan" messages from Team groups,
-store in Google Sheet "Team leader assign Plan" tab with comparison data,
-and send summary reports (3Day / 7Day / Month) to each team group + CONTROL.
+Collects "Daily Plan" messages from Team groups, stores in Google Sheet,
+and sends summary reports to each team group + CONTROL.
+
+3 modes via --mode argument:
+  eod     (17:00) — EOD Plan vs Actual results + Plan Tomorrow status
+  update  (21:00) — Updated Plan Tomorrow status (refresh)
+  morning (07:00) — Forward TL's plan content + 3D/7D/1M stats + 3-day completion rate
 
 Sheet: 1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y
 Tab:   "Team leader assign Plan" (GID: 853981745)
@@ -14,10 +18,11 @@ Tab:   "Team leader assign Plan" (GID: 853981745)
   E = Daily Report results (from "Daily report and Bussiness" B:S)
   F = Comparison (Plan vs Actual)
 
-Trigger: GitHub Actions daily_plan_report.yml at 14:30 UTC = 21:00 Myanmar
+Trigger: GitHub Actions daily_reports.yml (plan_eod / plan_update / plan_morning)
 Uses: Telethon (read messages) + SEND_BOT (send reports) + Apps Script (sheet I/O)
 """
 
+import argparse
 import asyncio
 import io
 import os
@@ -869,6 +874,143 @@ def build_plan_stats(plans: list, team_filter: str = None) -> dict:
     return stats
 
 
+# ── Plan Tomorrow helpers ──────────────────────────────────────
+
+def find_plans_for_date(plans: list, target_date_str: str, team_filter: str = None) -> list:
+    """
+    Find all plans whose embedded date matches target_date_str (DD/MM/YYYY).
+    Optionally filter by team.
+    """
+    results = []
+    for p in plans:
+        if team_filter:
+            plan_team = normalize_team(p.get("team", ""))
+            if plan_team != team_filter:
+                continue
+        dt = parse_plan_date(p.get("date", ""))
+        if not dt:
+            continue
+        plan_date_str = dt.strftime("%d/%m/%Y")
+        if plan_date_str == target_date_str:
+            results.append(p)
+    return results
+
+
+async def scan_plan_tomorrow(client, group_key: str, chat_id: int,
+                              target_date_str: str, leader_id: str,
+                              since_utc: datetime) -> dict:
+    """
+    Scan a Telegram group for Plan Tomorrow messages from the Team Leader.
+    Returns: {
+        "found": bool,
+        "sent_time": str (HH:MM),
+        "content": str,
+        "plan": dict or None
+    }
+    """
+    result = {"found": False, "sent_time": "", "content": "", "plan": None}
+    try:
+        history = await client(GetHistoryRequest(
+            peer=chat_id, limit=200,
+            offset_date=None, offset_id=0,
+            max_id=0, min_id=0, add_offset=0, hash=0,
+        ))
+        for msg in history.messages:
+            if msg.date < since_utc:
+                break
+            # Filter by leader
+            sender_id_str = str(msg.sender_id) if msg.sender_id else ""
+            if sender_id_str != str(leader_id).strip():
+                continue
+            if msg.message and is_daily_plan_msg(msg.message):
+                parsed = parse_daily_plan(msg.message)
+                if parsed:
+                    dt = parse_plan_date(parsed.get("date", ""))
+                    if dt and dt.strftime("%d/%m/%Y") == target_date_str:
+                        dt_mm = msg.date.astimezone(MYANMAR_TZ) if msg.date.tzinfo else \
+                            msg.date.replace(tzinfo=timezone.utc).astimezone(MYANMAR_TZ)
+                        result = {
+                            "found": True,
+                            "sent_time": dt_mm.strftime("%H:%M"),
+                            "content": parsed.get("content", msg.message),
+                            "plan": parsed,
+                        }
+                        return result  # Lấy plan mới nhất (messages desc)
+    except Exception as e:
+        logger.error(f"scan_plan_tomorrow {group_key} error: {e}")
+    return result
+
+
+def calc_3day_completion_rate(all_plans: list, team_comparisons: dict,
+                               team_reports_all: dict = None) -> dict:
+    """
+    Tính tỉ lệ hoàn thành kế hoạch 3 ngày gần nhất (không tính hôm nay nếu chưa hết ngày).
+    Returns per-team + overall:
+    {
+      "T1": {"days": [{date, plan_count, done_count, pct}, ...], "total_plan", "total_done", "pct"},
+      ...
+      "overall": {"total_plan", "total_done", "pct"}
+    }
+    """
+    now = myanmar_now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    result = {}
+    grand_plan = 0
+    grand_done = 0
+
+    for gk in ("T1", "T2", "T3", "T4"):
+        team_days = []
+        team_plan_total = 0
+        team_done_total = 0
+
+        for days_ago in range(3, 0, -1):  # d3, d2, d1 (3 ngày trước hôm nay)
+            target_dt = today_start - timedelta(days=days_ago)
+            target_str = target_dt.strftime("%d/%m/%Y")
+
+            # Tìm plans cho ngày đó
+            day_plans = find_plans_for_date(all_plans, target_str, team_filter=gk)
+            if not day_plans:
+                team_days.append({"date": target_str, "plan_count": 0, "done_count": 0, "pct": 0})
+                continue
+
+            # Đếm TNI codes trong plan
+            plan_tni = set()
+            for p in day_plans:
+                plan_tni |= extract_tni_codes(p.get("content", p.get("d", "")))
+
+            plan_count = len(plan_tni)
+
+            # Comparison data — nếu có trong sheet plans (col F)
+            done_count = 0
+            for p in day_plans:
+                comp_text = p.get("comparison", p.get("f", ""))
+                if comp_text:
+                    done_match = re.search(r'Done:\s*(\d+)', str(comp_text))
+                    if done_match:
+                        done_count = max(done_count, int(done_match.group(1)))
+
+            pct = round(done_count / plan_count * 100) if plan_count > 0 else 0
+            team_days.append({"date": target_str, "plan_count": plan_count, "done_count": done_count, "pct": pct})
+            team_plan_total += plan_count
+            team_done_total += done_count
+
+        team_pct = round(team_done_total / team_plan_total * 100) if team_plan_total > 0 else 0
+        result[gk] = {
+            "days": team_days,
+            "total_plan": team_plan_total,
+            "total_done": team_done_total,
+            "pct": team_pct,
+        }
+        grand_plan += team_plan_total
+        grand_done += team_done_total
+
+    overall_pct = round(grand_done / grand_plan * 100) if grand_plan > 0 else 0
+    result["overall"] = {"total_plan": grand_plan, "total_done": grand_done, "pct": overall_pct}
+
+    return result
+
+
 # ── Send message helper ────────────────────────────────────────
 
 async def send_msg(bot, cid, text, label=""):
@@ -914,11 +1056,23 @@ async def send_msg(bot, cid, text, label=""):
 
 # ── Main ────────────────────────────────────────────────────────
 
-async def main():
+async def run_eod_or_update(mode: str):
+    """
+    Mode 'eod' (17:00) or 'update' (21:00):
+    - Scan today's plans → store → compare vs daily report
+    - Build per-team + CONTROL report
+    - Append "Plan Tomorrow" section at the bottom
+    """
     now = myanmar_now()
     now_str = now.strftime("%d/%m/%Y %H:%M")
     date_str = now.strftime("%d/%m/%Y")
-    logger.info(f"🚀 Daily Plan Report start – {now_str}")
+    tomorrow = now + timedelta(days=1)
+    tomorrow_str = tomorrow.strftime("%d/%m/%Y")
+
+    mode_label = "EOD" if mode == "eod" else "Updated"
+    delete_prefix = "PLAN_EOD" if mode == "eod" else "PLAN_UPD"
+
+    logger.info(f"🚀 Daily Plan Report ({mode_label}) start – {now_str}")
 
     # ── Step 1: Scan Telegram groups for Daily Plan messages ──
     since_utc = (now - timedelta(days=2)).replace(
@@ -933,6 +1087,7 @@ async def main():
 
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
     all_today_plans = {}  # group_key -> list of parsed plans
+    plan_tomorrow_status = {}  # group_key -> {found, sent_time, content, plan}
 
     async with client:
         me = await client.get_me()
@@ -953,6 +1108,16 @@ async def main():
 
             if today_plans:
                 all_today_plans[group_key] = today_plans
+
+            # ── Scan Plan Tomorrow (plan for tomorrow's date) ──
+            pt = await scan_plan_tomorrow(
+                client, group_key, chat_id,
+                target_date_str=tomorrow_str,
+                leader_id=leader_id,
+                since_utc=since_utc,
+            )
+            plan_tomorrow_status[group_key] = pt
+            logger.info(f"     Plan Tomorrow ({tomorrow_str}): {'✅ Found' if pt['found'] else '❌ Not found'}")
 
             await asyncio.sleep(0.5)
 
@@ -1117,13 +1282,22 @@ async def main():
                         dr_part = f"3Day: {dc['d2']}/{dc['d1']}/{dc['d0']} | 7Day: {dc['d7']} | Month: {dc['month']}"
                     lines.append(f"   • Submission Stats: {dr_part}")
 
+            # ── Plan Tomorrow section ──
+            lines.append(divider)
+            pt = plan_tomorrow_status.get(group_key, {"found": False})
+            lines.append(f"📝 Plan Tomorrow ({tomorrow_str}):")
+            if pt["found"]:
+                lines.append(f"✅ Team Leader: Submitted ✓ (sent at {pt['sent_time']})")
+            else:
+                lines.append("❌ Team Leader: Not yet submitted")
             lines.append(divider)
 
             msg = "\n".join(lines)
-            delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, f"PLAN_{group_key}")
-            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-{group_key}")
+            delete_key = f"{delete_prefix}_{group_key}"
+            delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, delete_key)
+            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-{mode_label}-{group_key}")
             if ok and msg_ids:
-                save_msgids(APPS_SCRIPT_URL, f"PLAN_{group_key}", msg_ids)
+                save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
             await asyncio.sleep(0.5)
 
         # ── 5b. Send consolidated report to CONTROL ──
@@ -1197,16 +1371,227 @@ async def main():
                 ctrl_lines.append(f"🏷️ {team_name}:")
                 ctrl_lines.append(colorize_bullets(content))  # • [Admin] → vuông màu
 
+        # ── Plan Tomorrow summary for CONTROL ──
+        ctrl_lines.append(divider)
+        ctrl_lines.append(f"📝 Plan Tomorrow ({tomorrow_str}):")
+        for group_key in ("T1", "T2", "T3", "T4"):
+            team_name = GROUP_NAMES.get(group_key, group_key)
+            pt = plan_tomorrow_status.get(group_key, {"found": False})
+            if pt["found"]:
+                ctrl_lines.append(f"   ✅ {team_name}: Submitted ✓ (sent at {pt['sent_time']})")
+            else:
+                ctrl_lines.append(f"   ❌ {team_name}: Not yet submitted")
+
         ctrl_lines.append(divider)
 
         ctrl_msg = "\n".join(ctrl_lines)
-        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "PLAN_CONTROL")
-        ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, ctrl_msg, "PLAN-CONTROL")
+        ctrl_delete_key = f"{delete_prefix}_CONTROL"
+        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, ctrl_delete_key)
+        ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, ctrl_msg, f"PLAN-{mode_label}-CONTROL")
         if ok and msg_ids:
-            save_msgids(APPS_SCRIPT_URL, "PLAN_CONTROL", msg_ids)
+            save_msgids(APPS_SCRIPT_URL, ctrl_delete_key, msg_ids)
 
-    logger.info(f"🎉 Daily Plan Report complete – {myanmar_now().strftime('%H:%M')}")
+    logger.info(f"🎉 Daily Plan Report ({mode_label}) complete – {myanmar_now().strftime('%H:%M')}")
+
+
+async def run_morning():
+    """
+    Mode 'morning' (07:00):
+    - Forward TL's plan for today (plan_date == today)
+    - Show 3Day/7Day/1Month submission stats
+    - Show 3-day completion rate
+    """
+    now = myanmar_now()
+    now_str = now.strftime("%d/%m/%Y %H:%M")
+    date_str = now.strftime("%d/%m/%Y")
+    delete_prefix = "PLAN_MRN"
+
+    logger.info(f"🚀 Daily Plan Report (Morning) start – {now_str}")
+
+    # Scan for today's plan (sent yesterday or early morning with date = today)
+    since_utc = (now - timedelta(days=2)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ).astimezone(timezone.utc)
+
+    leaders = get_team_leaders()
+    logger.info(f"  📋 Team leaders loaded: {leaders}")
+
+    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+    plan_today_status = {}  # group_key -> {found, sent_time, content, plan}
+
+    async with client:
+        me = await client.get_me()
+        logger.info(f"🔑 Logged in: @{me.username} ({me.first_name})")
+
+        for group_key, chat_id in GROUPS.items():
+            logger.info(f"  📡 Scanning {group_key} for today's plan ({date_str})...")
+            leader_id = leaders.get(group_key)
+
+            pt = await scan_plan_tomorrow(
+                client, group_key, chat_id,
+                target_date_str=date_str,  # Today's date
+                leader_id=leader_id,
+                since_utc=since_utc,
+            )
+            plan_today_status[group_key] = pt
+            logger.info(f"     Plan today ({date_str}): {'✅ Found' if pt['found'] else '❌ Not found'}")
+            await asyncio.sleep(0.5)
+
+    # Read plan history from Sheet for stats
+    logger.info("📖 Reading plan history from Sheet...")
+    all_plans = get_daily_plans()
+    logger.info(f"  📊 Total plans in sheet: {len(all_plans)}")
+
+    # Build 3-day completion rate
+    logger.info("📊 Calculating 3-day completion rate...")
+    completion_rate = calc_3day_completion_rate(all_plans, {})
+
+    if not SEND_BOT_TOKEN:
+        logger.error("SEND_BOT_TOKEN not set — cannot send reports")
+        return
+
+    divider = "━" * 30
+
+    async with Bot(token=SEND_BOT_TOKEN) as bot:
+        # ── Per-team morning reports ──
+        for group_key, chat_id in GROUPS.items():
+            team_name = GROUP_NAMES.get(group_key, group_key)
+            stats = build_plan_stats(all_plans, team_filter=group_key)
+            pt = plan_today_status.get(group_key, {"found": False})
+            cr = completion_rate.get(group_key, {"days": [], "total_plan": 0, "total_done": 0, "pct": 0})
+
+            lines = [
+                f"📋 5.1 Report — Plan — {team_name}",
+                f"📅 {date_str}  |  🕐 {now.strftime('%H:%M')}",
+                divider,
+            ]
+
+            # Plan today status
+            lines.append(f"📝 Today's Plan ({date_str}):")
+            if pt["found"]:
+                lines.append(f"✅ Team Leader: Submitted ✓ (sent at {pt['sent_time']})")
+                lines.append("")
+                lines.append("📋 Plan Content:")
+                lines.append(colorize_bullets(pt["content"]))
+            else:
+                lines.append("⚠️ Team Leader: NOT SUBMITTED (Deadline: before 07:00)")
+
+            # Submission history
+            lines.append(divider)
+            lines.append(
+                f"📊 Submission History: 3Day: {stats['d2']}/{stats['d1']}/{stats['d0']} "
+                f"| 7Day: {stats['d7']} | Month: {stats['month']}"
+            )
+
+            # 3-day completion rate
+            lines.append("")
+            lines.append("📈 3-Day Completion Rate:")
+            for day_info in cr["days"]:
+                if day_info["plan_count"] > 0:
+                    lines.append(
+                        f"   {day_info['date']}: Plan {day_info['plan_count']} "
+                        f"→ Done {day_info['done_count']} ({day_info['pct']}%)"
+                    )
+                else:
+                    lines.append(f"   {day_info['date']}: No plan")
+
+            if cr["total_plan"] > 0:
+                lines.append(
+                    f"   Overall: {cr['total_done']}/{cr['total_plan']} = {cr['pct']}%"
+                )
+            else:
+                lines.append("   Overall: No data")
+
+            lines.append(divider)
+
+            msg = "\n".join(lines)
+            delete_key = f"{delete_prefix}_{group_key}"
+            delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, delete_key)
+            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-MRN-{group_key}")
+            if ok and msg_ids:
+                save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
+            await asyncio.sleep(0.5)
+
+        # ── CONTROL consolidated morning report ──
+        ctrl_lines = [
+            f"📋 5.1 Report — Plan — Summary",
+            f"📅 {date_str}  |  🕐 {now.strftime('%H:%M')}",
+            divider,
+        ]
+
+        for group_key in ("T1", "T2", "T3", "T4"):
+            team_name = GROUP_NAMES.get(group_key, group_key)
+            pt = plan_today_status.get(group_key, {"found": False})
+            stats = build_plan_stats(all_plans, team_filter=group_key)
+            cr = completion_rate.get(group_key, {"days": [], "total_plan": 0, "total_done": 0, "pct": 0})
+
+            ctrl_lines.append(f"🏷️ {team_name}:")
+            if pt["found"]:
+                ctrl_lines.append(f"   ✅ Plan Submitted ✓ (sent at {pt['sent_time']})")
+            else:
+                ctrl_lines.append("   ⚠️ NOT SUBMITTED (Deadline: before 07:00)")
+            ctrl_lines.append(
+                f"   3Day: {stats['d2']}/{stats['d1']}/{stats['d0']} "
+                f"| 7Day: {stats['d7']} | Month: {stats['month']}"
+            )
+            if cr["total_plan"] > 0:
+                ctrl_lines.append(
+                    f"   📈 Completion: {cr['total_done']}/{cr['total_plan']} = {cr['pct']}%"
+                )
+
+        ctrl_lines.append(divider)
+
+        # Overall completion rate
+        overall_cr = completion_rate.get("overall", {"total_plan": 0, "total_done": 0, "pct": 0})
+        if overall_cr["total_plan"] > 0:
+            ctrl_lines.append(
+                f"📊 Overall 3-Day Completion: "
+                f"{overall_cr['total_done']}/{overall_cr['total_plan']} = {overall_cr['pct']}%"
+            )
+
+        # Today's plan contents
+        has_any_plan = any(plan_today_status.get(gk, {}).get("found", False) for gk in ("T1", "T2", "T3", "T4"))
+        if has_any_plan:
+            ctrl_lines.append("")
+            ctrl_lines.append("📝 Today's Plans:")
+            for group_key in ("T1", "T2", "T3", "T4"):
+                pt = plan_today_status.get(group_key, {"found": False})
+                if pt["found"]:
+                    team_name = GROUP_NAMES.get(group_key, group_key)
+                    ctrl_lines.append("──────────")
+                    ctrl_lines.append(f"🏷️ {team_name}:")
+                    ctrl_lines.append(colorize_bullets(pt["content"]))
+
+        ctrl_lines.append(divider)
+
+        ctrl_msg = "\n".join(ctrl_lines)
+        ctrl_delete_key = f"{delete_prefix}_CONTROL"
+        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, ctrl_delete_key)
+        ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, ctrl_msg, "PLAN-MRN-CONTROL")
+        if ok and msg_ids:
+            save_msgids(APPS_SCRIPT_URL, ctrl_delete_key, msg_ids)
+
+    logger.info(f"🎉 Daily Plan Report (Morning) complete – {myanmar_now().strftime('%H:%M')}")
+
+
+async def main():
+    parser = argparse.ArgumentParser(description="Daily Plan Report — 3 modes")
+    parser.add_argument(
+        "--mode",
+        choices=["eod", "update", "morning"],
+        default="eod",
+        help="Report mode: eod (17:00), update (21:00), morning (07:00)",
+    )
+    args = parser.parse_args()
+
+    logger.info(f"📌 Mode: {args.mode}")
+
+    if args.mode in ("eod", "update"):
+        await run_eod_or_update(args.mode)
+    elif args.mode == "morning":
+        await run_morning()
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+

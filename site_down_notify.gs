@@ -329,19 +329,51 @@ function relayBotlookupToTNI() {
     }
   }
 
-  // Bước 7: 19:55–20:25 Myanmar → dispatch daily_plan_report.yml (1 lần/ngày lúc 20:00)
-  const isPlanReportTime = (myanmarHour === 19 && myanmarMin >= 55) || (myanmarHour === 20 && myanmarMin <= 25);
-  if (isPlanReportTime) {
-    const planReportKey = "DAILY_PLAN_REPORT_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
-    const props5        = PropertiesService.getScriptProperties();
-    if (!props5.getProperty(planReportKey)) {
-      const okPlan = triggerDailyPlanReport();
-      if (okPlan) {
-        props5.setProperty(planReportKey, "done");
-        Logger.log("[relayBotlookupToTNI] ✅ Dispatch daily_plan_report.yml lúc 20:xx Myanmar");
+  // Bước 7a: 16:55–17:25 Myanmar → dispatch plan_eod (1 lần/ngày lúc 17:00)
+  const isPlanEodTime = (myanmarHour === 16 && myanmarMin >= 55) || (myanmarHour === 17 && myanmarMin <= 25);
+  if (isPlanEodTime) {
+    const planEodKey = "DAILY_PLAN_EOD_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+    const propsEod   = PropertiesService.getScriptProperties();
+    if (!propsEod.getProperty(planEodKey)) {
+      const okPlanEod = triggerDailyWorkflow("plan_eod");
+      if (okPlanEod) {
+        propsEod.setProperty(planEodKey, "done");
+        Logger.log("[relayBotlookupToTNI] ✅ Dispatch plan_eod lúc 17:00 Myanmar");
       }
     } else {
-      Logger.log("[relayBotlookupToTNI] ℹ️ daily_plan_report.yml đã dispatch hôm nay rồi — bỏ qua");
+      Logger.log("[relayBotlookupToTNI] ℹ️ plan_eod đã dispatch hôm nay rồi — bỏ qua");
+    }
+  }
+
+  // Bước 7b: 20:55–21:25 Myanmar → dispatch plan_update (1 lần/ngày lúc 21:00)
+  const isPlanUpdTime = (myanmarHour === 20 && myanmarMin >= 55) || (myanmarHour === 21 && myanmarMin <= 25);
+  if (isPlanUpdTime) {
+    const planUpdKey = "DAILY_PLAN_UPD_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+    const propsUpd   = PropertiesService.getScriptProperties();
+    if (!propsUpd.getProperty(planUpdKey)) {
+      const okPlanUpd = triggerDailyWorkflow("plan_update");
+      if (okPlanUpd) {
+        propsUpd.setProperty(planUpdKey, "done");
+        Logger.log("[relayBotlookupToTNI] ✅ Dispatch plan_update lúc 21:00 Myanmar");
+      }
+    } else {
+      Logger.log("[relayBotlookupToTNI] ℹ️ plan_update đã dispatch hôm nay rồi — bỏ qua");
+    }
+  }
+
+  // Bước 7c: 06:55–07:25 Myanmar → dispatch plan_morning (1 lần/ngày lúc 07:00)
+  const isPlanMrnTime = (myanmarHour === 6 && myanmarMin >= 55) || (myanmarHour === 7 && myanmarMin <= 25);
+  if (isPlanMrnTime) {
+    const planMrnKey = "DAILY_PLAN_MRN_DATE_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+    const propsMrn   = PropertiesService.getScriptProperties();
+    if (!propsMrn.getProperty(planMrnKey)) {
+      const okPlanMrn = triggerDailyWorkflow("plan_morning");
+      if (okPlanMrn) {
+        propsMrn.setProperty(planMrnKey, "done");
+        Logger.log("[relayBotlookupToTNI] ✅ Dispatch plan_morning lúc 07:00 Myanmar");
+      }
+    } else {
+      Logger.log("[relayBotlookupToTNI] ℹ️ plan_morning đã dispatch hôm nay rồi — bỏ qua");
     }
   }
 }
@@ -508,9 +540,15 @@ function triggerDailyReadReport() {
   return triggerDailyWorkflow("read_report");
 }
 
-// ── Dispatch daily_plan_report.yml (plan_report) lúc 20:00 Myanmar
-function triggerDailyPlanReport() {
-  return triggerDailyWorkflow("plan_report");
+// ── Dispatch daily_plan_report.py — 3 modes
+function triggerDailyPlanEod() {
+  return triggerDailyWorkflow("plan_eod");
+}
+function triggerDailyPlanUpdate() {
+  return triggerDailyWorkflow("plan_update");
+}
+function triggerDailyPlanMorning() {
+  return triggerDailyWorkflow("plan_morning");
 }
 
 // ── Dispatch daily_bod_assign.yml (bod_assign) lúc 17:00 Myanmar

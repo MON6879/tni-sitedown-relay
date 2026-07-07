@@ -98,7 +98,7 @@ Telegram Groups (per-team + consolidated to CONTROL)
 
 ### 4. `check_read_status.py` — Quick Read Check (manual)
 
-### 5. `daily_plan_report.py` — Daily Plan Collection & Report (17:30 Myanmar)
+### 5. `daily_plan_report.py` — Daily Plan Collection & Report (3 modes: EOD 17:00, Update 21:00, Morning 07:00)
 - **Trigger:** GitHub Actions `daily_plan_report.yml` (cron + workflow_dispatch)
 - **Schedule:** 17:30 Myanmar = 11:00 UTC
 - **API:** Telethon (read messages) + SEND_BOT (send reports) + Apps Script (sheet I/O)
@@ -216,7 +216,9 @@ Missing: TNI0052, TNI0185, TNI0058
 | **17:00** | `daily_bod_assign.py` | `daily_reports.yml` (`bod_assign`) | Report 2: BOD-assigned task statistics (Consolidated) to CONTROL |
 | **17:10** | `backlog_send.py` | `daily_reports.yml` (`daily_task`) | Report 1, 2, 3: Daily Backlog reports to team groups |
 | **17:00** | `cron_send.py` | `daily_reports.yml` (`daily_task`) | Report 4: Daily EOD Task + Asset + Search reports to all groups |
-| **20:00** | `daily_plan_report.py` | `daily_reports.yml` (`plan_report`) | Report 5: Daily Plan collection + Comparison report |
+| **17:00** | `daily_plan_report.py --mode eod` | `daily_reports.yml` (`plan_eod`) | Report 5A: EOD Plan vs Actual + Plan Tomorrow status |
+| **21:00** | `daily_plan_report.py --mode update` | `daily_reports.yml` (`plan_update`) | Report 5B: Updated Plan Tomorrow status |
+| **07:00** | `daily_plan_report.py --mode morning` | `daily_reports.yml` (`plan_morning`) | Report 5C: Morning Plan forward + 3D/7D/1M stats + completion rate |
 | **20:30** | `daily_read_report.py` | `daily_reports.yml` (`read_report`) | Report 6: Note read status per-person (Cutoff at 20:25) to teams + CONTROL |
 
 ---
