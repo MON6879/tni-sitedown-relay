@@ -2104,8 +2104,16 @@ function setupSendBotWebhook() {
     return;
   }
   
-  const url = "https://api.telegram.org/bot" + token + "/setWebhook?url=" + webAppUrl + "&allowed_updates=[\"message\",\"callback_query\"]";
-  const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  const url = "https://api.telegram.org/bot" + token + "/setWebhook";
+  const payload = {
+    url: webAppUrl,
+    allowed_updates: JSON.stringify(["message", "callback_query"])
+  };
+  const resp = UrlFetchApp.fetch(url, {
+    method: "post",
+    payload: payload,
+    muteHttpExceptions: true
+  });
   Logger.log("Set Webhook Response: " + resp.getContentText());
 }
 
