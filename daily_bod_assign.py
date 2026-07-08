@@ -207,8 +207,8 @@ async def main():
         if ok and msg_ids and APPS_SCRIPT_URL:
             save_msgids(APPS_SCRIPT_URL, "BOD_ASSIGN_CONTROL", msg_ids)
 
-    # ── 8.1. Report — BOD Assign to M&E ──
-    has_new_assign_me = False
+    # ── 1.1. Report — BOD Assign to M&E ──
+    today_me_tasks = []
     for idx, row in data_rows.iterrows():
         if len(row) < 4:
             continue
@@ -222,29 +222,44 @@ async def main():
         if role == "m&e":
             assign_date = parse_date(assign_date_val)
             if assign_date == d0:
-                has_new_assign_me = True
-                break
+                row_num = idx + 2
+                pic_val = row[1] if len(row) > 1 else ""
+                content_val = row[2] if len(row) > 2 else ""
+                
+                pic = str(pic_val).strip()
+                content = str(content_val).strip()
+                today_me_tasks.append({
+                    "row": row_num,
+                    "pic": pic,
+                    "content": content
+                })
 
-    if has_new_assign_me:
-        report_8_1_lines = [
-            "📋 8.1. Report — BOD Assign to M&E",
+    if today_me_tasks:
+        report_1_1_lines = [
+            "📋 1.1. Report — BOD Assign to M&E",
             f"📅 {date_str}  |  🕐 {now_str}",
             "━━━━━━━━━━━━━━━━━━━━━━",
-            "M&E: You have new Assign from BOD or Manager",
+            "M&E: You have new Assign from BOD or Manager:",
             "━━━━━━━━━━━━━━━━━━━━━━"
         ]
-        report_8_1_msg = "\n".join(report_8_1_lines)
+        
+        buttons = []
+        for task in today_me_tasks:
+            task_line = f"• Row #{task['row']} | PIC: {task['pic']} | Content: {task['content']}"
+            report_1_1_lines.append(task_line)
+            buttons.append([InlineKeyboardButton(f"Yes, I received Row #{task['row']}", callback_data=f"ack_bod_assign_me_{task['row']}")])
+            
+        report_1_1_lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        report_1_1_msg = "\n".join(report_1_1_lines)
         
         if APPS_SCRIPT_URL:
-            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "BOD_ASSIGN_8_1_CONTROL")
+            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "BOD_ASSIGN_1_1_CONTROL")
             
         async with Bot(token=SEND_BOT_TOKEN) as bot:
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("Yes, I received and will follow it", callback_data="ack_bod_assign_me")]
-            ])
-            ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, report_8_1_msg, "BOD_ASSIGN_8_1_CONTROL", reply_markup=keyboard)
+            keyboard = InlineKeyboardMarkup(buttons)
+            ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, report_1_1_msg, "BOD_ASSIGN_1_1_CONTROL", reply_markup=keyboard)
             if ok and msg_ids and APPS_SCRIPT_URL:
-                save_msgids(APPS_SCRIPT_URL, "BOD_ASSIGN_8_1_CONTROL", msg_ids)
+                save_msgids(APPS_SCRIPT_URL, "BOD_ASSIGN_1_1_CONTROL", msg_ids)
 
 if __name__ == "__main__":
     asyncio.run(main())

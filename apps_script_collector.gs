@@ -1878,9 +1878,11 @@ function checkBodAssignME() {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return;
 
-  // Lấy dữ liệu cột A (Assign) và cột D (Detailed content)
-  const rangeA = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  const rangeD = sheet.getRange(2, 4, lastRow - 1, 1).getDisplayValues(); // Dùng DisplayValue để đọc hiển thị dạng chuỗi
+  // Lấy dữ liệu các cột
+  const rangeA = sheet.getRange(2, 1, lastRow - 1, 1).getValues(); // Cột A: Assign
+  const rangeB = sheet.getRange(2, 2, lastRow - 1, 1).getValues(); // Cột B: PIC / Backoffice task
+  const rangeC = sheet.getRange(2, 3, lastRow - 1, 1).getValues(); // Cột C: Group Assign (Content)
+  const rangeD = sheet.getRange(2, 4, lastRow - 1, 1).getDisplayValues(); // Cột D: Date Assign
 
   const todayStr = Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy");
   const props = PropertiesService.getScriptProperties();
@@ -1895,6 +1897,7 @@ function checkBodAssignME() {
 
   let hasNewMatch = false;
   let newSentRows = [...sentRows];
+  let matchedTasks = [];
 
   for (let i = 0; i < rangeA.length; i++) {
     const rowNum = i + 2;
@@ -1904,9 +1907,13 @@ function checkBodAssignME() {
     if (assignTo === "m&e" && dateStr) {
       const datePart = dateStr.split(" ")[0].trim();
       if (datePart === todayStr) {
-        // Hàng này có ngày giao trùng ngày hôm nay
+        matchedTasks.push({
+          row: rowNum,
+          pic: String(rangeB[i][0] || "").trim(),
+          content: String(rangeC[i][0] || "").trim()
+        });
+
         if (sentRows.indexOf(rowNum) === -1) {
-          // Chưa gửi thông báo cho hàng này
           hasNewMatch = true;
           newSentRows.push(rowNum);
         }
@@ -1928,16 +1935,27 @@ function checkBodAssignME() {
     const nowStr = Utilities.formatDate(new Date(), "Asia/Rangoon", "HH:mm");
     
     const lines = [
-      "📋 8.1. Report — BOD Assign to M&E",
+      "📋 1.1. Report — BOD Assign to M&E",
       "📅 " + todayStr + "  |  🕐 " + nowStr,
       "━━━━━━━━━━━━━━━━━━━━━━",
-      "M&E: You have new Assign from BOD or Manager",
+      "M&E: You have new Assign from BOD or Manager:",
       "━━━━━━━━━━━━━━━━━━━━━━"
     ];
+
+    const inlineKeyboard = [];
+    matchedTasks.forEach(function(task) {
+      lines.push("• Row #" + task.row + " | PIC: " + task.pic + " | Content: " + task.content);
+      inlineKeyboard.push([{
+        text: "Yes, I received Row #" + task.row,
+        callback_data: "ack_bod_assign_me_" + task.row
+      }]);
+    });
+
+    lines.push("━━━━━━━━━━━━━━━━━━━━━━");
     const msgText = lines.join("\n");
 
     // Xóa tin cũ
-    const oldMsgKey = "SD_MSGID_BOD_ASSIGN_8_1_CONTROL";
+    const oldMsgKey = "SD_MSGID_BOD_ASSIGN_1_1_CONTROL";
     const oldMsgIdsRaw = props.getProperty(oldMsgKey) || "[]";
     try {
       const oldMsgIds = JSON.parse(oldMsgIdsRaw);
@@ -1957,7 +1975,7 @@ function checkBodAssignME() {
       Logger.log("[checkBodAssignME] ⚠️ Lỗi parse tin cũ: " + e.message);
     }
 
-    // Gửi tin mới kèm button
+    // Gửi tin mới kèm các button
     try {
       const resp = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
         method: "post",
@@ -1966,11 +1984,7 @@ function checkBodAssignME() {
           chat_id: controlChatId,
           text: msgText,
           reply_markup: {
-            inline_keyboard: [
-              [
-                { text: "Yes, I received and will follow it", callback_data: "ack_bod_assign_me" }
-              ]
-            ]
+            inline_keyboard: inlineKeyboard
           }
         }),
         muteHttpExceptions: true
