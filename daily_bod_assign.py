@@ -5,8 +5,11 @@ import logging
 import requests
 import pandas as pd
 from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
 from telegram import Bot
 from delete_old_helper import delete_old_messages_bot, save_msgids
+
+load_dotenv()
 
 # ===================== CẤU HÌNH =====================
 logging.basicConfig(
@@ -203,6 +206,42 @@ async def main():
         ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, report_msg, "BOD_ASSIGN_CONTROL")
         if ok and msg_ids and APPS_SCRIPT_URL:
             save_msgids(APPS_SCRIPT_URL, "BOD_ASSIGN_CONTROL", msg_ids)
+
+    # ── 8.1. Report — BOD Assign to M&E ──
+    has_new_assign_me = False
+    for idx, row in data_rows.iterrows():
+        if len(row) < 4:
+            continue
+        role_val = row[0]
+        assign_date_val = row[3]  # Column D
+        
+        if pd.isna(role_val) or not str(role_val).strip():
+            continue
+        role = str(role_val).strip().lower()
+        
+        if role == "m&e":
+            assign_date = parse_date(assign_date_val)
+            if assign_date == d0:
+                has_new_assign_me = True
+                break
+
+    if has_new_assign_me:
+        report_8_1_lines = [
+            "📋 8.1. Report — BOD Assign to M&E",
+            f"📅 {date_str}  |  🕐 {now_str}",
+            "━━━━━━━━━━━━━━━━━━━━━━",
+            "M&E: You have new Assign from BOD or Manager",
+            "━━━━━━━━━━━━━━━━━━━━━━"
+        ]
+        report_8_1_msg = "\n".join(report_8_1_lines)
+        
+        if APPS_SCRIPT_URL:
+            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "BOD_ASSIGN_8_1_CONTROL")
+            
+        async with Bot(token=SEND_BOT_TOKEN) as bot:
+            ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, report_8_1_msg, "BOD_ASSIGN_8_1_CONTROL")
+            if ok and msg_ids and APPS_SCRIPT_URL:
+                save_msgids(APPS_SCRIPT_URL, "BOD_ASSIGN_8_1_CONTROL", msg_ids)
 
 if __name__ == "__main__":
     asyncio.run(main())

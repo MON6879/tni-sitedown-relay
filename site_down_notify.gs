@@ -7,7 +7,7 @@
 //   3. Apps Script ghi vào Cột A của Sheet
 //   4. checkAndSend() chạy ngay:
 //      - Tin 1: Cột C → từng Team (site list chi tiết)
-//      - Tin 2: AW4:AZ8 → từng Team + Control (summary)
+//      - Tin 2: AW7:AZ15 → từng Team + Control (summary)
 // ============================================================
 
 // ── Bot ─────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ const SD_BOT_TOKEN = PropertiesService.getScriptProperties().getProperty("SD_BOT
 // ── Group Chat IDs ───────────────────────────────────────────
 const SD_GROUPS = {
   T1:      "-5180992881",   // TNI TEAM 1
-  T2:      "-5188855349",   // TNI TEAM 2 (T2 + T5)
+  T2:      "-5188855349",   // TNI TEAM 2 (T2 + T2 S*)
   T3:      "-5183480727",   // TNI TEAM 3
   T4:      "-5238696719",   // TNI TEAM 4
   CONTROL: "-5251698940",   // TNI TECHNICA DEP CONTROL SITE
@@ -33,14 +33,15 @@ const SD_SHEET_ID  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
 const SD_SHEET_GID = "0";
 
 // ── Timestamp keys (PropertiesService) ──────────────────────
-// Tin 1 dùng A1 timestamp, Tin 2 dùng AW4 timestamp — độc lập nhau.
+// Tin 1 dùng A1 timestamp, Tin 2 dùng AW7 timestamp — độc lập nhau.
 const TS_KEY_A1  = "SD_LAST_TS_A1";   // Tin 1: Col A → Col C per-team
-const TS_KEY_AW4 = "SD_LAST_TS_AW4";  // Tin 2: AW4:AZ8 summary
+const TS_KEY_AW7 = "SD_LAST_TS_AW7";  // Tin 2: AW7:AZ15 summary
 
 // ── AW:AZ column index (0-based) ────────────────────────────
 const AWAZ_COL = { T1: 0, T2: 1, T3: 2, T4: 3 };
 
-// ── Row labels trong AW4:AZ8 ────────────────────────────────
+// ── Row labels trong AW7:AZ15 ───────────────────────────────
+// Rows: Site down, Cell down, DG Abnormal, DG Run>16H, Link down + future rows
 const AWAZ_LABELS = [
   { emoji: "⚡", name: "Site down"   },
   { emoji: "🔴", name: "Cell down"   },
@@ -140,11 +141,20 @@ function doPostSiteDown(e) {
       return okJson({ status: "ignored_bot_or_report" });
     }
 
-    if (chatId !== SD_GROUPS.CONTROL || !isSiteDownReport(text))
-      return okJson({ status: "ignored" });
     const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
     const sheet = getSheetByGid(ss, SD_SHEET_GID);
-    if (sheet) { writeToColumnA(sheet, text); SpreadsheetApp.flush(); Utilities.sleep(3000); checkAndSend(); }
+    if (!sheet) return okJson({ status: "error", message: "Sheet GID not found" });
+
+    const config = loadTeamConfig(sheet);
+    const controlId = config.groups.CONTROL || "-5251698940";
+
+    if (chatId !== controlId || !isSiteDownReport(text))
+      return okJson({ status: "ignored" });
+
+    writeToColumnA(sheet, text);
+    SpreadsheetApp.flush();
+    Utilities.sleep(3000);
+    checkAndSend();
     return okJson({ status: "ok" });
   } catch (err) {
     Logger.log("❌ doPost error: " + err.message);
@@ -203,12 +213,14 @@ function checkAndSend() {
     const sheet = getSheetByGid(ss, SD_SHEET_GID);
     if (!sheet) { Logger.log("❌ Không tìm thấy sheet"); return; }
 
+    const config = loadTeamConfig(sheet);
+
     // ── BƯỚC 1: Poll Telegram lấy báo cáo mới → ghi Cột A ──
     fetchTelegramUpdates(sheet);
 
     // ── BƯỚC 2: Kiểm tra và gửi tin ─────────────────────────
-    checkColC(sheet);   // Tin 1: A1 thay đổi → Col C per-team + CONTROL
-    checkAwAz(sheet);   // Tin 2: AW4 thay đổi → AW:AZ summary per-team
+    checkColC(sheet, config);   // Tin 1: A1 thay đổi → Col C per-team + CONTROL
+    checkAwAz(sheet, config);   // Tin 2: AW7 thay đổi → AW:AZ summary per-team
 
   } finally {
     lock.releaseLock();
@@ -394,16 +406,18 @@ const TASK_TEAM_MAP = {
   "team 2": "-5188855349",
   "team 3": "-5183480727",
   "team 4": "-5238696719",
-  "team 5": "-5188855349",   // T2+T5 cùng group
   "t1":     "-5180992881",
   "t2":     "-5188855349",
   "t3":     "-5183480727",
   "t4":     "-5238696719",
-  "t5":     "-5188855349",
 };
 
 function sendTaskRemain() {
   try {
+    const ssSiteDown = SpreadsheetApp.openById(SD_SHEET_ID);
+    const config = loadTeamConfig(ssSiteDown.getSheets()[0]);
+    const taskTeamMap = getTaskTeamMap(config);
+
     const ss = SpreadsheetApp.openById(TASK_SHEET_ID);
 
     // Tìm sheet theo GID
@@ -427,7 +441,7 @@ function sendTaskRemain() {
 
       if (!teamRaw || !content) continue;
 
-      const chatId = TASK_TEAM_MAP[teamRaw.toLowerCase()];
+      const chatId = taskTeamMap[teamRaw.toLowerCase()];
       if (!chatId) {
         Logger.log("[TaskRemain] ⚠️ Không tìm thấy group cho team: " + teamRaw);
         continue;
@@ -439,8 +453,8 @@ function sendTaskRemain() {
 
     // Tìm team key từ chatId (để dùng làm msgKey)
     var chatIdToTeam = {};
-    for (var tk in TASK_TEAM_MAP) {
-      chatIdToTeam[TASK_TEAM_MAP[tk]] = tk.toUpperCase();
+    for (var tk in taskTeamMap) {
+      chatIdToTeam[taskTeamMap[tk]] = tk.toUpperCase();
     }
 
     // Xóa tin cũ → Gửi từng task riêng lẻ → Lưu msg_ids mới
@@ -570,7 +584,8 @@ function triggerBotlookupRelay() {
 //   - Per-team (format đẹp) → từng nhóm Team
 //   - Toàn bộ Col C (nguyên văn) → nhóm CONTROL
 // ============================================================
-function checkColC(sheet) {
+function checkColC(sheet, config) {
+  if (!config) { config = loadTeamConfig(sheet); }
   const raw = sheet.getRange("A1").getValue().toString().trim();
   if (!raw) { Logger.log("[Tin1] A1 rỗng — bỏ qua"); return; }
 
@@ -591,9 +606,9 @@ function checkColC(sheet) {
   const lines = colCRaw.split("\n");
 
   // ① CONTROL: nhận TOÀN BỘ Col C (có tô màu team)
-  const controlId = SD_GROUPS["CONTROL"];
+  const controlId = config.groups["CONTROL"] || SD_GROUPS["CONTROL"];
   if (controlId) {
-    const coloredRaw = colorizeTeams(colCRaw);
+    const coloredRaw = colorizeTeams(colCRaw, config);
     // Fix: split nội dung TRƯỚC khi bọc <pre></pre>
     // Tránh lỗi Telegram "Unclosed tag" khi split cắt giữa <pre>...</pre>
     // Edit-in-place: edit tin cũ trong ngày, gửi mới nếu chưa có hoặc tin dài
@@ -601,21 +616,25 @@ function checkColC(sheet) {
   }
 
   // ② Mỗi Team: header chung + summary team đó + site của team đó
-  const sitePattern = {
-    T1: /\|\s*T1\s*\|/i,
-    T2: /\|\s*T[25]\s*\|/i,   // T2 + T5 gộp
-    T3: /\|\s*T3\s*\|/i,
-    T4: /\|\s*T4\s*\|/i,
-  };
-  const summaryPattern = {
-    T1: /^Team\s*1\s*:/i,
-    T2: /^Team\s*[25]\s*:/i,
-    T3: /^Team\s*3\s*:/i,
-    T4: /^Team\s*4\s*:/i,
-  };
+  const sitePattern = {};
+  const summaryPattern = {};
+  const teams = Object.keys(config.groups).filter(t => t !== "CONTROL");
 
-  for (const team of ["T1", "T2", "T3", "T4"]) {
-    const chatId = SD_GROUPS[team];
+  for (const team of teams) {
+    const subTeamsForParent = Object.keys(config.subTeams).filter(code => config.subTeams[code] === team);
+    const codesToMatch = [team].concat(subTeamsForParent);
+    const escapedCodes = codesToMatch.map(code => code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+    sitePattern[team] = new RegExp("\\|\\s*(" + escapedCodes.join("|") + ")\\s*\\|", "i");
+
+    const label = config.teamLabels[team] || team;
+    const escapedLabel = label.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&').replace(/\s+/g, '\\s*');
+    const numPart = team.replace(/\D/g, "");
+    const optNumPattern = numPart ? "|Team\\s*" + numPart : "";
+    summaryPattern[team] = new RegExp("^(" + escapedLabel + optNumPattern + ")\\s*:", "i");
+  }
+
+  for (const team of teams) {
+    const chatId = config.groups[team];
     if (!chatId) continue;
 
     // Lấy header chung (không phải site, không phải "Team X:" của team khác)
@@ -623,20 +642,20 @@ function checkColC(sheet) {
       if (!line.trim()) return false;
       if (/^\d+:/.test(line)) return false;                     // site line → bỏ
       if (/^Team\s*\d+\s*:/i.test(line)) {
-        return summaryPattern[team].test(line);                  // chỉ giữ summary của team này
+        return summaryPattern[team] && summaryPattern[team].test(line); // chỉ giữ summary của team này
       }
       return true;                                               // header chung → giữ
     });
 
     // Lấy site lines của team này
-    const siteLines = lines.filter(line => sitePattern[team].test(line));
+    const siteLines = lines.filter(line => sitePattern[team] && sitePattern[team].test(line));
 
     const teamContent = siteLines.length > 0
       ? [...headerLines, "...", ...siteLines].join("\n")
       : [...headerLines, "Không có site down"].join("\n");
 
     // Tô màu team code trong tin nhắn
-    const coloredContent = colorizeTeams(teamContent);
+    const coloredContent = colorizeTeams(teamContent, config);
     // Edit-in-place: edit tin cũ trong ngày, gửi mới nếu chưa có hoặc tin dài
     sendOrEditTelegramPre(chatId, coloredContent, "TIN1_" + team, "[Tin1][" + team + "]");
   }
@@ -685,38 +704,41 @@ function sendNoteB2B5(sheet) {
 
 // ============================================================
 // TIN 2 — AW:AZ: summary (Site/Cell/DG/Link)
-// Trigger: AW4 timestamp thay đổi
+// Trigger: AW7 timestamp thay đổi
 // ============================================================
-function checkAwAz(sheet) {
-  const ts = parseAW4Timestamp(sheet);
-  if (!ts) { Logger.log("[Tin2] Không có timestamp trong AW4"); return; }
+function checkAwAz(sheet, config) {
+  if (!config) { config = loadTeamConfig(sheet); }
+  const ts = parseAW7Timestamp(sheet);
+  if (!ts) { Logger.log("[Tin2] Không có timestamp trong AW7"); return; }
 
-  // Chỉ so sánh timestamp AW4 — KHÔNG dùng hash nội dung AW4:AZ8
+  // Chỉ so sánh timestamp AW7 — KHÔNG dùng hash nội dung AW7:AZ15
   // Lý do: hash quá nhạy, trigger gửi lại khi Col C cập nhật (botlookup mới)
-  // nhưng AW4 timestamp chưa đổi → gửi SUMMARY với data cũ (lỗi 06:43 04:25)
-  // Logic đúng: SUMMARY chỉ gửi khi AW4 có timestamp MỚI (cập nhật từ hệ thống)
+  // nhưng AW7 timestamp chưa đổi → gửi SUMMARY với data cũ (lỗi 06:43 04:25)
+  // Logic đúng: SUMMARY chỉ gửi khi AW7 có timestamp MỚI (cập nhật từ hệ thống)
   const props  = PropertiesService.getScriptProperties();
-  const lastTs = props.getProperty(TS_KEY_AW4) || "";
-  if (ts === lastTs) { Logger.log("[Tin2] AW4 không đổi (" + ts + ") — bỏ qua"); return; }
+  const lastTs = props.getProperty(TS_KEY_AW7) || "";
+  if (ts === lastTs) { Logger.log("[Tin2] AW7 không đổi (" + ts + ") — bỏ qua"); return; }
 
   Logger.log("[Tin2] 🆕 " + ts + " → gửi summary...");
 
-  const awaz  = readAwAz(sheet);
-  const teams = ["T1", "T2", "T3", "T4"];
+  const awaz  = readAwAz(sheet, config);
+  const teams = Object.keys(config.groups).filter(t => t !== "CONTROL");
 
   // Gửi từng team
   for (const team of teams) {
-    const chatId = SD_GROUPS[team];
+    const chatId = config.groups[team];
     if (!chatId) continue;
-    const msg = buildAwAzTeamMessage(team, ts, awaz, AWAZ_COL[team]);
+    const colIdx = config.awazCol[team];
+    if (colIdx === undefined || colIdx === null || colIdx === "") continue;
+    const msg = buildAwAzTeamMessage(team, ts, awaz, colIdx, config);
     sendOrEditTelegram(chatId, msg, "TIN2_" + team, "[Tin2][" + team + "]");
   }
 
   // Gửi Tin 2 tổng hợp vào Control (HTML + emoji)
-  const controlId2 = SD_GROUPS["CONTROL"];
+  const controlId2 = config.groups["CONTROL"] || SD_GROUPS["CONTROL"];
   if (controlId2) {
     try {
-      const msg = buildAwAzControlMessage(ts, awaz);
+      const msg = buildAwAzControlMessage(ts, awaz, config);
       sendOrEditTelegram(controlId2, msg, "TIN2_CONTROL", "[Tin2][CONTROL]");
     } catch(e) {
       Logger.log("[Tin2][CONTROL] ❌ Lỗi: " + e.message);
@@ -726,7 +748,7 @@ function checkAwAz(sheet) {
   // Gửi Tin 2 cho cá nhân (TNI) — giống CONTROL, nhận qua DM
   for (const pid of SD_PERSONAL_IDS) {
     try {
-      const msgPersonal = buildAwAzControlMessage(ts, awaz);
+      const msgPersonal = buildAwAzControlMessage(ts, awaz, config);
       sendOrEditTelegram(pid, msgPersonal, "TIN2_P_" + pid, "[Tin2][TNI]");
     } catch(e) {
       Logger.log("[Tin2][TNI] ❌ Lỗi: " + e.message);
@@ -734,7 +756,7 @@ function checkAwAz(sheet) {
     Utilities.sleep(300);
   }
 
-  props.setProperty(TS_KEY_AW4, ts);  // lưu chỉ timestamp AW4
+  props.setProperty(TS_KEY_AW7, ts);  // lưu chỉ timestamp AW7
   Logger.log("[Tin2] ✅ Xong — lưu timestamp: " + ts);
 }
 
@@ -758,11 +780,11 @@ function parseA1Timestamp(sheet) {
 
 
 // ============================================================
-// PARSE TIMESTAMP từ AW4
-// "*Site down: 08/06/2026 10:20 = 12*"
+// PARSE TIMESTAMP từ AW7
+// "*Site down: 08/07/2026 09:48 = 13*"
 // ============================================================
-function parseAW4Timestamp(sheet) {
-  const raw = sheet.getRange("AW4").getValue().toString();
+function parseAW7Timestamp(sheet) {
+  const raw = sheet.getRange("AW7").getValue().toString();
   const m   = raw.match(/Site down:\s*(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/i);
   return m ? m[1].trim() : null;
 }
@@ -784,10 +806,17 @@ function readColCRaw(sheet) {
 
 
 // ============================================================
-// ĐỌC CỘT C — Tách site theo team (T5 gộp vào T2)
+// ĐỌC CỘT C — Tách site theo team (T* S* gộp vào team gốc)
+// T1, T1 S1, T1 S2... → Team 1 | T2, T2 S1, T2 Su1... → Team 2
 // ============================================================
-function readColC(sheet) {
-  const result  = { T1: [], T2: [], T3: [], T4: [] };
+function readColC(sheet, config) {
+  if (!config) { config = loadTeamConfig(sheet); }
+  const result  = {};
+  const teams = Object.keys(config.groups).filter(t => t !== "CONTROL");
+  for (const team of teams) {
+    result[team] = [];
+  }
+
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return result;
 
@@ -800,7 +829,7 @@ function readColC(sheet) {
     if (/^TNI Site down/i.test(text))   continue;
 
     const m = text.match(
-      /^\d+:\s*(TNI\w+)\s*\|\s*(T\d)\s*\|\s*([\d.]+)\s*\|\s*(\w[\w_]*)\s*\|\s*([\w+]+)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*\d+\s*\|?\s*(.*)/i
+      /^\d+:\s*(TNI\w+)\s*\|\s*(T\d(?:\s+S\w*)?)\s*\|\s*([\d.]+)\s*\|\s*(\w[\w_]*)\s*\|\s*([\w+]+)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*\d+\s*\|?\s*(.*)/i
     );
     if (!m) continue;
 
@@ -815,21 +844,38 @@ function readColC(sheet) {
       eat:      eatRaw.replace(/^EAT:\s*/i, "").trim(),
     };
 
-    const team = teamRaw.toUpperCase();
-    if      (team === "T1")                    result.T1.push(obj);
-    else if (team === "T2" || team === "T5")   result.T2.push(obj);
-    else if (team === "T3")                    result.T3.push(obj);
-    else if (team === "T4")                    result.T4.push(obj);
+    const teamRawUpper = teamRaw.toUpperCase().trim();
+    let baseTeam = teamRawUpper;
+    
+    // Check if it matches any sub-team mapping in config
+    if (config.subTeams[teamRawUpper]) {
+      baseTeam = config.subTeams[teamRawUpper];
+    } else {
+      // Fallback: strip sub-team suffix
+      baseTeam = teamRawUpper.replace(/\s+S\w*$/i, "");
+    }
+    
+    if (result[baseTeam]) {
+      result[baseTeam].push(obj);
+    }
   }
   return result;
 }
 
 
 // ============================================================
-// ĐỌC AW4:AZ8 — 5 rows × 4 cols
+// ĐỌC AW7:AZ15 — 9 rows × 4 cols (skip header row 6)
 // ============================================================
-function readAwAz(sheet) {
-  return sheet.getRange(4, 49, 5, 4).getValues(); // AW=col49
+function readAwAz(sheet, config) {
+  if (!config) { config = loadTeamConfig(sheet); }
+  let maxColIdx = 3;
+  for (const team of Object.keys(config.awazCol)) {
+    if (config.awazCol[team] > maxColIdx) {
+      maxColIdx = config.awazCol[team];
+    }
+  }
+  const numCols = maxColIdx + 1;
+  return sheet.getRange(7, 49, 9, numCols).getValues(); // AW7=row7, AW=col49
 }
 
 
@@ -837,7 +883,7 @@ function readAwAz(sheet) {
 // BUILD Tin 1 — Cột C cho từng Team (bảng monospace)
 // ============================================================
 function buildColCMessage(teamKey, ts, sites) {
-  const label = teamKey === "T2" ? "Team 2 (T2+T5)" : teamKey.replace("T", "Team ");
+  const label = teamKey.replace("T", "Team ");
 
   if (sites.length === 0) {
     return label + " | " + ts + "\nKhông có site down";
@@ -880,39 +926,63 @@ function escHtml(str) {
 
 
 // ============================================================
-// TÔ MÀU TEAM CODES — thêm emoji màu trước T1/T2/T3/T4/T5
-// 🔵 T1 | 🟡 T2 | 🟢 T3 | 🔴 T4 | 🟠 T5
+// TÔ MÀU TEAM CODES — thêm emoji màu trước T1/T2/T3/T4
+// 🔵 T1 | 🟡 T2 | 🟢 T3 | 🔴 T4
 // Hoạt động cả trong <pre> block (emoji hiển thị bình thường)
 // ============================================================
 const TEAM_COLORS = {
-  T1: "🔵", T2: "🟡", T3: "🟢", T4: "🔴", T5: "🟠"
+  T1: "🔵", T2: "🟡", T3: "🟢", T4: "🔴"
 };
 
-function colorizeTeams(text) {
-  // Thay | T1 | → | 🔵T1 | trong các dòng site (dạng: số: TNIxxxx | Tx | ...)
-  return (text || "").replace(/\|\s*(T[1-5])\s*\|/gi, function(match, team) {
-    const emoji = TEAM_COLORS[team.toUpperCase()] || "";
-    return "| " + emoji + team + " |";
+function colorizeTeams(text, config) {
+  if (!config) {
+    return (text || "").replace(/\|\s*(T[1-4])(?:\s+S\w*)?\s*\|/gi, function(match, team) {
+      const emoji = TEAM_COLORS[team.toUpperCase()] || "";
+      return "| " + emoji + team + " |";
+    });
+  }
+  let result = text || "";
+  const allCodes = Object.keys(config.subTeams).concat(Object.keys(config.groups));
+  // Sort by length descending to match longer strings first
+  allCodes.sort((a, b) => b.length - a.length);
+  
+  allCodes.forEach(code => {
+    if (code === "CONTROL") return;
+    const parent = config.subTeams[code] || code;
+    const emoji = config.colors[parent] || "";
+    const escapedCode = code.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp("\\|\\s*(" + escapedCode + ")\\s*\\|", "gi");
+    result = result.replace(regex, "| " + emoji + "$1 |");
   });
+  return result;
 }
 
 // ============================================================
 // BUILD Tin 2 — AW:AZ cho từng Team (HTML format)
 // ============================================================
-function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
-  const label = teamKey === "T2" ? "Team 2 (T2+T5)" : teamKey.replace("T", "Team ");
+function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx, config) {
+  const label = config ? (config.teamLabels[teamKey] || teamKey.replace("T", "Team ")) : teamKey.replace("T", "Team ");
   const lines = [];
   lines.push("📊 <b>SUMMARY — " + label + "</b>");
   lines.push("📅 " + escHtml(ts));
   lines.push("━".repeat(26));
 
   let hasData = false;
-  for (let r = 0; r < 5; r++) {
+  const numRows = awaz.length; // 9 rows (AW7:AZ15)
+  for (let r = 0; r < numRows; r++) {
     const txt = ((awaz[r] || [])[colIdx] || "").toString().trim();
     if (!txt || txt === "0") continue;
     // Xóa markdown * _ ` rồi wrap HTML
     const clean = escHtml(txt.replace(/[*_`]/g, ""));
-    lines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
+    // Dùng label cố định nếu có, nếu không thì trích label từ cell
+    if (r < AWAZ_LABELS.length) {
+      lines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
+    } else {
+      // Row mới ngoài 5 label cố định — trích label từ nội dung cell
+      const labelMatch = txt.match(/^([^:]+):/); 
+      const cellLabel = labelMatch ? labelMatch[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
+      lines.push("📌 <b>" + escHtml(cellLabel) + ":</b> " + clean);
+    }
     hasData = true;
   }
   if (!hasData) lines.push("✅ Không có sự cố");
@@ -923,21 +993,23 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
 // ============================================================
 // BUILD Tin 1 — Cột C tổng hợp cho Control (tất cả team)
 // ============================================================
-function buildColCControlMessage(ts, colCData) {
-  const teamLabels = {
+function buildColCControlMessage(ts, colCData, config) {
+  const teamLabels = config ? config.teamLabels : {
     T1: "Team 1",
-    T2: "Team 2 (T2+T5)",
+    T2: "Team 2",
     T3: "Team 3",
     T4: "Team 4",
   };
+  const teams = config ? Object.keys(config.groups).filter(t => t !== "CONTROL") : ["T1", "T2", "T3", "T4"];
   const lines = [];
   lines.push("SITE DOWN TONG HOP - TAT CA TEAM");
   lines.push("Ngay: " + ts);
   lines.push("");
 
-  for (const team of ["T1", "T2", "T3", "T4"]) {
+  for (const team of teams) {
     const sites = colCData[team] || [];
-    lines.push("=== " + teamLabels[team] + " (" + sites.length + " sites) ===");
+    const label = teamLabels[team] || team;
+    lines.push("=== " + label + " (" + sites.length + " sites) ===");
     if (sites.length === 0) {
       lines.push("  Khong co site down");
     } else {
@@ -956,29 +1028,74 @@ function buildColCControlMessage(ts, colCData) {
 // ============================================================
 // BUILD Tin 2 — AW:AZ tổng hợp cho Control (4 team, có emoji + format đẹp)
 // ============================================================
-function buildAwAzControlMessage(ts, awaz) {
-  const teamLabels = [
-    { key: "T1", label: "Team 1",          emoji: "🔵" },
-    { key: "T2", label: "Team 2 (T2+T5)",  emoji: "🟡" },
-    { key: "T3", label: "Team 3",          emoji: "🟢" },
-    { key: "T4", label: "Team 4",          emoji: "🔴" },
-  ];
+function buildAwAzControlMessage(ts, awaz, config) {
+  if (!config) {
+    const teamLabels = [
+      { key: "T1", label: "Team 1",  emoji: "🔵" },
+      { key: "T2", label: "Team 2",  emoji: "🟡" },
+      { key: "T3", label: "Team 3",  emoji: "🟢" },
+      { key: "T4", label: "Team 4",  emoji: "🔴" },
+    ];
+    const lines = [];
+    lines.push("📊 <b>SUMMARY TỔNG HỢP — TẤT CẢ TEAM</b>");
+    lines.push("📅 " + escHtml(ts));
+    lines.push("━".repeat(26));
+
+    const numRows = awaz.length; // 9 rows (AW7:AZ15)
+    for (let col = 0; col < 4; col++) {
+      const t = teamLabels[col];
+      lines.push("");
+      lines.push(t.emoji + " <b>" + t.label + "</b>");
+      lines.push("─".repeat(20));
+      let hasData = false;
+      for (let r = 0; r < numRows; r++) {
+        const txt = ((awaz[r] || [])[col] || "").toString().trim();
+        if (!txt || txt === "0") continue;
+        const clean = escHtml(txt.replace(/[*_`]/g, ""));
+        if (r < AWAZ_LABELS.length) {
+          lines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
+        } else {
+          const labelMatch = txt.match(/^([^:]+):/);
+          const cellLabel = labelMatch ? labelMatch[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
+          lines.push("📌 <b>" + escHtml(cellLabel) + ":</b> " + clean);
+        }
+        hasData = true;
+      }
+      if (!hasData) lines.push("✅ Không có sự cố");
+    }
+    return lines.join("\n");
+  }
+
+  const teams = Object.keys(config.groups).filter(t => t !== "CONTROL");
+  teams.sort((a, b) => (config.awazCol[a] || 0) - (config.awazCol[b] || 0));
+
   const lines = [];
   lines.push("📊 <b>SUMMARY TỔNG HỢP — TẤT CẢ TEAM</b>");
   lines.push("📅 " + escHtml(ts));
   lines.push("━".repeat(26));
 
-  for (let col = 0; col < 4; col++) {
-    const t = teamLabels[col];
+  const numRows = awaz.length; // 9 rows (AW7:AZ15)
+  for (const team of teams) {
+    const col = config.awazCol[team];
+    if (col === undefined || col === null || col === "") continue;
+    const label = config.teamLabels[team] || team.replace("T", "Team ");
+    const emoji = config.colors[team] || "🔵";
+
     lines.push("");
-    lines.push(t.emoji + " <b>" + t.label + "</b>");
+    lines.push(emoji + " <b>" + label + "</b>");
     lines.push("─".repeat(20));
     let hasData = false;
-    for (let r = 0; r < 5; r++) {
+    for (let r = 0; r < numRows; r++) {
       const txt = ((awaz[r] || [])[col] || "").toString().trim();
       if (!txt || txt === "0") continue;
       const clean = escHtml(txt.replace(/[*_`]/g, ""));
-      lines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
+      if (r < AWAZ_LABELS.length) {
+        lines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
+      } else {
+        const labelMatch = txt.match(/^([^:]+):/);
+        const cellLabel = labelMatch ? labelMatch[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
+        lines.push("📌 <b>" + escHtml(cellLabel) + ":</b> " + clean);
+      }
       hasData = true;
     }
     if (!hasData) lines.push("✅ Không có sự cố");
@@ -1435,11 +1552,19 @@ function getWebhookInfo() {
 // SETUP TRIGGER — Chạy 1 lần để cài lịch 5 phút (backup)
 // ============================================================
 function setupSdTrigger() {
+  // 1. Trigger checkAndSend mỗi 5 phút
   ScriptApp.getProjectTriggers()
     .filter(t => t.getHandlerFunction() === "checkAndSend")
     .forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger("checkAndSend").timeBased().everyMinutes(5).create();
-  Logger.log("✅ Trigger đã cài: checkAndSend() mỗi 5 phút");
+
+  // 2. Trigger relayBotlookupToTNI mỗi 30 phút
+  ScriptApp.getProjectTriggers()
+    .filter(t => t.getHandlerFunction() === "relayBotlookupToTNI")
+    .forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger("relayBotlookupToTNI").timeBased().everyMinutes(30).create();
+
+  Logger.log("✅ Triggers đã cài: checkAndSend() mỗi 5 phút và relayBotlookupToTNI() mỗi 30 phút");
 }
 
 
@@ -1451,7 +1576,7 @@ function setupSdTrigger() {
 function testSendNow() {
   const props = PropertiesService.getScriptProperties();
   props.deleteProperty(TS_KEY_A1);
-  props.deleteProperty(TS_KEY_AW4);
+  props.deleteProperty(TS_KEY_AW7);
   Logger.log("🧪 Xóa timestamp → ép gửi cả 2 tin...");
   checkAndSend();
 }
@@ -1498,7 +1623,7 @@ function testPingBot() {
 function testTin2Only() {
   const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
   const sheet = getSheetByGid(ss, SD_SHEET_GID);
-  PropertiesService.getScriptProperties().deleteProperty(TS_KEY_AW4);
+  PropertiesService.getScriptProperties().deleteProperty(TS_KEY_AW7);
   checkAwAz(sheet);
 }
 
@@ -1506,7 +1631,7 @@ function testTin2Only() {
 function showTimestamps() {
   const p = PropertiesService.getScriptProperties();
   Logger.log("📌 Tin1 (A1)  last sent: " + (p.getProperty(TS_KEY_A1)  || "(chưa có)"));
-  Logger.log("📌 Tin2 (AW4) last sent: " + (p.getProperty(TS_KEY_AW4) || "(chưa có)"));
+  Logger.log("📌 Tin2 (AW7) last sent: " + (p.getProperty(TS_KEY_AW7) || "(chưa có)"));
 }
 
 
@@ -1531,14 +1656,14 @@ function testDebugA1() {
   Logger.log("💾 TS_KEY_A1 stored: " + stored.substring(0, 120));
   Logger.log("❓ Sẽ gửi Tin1? " + (raw.trim() !== stored.trim() ? "✅ Có (A1 đã thay đổi)" : "❌ Không (A1 giống stored)"));
 
-  // Kiểm tra AW4
-  const aw4 = sheet.getRange("AW4").getValue().toString();
-  Logger.log("🔍 AW4 raw (100 chữ): " + aw4.substring(0, 100));
-  const tsAw4 = parseAW4Timestamp(sheet);
-  Logger.log("⏱️ parseAW4Timestamp: " + (tsAw4 || "(null)"));
-  const storedAw4 = p.getProperty(TS_KEY_AW4) || "(chưa có)";
-  Logger.log("💾 TS_KEY_AW4 stored: " + storedAw4);
-  Logger.log("❓ Sẽ gửi Tin2? " + (tsAw4 && tsAw4 !== storedAw4 ? "✅ Có" : "❌ Không"));
+  // Kiểm tra AW7
+  const aw7 = sheet.getRange("AW7").getValue().toString();
+  Logger.log("🔍 AW7 raw (100 chữ): " + aw7.substring(0, 100));
+  const tsAw7 = parseAW7Timestamp(sheet);
+  Logger.log("⏱️ parseAW7Timestamp: " + (tsAw7 || "(null)"));
+  const storedAw7 = p.getProperty(TS_KEY_AW7) || "(chưa có)";
+  Logger.log("💾 TS_KEY_AW7 stored: " + storedAw7);
+  Logger.log("❓ Sẽ gửi Tin2? " + (tsAw7 && tsAw7 !== storedAw7 ? "✅ Có" : "❌ Không"));
 }
 
 
@@ -1583,4 +1708,117 @@ function saveMyTokens() {
   props.setProperty("SD_BOT_TOKEN", "8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI");
   props.setProperty("SEND_BOT_TOKEN", "8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A");
   Logger.log("✅ Đã lưu thành công SD_BOT_TOKEN và SEND_BOT_TOKEN!");
+}
+
+
+// ============================================================
+// DYNAMIC TEAM CONFIGURATION LOADER
+// Reads mapping from "TeamConfig" sheet tab. Creates it if missing.
+// ============================================================
+function loadTeamConfig(sheet) {
+  const ss = sheet.getParent();
+  let cfgSheet = ss.getSheetByName("TeamConfig");
+  if (!cfgSheet) {
+    // Tự động tạo nếu thiếu
+    cfgSheet = ss.insertSheet("TeamConfig");
+    const defaultData = [
+      ["Team Code", "Parent Team", "Telegram Chat ID", "Team Label", "Emoji", "AWAZ Column Index"],
+      ["T1", "T1", "-5180992881", "Team 1", "🔵", "0"],
+      ["T2", "T2", "-5188855349", "Team 2", "🟡", "1"],
+      ["T3", "T3", "-5183480727", "Team 3", "🟢", "2"],
+      ["T4", "T4", "-5238696719", "Team 4", "🔴", "3"],
+      ["CONTROL", "CONTROL", "-5251698940", "CONTROL", "📊", ""],
+      ["T1 S1", "T1", "-5180992881", "Team 1", "🔵", ""],
+      ["T2 S1", "T2", "-5188855349", "Team 2", "🟡", ""],
+      ["T2 Su1", "T2", "-5188855349", "Team 2", "🟡", ""]
+    ];
+    cfgSheet.getRange(1, 1, defaultData.length, defaultData[0].length).setValues(defaultData);
+    cfgSheet.getRange(1, 1, 1, 6).setFontWeight("bold").setBackground("#4472C4").setFontColor("#FFFFFF");
+    cfgSheet.setColumnWidth(1, 120);
+    cfgSheet.setColumnWidth(2, 120);
+    cfgSheet.setColumnWidth(3, 160);
+    cfgSheet.setColumnWidth(4, 150);
+    cfgSheet.setColumnWidth(5, 80);
+    cfgSheet.setColumnWidth(6, 150);
+  }
+  
+  const config = {
+    groups: {
+      T1: "-5180992881",
+      T2: "-5188855349",
+      T3: "-5183480727",
+      T4: "-5238696719",
+      CONTROL: "-5251698940"
+    },
+    colors: {
+      T1: "🔵", T2: "🟡", T3: "🟢", T4: "🔴"
+    },
+    awazCol: {
+      T1: 0, T2: 1, T3: 2, T4: 3
+    },
+    teamLabels: {
+      T1: "Team 1", T2: "Team 2", T3: "Team 3", T4: "Team 4"
+    },
+    subTeams: {}
+  };
+  
+  try {
+    const rows = cfgSheet.getDataRange().getValues();
+    if (rows.length > 1) {
+      const newGroups = {};
+      const newColors = {};
+      const newAwazCol = {};
+      const newTeamLabels = {};
+      const newSubTeams = {};
+      
+      for (let i = 1; i < rows.length; i++) {
+        const [code, parent, chatId, label, emoji, colIdx] = rows[i].map(v => String(v || "").trim());
+        if (!code || !parent) continue;
+        
+        const codeUpper = code.toUpperCase();
+        const parentUpper = parent.toUpperCase();
+        
+        if (codeUpper === parentUpper) {
+          if (chatId) newGroups[parentUpper] = chatId;
+          if (emoji) newColors[parentUpper] = emoji;
+          if (colIdx !== "") newAwazCol[parentUpper] = parseInt(colIdx);
+          if (label) newTeamLabels[parentUpper] = label;
+        } else {
+          newSubTeams[codeUpper] = parentUpper;
+        }
+      }
+      
+      if (Object.keys(newGroups).length > 0) {
+        config.groups = newGroups;
+        config.colors = newColors;
+        config.awazCol = newAwazCol;
+        config.teamLabels = newTeamLabels;
+        config.subTeams = newSubTeams;
+      }
+    }
+  } catch(e) {
+    Logger.log("⚠️ Lỗi loadTeamConfig (sử dụng cấu hình mặc định): " + e.message);
+  }
+  return config;
+}
+
+function getTaskTeamMap(config) {
+  const map = {};
+  for (const team of Object.keys(config.groups)) {
+    if (team === "CONTROL") continue;
+    const cid = config.groups[team];
+    const label = config.teamLabels[team] || team;
+    
+    map[label.toLowerCase()] = cid;
+    map[team.toLowerCase()] = cid;
+    
+    for (const sub of Object.keys(config.subTeams)) {
+      if (config.subTeams[sub] === team) {
+        map[sub.toLowerCase()] = cid;
+        const subClean = sub.replace(/T(\d+)\s+S(\w+)/i, "team $1 s$2");
+        map[subClean.toLowerCase()] = cid;
+      }
+    }
+  }
+  return map;
 }

@@ -144,13 +144,20 @@ function getSiteDownData() {
               .filter(c => c.length > 0)
       : [];
 
-    // AW4:AZ8 (5 rows × 4 cols) — summary per team
-    const awaz = sheet.getRange(4, 49, 5, 4).getValues();
+    // AW7:AZ15 (9 rows × 4 cols) — summary per team (skip header row 6)
+    const awaz = sheet.getRange(7, 49, 9, 4).getValues();
 
-    // AW4 timestamp
-    const aw4 = sheet.getRange("AW4").getValue().toString().trim();
+    // AW7 timestamp
+    const aw7 = sheet.getRange("AW7").getValue().toString().trim();
 
-    return json({ status: "ok", a1, colC, awaz, aw4 });
+    // Fetch team config
+    let cfgSheet = ss.getSheetByName("TeamConfig");
+    let teamConfig = [];
+    if (cfgSheet) {
+      teamConfig = cfgSheet.getDataRange().getValues();
+    }
+
+    return json({ status: "ok", a1, colC, awaz, aw7, teamConfig });
   } catch (err) {
     return json({ status: "error", message: err.message });
   }
@@ -1849,5 +1856,140 @@ function handleGetMsgIds(params) {
   } catch(e) {
     return json({ status: "ok", key: key, msgids: [] });
   }
+}
+
+// ============================================================
+// REAL-TIME BOD ASSIGN TO M&E ALERTS
+// ============================================================
+
+/** Kiểm tra và gửi thông báo nếu có giao việc mới cho M&E hôm nay */
+function checkBodAssignME() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheets().find(s => s.getSheetId() === 1482565085) || ss.getSheetByName("BOD assign");
+  if (!sheet) {
+    Logger.log("[checkBodAssignME] ❌ Không tìm thấy sheet BOD assign");
+    return;
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  // Lấy dữ liệu cột A (Assign) và cột D (Detailed content)
+  const rangeA = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  const rangeD = sheet.getRange(2, 4, lastRow - 1, 1).getDisplayValues(); // Dùng DisplayValue để đọc hiển thị dạng chuỗi
+
+  const todayStr = Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy");
+  const props = PropertiesService.getScriptProperties();
+  const sentRowsKey = "BOD_ASSIGN_ME_SENT_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+  
+  let sentRows = [];
+  try {
+    sentRows = JSON.parse(props.getProperty(sentRowsKey) || "[]");
+  } catch (e) {
+    sentRows = [];
+  }
+
+  let hasNewMatch = false;
+  let newSentRows = [...sentRows];
+
+  for (let i = 0; i < rangeA.length; i++) {
+    const rowNum = i + 2;
+    const assignTo = String(rangeA[i][0]).trim().toLowerCase();
+    const dateStr = String(rangeD[i][0]).trim();
+
+    if (assignTo === "m&e" && dateStr) {
+      const datePart = dateStr.split(" ")[0].trim();
+      if (datePart === todayStr) {
+        // Hàng này có ngày giao trùng ngày hôm nay
+        if (sentRows.indexOf(rowNum) === -1) {
+          // Chưa gửi thông báo cho hàng này
+          hasNewMatch = true;
+          newSentRows.push(rowNum);
+        }
+      }
+    }
+  }
+
+  if (hasNewMatch) {
+    Logger.log("[checkBodAssignME] 🔔 Phát hiện giao việc mới cho M&E!");
+    
+    const token = props.getProperty("SEND_BOT_TOKEN") || "";
+    const controlChatId = "-5251698940";
+    
+    if (!token) {
+      Logger.log("[checkBodAssignME] ❌ Thiếu SEND_BOT_TOKEN");
+      return;
+    }
+
+    const nowStr = Utilities.formatDate(new Date(), "Asia/Rangoon", "HH:mm");
+    
+    const lines = [
+      "📋 8.1. Report — BOD Assign to M&E",
+      "📅 " + todayStr + "  |  🕐 " + nowStr,
+      "━━━━━━━━━━━━━━━━━━━━━━",
+      "M&E: You have new Assign from BOD or Manager",
+      "━━━━━━━━━━━━━━━━━━━━━━"
+    ];
+    const msgText = lines.join("\n");
+
+    // Xóa tin cũ
+    const oldMsgKey = "SD_MSGID_BOD_ASSIGN_8_1_CONTROL";
+    const oldMsgIdsRaw = props.getProperty(oldMsgKey) || "[]";
+    try {
+      const oldMsgIds = JSON.parse(oldMsgIdsRaw);
+      oldMsgIds.forEach(function(mid) {
+        try {
+          UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/deleteMessage", {
+            method: "post",
+            contentType: "application/json",
+            payload: JSON.stringify({ chat_id: controlChatId, message_id: mid }),
+            muteHttpExceptions: true
+          });
+        } catch(e) {
+          Logger.log("[checkBodAssignME] ⚠️ Lỗi xóa tin cũ: " + e.message);
+        }
+      });
+    } catch(e) {
+      Logger.log("[checkBodAssignME] ⚠️ Lỗi parse tin cũ: " + e.message);
+    }
+
+    // Gửi tin mới
+    try {
+      const resp = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify({ chat_id: controlChatId, text: msgText }),
+        muteHttpExceptions: true
+      });
+      const resData = JSON.parse(resp.getContentText());
+      if (resData.ok) {
+        const newMsgId = resData.result.message_id;
+        props.setProperty(oldMsgKey, JSON.stringify([newMsgId]));
+        Logger.log("[checkBodAssignME] ✅ Đã gửi tin mới và lưu ID: " + newMsgId);
+        
+        // Lưu lại danh sách hàng đã gửi thành công
+        props.setProperty(sentRowsKey, JSON.stringify(newSentRows));
+      } else {
+        Logger.log("[checkBodAssignME] ❌ Gửi tin lỗi: " + resData.description);
+      }
+    } catch(e) {
+      Logger.log("[checkBodAssignME] ❌ Lỗi gọi Telegram: " + e.message);
+    }
+  } else {
+    Logger.log("[checkBodAssignME] 😴 Không có giao việc M&E mới");
+  }
+}
+
+/** Cài đặt trigger chạy checkBodAssignME mỗi 5 phút */
+function setupBodAssignMETrigger() {
+  const triggerName = "checkBodAssignME";
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t) {
+    if (t.getHandlerFunction() === triggerName) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger(triggerName).timeBased().everyMinutes(5).create();
+  Logger.log("✅ Đã cài trigger checkBodAssignME mỗi 5 phút");
 }
 
