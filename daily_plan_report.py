@@ -1269,6 +1269,11 @@ async def run_eod_or_update(mode: str):
                         lines.append(f"   • Completed: {', '.join(sorted(done_set)) if done_set else 'None'} (Done: {len(done_set)}/{len(assigned_set)}, {pct}%)")
                         if remain_set:
                             lines.append(f"   • Remaining: {', '.join(sorted(remain_set))}")
+                        
+                        # Khác biệt so với kế hoạch được giao
+                        diff_set = completed_set - assigned_set
+                        if diff_set:
+                            lines.append(f"   • Different from Plan: {', '.join(sorted(diff_set))}")
                     else:
                         lines.append("   • Plan: None")
                         if completed_set:
