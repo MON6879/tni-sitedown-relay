@@ -36,6 +36,10 @@ const REPORT_GID       = "133591305";
 function doPost(e) {
   try {
     const body  = JSON.parse(e.postData.contents);
+
+    // Route Telegram Callback Query (nút bấm nhận việc)
+    if (body.callback_query) return handleCallbackQuery(body);
+
     const ss    = SpreadsheetApp.openById(SHEET_ID);
     const sheet = getDataSheet(ss);
 
@@ -1953,12 +1957,22 @@ function checkBodAssignME() {
       Logger.log("[checkBodAssignME] ⚠️ Lỗi parse tin cũ: " + e.message);
     }
 
-    // Gửi tin mới
+    // Gửi tin mới kèm button
     try {
       const resp = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
         method: "post",
         contentType: "application/json",
-        payload: JSON.stringify({ chat_id: controlChatId, text: msgText }),
+        payload: JSON.stringify({
+          chat_id: controlChatId,
+          text: msgText,
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "Yes, I received and will follow it", callback_data: "ack_bod_assign_me" }
+              ]
+            ]
+          }
+        }),
         muteHttpExceptions: true
       });
       const resData = JSON.parse(resp.getContentText());
@@ -1991,5 +2005,93 @@ function setupBodAssignMETrigger() {
   });
   ScriptApp.newTrigger(triggerName).timeBased().everyMinutes(5).create();
   Logger.log("✅ Đã cài trigger checkBodAssignME mỗi 5 phút");
+}
+
+// ════════════════════════════════════════════════════════════
+// TELEGRAM CALLBACK QUERY HANDLER FOR REPORT 8.1 ACKNOWLEDGEMENT
+// ════════════════════════════════════════════════════════════
+
+function handleCallbackQuery(body) {
+  const cb = body.callback_query;
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty("SEND_BOT_TOKEN") || "";
+  
+  if (!token) {
+    return ContentService.createTextOutput("Missing Token");
+  }
+
+  if (cb.data === "ack_bod_assign_me") {
+    const user = cb.from;
+    const name = user.first_name + (user.last_name ? " " + user.last_name : "");
+    const msg = cb.message;
+    const chatId = msg.chat.id.toString();
+    const msgId = msg.message_id;
+    const oldText = msg.text || "";
+    
+    const ackHeader = "\n\n✅ Acknowledged by:";
+    let newText = oldText;
+    
+    if (oldText.indexOf(name) === -1) {
+      if (oldText.indexOf(ackHeader) === -1) {
+        newText = oldText + ackHeader + "\n- " + name;
+      } else {
+        newText = oldText + "\n- " + name;
+      }
+      
+      // Cập nhật lại nội dung tin nhắn trên Telegram để hiện danh sách đã xác nhận
+      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/editMessageText", {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify({
+          chat_id: chatId,
+          message_id: msgId,
+          text: newText,
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "Yes, I received and will follow it", callback_data: "ack_bod_assign_me" }
+              ]
+            ]
+          }
+        }),
+        muteHttpExceptions: true
+      });
+      
+      answerCallback(token, cb.id, "Thank you! Acknowledgment recorded.");
+    } else {
+      answerCallback(token, cb.id, "You have already acknowledged this report.");
+    }
+  }
+  
+  return ContentService.createTextOutput("OK");
+}
+
+function answerCallback(token, callbackQueryId, text) {
+  UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/answerCallbackQuery", {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({
+      callback_query_id: callbackQueryId,
+      text: text,
+      show_alert: false
+    }),
+    muteHttpExceptions: true
+  });
+}
+
+/** Cài đặt Webhook cho SEND_BOT để nhận sự kiện bấm nút */
+function setupSendBotWebhook() {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty("SEND_BOT_TOKEN") || "";
+  const webAppUrl = props.getProperty("WEBAPP_URL") || "";
+  
+  if (!token || !webAppUrl) {
+    Logger.log("❌ Thiếu SEND_BOT_TOKEN hoặc WEBAPP_URL trong Script Properties");
+    return;
+  }
+  
+  const url = "https://api.telegram.org/bot" + token + "/setWebhook?url=" + webAppUrl + "&allowed_updates=[\"message\",\"callback_query\"]";
+  const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  Logger.log("Set Webhook Response: " + resp.getContentText());
 }
 

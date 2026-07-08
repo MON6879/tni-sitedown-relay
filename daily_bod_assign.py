@@ -6,7 +6,7 @@ import requests
 import pandas as pd
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
-from telegram import Bot
+from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton
 from delete_old_helper import delete_old_messages_bot, save_msgids
 
 load_dotenv()
@@ -58,10 +58,10 @@ def parse_date(val):
             pass
     return None
 
-async def send_msg(bot: Bot, chat_id: int, text: str, label: str):
+async def send_msg(bot: Bot, chat_id: int, text: str, label: str, reply_markup=None):
     """Gửi tin nhắn Telegram an toàn."""
     try:
-        sent = await bot.send_message(chat_id=chat_id, text=text)
+        sent = await bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
         logger.info(f"✅ Sent message to {chat_id} ({label})")
         return True, [sent.message_id]
     except Exception as e:
@@ -239,7 +239,10 @@ async def main():
             delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "BOD_ASSIGN_8_1_CONTROL")
             
         async with Bot(token=SEND_BOT_TOKEN) as bot:
-            ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, report_8_1_msg, "BOD_ASSIGN_8_1_CONTROL")
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("Yes, I received and will follow it", callback_data="ack_bod_assign_me")]
+            ])
+            ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, report_8_1_msg, "BOD_ASSIGN_8_1_CONTROL", reply_markup=keyboard)
             if ok and msg_ids and APPS_SCRIPT_URL:
                 save_msgids(APPS_SCRIPT_URL, "BOD_ASSIGN_8_1_CONTROL", msg_ids)
 
