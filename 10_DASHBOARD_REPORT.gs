@@ -75,7 +75,7 @@ function drRawOnly() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const d  = drGatherData(ss);
   drBuildRaw(ss, d);
-  SpreadsheetApp.getUi().alert("✅ Đã cập nhật 'Dashboard Raw'!");
+  try { SpreadsheetApp.getUi().alert("✅ Đã cập nhật 'Dashboard Raw'!"); } catch(_) {}
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -555,11 +555,11 @@ function drSetupTrigger() {
   ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==="drStep1_BuildTables")
     .forEach(t=>ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger("drStep1_BuildTables").timeBased().atHour(11).everyDays(1).create();
-  SpreadsheetApp.getUi().alert("✅ Auto trigger đã bật!\nBảng tự động cập nhật mỗi ngày ~18:00 MMT.");
+  try { SpreadsheetApp.getUi().alert("✅ Auto trigger đã bật!\nBảng tự động cập nhật mỗi ngày ~18:00 MMT."); } catch(_) {}
 }
 function drRemoveTrigger() {
   let n=0;
   ScriptApp.getProjectTriggers().filter(t=>["drStep1_BuildTables","buildDashboardReport"].includes(t.getHandlerFunction()))
     .forEach(t=>{ScriptApp.deleteTrigger(t);n++;});
-  SpreadsheetApp.getUi().alert("🗑️ Đã xóa "+n+" trigger.");
+  try { SpreadsheetApp.getUi().alert("🗑️ Đã xóa "+n+" trigger."); } catch(_) {}
 }
