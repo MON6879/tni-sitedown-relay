@@ -5,6 +5,7 @@ on:
     - cron: '30 10 * * *'  # 17:00 Myanmar / 10:30 UTC → daily_task (cron_send.py)
     - cron: '0 11 * * *'   # 17:30 Myanmar / 11:00 UTC → cable_report
     - cron: '30 22 * * *'  # 05:00 Myanmar / 22:30 UTC → refuel_report
+    - cron: '30 6 * * *'   # 13:00 Myanmar / 06:30 UTC → refuel_report
   workflow_dispatch:
     inputs:
       report_type:
@@ -147,7 +148,7 @@ jobs:
 
       - name: Task — Refuel Request Report (Cron or Manual)
         if: |
-          (github.event_name == 'schedule' && (github.event.schedule == '30 10 * * *' || github.event.schedule == '30 22 * * *')) ||
+          (github.event_name == 'schedule' && (github.event.schedule == '30 10 * * *' || github.event.schedule == '30 22 * * *' || github.event.schedule == '30 6 * * *')) ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'refuel_report')
         env:
           REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}

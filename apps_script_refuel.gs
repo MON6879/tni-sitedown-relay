@@ -412,7 +412,7 @@ function saveNewMsgIdRefuel(msgIds) {
 }
 
 /**
- * Thiết lập 2 trigger chạy tự động hàng ngày lúc 17:00 và 05:00
+ * Thiết lập 3 trigger chạy tự động hàng ngày lúc 05:00, 13:00 và 17:00
  * (Lưu ý: Giờ chạy thực tế sẽ dựa trên múi giờ cài đặt của Spreadsheet này)
  */
 function setupRefuelDailyTriggers() {
@@ -431,6 +431,13 @@ function setupRefuelDailyTriggers() {
            .atHour(5)
            .create();
            
+  // Tạo trigger chạy lúc 13:00 - 14:00 trưa
+  ScriptApp.newTrigger("sendRefuelReport")
+           .timeBased()
+           .everyDays(1)
+           .atHour(13)
+           .create();
+           
   // Tạo trigger chạy lúc 17:00 - 18:00 chiều
   ScriptApp.newTrigger("sendRefuelReport")
            .timeBased()
@@ -438,5 +445,5 @@ function setupRefuelDailyTriggers() {
            .atHour(17)
            .create();
            
-  Logger.log("✅ Đã thiết lập thành công 2 trigger tự động lúc 05:00 và 17:00 hàng ngày!");
+  Logger.log("✅ Đã thiết lập thành công 3 trigger tự động lúc 05:00, 13:00 và 17:00 hàng ngày!");
 }
