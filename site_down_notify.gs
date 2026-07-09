@@ -210,10 +210,10 @@ function checkAndSend() {
   const currentMinutes = hour * 60 + minute;
 
   const activeStart = 3 * 60 + 30; // 03:30 -> 210 phút
-  const activeEnd = 21 * 60 + 30;  // 21:30 -> 1290 phút
+  const activeEnd = 22 * 60 + 10;  // 22:10 -> 1330 phút
 
   if (currentMinutes < activeStart || currentMinutes > activeEnd) {
-    Logger.log("😴 Ngoài khung giờ hoạt động checkAndSend (03:30-21:30 Myanmar) — Bỏ qua.");
+    Logger.log("😴 Ngoài khung giờ hoạt động checkAndSend (03:30-22:10 Myanmar) — Bỏ qua.");
     return;
   }
 
@@ -256,9 +256,9 @@ function relayBotlookupToTNI() {
   const myanmarMin  = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "m"), 10);
   const currentMinutes = myanmarHour * 60 + myanmarMin;
 
-  // Khung giờ hoạt động: 04:00 đến 21:30 Myanmar Time
+  // Khung giờ hoạt động: 04:00 đến 22:10 Myanmar Time
   const activeStart = 4 * 60;
-  const activeEnd = 21 * 60 + 30;
+  const activeEnd = 22 * 60 + 10;
 
   if (currentMinutes >= activeStart && currentMinutes <= activeEnd) {
     // Bước 1: Dispatch GitHub Actions workflow
@@ -269,7 +269,7 @@ function relayBotlookupToTNI() {
       Logger.log("[relayBotlookupToTNI] ⚠️ Không dispatch được GitHub Actions (thiếu GITHUB_PAT?)");
     }
   } else {
-    Logger.log("[relayBotlookupToTNI] 🌙 Ngoài khung giờ hoạt động (04:00-21:30 Myanmar) — Bỏ qua dispatch GitHub Actions");
+    Logger.log("[relayBotlookupToTNI] 🌙 Ngoài khung giờ hoạt động (04:00-22:10 Myanmar) — Bỏ qua dispatch GitHub Actions");
   }
 
   // Bước 2: Chạy checkAndSend để gửi nếu Cột A đã có data
@@ -1572,13 +1572,13 @@ function setupSdTrigger() {
     .forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger("checkAndSend").timeBased().everyMinutes(5).create();
 
-  // 2. Trigger relayBotlookupToTNI mỗi 30 phút
+  // 2. Trigger relayBotlookupToTNI mỗi 30 phút — ĐÃ TẮT (Chuyển sang chạy bằng GitHub Actions)
   ScriptApp.getProjectTriggers()
     .filter(t => t.getHandlerFunction() === "relayBotlookupToTNI")
     .forEach(t => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger("relayBotlookupToTNI").timeBased().everyMinutes(30).create();
+  // ScriptApp.newTrigger("relayBotlookupToTNI").timeBased().everyMinutes(30).create();
 
-  Logger.log("✅ Triggers đã cài: checkAndSend() mỗi 5 phút và relayBotlookupToTNI() mỗi 30 phút");
+  Logger.log("✅ Triggers đã cài: checkAndSend() mỗi 5 phút (relayBotlookupToTNI đã chuyển sang GitHub Actions)");
 }
 
 
@@ -1786,7 +1786,7 @@ function loadTeamConfig(sheet) {
       const newSubTeams = {};
       
       for (let i = 1; i < rows.length; i++) {
-        const [code, parent, chatId, label, emoji, colIdx] = rows[i].map(v => String(v || "").trim());
+        const [code, parent, chatId, label, emoji, colIdx] = rows[i].map(v => String(v === null || v === undefined ? "" : v).trim());
         if (!code || !parent) continue;
         
         const codeUpper = code.toUpperCase();

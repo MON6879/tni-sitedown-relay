@@ -1742,7 +1742,7 @@ function handleStoreSiteDownDirect(body) {
     Logger.log("[store_site_down] ✅ Đã ghi " + writeData.length + " dòng vào Cột A (sheet: " + sheet.getName() + ")");
 
     SpreadsheetApp.flush();
-    Utilities.sleep(3000);   // chờ công thức Cột C cập nhật
+    Utilities.sleep(10000);   // Chờ công thức Cột C và AW7:AZ15 cập nhật hoàn toàn
 
     // ── Gọi checkAndSend() nếu cùng GAS project; nếu khác project thì GAS trigger 5p sẽ xử lý ──
     try {
