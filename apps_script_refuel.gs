@@ -8,7 +8,7 @@ const REFUEL_BOT_TOKEN = "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME";
 const REFUEL_CHAT_ID = "-5469544739";
 
 /**
- * HÀMỦY QUYỀN MẠNG: Chọn hàm này từ dropdown và bấm "Run" để hiện hộp thoại cấp quyền của Google.
+ * HÀM ỦY QUYỀN MẠNG: Chọn hàm này từ dropdown và bấm "Run" để hiện hộp thoại cấp quyền của Google.
  */
 function authorizeUrlFetch() {
   Logger.log("🔐 Đang kích hoạt hộp thoại cấp quyền kết nối mạng...");
@@ -129,12 +129,12 @@ function json(obj) {
 
 /**
  * Hàm chính để gửi báo cáo Refuel và xóa tin nhắn cũ trực tiếp từ GAS.
- * Bạn có thể chọn hàm này ở mục dropdown trên thanh công cụ và bấm "Run".
+ * Tự động chia nhỏ tin nhắn nếu dữ liệu vượt quá 4096 ký tự của Telegram.
  */
 function sendRefuelReport() {
   Logger.log("⛽ Bắt đầu tác vụ gửi báo cáo Refuel từ Google Apps Script...");
   
-  // 1. Xóa tin cũ
+  // 1. Xóa các tin nhắn báo cáo cũ
   deleteOldMessagesRefuel();
   
   // 2. Đọc dữ liệu cột R
@@ -160,59 +160,84 @@ function sendRefuelReport() {
     }
   }
   
-  // 3. Định nhắn HTML
-  const formattedMsg = formatRefuelMessage(rows);
-  Logger.log("📨 Nội dung gửi đi:\n" + formattedMsg);
-  
-  // 4. Gửi lên Telegram
-  const newMsgId = sendTelegramMessage(formattedMsg);
-  
-  // 5. Lưu message_id mới gửi
-  if (newMsgId) {
-    saveNewMsgIdRefuel(newMsgId);
+  if (rows.length === 0) {
+    Logger.log("📭 Không có dữ liệu để gửi.");
+    return;
   }
-}
-
-/**
- * Định dạng tin nhắn HTML gọn gàng
- */
-function formatRefuelMessage(rows) {
+  
+  // 3. Phân chia dòng thành các nhóm nhỏ để tránh lỗi vượt quá 4096 ký tự của Telegram
   const now = new Date();
   const dateStr = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
   const timeStr = Utilities.formatDate(now, "Asia/Rangoon", "HH:mm");
   
   let headerLine = "";
   let startIdx = 0;
-  
-  if (rows.length > 0 && rows[0].indexOf("Report need refuel") !== -1) {
+  if (rows[0].indexOf("Report need refuel") !== -1) {
     headerLine = "📋 <b>" + rows[0] + "</b>\n";
     startIdx = 1;
   }
   
-  const lines = [
-    "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>",
-    "📅 " + dateStr + "  ⏰ " + timeStr + " (Myanmar)",
-    "━━━━━━━━━━━━━━━━━━━━━",
-    ""
-  ];
+  const baseTitle = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>\n📅 " + dateStr + "  ⏰ " + timeStr + " (Myanmar)\n━━━━━━━━━━━━━━━━━━━━━\n\n";
+  const baseFooter = "\n━━━━━━━━━━━━━━━━━━━━━\n🤖 <i>Auto report by @TNI_REFUEL_BOT</i>";
   
-  if (headerLine) {
-    lines.push(headerLine);
-  }
+  const chunks = [];
+  let currentChunkLines = [];
+  let currentLength = baseTitle.length + baseFooter.length + (headerLine ? headerLine.length : 0);
   
   for (let i = startIdx; i < rows.length; i++) {
-    lines.push(rows[i]);
+    const line = rows[i];
+    // 4000 ký tự là ngưỡng an toàn
+    if (currentLength + line.length + 1 > 4000) {
+      chunks.push(currentChunkLines);
+      currentChunkLines = [line];
+      currentLength = baseTitle.length + baseFooter.length + line.length;
+    } else {
+      currentChunkLines.push(line);
+      currentLength += line.length + 1; // +1 cho newline
+    }
+  }
+  if (currentChunkLines.length > 0) {
+    chunks.push(currentChunkLines);
   }
   
-  if (rows.length === 0 || (startIdx === 1 && rows.length === 1)) {
-    lines.push("📭 No refuel requests today.");
+  // 4. Gửi từng phần lên Telegram và gom các message ID mới
+  const newMsgIds = [];
+  for (let c = 0; c < chunks.length; c++) {
+    const chunkLines = chunks[c];
+    const lines = [];
+    
+    // Ghi tiêu đề kèm thông tin phân trang nếu gửi nhiều phần
+    const titleText = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>" + (chunks.length > 1 ? " (Phần " + (c + 1) + "/" + chunks.length + ")" : "");
+    lines.push(titleText);
+    lines.push("📅 " + dateStr + "  ⏰ " + timeStr + " (Myanmar)");
+    lines.push("━━━━━━━━━━━━━━━━━━━━━");
+    lines.push("");
+    
+    // Chỉ ghi Header ở Phần 1
+    if (c === 0 && headerLine) {
+      lines.push(headerLine);
+    }
+    
+    // Thêm các dòng dữ liệu
+    for (let j = 0; j < chunkLines.length; j++) {
+      lines.push(chunkLines[j]);
+    }
+    
+    lines.push("");
+    lines.push("━━━━━━━━━━━━━━━━━━━━━");
+    lines.push("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>");
+    
+    const formattedMsg = lines.join("\n");
+    const newMsgId = sendTelegramMessage(formattedMsg);
+    if (newMsgId) {
+      newMsgIds.push(newMsgId);
+    }
   }
   
-  lines.push("");
-  lines.push("━━━━━━━━━━━━━━━━━━━━━");
-  lines.push("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>");
-  
-  return lines.join("\n");
+  // 5. Lưu danh sách message ID mới gửi để xóa ở lần kế tiếp
+  if (newMsgIds.length > 0) {
+    saveNewMsgIdRefuel(newMsgIds);
+  }
 }
 
 /**
@@ -293,12 +318,12 @@ function deleteOldMessagesRefuel() {
 }
 
 /**
- * Lưu message_id mới gửi
+ * Lưu danh sách message_ids mới gửi
  */
-function saveNewMsgIdRefuel(msgId) {
+function saveNewMsgIdRefuel(msgIds) {
   const props = PropertiesService.getScriptProperties();
-  props.setProperty("REFUEL_MSGID_REFUEL_DAILY_REPORT", JSON.stringify([msgId]));
-  Logger.log("💾 Đã lưu message ID mới vào bộ nhớ: " + msgId);
+  props.setProperty("REFUEL_MSGID_REFUEL_DAILY_REPORT", JSON.stringify(msgIds));
+  Logger.log("💾 Đã lưu danh sách message ID mới vào bộ nhớ: " + JSON.stringify(msgIds));
 }
 
 /**

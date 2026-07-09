@@ -36,40 +36,6 @@ def fetch_refuel_data() -> list[str] | None:
     return None
 
 
-def format_report(rows: list[str]) -> str:
-    """Định dạng báo cáo Refuel dưới dạng tin nhắn HTML."""
-    now = datetime.now(TZ_MM)
-    date_str = now.strftime("%d/%m/%Y")
-    time_str = now.strftime("%H:%M")
-    
-    header_line = ""
-    start_idx = 0
-    # Nếu dòng đầu chứa chữ "Report need refuel" thì trích xuất làm tiêu đề phụ
-    if rows and "Report need refuel" in rows[0]:
-        header_line = f"📋 <b>{rows[0]}</b>\n"
-        start_idx = 1
-        
-    lines = [
-        "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>",
-        f"📅 {date_str}  ⏰ {time_str} (Myanmar)",
-        "━━━━━━━━━━━━━━━━━━━━━",
-        "",
-    ]
-    if header_line:
-        lines.append(header_line)
-        
-    for i in range(start_idx, len(rows)):
-        lines.append(rows[i])
-        
-    if not rows or (start_idx == 1 and len(rows) == 1):
-        lines.append("📭 No refuel requests today.")
-        
-    lines.append("")
-    lines.append("━━━━━━━━━━━━━━━━━━━━━")
-    lines.append("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>")
-    return "\n".join(lines)
-
-
 def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
     """Gửi tin nhắn định dạng HTML lên group Telegram."""
     url = f"https://api.telegram.org/bot{REFUEL_BOT_TOKEN}/sendMessage"
@@ -87,6 +53,71 @@ def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
     else:
         print(f"❌ Send failed: {resp.text[:200]}", file=sys.stderr)
     return ok, msg_id
+
+
+def format_and_send_report(rows: list[str]) -> list[int]:
+    """Chia nhỏ báo cáo và gửi lên Telegram để tránh vượt quá giới hạn 4096 ký tự."""
+    now = datetime.now(TZ_MM)
+    date_str = now.strftime("%d/%m/%Y")
+    time_str = now.strftime("%H:%M")
+    
+    header_line = ""
+    start_idx = 0
+    if rows and "Report need refuel" in rows[0]:
+        header_line = f"📋 <b>{rows[0]}</b>\n"
+        start_idx = 1
+        
+    base_title = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>\n📅 {date_str}  ⏰ {time_str} (Myanmar)\n━━━━━━━━━━━━━━━━━━━━━\n\n"
+    base_footer = "\n━━━━━━━━━━━━━━━━━━━━━\n🤖 <i>Auto report by @TNI_REFUEL_BOT</i>"
+    
+    # Chia nhỏ các dòng dữ liệu thành các chunk an toàn (< 4000 ký tự)
+    chunks = []
+    current_chunk = []
+    current_len = len(base_title) + len(base_footer) + (len(header_line) if header_line else 0)
+    
+    for i in range(start_idx, len(rows)):
+        line = rows[i]
+        if current_len + len(line) + 1 > 4000:
+            chunks.append(current_chunk)
+            current_chunk = [line]
+            current_len = len(base_title) + len(base_footer) + len(line)
+        else:
+            current_chunk.append(line)
+            current_len += len(line) + 1
+            
+    if current_chunk:
+        chunks.append(current_chunk)
+        
+    sent_ids = []
+    for idx, chunk_lines in enumerate(chunks):
+        title = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>"
+        if len(chunks) > 1:
+            title += f" (Phần {idx + 1}/{len(chunks)})"
+            
+        lines = [
+            title,
+            f"📅 {date_str}  ⏰ {time_str} (Myanmar)",
+            "━━━━━━━━━━━━━━━━━━━━━",
+            ""
+        ]
+        
+        # Chỉ in Header ở phần 1
+        if idx == 0 and header_line:
+            lines.append(header_line)
+            
+        for line in chunk_lines:
+            lines.append(line)
+            
+        lines.append("")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>")
+        
+        msg = "\n".join(lines)
+        ok, msg_id = send_telegram(REFUEL_CHAT_ID, msg)
+        if ok and msg_id:
+            sent_ids.append(msg_id)
+            
+    return sent_ids
 
 
 def main():
@@ -110,16 +141,14 @@ def main():
         print("⚠️ No data available from spreadsheet, exiting")
         sys.exit(1)
 
-    # 3. Định dạng và gửi tin mới
-    msg = format_report(rows)
-    print("📨 Report content:\n" + msg)
-    ok, msg_id = send_telegram(REFUEL_CHAT_ID, msg)
+    # 3. Chia nhỏ tin và gửi đi
+    new_ids = format_and_send_report(rows)
     
-    # 4. Lưu lại message ID mới gửi qua Apps Script để xóa ở lần sau
-    if ok and REFUEL_APPS_SCRIPT_URL and msg_id:
+    # 4. Lưu lại danh sách message ID mới gửi qua Apps Script để xóa ở lần sau
+    if new_ids and REFUEL_APPS_SCRIPT_URL:
         try:
             from delete_old_helper import save_msgids
-            save_msgids(REFUEL_APPS_SCRIPT_URL, "REFUEL_DAILY_REPORT", [msg_id])
+            save_msgids(REFUEL_APPS_SCRIPT_URL, "REFUEL_DAILY_REPORT", new_ids)
         except Exception as e:
             print(f"⚠️ Error saving refuel report msgid: {e}", file=sys.stderr)
 
