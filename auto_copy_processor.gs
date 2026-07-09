@@ -240,43 +240,15 @@ function runAutoCopyProcessor() {
       }
     }
 
-    // ========================================================
-    // PHẦN 2: XÓA HÀNG ĐỘC LẬP (Nếu có đủ cấu hình)
-    // ========================================================
-    if (deleteLink && deleteColCond && deleteValCond) {
-      try {
-        const delSSId = extractSsId_(deleteLink);
-        const delSS = getSpreadsheetCached_(delSSId);
-        const delInfo = parseSheetAndRange_(deleteColCond);
-        const delSh = delSS.getSheetByName(delInfo.sheetName);
+    // ⚠️ PHẦN 2 - XÓA HÀNG: Đã bỏ hoàn toàn.
+    // Lý do: Cột A của sheet nguồn chứa công thức VLOOKUP/INDEX.
+    // Sau khi copy, công thức sẽ tự tính lại sang giá trị khác —
+    // nếu xóa dòng nguồn sẽ làm mất công thức và gây lỗi dữ liệu.
+    // Cơ chế đánh dấu "đã xử lý" dùng Cell Note (✅ Auto-Copied) thay thế.
+  } // end for configRows
 
-        if (!delSh) {
-          Logger.log("  ❌ Lỗi: Không tìm thấy sheet xóa: '" + delInfo.sheetName + "'");
-        } else {
-          const delColLetter = delInfo.rangeStr || "A";
-          const delColNum = colLetterToNum_(delColLetter);
-          const delLastRow = delSh.getLastRow();
+  Logger.log("🏁 Hoàn thành toàn bộ tiến trình Auto Copy.");
 
-          if (delLastRow >= 1) {
-            const delData = delSh.getRange(1, delColNum, delLastRow, 1).getValues();
-            let deletedCount = 0;
-            
-            // Quét từ dưới lên để tránh lệch index dòng khi xóa
-            for (let r = delLastRow - 1; r >= 0; r--) {
-              if (String(delData[r][0]).trim() === deleteValCond) {
-                delSh.deleteRow(r + 1);
-                deletedCount++;
-              }
-            }
-            Logger.log("  🗑️ Hoàn thành xóa: Đã xóa " + deletedCount + " dòng có '" + deleteValCond + "' ở cột " + delColLetter);
-          }
-        }
-      } catch (err) {
-        Logger.log("  ❌ Lỗi xử lý Xóa dòng #" + rowIdx + ": " + err.message);
-      }
-    }
-  }
-  Logger.log("🏁 Hoàn thành toàn bộ tiến trình Auto Copy & Delete.");
   
   // Gửi báo cáo tổng hợp lỗi nếu có
   if (errorRows.length > 0) {
