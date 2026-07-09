@@ -193,10 +193,10 @@ def normalize_team(team_str: str) -> str:
 
 
 def extract_tni_codes(text: str) -> set:
-    """Extract all TNIxxxx site codes from text."""
+    """Extract all TNIxxxx site codes from text and convert to uppercase."""
     if not text:
         return set()
-    return set(re.findall(r'TNI\d{3,5}(?:_\d+)?', text, re.IGNORECASE))
+    return set(code.upper() for code in re.findall(r'TNI\d{3,5}(?:_\d+)?', text, re.IGNORECASE))
 
 
 # Mỗi category một màu vuông cố định — trùng tên category = trùng màu
@@ -475,10 +475,11 @@ def parse_assigned_tni_per_person(plan_text: str, team_emps: list) -> dict:
     return assigned
 
 
-def get_employee_completed_tni_today(df_report, target_date: str) -> dict:
+def get_employee_completed_tni_today_detailed(df_report, target_date: str) -> dict:
     """
-    Given the df_report dataframe, extracts all completed TNI codes today per employee telegram ID.
-    Returns: { tg_id: set_of_TNI_codes }
+    Given the df_report dataframe, extracts all completed TNI codes today per employee telegram ID,
+    along with the column header where they were found.
+    Returns: { tg_id: { TNI_code: header_name } }
     """
     completed = {}
     if df_report is None or df_report.empty:
@@ -503,12 +504,20 @@ def get_employee_completed_tni_today(df_report, target_date: str) -> dict:
             
         cid = tg_id.replace(".0", "") if tg_id.endswith(".0") else tg_id
         
-        # Extract TNI codes from all columns starting after date up to tg_idx
-        report_content = " ".join(str(val) for val in row.iloc[date_idx+1:tg_idx] if not pd.isna(val))
-        codes = extract_tni_codes(report_content)
-        if codes:
-            completed.setdefault(cid, set()).update(codes)
-            
+        emp_details = completed.setdefault(cid, {})
+        for col_i in range(date_idx + 1, tg_idx):
+            if col_i >= len(row):
+                continue
+            val = row.iloc[col_i]
+            if pd.isna(val):
+                continue
+            val_str = str(val).strip()
+            codes = extract_tni_codes(val_str)
+            if codes:
+                col_header = df_report.columns[col_i]
+                for code in codes:
+                    emp_details[code.upper()] = col_header
+                    
     return completed
 
 
@@ -1218,7 +1227,7 @@ async def run_eod_or_update(mode: str):
                 lines.append("❌ No Daily Plan submitted today")
 
             # ── Phần Consolidated FT Plan & Actual ──
-            emp_completed_map = get_employee_completed_tni_today(df_report_raw, date_str)
+            emp_completed_details = get_employee_completed_tni_today_detailed(df_report_raw, date_str)
             combined_plan_text = "\n".join(tp.get("content", "") for tp in stats["today_plans"])
             emp_assigned_map = parse_assigned_tni_per_person(combined_plan_text, emps)
 
@@ -1234,7 +1243,8 @@ async def run_eod_or_update(mode: str):
                     tg_id = str(emp.get("telegram_id", emp.get("tg_id", ""))).replace(".0", "")
 
                     assigned_set = emp_assigned_map.get(tg_id, set())
-                    completed_set = emp_completed_map.get(tg_id, set())
+                    emp_details = emp_completed_details.get(tg_id, {})
+                    completed_set = set(emp_details.keys())
                     done_set = assigned_set & completed_set
                     remain_set = assigned_set - completed_set
 
@@ -1273,11 +1283,27 @@ async def run_eod_or_update(mode: str):
                         # Khác biệt so với kế hoạch được giao
                         diff_set = completed_set - assigned_set
                         if diff_set:
-                            lines.append(f"   • Different from Plan: {', '.join(sorted(diff_set))}")
+                            header_to_codes = {}
+                            for code in sorted(diff_set):
+                                header = emp_details.get(code, "Report")
+                                header_to_codes.setdefault(header, []).append(code)
+                            
+                            diff_items = []
+                            for header, codes in header_to_codes.items():
+                                diff_items.append(f"{header}: {', '.join(codes)}")
+                            lines.append(f"   • Different from Plan: {'; '.join(diff_items)}")
                     else:
                         lines.append("   • Plan: None")
                         if completed_set:
-                            lines.append(f"   • Completed: {', '.join(sorted(completed_set))}")
+                            header_to_codes = {}
+                            for code in sorted(completed_set):
+                                header = emp_details.get(code, "Report")
+                                header_to_codes.setdefault(header, []).append(code)
+                            
+                            completed_items = []
+                            for header, codes in header_to_codes.items():
+                                completed_items.append(f"{header}: {', '.join(codes)}")
+                            lines.append(f"   • Completed: {'; '.join(completed_items)}")
 
                     lines.append(f"   • Report: {report_status_text}")
 

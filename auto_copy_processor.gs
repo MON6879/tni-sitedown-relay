@@ -64,6 +64,10 @@ function initConfigTab() {
  * Hàm xử lý chính: Quét cấu hình và thực thi Copy-Paste + Xóa dòng
  */
 function runAutoCopyProcessor() {
+  if (!isWithinCopyActiveWindows_()) {
+    Logger.log("😴 Ngoài khung giờ hoạt động Copy (08:00-12:00 & 14:00-22:00 Myanmar) — Dừng tiến trình.");
+    return;
+  }
   Logger.log("🚀 Bắt đầu tiến trình Auto Copy & Delete...");
   let ssConfig;
   try {
@@ -178,6 +182,9 @@ function runAutoCopyProcessor() {
                   tgtSh.getRange(tgtNextRow, targetStartCol, 1, numCols).setValues(rowValues);
                   copiedCount++;
                   Logger.log("  ✅ Đã copy dòng " + srcRowNum + " sang sheet đích dòng " + tgtNextRow);
+                  
+                  // Đánh dấu dòng đã được copy ở sheet nguồn để tránh lặp lại ở chu kỳ sau
+                  srcSh.getRange(srcRowNum, condColNum).setValue("Copied");
                 }
               }
               Logger.log("  📊 Hoàn thành copy: " + copiedCount + " dòng.");
@@ -234,9 +241,9 @@ function runAutoCopyProcessor() {
 }
 
 /**
- * Thiết lập lịch chạy tự động vào lúc 22:00 hàng ngày (giờ Myanmar)
+ * Thiết lập lịch chạy tự động mỗi 15 phút (chỉ chạy trong khung giờ làm việc)
  */
-function setupAutoCopyTrigger() {
+function setupAutoCopyEvery15MinutesTrigger() {
   // Xóa các trigger cũ cùng tên để tránh trùng lặp
   const triggers = ScriptApp.getProjectTriggers();
   for (const t of triggers) {
@@ -245,16 +252,13 @@ function setupAutoCopyTrigger() {
     }
   }
 
-  // Tạo trigger mới chạy hàng ngày từ 22:00 đến 23:00
-  // Note: Google Apps Script chỉ cho phép thiết lập trigger theo khoảng 1 giờ
+  // Tạo trigger mới chạy mỗi 15 phút
   ScriptApp.newTrigger("runAutoCopyProcessor")
            .timeBased()
-           .everyDays(1)
-           .atHour(22)
-           .inTimezone("Asia/Rangoon") // Đặt múi giờ Myanmar
+           .everyMinutes(15)
            .create();
   
-  Logger.log("⏰ Đã thiết lập trigger chạy tự động lúc 22:00 hàng ngày (giờ Myanmar).");
+  Logger.log("⏰ Đã thiết lập trigger chạy tự động mỗi 15 phút cho tác vụ Copy.");
 }
 
 
@@ -452,5 +456,26 @@ function parseSortConfigRange_(rangeStr, defaultStartRow) {
   }
   
   return { colLetter: colLetter, startRow: startRow };
+}
+
+/**
+ * Kiểm tra xem thời gian hiện tại có nằm trong 2 khung giờ hoạt động của tác vụ Copy hay không
+ * Khung 1: 08:00 - 12:00 (Myanmar Time)
+ * Khung 2: 14:00 - 22:00 (Myanmar Time)
+ */
+function isWithinCopyActiveWindows_() {
+  const now = new Date();
+  const hour = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "H"), 10);
+  const minute = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "m"), 10);
+  
+  // Khung 1: 08:00 - 12:00
+  if (hour >= 8 && hour < 12) return true;
+  if (hour === 12 && minute === 0) return true;
+  
+  // Khung 2: 14:00 - 22:00
+  if (hour >= 14 && hour < 22) return true;
+  if (hour === 22 && minute === 0) return true;
+  
+  return false;
 }
 

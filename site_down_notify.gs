@@ -203,6 +203,20 @@ function writeToColumnA(sheet, text) {
 // (cũng được gọi từ doPost sau khi ghi Cột A)
 // ============================================================
 function checkAndSend() {
+  // Đọc giờ Myanmar để giới hạn thời gian hoạt động (03:30 - 21:30)
+  const now = new Date();
+  const hour = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "H"), 10);
+  const minute = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "m"), 10);
+  const currentMinutes = hour * 60 + minute;
+
+  const activeStart = 3 * 60 + 30; // 03:30 -> 210 phút
+  const activeEnd = 21 * 60 + 30;  // 21:30 -> 1290 phút
+
+  if (currentMinutes < activeStart || currentMinutes > activeEnd) {
+    Logger.log("😴 Ngoài khung giờ hoạt động checkAndSend (03:30-21:30 Myanmar) — Bỏ qua.");
+    return;
+  }
+
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(3000)) {
     Logger.log("⏭️ checkAndSend: đang có execution khác — bỏ qua");
