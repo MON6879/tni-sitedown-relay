@@ -558,6 +558,9 @@ def get_employee_completed_tni_today_detailed(df_report, target_date: str, emplo
             if pd.isna(val):
                 continue
             val_str = str(val).strip()
+            # Bỏ qua các lệnh bot: CLEAR TNI..., T1waitcd, v.v.
+            if re.match(r'^clear\b', val_str, re.IGNORECASE):
+                continue
             codes = extract_tni_codes(val_str)
             if codes:
                 # Dùng tiêu đề TNIxxxx từ nội dung cell thay vì tên cột sheet

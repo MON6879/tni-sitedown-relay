@@ -855,6 +855,9 @@ function buildSearchStatsMap(ss) {
     // Cot E (UserID) -> index 4: dung UserID lam key de match chinh xac
     const userId = (row[4] || '').toString().trim();
     if (!userId) continue;
+    // Bo qua lenh CLEAR TNIxxxx — khong tinh vao search stats
+    const tniCode = (row[5] || '').toString().trim();
+    if (/^clear\b/i.test(tniCode)) continue;
     if (!map[userId]) map[userId] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     const u = map[userId];
     const parts = dateVal.split('/');
@@ -867,6 +870,7 @@ function buildSearchStatsMap(ss) {
     if (diffMs <= msWeek) u.week++;
     if (diffMs <= msMonth) u.month++;
   }
+
   return map;
 }
 
