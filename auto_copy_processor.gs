@@ -69,6 +69,7 @@ function runAutoCopyProcessor() {
     return;
   }
   Logger.log("🚀 Bắt đầu tiến trình Auto Copy & Delete...");
+  const errorRows = []; // Thu thập các dòng lỗi để tổng hợp báo cáo
   let ssConfig;
   try {
     ssConfig = getSpreadsheetCached_(CONFIG_SS_ID);
@@ -173,18 +174,56 @@ function runAutoCopyProcessor() {
               for (let r = 0; r < condData.length; r++) {
                 if (String(condData[r][0]).trim() === sourceValCond) {
                   const srcRowNum = r + 1;
-                  const rowValues = srcSh.getRange(srcRowNum, startCol, 1, numCols).getValues();
+                  
+                  // Kiểm tra xem dòng này đã được copy trước đó chưa (qua Cell Note)
+                  const condCell = srcSh.getRange(srcRowNum, condColNum);
+                  const existingNote = condCell.getNote() || "";
+                  if (existingNote.indexOf("✅ Auto-Copied:") !== -1) {
+                    Logger.log("  ⏭️ Dòng " + srcRowNum + " đã được đánh dấu Copied — bỏ qua.");
+                    continue;
+                  }
+                  
+                  let rowValues;
+                  let hasCircularError = false;
+                  
+                  // Đọc giá trị dòng nguồn — bắt lỗi vòng lặp (Circular Reference)
+                  try {
+                    rowValues = srcSh.getRange(srcRowNum, startCol, 1, numCols).getValues();
+                    // Nếu ô nào chứa lỗi Error (VD: #REF!, #CIRC!), đánh dấu đỏ và ghi log
+                    const flatVals = rowValues[0];
+                    for (let v = 0; v < flatVals.length; v++) {
+                      const vStr = String(flatVals[v]);
+                      if (vStr.indexOf("#REF") !== -1 || vStr.indexOf("#CIRC") !== -1 || vStr.indexOf("Error") !== -1) {
+                        hasCircularError = true;
+                        break;
+                      }
+                    }
+                  } catch (readErr) {
+                    hasCircularError = true;
+                    rowValues = null;
+                    Logger.log("  ⚠️ Lỗi đọc dữ liệu dòng " + srcRowNum + " (có thể Circular Reference): " + readErr.message);
+                  }
+                  
+                  if (hasCircularError) {
+                    // Bôi đỏ toàn bộ dòng lỗi trong sheet nguồn
+                    srcSh.getRange(srcRowNum, 1, 1, srcSh.getLastColumn()).setBackground("#FF5252");
+                    const errMsg = "⚠️ Lỗi vòng lặp/công thức tại sheet '" + srcInfo.sheetName + "' dòng " + srcRowNum + " (Cấu hình dòng #" + rowIdx + ")";
+                    errorRows.push(errMsg);
+                    Logger.log("  ❌ " + errMsg);
+                    continue;
+                  }
                   
                   // Tìm dòng trống tiếp theo dựa theo cột dán đích
                   const tgtNextRow = findNextEmptyRowInCol_(tgtSh, targetStartCol);
                   
-                  // Ghi dữ liệu dạng Paste 123 (values only)
+                  // Ghi dữ liệu dạng Paste 123 (values only — giữ nguyên công thức nguồn)
                   tgtSh.getRange(tgtNextRow, targetStartCol, 1, numCols).setValues(rowValues);
                   copiedCount++;
                   Logger.log("  ✅ Đã copy dòng " + srcRowNum + " sang sheet đích dòng " + tgtNextRow);
                   
-                  // Đánh dấu dòng đã được copy ở sheet nguồn để tránh lặp lại ở chu kỳ sau
-                  srcSh.getRange(srcRowNum, condColNum).setValue("Copied");
+                  // Đánh dấu dòng đã xử lý bằng Cell Note (KHÔNG ghi đè công thức)
+                  const noteText = "✅ Auto-Copied: " + Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy HH:mm") + " Myanmar";
+                  condCell.setNote(noteText);
                 }
               }
               Logger.log("  📊 Hoàn thành copy: " + copiedCount + " dòng.");
@@ -238,6 +277,20 @@ function runAutoCopyProcessor() {
     }
   }
   Logger.log("🏁 Hoàn thành toàn bộ tiến trình Auto Copy & Delete.");
+  
+  // Gửi báo cáo tổng hợp lỗi nếu có
+  if (errorRows.length > 0) {
+    const summaryMsg = "⚠️ AUTO COPY BÁO CÁO LỖI\n" +
+      "━━━━━━━━━━━━━━━━━━━━\n" +
+      errorRows.join("\n") +
+      "\n━━━━━━━━━━━━━━━━━━━━\n" +
+      "🔧 Các dòng trên đã được bôi đỏ trong sheet nguồn. Vui lòng kiểm tra và chỉnh sửa.";
+    Logger.log("📨 Tổng hợp lỗi:\n" + summaryMsg);
+    // Ghi lỗi vào Script Properties để có thể truy xuất sau
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty("LAST_COPY_ERRORS", summaryMsg);
+    props.setProperty("LAST_COPY_ERROR_TIME", new Date().toISOString());
+  }
 }
 
 /**
@@ -260,6 +313,52 @@ function setupAutoCopyEvery15MinutesTrigger() {
   
   Logger.log("⏰ Đã thiết lập trigger chạy tự động mỗi 15 phút cho tác vụ Copy.");
 }
+
+
+/**
+ * Xem báo cáo lỗi lần chạy Auto Copy cuối cùng
+ * Chạy thủ công từ Apps Script Editor để xem có lỗi gì không
+ */
+function getLastCopyErrors() {
+  const props = PropertiesService.getScriptProperties();
+  const errors = props.getProperty("LAST_COPY_ERRORS");
+  const errorTime = props.getProperty("LAST_COPY_ERROR_TIME");
+  if (errors) {
+    Logger.log("🕐 Thời điểm lỗi: " + (errorTime || "N/A"));
+    Logger.log(errors);
+  } else {
+    Logger.log("✅ Không có lỗi nào từ lần chạy cuối cùng.");
+  }
+}
+
+
+/**
+ * Reset toàn bộ Cell Note "✅ Auto-Copied" trên sheet nguồn để cho phép copy lại
+ * Hữu ích khi bạn muốn chạy lại toàn bộ từ đầu
+ * Tham số: sheetId (ID của spreadsheet), sheetName (tên sheet), condColLetter (cột điều kiện VD: "A")
+ */
+function resetCopiedNotes(sheetId, sheetName, condColLetter) {
+  try {
+    const ss = SpreadsheetApp.openById(sheetId || CONFIG_SS_ID);
+    const sh = ss.getSheetByName(sheetName);
+    if (!sh) { Logger.log("❌ Không tìm thấy sheet: " + sheetName); return; }
+    const colNum = colLetterToNum_(condColLetter || "A");
+    const lastRow = sh.getLastRow();
+    if (lastRow < 1) return;
+    for (let r = 1; r <= lastRow; r++) {
+      const cell = sh.getRange(r, colNum);
+      const note = cell.getNote() || "";
+      if (note.indexOf("✅ Auto-Copied:") !== -1) {
+        cell.clearNote();
+      }
+    }
+    Logger.log("✅ Đã xóa toàn bộ Auto-Copied Note trên sheet '" + sheetName + "' cột " + condColLetter);
+  } catch (e) {
+    Logger.log("❌ Lỗi reset notes: " + e.message);
+  }
+}
+
+
 
 
 // ============================================================
