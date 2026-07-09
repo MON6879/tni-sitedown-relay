@@ -240,14 +240,48 @@ function runAutoCopyProcessor() {
       }
     }
 
-    // ⚠️ PHẦN 2 - XÓA HÀNG: Đã bỏ hoàn toàn.
-    // Lý do: Cột A của sheet nguồn chứa công thức VLOOKUP/INDEX.
-    // Sau khi copy, công thức sẽ tự tính lại sang giá trị khác —
-    // nếu xóa dòng nguồn sẽ làm mất công thức và gây lỗi dữ liệu.
-    // Cơ chế đánh dấu "đã xử lý" dùng Cell Note (✅ Auto-Copied) thay thế.
+    // ========================================================
+    // PHẦN 2: XÓA HÀNG Ở SHEET KHÁC (theo cấu hình cột G, H, I)
+    // ========================================================
+    // Sheet xóa là sheet KHÁC với sheet nguồn (link cột G, sheet cột H)
+    // Điều kiện xóa dựa vào Cột A của sheet đó (công thức VLOOKUP trả về
+    // các giá trị như "Not same task", "Remove" v.v.)
+    if (deleteLink && deleteColCond && deleteValCond) {
+      try {
+        const delSSId = extractSsId_(deleteLink);
+        const delSS = getSpreadsheetCached_(delSSId);
+        const delInfo = parseSheetAndRange_(deleteColCond);
+        const delSh = delSS.getSheetByName(delInfo.sheetName);
+
+        if (!delSh) {
+          Logger.log("  ❌ Lỗi: Không tìm thấy sheet xóa: '" + delInfo.sheetName + "'");
+        } else {
+          const delColLetter = delInfo.rangeStr || "A";
+          const delColNum = colLetterToNum_(delColLetter);
+          const delLastRow = delSh.getLastRow();
+
+          if (delLastRow >= 1) {
+            const delData = delSh.getRange(1, delColNum, delLastRow, 1).getValues();
+            let deletedCount = 0;
+
+            // Quét từ dưới lên để tránh lệch index dòng khi xóa
+            for (let r = delLastRow - 1; r >= 0; r--) {
+              if (String(delData[r][0]).trim() === deleteValCond) {
+                delSh.deleteRow(r + 1);
+                deletedCount++;
+              }
+            }
+            Logger.log("  🗑️ Xóa xong: " + deletedCount + " dòng có '" + deleteValCond + "' tại '" + delInfo.sheetName + "' cột " + delColLetter);
+          }
+        }
+      } catch (err) {
+        Logger.log("  ❌ Lỗi xử lý Xóa dòng #" + rowIdx + ": " + err.message);
+      }
+    }
   } // end for configRows
 
-  Logger.log("🏁 Hoàn thành toàn bộ tiến trình Auto Copy.");
+  Logger.log("🏁 Hoàn thành toàn bộ tiến trình Auto Copy & Delete.");
+
 
   
   // Gửi báo cáo tổng hợp lỗi nếu có
