@@ -298,3 +298,31 @@ python daily_read_report.py
 3. **Search data = 0:** If all search values show 0, check that Apps Script is deployed with the latest version that includes per-person search fields
 4. **Duplicate names:** The system deduplicates by name. If two different people have the same name, only one will show
 5. **Rate limiting:** Telethon calls have 0.3s delays between API calls to avoid Telegram rate limits
+
+---
+
+## 📊 Resource Consumption & Quotas
+
+To prevent resource exhaustion and monitor usage limits, the system operates under the following quotas:
+
+### 1. GitHub Actions (Minutes Quota)
+- **Limit:** 2,000 free minutes/month (for private repos; unlimited/free for public repos).
+- **Consumption:**
+  - `botlookup_relay`: Runs every 30 minutes from 03:30 to 22:10 (38 runs/day). Each run takes ~40s (0.7 min). Day total: ~27 minutes.
+  - Daily reports (`plan`, `read_report`, `daily_task`, `cable`, `refuel`): Runs ~10 times/day total. Each run takes ~1 min. Day total: ~10 minutes.
+  - **Estimated Total:** ~37 minutes/day = **~1,100 minutes/month** (~55% of the free quota).
+- **Monitoring:** View details in GitHub Profile → Settings → Billing & Plans → Plans and usage → Actions.
+
+### 2. Google Apps Script (GAS Quota)
+- **UrlFetchApp calls (Telegram Sends):**
+  - **Limit:** 20,000 fetch calls/day (consumer Gmail) or 100,000 fetch calls/day (Google Workspace).
+  - **Consumption:** Only called on updates and daily summaries (~150 calls/day total). Uses **< 1%** of quota.
+- **Trigger Executions:**
+  - **Limit:** 90 minutes/day execution time (consumer Gmail) or 6 hours/day (Google Workspace).
+  - **Consumption:** The 5-minute `checkAndSend` trigger runs for ~2-3 seconds per execution (~15 mins/day total). Uses **~16%** of quota.
+- **Monitoring:** View details in Apps Script Dashboard → G Suite Developer Console → Quotas.
+
+### 3. Telegram API Rate Limits
+- **Limits:** Max 30 messages/second to different chats; max 20 messages/minute within a single group.
+- **Controls:** Telethon API calls in our Python scripts use `asyncio.sleep(0.3)` between individual chat/user checks to prevent rate limiting issues.
+
