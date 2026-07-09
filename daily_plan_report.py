@@ -560,7 +560,20 @@ def get_employee_completed_tni_today_detailed(df_report, target_date: str, emplo
             val_str = str(val).strip()
             codes = extract_tni_codes(val_str)
             if codes:
-                col_header = df_report.columns[col_i]
+                # Dùng tiêu đề TNIxxxx từ nội dung cell thay vì tên cột sheet
+                # Ví dụ: "TNI0295 maintenance:" → header = "TNI0295 maintenance"
+                # Chỉ áp dụng khi cell có dạng TNIxxxx + text mô tả (không phải danh sách nhiều TNI)
+                tni_heading_match = re.match(r'(TNI\d{3,5}\s+[^\n]+)', val_str, re.IGNORECASE)
+                if tni_heading_match and len(codes) == 1:
+                    # Cell có 1 TNI code với mô tả, dùng toàn bộ phần đầu làm tiêu đề
+                    raw_heading = tni_heading_match.group(1).strip().rstrip(':').strip()
+                    col_header = raw_heading
+                elif len(codes) == 1:
+                    # Cell chỉ có 1 TNI code đơn thuần, dùng chính code đó làm tiêu đề
+                    col_header = list(codes)[0].upper()
+                else:
+                    # Cell có nhiều TNI code (danh sách), dùng tên cột sheet
+                    col_header = df_report.columns[col_i]
                 for code in codes:
                     row_tni_details[code.upper()] = col_header
                     
