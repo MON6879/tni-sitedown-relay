@@ -6,6 +6,7 @@ on:
     - cron: '0 11 * * *'   # 17:30 Myanmar / 11:00 UTC → cable_report
     - cron: '30 22 * * *'  # 05:00 Myanmar / 22:30 UTC → refuel_report
     - cron: '30 6 * * *'   # 13:00 Myanmar / 06:30 UTC → refuel_report
+    - cron: '5,35 0-15,21-23 * * *' # Every 30 minutes at :05 and :35 during active hours (03:30-22:00 Myanmar) → botlookup_relay
   workflow_dispatch:
     inputs:
       report_type:
@@ -126,7 +127,9 @@ jobs:
         run: python check_read_status.py
 
       - name: Task — Botlookup Relay
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'botlookup_relay'
+        if: |
+          (github.event_name == 'schedule' && github.event.schedule == '5,35 0-15,21-23 * * *') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'botlookup_relay')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
