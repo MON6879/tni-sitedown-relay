@@ -9,19 +9,20 @@ load_dotenv()
 # Cấu hình bot và chat ID mặc định của group 9 TNI REQUEST REFUEL
 REFUEL_BOT_TOKEN = os.getenv("REFUEL_BOT_TOKEN", "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME")
 REFUEL_CHAT_ID   = os.getenv("REFUEL_CHAT_ID", "-5469544739")
-APPS_SCRIPT_URL  = os.getenv("APPS_SCRIPT_URL", "")
+# URL Apps Script của bảng tính Refuel riêng, nếu không có sẽ tự động dùng chung APPS_SCRIPT_URL
+REFUEL_APPS_SCRIPT_URL = os.getenv("REFUEL_APPS_SCRIPT_URL", os.getenv("APPS_SCRIPT_URL", ""))
 
 TZ_MM = timezone(timedelta(hours=6, minutes=30))  # Múi giờ Myanmar UTC+6:30
 
 
 def fetch_refuel_data() -> list[str] | None:
     """Tải dữ liệu cột G của tab Refuel từ Google Sheets qua Apps Script Web App API."""
-    if not APPS_SCRIPT_URL:
-        print("❌ APPS_SCRIPT_URL not set in environment", file=sys.stderr)
+    if not REFUEL_APPS_SCRIPT_URL:
+        print("❌ REFUEL_APPS_SCRIPT_URL not set in environment", file=sys.stderr)
         return None
     try:
         resp = requests.get(
-            APPS_SCRIPT_URL,
+            REFUEL_APPS_SCRIPT_URL,
             params={"action": "get_refuel_data"},
             timeout=30,
         )
@@ -87,10 +88,10 @@ def main():
         sys.exit(1)
 
     # 1. Thực hiện xóa tin nhắn báo cáo Refuel cũ trong group
-    if APPS_SCRIPT_URL:
+    if REFUEL_APPS_SCRIPT_URL:
         try:
             from delete_old_helper import delete_old_messages_bot
-            delete_old_messages_bot(REFUEL_BOT_TOKEN, REFUEL_CHAT_ID, APPS_SCRIPT_URL, "REFUEL_DAILY_REPORT")
+            delete_old_messages_bot(REFUEL_BOT_TOKEN, REFUEL_CHAT_ID, REFUEL_APPS_SCRIPT_URL, "REFUEL_DAILY_REPORT")
         except Exception as e:
             print(f"⚠️ Error deleting old refuel report: {e}", file=sys.stderr)
 
@@ -106,10 +107,10 @@ def main():
     ok, msg_id = send_telegram(REFUEL_CHAT_ID, msg)
     
     # 4. Lưu lại message ID mới gửi qua Apps Script để xóa ở lần sau
-    if ok and APPS_SCRIPT_URL and msg_id:
+    if ok and REFUEL_APPS_SCRIPT_URL and msg_id:
         try:
             from delete_old_helper import save_msgids
-            save_msgids(APPS_SCRIPT_URL, "REFUEL_DAILY_REPORT", [msg_id])
+            save_msgids(REFUEL_APPS_SCRIPT_URL, "REFUEL_DAILY_REPORT", [msg_id])
         except Exception as e:
             print(f"⚠️ Error saving refuel report msgid: {e}", file=sys.stderr)
 
