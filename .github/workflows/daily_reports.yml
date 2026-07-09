@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: '30 10 * * *'  # 17:00 Myanmar / 10:30 UTC → daily_task (cron_send.py)
     - cron: '0 11 * * *'   # 17:30 Myanmar / 11:00 UTC → cable_report
+    - cron: '30 22 * * *'  # 05:00 Myanmar / 22:30 UTC → refuel_report
   workflow_dispatch:
     inputs:
       report_type:
@@ -21,6 +22,7 @@ on:
           - check_read_status
           - botlookup_relay
           - cable_report
+          - refuel_report
       skip_delay:
         description: 'Skip random delay (1=yes, 0=no) - for botlookup_relay'
         required: false
@@ -142,3 +144,11 @@ jobs:
           CABLE_CHAT_ID: ${{ secrets.CABLE_CHAT_ID }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
         run: python cable_report.py
+
+      - name: Task — Refuel Request Report (Cron or Manual)
+        if: |
+          (github.event_name == 'schedule' && (github.event.schedule == '30 10 * * *' || github.event.schedule == '30 22 * * *')) ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'refuel_report')
+        env:
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+        run: python refuel_send.py

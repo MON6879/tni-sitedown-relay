@@ -104,6 +104,7 @@ function doGet(e) {
     if (action === "get_note_b2b5")       return getNoteB2B5();
     if (action === "get_note_msgids")     return handleGetNoteMsgIds();
     if (action === "get_msgids")          return handleGetMsgIds(e.parameter || {});
+    if (action === "get_refuel_data")     return doGetRefuelData_(e);
 
     // ── Cable / MDG GET endpoints ─────────────────────────────────────────
     if (action === "cable_get_stats" || action === "cable_check_row") return doGetCable_(e);
@@ -2115,5 +2116,35 @@ function setupSendBotWebhook() {
     muteHttpExceptions: true
   });
   Logger.log("Set Webhook Response: " + resp.getContentText());
+}
+
+/**
+ * Đọc cột G (cột 7), từ dòng 2 đến dòng cuối cùng của sheet "Refuel"
+ * từ Spreadsheet ID: 1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM
+ */
+function doGetRefuelData_(e) {
+  try {
+    const ssId = "1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM";
+    const ss = SpreadsheetApp.openById(ssId);
+    const sheet = ss.getSheetByName("Refuel");
+    if (!sheet) {
+      return json({ status: "error", message: "Sheet Refuel not found" });
+    }
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      return json({ status: "ok", data: [] });
+    }
+    const values = sheet.getRange(2, 7, lastRow - 1, 1).getValues();
+    const data = [];
+    for (let i = 0; i < values.length; i++) {
+      const valTrim = String(values[i][0] || "").trim();
+      if (valTrim) {
+        data.push(valTrim);
+      }
+    }
+    return json({ status: "ok", data: data });
+  } catch (err) {
+    return json({ status: "error", message: err.message });
+  }
 }
 
