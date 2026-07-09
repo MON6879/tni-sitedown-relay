@@ -2,11 +2,14 @@ name: Unified Daily Reports
 
 on:
   schedule:
-    - cron: '30 10 * * *'  # 17:00 Myanmar / 10:30 UTC → daily_task (cron_send.py)
+    - cron: '30 10 * * *'  # 17:00 Myanmar / 10:30 UTC → daily_task + plan_eod + bod_assign
     - cron: '0 11 * * *'   # 17:30 Myanmar / 11:00 UTC → cable_report
     - cron: '30 22 * * *'  # 05:00 Myanmar / 22:30 UTC → refuel_report
     - cron: '30 6 * * *'   # 13:00 Myanmar / 06:30 UTC → refuel_report
     - cron: '5,35 0-15,21-23 * * *' # Every 30 minutes at :05 and :35 during active hours (03:30-22:00 Myanmar) → botlookup_relay
+    - cron: '30 0 * * *'   # 07:00 Myanmar / 00:30 UTC → plan_morning
+    - cron: '30 14 * * *'  # 21:00 Myanmar / 14:30 UTC → plan_update
+    - cron: '0 14 * * *'   # 20:30 Myanmar / 14:00 UTC → read_report
   workflow_dispatch:
     inputs:
       report_type:
@@ -48,7 +51,9 @@ jobs:
         run: pip install python-telegram-bot requests pandas python-dotenv telethon
 
       - name: Report 2 — BOD-assigned Tasks Stats
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'bod_assign'
+        if: |
+          (github.event_name == 'schedule' && github.event.schedule == '30 10 * * *') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'bod_assign')
         env:
           SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
@@ -78,7 +83,9 @@ jobs:
         run: python daily_plan_report.py
 
       - name: Report 5A — Daily Plan EOD
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_eod'
+        if: |
+          (github.event_name == 'schedule' && github.event.schedule == '30 10 * * *') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_eod')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -88,7 +95,9 @@ jobs:
         run: python daily_plan_report.py --mode eod
 
       - name: Report 5B — Daily Plan Update
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_update'
+        if: |
+          (github.event_name == 'schedule' && github.event.schedule == '30 14 * * *') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_update')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -98,7 +107,9 @@ jobs:
         run: python daily_plan_report.py --mode update
 
       - name: Report 5C — Morning Plan
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_morning'
+        if: |
+          (github.event_name == 'schedule' && github.event.schedule == '30 0 * * *') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_morning')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -108,7 +119,9 @@ jobs:
         run: python daily_plan_report.py --mode morning
 
       - name: Report 6 — Daily Note Read Report
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'read_report'
+        if: |
+          (github.event_name == 'schedule' && github.event.schedule == '0 14 * * *') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'read_report')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
