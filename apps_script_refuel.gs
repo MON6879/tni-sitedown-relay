@@ -7,6 +7,15 @@
 const REFUEL_BOT_TOKEN = "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME";
 const REFUEL_CHAT_ID = "-5469544739";
 
+/**
+ * HÀMỦY QUYỀN MẠNG: Chọn hàm này từ dropdown và bấm "Run" để hiện hộp thoại cấp quyền của Google.
+ */
+function authorizeUrlFetch() {
+  Logger.log("🔐 Đang kích hoạt hộp thoại cấp quyền kết nối mạng...");
+  UrlFetchApp.fetch("https://api.telegram.org");
+  Logger.log("✅ Đã cấp quyền thành công!");
+}
+
 function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || "";
@@ -151,7 +160,7 @@ function sendRefuelReport() {
     }
   }
   
-  // 3. Định dạng tin nhắn HTML
+  // 3. Định nhắn HTML
   const formattedMsg = formatRefuelMessage(rows);
   Logger.log("📨 Nội dung gửi đi:\n" + formattedMsg);
   
