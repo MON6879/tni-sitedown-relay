@@ -480,17 +480,19 @@ function sortSheetByConfig_(ss, sortConfig) {
 
     // Lấy vùng dữ liệu thực tế cần sắp xếp (loại trừ các dòng hoàn toàn trống ở dưới)
     const range = sheet.getRange(startRow, 1, actualLastRow - startRow + 1, lastCol);
-    const data = range.getValues();
+    const data        = range.getValues();
+    const formulas    = range.getFormulas();   // Đọc thêm công thức để bảo toàn sau khi sort
     const backgrounds = range.getBackgrounds();
     const fontWeights = range.getFontWeights();
 
-    // Gộp dữ liệu và định dạng để sắp xếp đi kèm với nhau
+    // Gộp dữ liệu, công thức và định dạng để sắp xếp đi kèm với nhau
     const rows = [];
     for (let r = 0; r < data.length; r++) {
       rows.push({
-        values: data[r],
-        bg: backgrounds[r],
-        fw: fontWeights[r]
+        values:   data[r],
+        formulas: formulas[r],   // Lưu công thức của từng dòng
+        bg:       backgrounds[r],
+        fw:       fontWeights[r]
       });
     }
 
@@ -514,11 +516,16 @@ function sortSheetByConfig_(ss, sortConfig) {
     });
 
     // Tách mảng đã sắp xếp ra để ghi đè lại sheet
-    const sortedValues = rows.map(r => r.values);
+    const sortedValues     = rows.map(r => r.values);
+    const sortedFormulas   = rows.map(r => r.formulas);
     const sortedBackgrounds = rows.map(r => r.bg);
     const sortedFontWeights = rows.map(r => r.fw);
 
+    // Bước 1: Ghi giá trị trước (cho các ô không có công thức)
     range.setValues(sortedValues);
+    // Bước 2: Ghi lại công thức — ô nào có công thức sẽ được khôi phục,
+    //         ô không có công thức (chuỗi rỗng "") giữ nguyên giá trị vừa ghi ở Bước 1
+    range.setFormulas(sortedFormulas);
     range.setBackgrounds(sortedBackgrounds);
     range.setFontWeights(sortedFontWeights);
 
