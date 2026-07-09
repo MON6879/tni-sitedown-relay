@@ -177,20 +177,21 @@ function sendRefuelReport() {
     startIdx = 1;
   }
   
+  // Trừ hao thêm các ký tự HTML tag <pre> và </pre>
   const baseTitle = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>\n📅 " + dateStr + "  ⏰ " + timeStr + " (Myanmar)\n━━━━━━━━━━━━━━━━━━━━━\n\n";
   const baseFooter = "\n━━━━━━━━━━━━━━━━━━━━━\n🤖 <i>Auto report by @TNI_REFUEL_BOT</i>";
   
   const chunks = [];
   let currentChunkLines = [];
-  let currentLength = baseTitle.length + baseFooter.length + (headerLine ? headerLine.length : 0);
+  let currentLength = baseTitle.length + baseFooter.length + (headerLine ? headerLine.length : 0) + 13; // +13 cho <pre></pre>
   
   for (let i = startIdx; i < rows.length; i++) {
     const line = rows[i];
-    // 4000 ký tự là ngưỡng an toàn
-    if (currentLength + line.length + 1 > 4000) {
+    // 3800 ký tự là ngưỡng an toàn
+    if (currentLength + line.length + 1 > 3800) {
       chunks.push(currentChunkLines);
       currentChunkLines = [line];
-      currentLength = baseTitle.length + baseFooter.length + line.length;
+      currentLength = baseTitle.length + baseFooter.length + line.length + 13;
     } else {
       currentChunkLines.push(line);
       currentLength += line.length + 1; // +1 cho newline
@@ -218,12 +219,13 @@ function sendRefuelReport() {
       lines.push(headerLine);
     }
     
-    // Thêm các dòng dữ liệu
+    // Đóng khung trong thẻ pre để tạo giao diện Monospace gọn gàng (ép thành 1 dòng)
+    lines.push("<pre>");
     for (let j = 0; j < chunkLines.length; j++) {
       lines.push(chunkLines[j]);
     }
+    lines.push("</pre>");
     
-    lines.push("");
     lines.push("━━━━━━━━━━━━━━━━━━━━━");
     lines.push("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>");
     

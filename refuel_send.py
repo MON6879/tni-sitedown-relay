@@ -70,17 +70,17 @@ def format_and_send_report(rows: list[str]) -> list[int]:
     base_title = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>\n📅 {date_str}  ⏰ {time_str} (Myanmar)\n━━━━━━━━━━━━━━━━━━━━━\n\n"
     base_footer = "\n━━━━━━━━━━━━━━━━━━━━━\n🤖 <i>Auto report by @TNI_REFUEL_BOT</i>"
     
-    # Chia nhỏ các dòng dữ liệu thành các chunk an toàn (< 4000 ký tự)
+    # Chia nhỏ các dòng dữ liệu thành các chunk an toàn (< 3800 ký tự cho pre tag)
     chunks = []
     current_chunk = []
-    current_len = len(base_title) + len(base_footer) + (len(header_line) if header_line else 0)
+    current_len = len(base_title) + len(base_footer) + (len(header_line) if header_line else 0) + 13
     
     for i in range(start_idx, len(rows)):
         line = rows[i]
-        if current_len + len(line) + 1 > 4000:
+        if current_len + len(line) + 1 > 3800:
             chunks.append(current_chunk)
             current_chunk = [line]
-            current_len = len(base_title) + len(base_footer) + len(line)
+            current_len = len(base_title) + len(base_footer) + len(line) + 13
         else:
             current_chunk.append(line)
             current_len += len(line) + 1
@@ -105,10 +105,12 @@ def format_and_send_report(rows: list[str]) -> list[int]:
         if idx == 0 and header_line:
             lines.append(header_line)
             
+        # Bọc danh sách trong khối thẻ pre để đồng nhất Monospace (ép thành 1 dòng)
+        lines.append("<pre>")
         for line in chunk_lines:
             lines.append(line)
-            
-        lines.append("")
+        lines.append("</pre>")
+        
         lines.append("━━━━━━━━━━━━━━━━━━━━━")
         lines.append("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>")
         
