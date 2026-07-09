@@ -199,6 +199,35 @@ def extract_tni_codes(text: str) -> set:
     return set(code.upper() for code in re.findall(r'TNI\d{3,5}(?:_\d+)?', text, re.IGNORECASE))
 
 
+def is_employee_in_cell(emp: dict, cell_value: str) -> bool:
+    """Fuzzy match employee name or username inside a cell value."""
+    if not cell_value:
+        return False
+    cell_lower = cell_value.lower()
+    
+    # 1. Check Name
+    name = emp.get("name", "").strip()
+    if name and name != "-":
+        name_clean = re.sub(r'[\s._]', '', name).lower()
+        cell_clean = re.sub(r'[\s._]', '', cell_lower)
+        if name_clean in cell_clean:
+            return True
+            
+    # 2. Check Username (sys_name)
+    sys_name = emp.get("sys_name", "").strip()
+    if sys_name and sys_name != "-":
+        sys_clean = sys_name.lower()
+        if sys_clean.startswith("myt_"):
+            sys_clean = sys_clean[4:]
+        sys_clean = re.sub(r'[\s._]', '', sys_clean)
+        cell_clean = re.sub(r'[\s._]', '', cell_lower)
+        if sys_clean in cell_clean:
+            return True
+            
+    return False
+
+
+
 # Mỗi category một màu vuông cố định — trùng tên category = trùng màu
 CATEGORY_SQUARES = {
     "admin":        "🟦",   # xanh dương
@@ -475,21 +504,27 @@ def parse_assigned_tni_per_person(plan_text: str, team_emps: list) -> dict:
     return assigned
 
 
-def get_employee_completed_tni_today_detailed(df_report, target_date: str) -> dict:
+def get_employee_completed_tni_today_detailed(df_report, target_date: str, employees: list) -> dict:
     """
-    Given the df_report dataframe, extracts all completed TNI codes today per employee telegram ID,
-    along with the column header where they were found.
+    Given the df_report dataframe, extracts all completed TNI codes today per employee,
+    supporting both Telegram ID matching and fuzzy name/username matching.
     Returns: { tg_id: { TNI_code: header_name } }
     """
     completed = {}
     if df_report is None or df_report.empty:
         return completed
         
+    name_idx = 1
+    fullname_idx = 1
     date_idx = 2
     tg_idx = 17
     for col_idx, col_name in enumerate(df_report.columns):
         c_lower = col_name.lower().strip()
-        if "daily report" in c_lower and not ":" in c_lower:
+        if "tên nhân viên" in c_lower and not ".1" in c_lower:
+            name_idx = col_idx
+        elif "full name" in c_lower:
+            fullname_idx = col_idx
+        elif "daily report" in c_lower and not ":" in c_lower:
             date_idx = col_idx
         elif "telegram id" in c_lower:
             tg_idx = col_idx
@@ -497,14 +532,25 @@ def get_employee_completed_tni_today_detailed(df_report, target_date: str) -> di
     for idx, row in df_report.iterrows():
         date_cell = str(row.iloc[date_idx]).strip() if not pd.isna(row.iloc[date_idx]) else ""
         tg_id = str(row.iloc[tg_idx]).strip() if len(row) > tg_idx and not pd.isna(row.iloc[tg_idx]) else ""
+        emp_name = str(row.iloc[name_idx]).strip() if not pd.isna(row.iloc[name_idx]) else ""
+        fullname_val = str(row.iloc[fullname_idx]).strip() if len(row) > fullname_idx and not pd.isna(row.iloc[fullname_idx]) else ""
+        search_name = f"{emp_name} {fullname_val}".strip()
         
-        if not tg_id or tg_id.lower() in ("nan", "none"): continue
         if target_date and date_cell and target_date not in date_cell:
             continue
             
-        cid = tg_id.replace(".0", "") if tg_id.endswith(".0") else tg_id
-        
-        emp_details = completed.setdefault(cid, {})
+        matched_tg_ids = set()
+        if tg_id and tg_id.lower() not in ("nan", "none", ""):
+            cid = tg_id.replace(".0", "") if tg_id.endswith(".0") else tg_id
+            matched_tg_ids.add(cid)
+            
+        for emp in employees:
+            emp_tg_id = str(emp.get("telegram_id", "")).strip()
+            if emp_tg_id and is_employee_in_cell(emp, search_name):
+                matched_tg_ids.add(emp_tg_id)
+                
+        # Extract TNI codes
+        row_tni_details = {}
         for col_i in range(date_idx + 1, tg_idx):
             if col_i >= len(row):
                 continue
@@ -516,8 +562,13 @@ def get_employee_completed_tni_today_detailed(df_report, target_date: str) -> di
             if codes:
                 col_header = df_report.columns[col_i]
                 for code in codes:
-                    emp_details[code.upper()] = col_header
+                    row_tni_details[code.upper()] = col_header
                     
+        for cid in matched_tg_ids:
+            emp_details = completed.setdefault(cid, {})
+            for code, col_header in row_tni_details.items():
+                emp_details[code] = col_header
+                
     return completed
 
 
@@ -639,9 +690,9 @@ def get_daily_reports_from_sheet(target_date: str) -> dict:
     return team_reports, df
 
 
-def get_employee_report_counts() -> dict:
+def get_employee_report_counts(employees: list) -> dict:
     """
-    Đếm số lần nhân viên nộp daily result theo Telegram ID.
+    Đếm số lần nhân viên nộp daily result theo Telegram ID và Tên nhân viên/Full Name.
     Cú pháp daily report: dòng đầu = "Daily report: DD/MM/YYYY"
 
     Returns:
@@ -683,11 +734,17 @@ def get_employee_report_counts() -> dict:
             return counts
 
         # Find column indices dynamically
+        name_idx = 1
+        fullname_idx = 1
         date_idx = 2
         tg_idx = 17
         for col_idx, col_name in enumerate(df.columns):
             c_lower = col_name.lower().strip()
-            if "daily report" in c_lower and not ":" in c_lower:
+            if "tên nhân viên" in c_lower and not ".1" in c_lower:
+                name_idx = col_idx
+            elif "full name" in c_lower:
+                fullname_idx = col_idx
+            elif "daily report" in c_lower and not ":" in c_lower:
                 date_idx = col_idx
             elif "telegram id" in c_lower:
                 tg_idx = col_idx
@@ -695,22 +752,33 @@ def get_employee_report_counts() -> dict:
         for _, row in df.iterrows():
             date_raw = str(row.iloc[date_idx]).strip() if not pd.isna(row.iloc[date_idx]) else ""
             tg_raw   = str(row.iloc[tg_idx]).strip() if len(row) > tg_idx and not pd.isna(row.iloc[tg_idx]) else ""
+            emp_name = str(row.iloc[name_idx]).strip() if not pd.isna(row.iloc[name_idx]) else ""
+            fullname_val = str(row.iloc[fullname_idx]).strip() if len(row) > fullname_idx and not pd.isna(row.iloc[fullname_idx]) else ""
+            search_name = f"{emp_name} {fullname_val}".strip()
 
-            if tg_raw.lower() in ("nan", "none", ""): continue
             if date_raw.lower() in ("nan", "none", ""): continue
-
-            tg_id = tg_raw.replace(".0", "") if tg_raw.endswith(".0") else tg_raw
             dt    = parse_date_cell(date_raw)
             if not dt: continue
 
             day = dt.replace(hour=0, minute=0, second=0, microsecond=0)
-            rec = counts.setdefault(tg_id, {"d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0})
+            
+            matched_tg_ids = set()
+            if tg_raw and tg_raw.lower() not in ("nan", "none", ""):
+                cid = tg_raw.replace(".0", "") if tg_raw.endswith(".0") else tg_raw
+                matched_tg_ids.add(cid)
+                
+            for emp in employees:
+                emp_tg_id = str(emp.get("telegram_id", "")).strip()
+                if emp_tg_id and is_employee_in_cell(emp, search_name):
+                    matched_tg_ids.add(emp_tg_id)
 
-            if day >= month_start: rec["month"] += 1
-            if day >= d7_start:    rec["d7"]    += 1
-            if day >= today:       rec["d0"]    += 1
-            elif day >= d1_start:  rec["d1"]    += 1
-            elif day >= d2_start:  rec["d2"]    += 1
+            for tg_id in matched_tg_ids:
+                rec = counts.setdefault(tg_id, {"d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0})
+                if day >= month_start: rec["month"] += 1
+                if day >= d7_start:    rec["d7"]    += 1
+                if day >= today:       rec["d0"]    += 1
+                elif day >= d1_start:  rec["d1"]    += 1
+                elif day >= d2_start:  rec["d2"]    += 1
 
         logger.info(f"  📊 Daily report counts: {len(counts)} employees tracked")
     except Exception as e:
@@ -1184,7 +1252,7 @@ async def run_eod_or_update(mode: str):
 
     # ── Step 4c: Đếm số lần nộp daily result per-person ──
     logger.info("📊 Counting employee daily report submissions...")
-    daily_counts = get_employee_report_counts()  # { tg_id: {d0,d1,d2,d7,month} }
+    daily_counts = get_employee_report_counts(unified_employees)  # { tg_id: {d0,d1,d2,d7,month} }
 
     # ── Step 5: Build and send reports ──
     if not SEND_BOT_TOKEN:
@@ -1227,7 +1295,7 @@ async def run_eod_or_update(mode: str):
                 lines.append("❌ No Daily Plan submitted today")
 
             # ── Phần Consolidated FT Plan & Actual ──
-            emp_completed_details = get_employee_completed_tni_today_detailed(df_report_raw, date_str)
+            emp_completed_details = get_employee_completed_tni_today_detailed(df_report_raw, date_str, emps)
             combined_plan_text = "\n".join(tp.get("content", "") for tp in stats["today_plans"])
             emp_assigned_map = parse_assigned_tni_per_person(combined_plan_text, emps)
 
