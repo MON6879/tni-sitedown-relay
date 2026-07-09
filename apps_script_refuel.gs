@@ -129,7 +129,7 @@ function json(obj) {
 
 /**
  * Hàm chính để gửi báo cáo Refuel và xóa tin nhắn cũ trực tiếp từ GAS.
- * Tự động chia nhỏ tin nhắn nếu dữ liệu vượt quá 4096 ký tự của Telegram.
+ * Gom nhóm danh sách theo từng Team và hiển thị bảng tổng hợp ở đầu tin nhắn.
  */
 function sendRefuelReport() {
   Logger.log("⛽ Bắt đầu tác vụ gửi báo cáo Refuel từ Google Apps Script...");
@@ -165,81 +165,164 @@ function sendRefuelReport() {
     return;
   }
   
-  // 3. Phân chia dòng thành các nhóm nhỏ để tránh lỗi vượt quá 4096 ký tự của Telegram
-  const now = new Date();
-  const dateStr = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
-  const timeStr = Utilities.formatDate(now, "Asia/Rangoon", "HH:mm");
+  // 3. Xây dựng danh sách các dòng tin nhắn được phân loại và gom nhóm
+  const formattedMsgList = buildRefuelMessageLines(rows);
   
-  let headerLine = "";
-  let startIdx = 0;
-  if (rows[0].indexOf("Report need refuel") !== -1) {
-    headerLine = "📋 <b>" + rows[0] + "</b>\n";
-    startIdx = 1;
-  }
-  
-  // Trừ hao thêm các ký tự HTML tag <pre> và </pre>
-  const baseTitle = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>\n📅 " + dateStr + "  ⏰ " + timeStr + " (Myanmar)\n━━━━━━━━━━━━━━━━━━━━━\n\n";
-  const baseFooter = "\n━━━━━━━━━━━━━━━━━━━━━\n🤖 <i>Auto report by @TNI_REFUEL_BOT</i>";
-  
+  // 4. Chia nhỏ thành các phần nếu tổng dung lượng vượt quá 3800 ký tự
   const chunks = [];
   let currentChunkLines = [];
-  let currentLength = baseTitle.length + baseFooter.length + (headerLine ? headerLine.length : 0) + 13; // +13 cho <pre></pre>
+  let currentLength = 0;
   
-  for (let i = startIdx; i < rows.length; i++) {
-    const line = rows[i];
-    // 3800 ký tự là ngưỡng an toàn
+  for (let i = 0; i < formattedMsgList.length; i++) {
+    const line = formattedMsgList[i];
     if (currentLength + line.length + 1 > 3800) {
       chunks.push(currentChunkLines);
       currentChunkLines = [line];
-      currentLength = baseTitle.length + baseFooter.length + line.length + 13;
+      currentLength = line.length;
     } else {
       currentChunkLines.push(line);
-      currentLength += line.length + 1; // +1 cho newline
+      currentLength += line.length + 1;
     }
   }
   if (currentChunkLines.length > 0) {
     chunks.push(currentChunkLines);
   }
   
-  // 4. Gửi từng phần lên Telegram và gom các message ID mới
+  // 5. Gửi từng phần lên Telegram và gom các message ID mới
   const newMsgIds = [];
   for (let c = 0; c < chunks.length; c++) {
     const chunkLines = chunks[c];
-    const lines = [];
+    const finalLines = [];
+    
+    const now = new Date();
+    const dateStr = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
+    const timeStr = Utilities.formatDate(now, "Asia/Rangoon", "HH:mm");
     
     // Ghi tiêu đề kèm thông tin phân trang nếu gửi nhiều phần
     const titleText = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>" + (chunks.length > 1 ? " (Phần " + (c + 1) + "/" + chunks.length + ")" : "");
-    lines.push(titleText);
-    lines.push("📅 " + dateStr + "  ⏰ " + timeStr + " (Myanmar)");
-    lines.push("━━━━━━━━━━━━━━━━━━━━━");
-    lines.push("");
+    finalLines.push(titleText);
+    finalLines.push("📅 " + dateStr + "  ⏰ " + timeStr + " (Myanmar)");
+    finalLines.push("━━━━━━━━━━━━━━━━━━━━━");
+    finalLines.push("");
     
-    // Chỉ ghi Header ở Phần 1
-    if (c === 0 && headerLine) {
-      lines.push(headerLine);
-    }
-    
-    // Đóng khung trong thẻ pre để tạo giao diện Monospace gọn gàng (ép thành 1 dòng)
-    lines.push("<pre>");
+    // Ghi nội dung chunk
     for (let j = 0; j < chunkLines.length; j++) {
-      lines.push(chunkLines[j]);
+      finalLines.push(chunkLines[j]);
     }
-    lines.push("</pre>");
     
-    lines.push("━━━━━━━━━━━━━━━━━━━━━");
-    lines.push("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>");
+    // Thêm chân trang nếu phần cuối chưa có chân trang
+    if (finalLines[finalLines.length - 1] !== "🤖 <i>Auto report by @TNI_REFUEL_BOT</i>") {
+      finalLines.push("");
+      finalLines.push("━━━━━━━━━━━━━━━━━━━━━");
+      finalLines.push("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>");
+    }
     
-    const formattedMsg = lines.join("\n");
+    const formattedMsg = finalLines.join("\n");
     const newMsgId = sendTelegramMessage(formattedMsg);
     if (newMsgId) {
       newMsgIds.push(newMsgId);
     }
   }
   
-  // 5. Lưu danh sách message ID mới gửi để xóa ở lần kế tiếp
+  // 6. Lưu danh sách message ID mới gửi để xóa ở lần kế tiếp
   if (newMsgIds.length > 0) {
     saveNewMsgIdRefuel(newMsgIds);
   }
+}
+
+/**
+ * Xây dựng và gom nhóm danh sách dòng tin nhắn theo Team
+ */
+function buildRefuelMessageLines(rows) {
+  let headerLine = "";
+  let startIdx = 0;
+  if (rows.length > 0 && rows[0].indexOf("Report need refuel") !== -1) {
+    headerLine = "📋 <b>" + rows[0] + "</b>";
+    startIdx = 1;
+  }
+  
+  // Phân nhóm
+  const teamGroups = {
+    1: [],
+    2: [],
+    3: [],
+    4: [],
+    0: []
+  };
+  
+  for (let i = startIdx; i < rows.length; i++) {
+    const line = rows[i];
+    const match = line.match(/\/T([1-9])/);
+    const teamNum = match ? parseInt(match[1], 10) : 0;
+    if (teamGroups[teamNum] !== undefined) {
+      teamGroups[teamNum].push(line);
+    } else {
+      teamGroups[0].push(line);
+    }
+  }
+  
+  const t1Count = teamGroups[1].length;
+  const t2Count = teamGroups[2].length;
+  const t3Count = teamGroups[3].length;
+  const t4Count = teamGroups[4].length;
+  const t0Count = teamGroups[0].length;
+  const totalCount = t1Count + t2Count + t3Count + t4Count + t0Count;
+  
+  const lines = [];
+  
+  // 1. Khung tổng hợp (Summary) ở đầu tin nhắn
+  lines.push("📊 <b>Summary by Team:</b>");
+  lines.push("🔴 Team 1: <b>" + t1Count + "</b> sites");
+  lines.push("🔵 Team 2: <b>" + t2Count + "</b> sites");
+  lines.push("🟢 Team 3: <b>" + t3Count + "</b> sites");
+  lines.push("🟡 Team 4: <b>" + t4Count + "</b> sites");
+  if (t0Count > 0) {
+    lines.push("⚪ Other: <b>" + t0Count + "</b> sites");
+  }
+  lines.push("Total: <b>" + totalCount + "</b> sites");
+  lines.push("━━━━━━━━━━━━━━━━━━━━━");
+  lines.push("");
+  
+  if (headerLine) {
+    lines.push(headerLine);
+    lines.push("");
+  }
+  
+  // 2. Liệt kê chi tiết và phân nhóm các xe bằng dấu tròn màu sắc
+  const teamEmojis = {
+    1: "🔴",
+    2: "🔵",
+    3: "🟢",
+    4: "🟡",
+    0: "⚪"
+  };
+  const teamNames = {
+    1: "Team 1",
+    2: "Team 2",
+    3: "Team 3",
+    4: "Team 4",
+    0: "Other/Unknown"
+  };
+  
+  const activeTeams = [1, 2, 3, 4, 0];
+  for (let k = 0; k < activeTeams.length; k++) {
+    const t = activeTeams[k];
+    const teamRows = teamGroups[t];
+    if (teamRows.length > 0) {
+      lines.push(teamEmojis[t] + " <b>" + teamNames[t] + " (" + teamRows.length + " sites)</b>");
+      for (let j = 0; j < teamRows.length; j++) {
+        lines.push(teamRows[j]);
+      }
+      lines.push(""); // Dòng trống ngăn cách các nhóm
+    }
+  }
+  
+  if (totalCount === 0) {
+    lines.push("📭 No refuel requests today.");
+    lines.push("");
+  }
+  
+  return lines;
 }
 
 /**

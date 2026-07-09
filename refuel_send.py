@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import requests
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
@@ -56,7 +57,7 @@ def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
 
 
 def format_and_send_report(rows: list[str]) -> list[int]:
-    """Chia nhỏ báo cáo và gửi lên Telegram để tránh vượt quá giới hạn 4096 ký tự."""
+    """Phân loại dữ liệu theo Team, lập bảng tổng hợp và chia nhỏ tin nếu vượt quá giới hạn 4096 ký tự."""
     now = datetime.now(TZ_MM)
     date_str = now.strftime("%d/%m/%Y")
     time_str = now.strftime("%H:%M")
@@ -64,23 +65,79 @@ def format_and_send_report(rows: list[str]) -> list[int]:
     header_line = ""
     start_idx = 0
     if rows and "Report need refuel" in rows[0]:
-        header_line = f"📋 <b>{rows[0]}</b>\n"
+        header_line = f"📋 <b>{rows[0]}</b>"
         start_idx = 1
         
-    base_title = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>\n📅 {date_str}  ⏰ {time_str} (Myanmar)\n━━━━━━━━━━━━━━━━━━━━━\n\n"
-    base_footer = "\n━━━━━━━━━━━━━━━━━━━━━\n🤖 <i>Auto report by @TNI_REFUEL_BOT</i>"
-    
-    # Chia nhỏ các dòng dữ liệu thành các chunk an toàn (< 3800 ký tự cho pre tag)
-    chunks = []
-    current_chunk = []
-    current_len = len(base_title) + len(base_footer) + (len(header_line) if header_line else 0) + 13
+    team_groups = {
+        1: [],
+        2: [],
+        3: [],
+        4: [],
+        0: []
+    }
     
     for i in range(start_idx, len(rows)):
         line = rows[i]
+        # Tìm mã /T1, /T2, /T3...
+        match = re.search(r'/T([1-9])', line)
+        team_num = int(match.group(1)) if match else 0
+        if team_num in team_groups:
+            team_groups[team_num].append(line)
+        else:
+            team_groups[0].append(line)
+            
+    t1_count = len(team_groups[1])
+    t2_count = len(team_groups[2])
+    t3_count = len(team_groups[3])
+    t4_count = len(team_groups[4])
+    t0_count = len(team_groups[0])
+    total_count = t1_count + t2_count + t3_count + t4_count + t0_count
+    
+    # Xây dựng danh sách dòng thô
+    msg_lines = []
+    
+    # 1. Khung tổng hợp (Summary) ở đầu tin nhắn
+    msg_lines.append("📊 <b>Summary by Team:</b>")
+    msg_lines.append(f"🔴 Team 1: <b>{t1_count}</b> sites")
+    msg_lines.append(f"🔵 Team 2: <b>{t2_count}</b> sites")
+    msg_lines.append(f"🟢 Team 3: <b>{t3_count}</b> sites")
+    msg_lines.append(f"🟡 Team 4: <b>{t4_count}</b> sites")
+    if t0_count > 0:
+        msg_lines.append(f"⚪ Other: <b>{t0_count}</b> sites")
+    msg_lines.append(f"Total: <b>{total_count}</b> sites")
+    msg_lines.append("━━━━━━━━━━━━━━━━━━━━━")
+    msg_lines.append("")
+    
+    if header_line:
+        msg_lines.append(header_line)
+        msg_lines.append("")
+        
+    # 2. Liệt kê chi tiết
+    team_emojis = {1: "🔴", 2: "🔵", 3: "🟢", 4: "🟡", 0: "⚪"}
+    team_names = {1: "Team 1", 2: "Team 2", 3: "Team 3", 4: "Team 4", 0: "Other/Unknown"}
+    
+    for t in [1, 2, 3, 4, 0]:
+        team_rows = team_groups[t]
+        if team_rows:
+            msg_lines.append(f"{team_emojis[t]} <b>{team_names[t]} ({len(team_rows)} sites)</b>")
+            for r in team_rows:
+                msg_lines.append(r)
+            msg_lines.append("") # Dòng trống phân tách giữa các Team
+            
+    if total_count == 0:
+        msg_lines.append("📭 No refuel requests today.")
+        msg_lines.append("")
+        
+    # 3. Chia nhỏ dòng thô thành các phần an toàn (< 3800 ký tự)
+    chunks = []
+    current_chunk = []
+    current_len = 0
+    
+    for line in msg_lines:
         if current_len + len(line) + 1 > 3800:
             chunks.append(current_chunk)
             current_chunk = [line]
-            current_len = len(base_title) + len(base_footer) + len(line) + 13
+            current_len = len(line)
         else:
             current_chunk.append(line)
             current_len += len(line) + 1
@@ -101,19 +158,16 @@ def format_and_send_report(rows: list[str]) -> list[int]:
             ""
         ]
         
-        # Chỉ in Header ở phần 1
-        if idx == 0 and header_line:
-            lines.append(header_line)
-            
-        # Bọc danh sách trong khối thẻ pre để đồng nhất Monospace (ép thành 1 dòng)
-        lines.append("<pre>")
         for line in chunk_lines:
             lines.append(line)
-        lines.append("</pre>")
-        
-        lines.append("━━━━━━━━━━━━━━━━━━━━━")
-        lines.append("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>")
-        
+            
+        # Thêm footer nếu chưa có ở cuối phần
+        if lines[-1] != "🤖 <i>Auto report by @TNI_REFUEL_BOT</i>":
+            if lines[-1] != "":
+                lines.append("")
+            lines.append("━━━━━━━━━━━━━━━━━━━━━")
+            lines.append("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>")
+            
         msg = "\n".join(lines)
         ok, msg_id = send_telegram(REFUEL_CHAT_ID, msg)
         if ok and msg_id:
