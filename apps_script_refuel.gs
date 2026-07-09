@@ -1,14 +1,14 @@
 // ============================================================
 // SYSTEM: Refuel Apps Script Collector
 // Spreadsheet: https://docs.google.com/spreadsheets/d/1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM/edit
-// Description: Đọc cột G của sheet Refuel và lưu trữ message_ids để xóa tin cũ.
+// Description: Đọc cột R của sheet Refuel và lưu trữ message_ids để xóa tin cũ.
 // ============================================================
 
 function doGet(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || "";
     
-    // 1. Đọc cột G của sheet Refuel
+    // 1. Đọc cột R của sheet Refuel
     if (action === "get_refuel_data") {
       return getRefuelData();
     }
@@ -47,7 +47,7 @@ function doPost(e) {
 }
 
 /**
- * Đọc cột G (cột thứ 7), từ dòng thứ 2 đến cuối cùng của tab "Refuel"
+ * Đọc cột R (cột thứ 18), từ dòng thứ 2 đến cuối cùng của tab "Refuel"
  */
 function getRefuelData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -61,8 +61,8 @@ function getRefuelData() {
     return json({ status: "ok", data: [] });
   }
   
-  // Cột G là cột 7, đọc từ dòng 2 đến hết
-  const values = sheet.getRange(2, 7, lastRow - 1, 1).getValues();
+  // Cột R là cột 18, đọc từ dòng 2 đến hết
+  const values = sheet.getRange(2, 18, lastRow - 1, 1).getValues();
   const data = [];
   for (let i = 0; i < values.length; i++) {
     const valTrim = String(values[i][0] || "").trim();

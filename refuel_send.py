@@ -42,20 +42,29 @@ def format_report(rows: list[str]) -> str:
     date_str = now.strftime("%d/%m/%Y")
     time_str = now.strftime("%H:%M")
     
+    header_line = ""
+    start_idx = 0
+    # Nếu dòng đầu chứa chữ "Report need refuel" thì trích xuất làm tiêu đề phụ
+    if rows and "Report need refuel" in rows[0]:
+        header_line = f"📋 <b>{rows[0]}</b>\n"
+        start_idx = 1
+        
     lines = [
         "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>",
         f"📅 {date_str}  ⏰ {time_str} (Myanmar)",
         "━━━━━━━━━━━━━━━━━━━━━",
         "",
     ]
-    for row in rows:
-        lines.append(row)
-        lines.append("")
+    if header_line:
+        lines.append(header_line)
         
-    if not rows:
+    for i in range(start_idx, len(rows)):
+        lines.append(rows[i])
+        
+    if not rows or (start_idx == 1 and len(rows) == 1):
         lines.append("📭 No refuel requests today.")
-        lines.append("")
         
+    lines.append("")
     lines.append("━━━━━━━━━━━━━━━━━━━━━")
     lines.append("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>")
     return "\n".join(lines)
