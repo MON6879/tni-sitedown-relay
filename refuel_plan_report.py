@@ -496,74 +496,41 @@ def report_4(data: RefuelData):
 
 
 def report_5(data: RefuelData):
-    print("📋 Generating Report 5 — Plan Sent by Target List...")
+    print("📋 Generating Report 5 — Members Not Joined Telegram Group...")
     now = datetime.now(TZ_MM)
-    freq = {}
-
-    for r in data.records:
-        if r["cat"] != "PLAN" or not r["sender_id"]:
-            continue
-        diff = now - r["ts"]
-        sid = r["sender_id"]
-
-        if sid not in freq:
-            freq[sid] = {"d3": 0, "d7": 0, "d30": 0}
-        if diff <= timedelta(days=3):
-            freq[sid]["d3"] += 1
-        if diff <= timedelta(days=7):
-            freq[sid]["d7"] += 1
-        if diff <= timedelta(days=30):
-            freq[sid]["d30"] += 1
 
     lines = [
-        f"📋 <b>[Report 5] PLAN SUBMISSIONS BY TARGET LIST</b>",
+        f"📋 <b>[Report 5] MEMBERS NOT YET JOINED</b>",
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
     ]
 
-    # Fallback: dùng lettel_persons nếu target_members rỗng
-    targets = data.target_members or data.lettel_persons
+    not_joined = data.not_joined   # list of str (tên, chưa có Telegram ID)
+    joined     = data.members      # list of {id, name} (đã có ID)
 
-    if not targets:
-        lines.append("\n⚠️ <b>No partner targets in Template col G&H or Lettel Progress col J&K!</b>")
-        lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
+    if not not_joined:
+        lines += [
+            f"\n✅ All <b>{len(joined)}</b> members have joined the Telegram group!",
+            "\n🤖 <i>Auto report — Refuel Plan System</i>"
+        ]
         tg_send("\n".join(lines), "report5")
-        print("⚠️ Report 5 sent (warning: empty targets).")
+        print("✅ Report 5 sent — all joined.")
         return
 
     lines += [
-        f"<code>{'No':<3} {'Name':<12} | {'3D':>4} | {'7D':>4} | {'1M':>5}</code>",
-        "<code>" + "────┬─────────────┼──────┼──────┼───────" + "</code>"
+        f"\n❌ <b>{len(not_joined)}</b> members NOT yet joined | ✅ Joined: <b>{len(joined)}</b>",
+        f"<code>{'No':<3} {'Name':<25}</code>",
+        "<code>" + "────┬────────────────────────────" + "</code>",
     ]
+    for i, name in enumerate(sorted(not_joined), 1):
+        lines.append(f"<code>{i:<3} {name[:25]:<25}</code>")
 
-    for i, t in enumerate(targets, 1):
-        name = t["name"]
-        tid = t["id"]
-        f = freq.get(tid, {"d3": 0, "d7": 0, "d30": 0})
-        short_name = name[:12]
-        lines.append(f"<code>{i:<3} {short_name:<12} | {f['d3']:>3}x | {f['d7']:>3}x | {f['d30']:>4}x</code>")
-
-    lines.append("<code>" + "────┴─────────────┴──────┴──────┴───────" + "</code>")
-
-    # Thêm nhắc nhở keyword để đối tác/nhân viên nhớ cách gửi đúng format
     lines += [
-        "",
-        "📌 <b>KEYWORD REMINDER</b>",
-        "<code>─────────────────────────────────</code>",
-        "✏️ <b>Plan</b> — Partner sends fuel plan:",
-        "<code>Plan refuel DD/MM/YYYY Team X</code>",
-        "<code>TNI0061: 440L</code>",
-        "<code>TNI0319: 440L</code>",
-        "",
-        "📩 <b>Request</b> — Team requests fuel:",
-        "<code>Request refuel DD/MM/YYYY Team X</code>",
-        "<code>TNI0061: 440L</code>",
-        "<code>TNI0319: 440L</code>",
-        "<code>─────────────────────────────────</code>",
+        "<code>" + "────┴────────────────────────────" + "</code>",
+        "\n🤖 <i>Auto report — Refuel Plan System</i>"
     ]
-
-    lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
     tg_send("\n".join(lines), "report5")
-    print("✅ Report 5 sent.")
+    print(f"✅ Report 5 sent — {len(not_joined)} not joined.")
+
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
