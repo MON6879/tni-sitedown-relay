@@ -7,7 +7,7 @@ Báo cáo 1: Tần suất gửi Plan của từng trạm (3 ngày / 7 ngày / 1 
 Báo cáo 2: So sánh Plan hôm nay vs Refueled thực tế (chạy lúc 18:00)
 Báo cáo 3: So sánh Plan hôm nay vs Team Request (chạy lúc 18:00)
 Báo cáo 4: Thống kê Request refuel theo thành viên (từ sheet Telegram ID) + Ai chưa tham gia (chạy lúc 22:00)
-Báo cáo 5: Thống kê Plan gửi theo danh sách ID tại cột G sheet Template (chạy lúc 22:00)
+Báo cáo 5: Thống kê Plan gửi theo danh sách ID tại cột G và tên tại cột H sheet Template (chạy lúc 22:00)
 
 Cách chạy:
   python refuel_plan_report.py --report 1
@@ -80,19 +80,24 @@ def parse_datetime(val) -> datetime | None:
     return None
 
 
-def fmt_row(col_a: str, col_b: str, col_c: str, col_d: str) -> str:
-    """Format dòng cột đều nhau dưới dạng monospace HTML."""
-    return f"<code>{col_a:<12} {col_b:>6} {col_c:>6} {col_d:>6}</code>"
+def fmt_row_freq(col_a: str, col_b: str, col_c: str, col_d: str) -> str:
+    """Format dòng tần suất (Site/Name | 3D | 7D | 1M) dạng monospace có gạch dọc '|'."""
+    return f"<code>{col_a:<12} | {col_b:>5} | {col_c:>5} | {col_d:>6}</code>"
+
+
+def fmt_row_compare(col_a: str, col_b: str, col_c: str, col_d: str) -> str:
+    """Format dòng so sánh lượng dầu (Site | Plan/Req | Filled/Plan | Diff) dạng monospace có gạch dọc '|'."""
+    return f"<code>{col_a:<12} | {col_b:>5} | {col_c:>6} | {col_d:>6}</code>"
 
 
 # ── Load spreadsheet data ───────────────────────────────────────────────────
 
 class RefuelData:
     def __init__(self):
-        self.members = []       # list of dict: {id, name}
-        self.not_joined = []    # list of str (names)
-        self.target_ids = []    # list of str (Telegram IDs)
-        self.records = []       # list of dict: {ts, date, cat, sender, sender_id, site, qty}
+        self.members = []          # list of dict: {id, name}
+        self.not_joined = []       # list of str (names)
+        self.target_members = []   # list of dict: {id, name} (từ sheet Template cột G & H)
+        self.records = []          # list of dict: {ts, date, cat, sender, sender_id, site, qty}
 
         if not os.path.exists(XLSX_FILE_PATH):
             if not download_spreadsheet():
@@ -116,7 +121,6 @@ class RefuelData:
                     continue
 
                 tg_id_str = str(tg_id).strip() if tg_id is not None else ""
-                # Nếu ID trống hoặc không phải số thì xem như chưa join
                 if not tg_id_str or tg_id_str == "None" or tg_id_str == "0" or not tg_id_str.isdigit():
                     self.not_joined.append(name or "Unknown")
                 else:
@@ -125,12 +129,19 @@ class RefuelData:
     def _parse_targets(self, wb):
         if "Template" in wb.sheetnames:
             ws = wb["Template"]
-            for r in range(3, ws.max_row + 1):  # Bắt đầu từ dòng 3
-                val = ws.cell(row=r, column=7).value
+            for r in range(2, ws.max_row + 1):  # Quét từ dòng 2
+                val = ws.cell(row=r, column=7).value     # Cột G: ID telegram
+                name = ws.cell(row=r, column=8).value    # Cột H: Tên
                 if val is not None:
                     val_str = str(val).strip()
+                    # Bỏ qua dòng tiêu đề mẫu nếu có chữ "id telegram"
+                    if val_str.lower() == "id telegram":
+                        continue
                     if val_str.isdigit() and len(val_str) > 8:
-                        self.target_ids.append(val_str)
+                        self.target_members.append({
+                            "id": val_str,
+                            "name": str(name).strip() if name else f"ID:{val_str[-6:]}"
+                        })
 
     def _parse_records(self, wb):
         if "PlanRefuel" in wb.sheetnames:
@@ -185,13 +196,14 @@ def report_1(data: RefuelData):
     lines = [
         f"📊 <b>PLAN SUBMISSION FREQUENCY</b>",
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
-        fmt_row("Site ID", "3Days", "7Days", "1Month"),
-        "<code>" + "─"*33 + "</code>"
+        fmt_row_freq("Site ID", "3Days", "7Days", "1Month"),
+        "<code>" + "─────────────┼───────┼───────┼────────" + "</code>"
     ]
     for site in sorted(freq.keys()):
         f = freq[site]
-        lines.append(fmt_row(site, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x"))
+        lines.append(fmt_row_freq(site, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x"))
 
+    lines.append("<code>" + "─────────────┴───────┴───────┴────────" + "</code>")
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
     tg_send("\n".join(lines))
     print("✅ Report 1 sent.")
@@ -221,8 +233,8 @@ def report_2(data: RefuelData):
     lines = [
         f"⛽ <b>PLAN vs REFUELED — {today_str}</b>",
         f"⏰ {now.strftime('%H:%M')} Myanmar",
-        fmt_row("Site ID", "Plan", "Filled", "Diff"),
-        "<code>" + "─"*33 + "</code>"
+        fmt_row_compare("Site ID", "Plan", "Filled", "Diff"),
+        "<code>" + "─────────────┼───────┼────────┼────────" + "</code>"
     ]
 
     ok_count = warn_count = miss_count = 0
@@ -246,10 +258,10 @@ def report_2(data: RefuelData):
             icon = "❌"
             miss_count += 1
 
-        lines.append(f"{icon} {fmt_row(site, f'{p}L', f'{f}L', diff_str)}")
+        lines.append(f"{icon} {fmt_row_compare(site, f'{p}L', f'{f}L', diff_str)}")
 
     lines += [
-        "<code>" + "─"*33 + "</code>",
+        "<code>" + "─────────────┴───────┴────────┴────────" + "</code>",
         f"✅ Match: <b>{ok_count}</b>  ⚠️ Near: <b>{warn_count}</b>  ❌ Miss: <b>{miss_count}</b>",
         "\n🤖 <i>Auto report — Refuel Plan System</i>"
     ]
@@ -286,7 +298,7 @@ def report_3(data: RefuelData):
         q = request.get(site, 0)
         diff = p - q
 
-        row_str = fmt_row(site, f"{q}L", f"{p}L", "=" if diff == 0 else f"{diff}L")
+        row_str = fmt_row_compare(site, f"{q}L", f"{p}L", "=" if diff == 0 else f"{diff}L")
         if diff == 0:
             match_rows.append(row_str)
         else:
@@ -297,25 +309,25 @@ def report_3(data: RefuelData):
         f"⏰ {now.strftime('%H:%M')} Myanmar",
     ]
 
-    header_bar = "<code>" + "─"*33 + "</code>"
+    header_bar = "<code>" + "─────────────┼───────┼────────┼────────" + "</code>"
+    footer_bar = "<code>" + "─────────────┴───────┴────────┴────────" + "</code>"
 
     if match_rows:
         lines += [
             "\n✅ <b>MATCH (same quantity)</b>",
-            fmt_row("Site ID", "Request", "Plan", "Diff"),
+            fmt_row_compare("Site ID", "Request", "Plan", "Diff"),
             header_bar
-        ] + match_rows
+        ] + match_rows + [footer_bar]
 
     if diff_rows:
         lines += [
             "\n⚠️ <b>DIFF (different quantity)</b>",
-            fmt_row("Site ID", "Request", "Plan", "Diff"),
+            fmt_row_compare("Site ID", "Request", "Plan", "Diff"),
             header_bar
-        ] + diff_rows
+        ] + diff_rows + [footer_bar]
 
     lines += [
-        header_bar,
-        f"📊 Match: <b>{len(match_rows)}</b>  Diff: <b>{len(diff_rows)}</b>",
+        f"\n📊 Match: <b>{len(match_rows)}</b>  Diff: <b>{len(diff_rows)}</b>",
         "\n🤖 <i>Auto report — Refuel Plan System</i>"
     ]
     tg_send("\n".join(lines))
@@ -345,22 +357,23 @@ def report_4(data: RefuelData):
     lines = [
         f"👤 <b>REFUEL REQUESTS BY PERSON (Col F)</b>",
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
-        fmt_row("Name", "3Days", "7Days", "1Month"),
-        "<code>" + "─"*33 + "</code>"
+        fmt_row_freq("Name", "3Days", "7Days", "1Month"),
+        "<code>" + "─────────────┼───────┼───────┼────────" + "</code>"
     ]
 
     # Hiển thị từng thành viên đã tham gia nhóm (có ID)
     for m in data.members:
         f = freq.get(m["id"], {"d3": 0, "d7": 0, "d30": 0})
-        # Rút gọn tên cho vừa bảng
         short_name = m["name"][:12]
-        lines.append(fmt_row(short_name, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x"))
+        lines.append(fmt_row_freq(short_name, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x"))
+
+    lines.append("<code>" + "─────────────┴───────┴───────┴────────" + "</code>")
 
     # Hiển thị những người chưa tham gia nhóm
     if data.not_joined:
         lines += [
             "\n⚠️ <b>NOT JOINED GROUP (No Telegram ID)</b>",
-            "<code>" + "─"*33 + "</code>"
+            "<code>" + "─────────────────────────────────" + "</code>"
         ]
         for name in sorted(data.not_joined):
             lines.append(f"• {name}")
@@ -390,33 +403,32 @@ def report_5(data: RefuelData):
         if diff <= timedelta(days=30):
             freq[sid]["d30"] += 1
 
-    # Tạo map từ ID sang Name để hiển thị cho đẹp
-    member_map = {m["id"]: m["name"] for m in data.members}
-
     lines = [
         f"📋 <b>PLAN SUBMISSIONS BY TARGET LIST</b>",
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
     ]
 
     # Kiểm tra xem danh sách đích có rỗng không
-    if not data.target_ids:
-        # Fallback: dùng toàn bộ danh sách thành viên có ID nếu cột G trống
-        target_ids = [m["id"] for m in data.members]
+    if not data.target_members:
+        # Fallback: dùng toàn bộ danh sách thành viên từ Telegram ID nếu cột G trống
+        targets = [{"id": m["id"], "name": m["name"]} for m in data.members]
         lines.append("<i>(Fallback: Using all Telegram ID members)</i>")
     else:
-        target_ids = data.target_ids
+        targets = data.target_members
 
     lines += [
-        fmt_row("Name/ID", "3Days", "7Days", "1Month"),
-        "<code>" + "─"*33 + "</code>"
+        fmt_row_freq("Name/ID", "3Days", "7Days", "1Month"),
+        "<code>" + "─────────────┼───────┼───────┼────────" + "</code>"
     ]
 
-    for tid in target_ids:
-        name = member_map.get(tid, f"ID:{tid[-6:]}")
+    for t in targets:
+        name = t["name"]
+        tid = t["id"]
         f = freq.get(tid, {"d3": 0, "d7": 0, "d30": 0})
         short_name = name[:12]
-        lines.append(fmt_row(short_name, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x"))
+        lines.append(fmt_row_freq(short_name, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x"))
 
+    lines.append("<code>" + "─────────────┴───────┴───────┴────────" + "</code>")
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
     tg_send("\n".join(lines))
     print("✅ Report 5 sent.")
