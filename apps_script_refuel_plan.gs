@@ -27,11 +27,51 @@ function doPost(e) {
   const action = body.action || "";
   try {
     if (action === "collect_message") return collectMessage(body);
+    if (action === "get_msg_id")      return getMsgId(body.key || "");
+    if (action === "set_msg_id")      return setMsgId(body.key || "", body.msg_id || "");
     return jsonResp({ status: "error", message: "Unknown action: " + action });
   } catch (err) {
     return jsonResp({ status: "error", message: err.message });
   }
 }
+
+// ── BotState: lưu/đọc message_id trong tab BotState ───────────────────────
+
+function getBotStateSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName("BotState");
+  if (!sh) {
+    sh = ss.insertSheet("BotState");
+    sh.getRange(1, 1, 1, 2).setValues([["key", "msg_id"]]);
+  }
+  return sh;
+}
+
+function getMsgId(key) {
+  const sh = getBotStateSheet();
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === key) {
+      return jsonResp({ status: "ok", key: key, msg_id: String(data[i][1]) });
+    }
+  }
+  return jsonResp({ status: "ok", key: key, msg_id: "" });
+}
+
+function setMsgId(key, msgId) {
+  const sh = getBotStateSheet();
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === key) {
+      sh.getRange(i + 1, 2).setValue(msgId);
+      return jsonResp({ status: "ok", key: key, msg_id: msgId });
+    }
+  }
+  // Thêm dòng mới nếu chưa có key
+  sh.appendRow([key, msgId]);
+  return jsonResp({ status: "ok", key: key, msg_id: msgId });
+}
+
 
 // ── Helper: generate next sequential DEF ID ────────────────────────────────
 

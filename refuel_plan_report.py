@@ -20,6 +20,7 @@ Cách chạy:
 import os, sys, argparse, requests
 import openpyxl
 from datetime import datetime, timezone, timedelta
+from tg_utils import tg_send_fresh
 
 # Cấu hình bot và chat ID mặc định của group 9 TNI REQUEST REFUEL
 REFUEL_BOT_TOKEN    = os.getenv("REFUEL_BOT_TOKEN", "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME")
@@ -33,18 +34,21 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))  # Myanmar UTC+6:30
 
 # ── Helper functions ─────────────────────────────────────────────────────────
 
-def tg_send(text: str) -> bool:
-    """Gửi tin nhắn HTML lên Telegram group."""
-    url = f"https://api.telegram.org/bot{REFUEL_BOT_TOKEN}/sendMessage"
-    r = requests.post(url, json={
-        "chat_id": REFUEL_CHAT_ID,
-        "text": text,
-        "parse_mode": "HTML",
-    }, timeout=30)
-    ok = r.json().get("ok", False)
-    if not ok:
-        print(f"❌ Telegram send failed: {r.text[:200]}", file=sys.stderr)
-    return ok
+# GAS URL để lưu message_id (BotState)
+REFUEL_GAS_URL = (
+    os.getenv("REFUEL_APPS_SCRIPT_URL") or
+    os.getenv("APPS_SCRIPT_URL") or ""
+).strip()
+
+
+def tg_send(text: str, report_key: str = "") -> bool:
+    """Xóa tin cũ rồi gửi tin mới lên Telegram group."""
+    state_key = f"{report_key}_{REFUEL_CHAT_ID}" if report_key else None
+    msg_id = tg_send_fresh(REFUEL_CHAT_ID, text, state_key=state_key)
+    if not msg_id:
+        print(f"❌ Telegram send failed", file=sys.stderr)
+        return False
+    return True
 
 
 def download_spreadsheet() -> bool:
@@ -234,7 +238,7 @@ def report_1(data: RefuelData):
             freq[site]["d30"] += 1
 
     if not freq:
-        tg_send("📊 <b>Report 1 — Plan Frequency</b>\n📭 No plan records found.")
+        tg_send("📊 <b>Report 1 — Plan Frequency</b>\n📭 No plan records found.", "report1")
         return
 
     lines = [
@@ -249,7 +253,7 @@ def report_1(data: RefuelData):
 
     lines.append("<code>" + "─────────────┴───────┴───────┴────────" + "</code>")
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
-    tg_send("\n".join(lines))
+    tg_send("\n".join(lines), "report1")
     print("✅ Report 1 sent.")
 
 
@@ -271,7 +275,7 @@ def report_2(data: RefuelData):
 
     all_sites = sorted(set(list(plan.keys()) + list(refueled.keys())))
     if not all_sites:
-        tg_send(f"⛽ <b>Report 2 — Plan vs Refueled</b>\n📅 {today_str}\n📭 No refuel records today.")
+        tg_send(f"⛽ <b>Report 2 — Plan vs Refueled</b>\n📅 {today_str}\n📭 No refuel records today.", "report2")
         return
 
     lines = [
@@ -309,7 +313,7 @@ def report_2(data: RefuelData):
         f"✅ Match: <b>{ok_count}</b>  ⚠️ Near: <b>{warn_count}</b>  ❌ Miss: <b>{miss_count}</b>",
         "\n🤖 <i>Auto report — Refuel Plan System</i>"
     ]
-    tg_send("\n".join(lines))
+    tg_send("\n".join(lines), "report2")
     print("✅ Report 2 sent.")
 
 
@@ -331,7 +335,7 @@ def report_3(data: RefuelData):
 
     all_sites = sorted(set(list(plan.keys()) + list(request.keys())))
     if not all_sites:
-        tg_send(f"🔄 <b>Report 3 — Plan vs Request</b>\n📅 {today_str}\n📭 No records today.")
+        tg_send(f"🔄 <b>Report 3 — Plan vs Request</b>\n📅 {today_str}\n📭 No records today.", "report3")
         return
 
     match_rows = []
@@ -374,7 +378,7 @@ def report_3(data: RefuelData):
         f"\n📊 Match: <b>{len(match_rows)}</b>  Diff: <b>{len(diff_rows)}</b>",
         "\n🤖 <i>Auto report — Refuel Plan System</i>"
     ]
-    tg_send("\n".join(lines))
+    tg_send("\n".join(lines), "report3")
     print("✅ Report 3 sent.")
 
 
@@ -423,7 +427,7 @@ def report_4(data: RefuelData):
             lines.append(f"• {name}")
 
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
-    tg_send("\n".join(lines))
+    tg_send("\n".join(lines), "report4")
     print("✅ Report 4 sent.")
 
 
@@ -457,7 +461,7 @@ def report_5(data: RefuelData):
         lines.append("\n⚠️ <b>No partner targets configured in Template sheet Column G & H!</b>")
         lines.append("<i>Please add partner Telegram IDs to Col G and Names to Col H in the Template tab.</i>")
         lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
-        tg_send("\n".join(lines))
+        tg_send("\n".join(lines), "report5")
         print("⚠️ Report 5 sent (warning: empty targets).")
         return
 
@@ -495,7 +499,7 @@ def report_5(data: RefuelData):
     ]
 
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
-    tg_send("\n".join(lines))
+    tg_send("\n".join(lines), "report5")
     print("✅ Report 5 sent.")
 
 
