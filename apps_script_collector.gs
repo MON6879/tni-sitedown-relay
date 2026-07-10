@@ -62,6 +62,8 @@ function doPost(e) {
     if (body.action === "store_site_down")   return handleStoreSiteDownDirect(body);
     if (body.action === "save_note_msgids")   return handleSaveNoteMsgIds(body);
     if (body.action === "save_msgids")          return handleSaveMsgIds(body);
+    if (body.action === "get_msg_id")           return handleGetMsgId(body);
+    if (body.action === "set_msg_id")           return handleSetMsgId(body);
 
     // ── Daily Report Collector ─────────────────────────────────────────────
     if (body.action === "daily_add" ||
@@ -2151,4 +2153,53 @@ function doGetRefuelData_(e) {
     return json({ status: "error", message: err.message });
   }
 }
+
+
+// ── BotState: lưu/đọc message_id để xóa tin cũ trước khi gửi mới ──────────
+
+function getBotStateSheet_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sh = ss.getSheetByName("BotState");
+  if (!sh) {
+    sh = ss.insertSheet("BotState");
+    sh.getRange(1, 1, 1, 2).setValues([["key", "msg_id"]]);
+  }
+  return sh;
+}
+
+function handleGetMsgId(body) {
+  try {
+    const key  = String(body.key || "").trim();
+    const sh   = getBotStateSheet_();
+    const data = sh.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === key) {
+        return json({ status: "ok", key: key, msg_id: String(data[i][1]) });
+      }
+    }
+    return json({ status: "ok", key: key, msg_id: "" });
+  } catch (err) {
+    return json({ status: "error", message: err.message });
+  }
+}
+
+function handleSetMsgId(body) {
+  try {
+    const key   = String(body.key    || "").trim();
+    const msgId = String(body.msg_id || "").trim();
+    const sh    = getBotStateSheet_();
+    const data  = sh.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === key) {
+        sh.getRange(i + 1, 2).setValue(msgId);
+        return json({ status: "ok", key: key, msg_id: msgId });
+      }
+    }
+    sh.appendRow([key, msgId]);
+    return json({ status: "ok", key: key, msg_id: msgId });
+  } catch (err) {
+    return json({ status: "error", message: err.message });
+  }
+}
+
 
