@@ -81,26 +81,24 @@ function collectMessage(body) {
 
     const row = [
       defId,            // A: DEF (#00001)
-      "",               // B: No
-      "",               // C: Branch
-      p.date || today,  // D: Date
-      p.dgId,           // E: DG ID
-      p.siteId,         // F: Site ID
-      p.team,           // G: Team
-      p.rh,             // H: DG Running Hour
-      p.kwh,            // I: DG KWH Hour
-      p.beforeLvl,      // J: Before Fuel Level %
-      p.beforeCsu,      // K: Before CSU Reading(L)
-      p.beforeCm,       // L: Before Fuel Liter/cm (cm reading)
-      p.afterLvl,       // M: After Fuel Level %
-      p.afterCsu,       // N: After CSU Reading(L)
-      p.afterCm,        // O: After Fuel Liter/cm (cm reading)
-      p.filled,         // P: Actual Filled Qty(L)
-      p.price,          // Q: Partner Price per Liter (MMK)
-      totalVal,         // R: Total Amount (MMK)
-      now,              // S: Timestamp (metadata)
-      sender,           // T: Sender Name (metadata)
-      senderId          // U: Sender ID (metadata)
+      p.date || today,  // B: Date
+      p.dgId,           // C: DG ID
+      p.siteId,         // D: Site ID
+      p.team,           // E: Team
+      p.rh,             // F: DG Running Hour
+      p.kwh,            // G: DG KWH Hour
+      p.beforeLvl,      // H: Before Fuel Level %
+      p.beforeCsu,      // I: Before CSU Reading(L)
+      p.beforeCm,       // J: Before Fuel Liter/cm (cm reading)
+      p.afterLvl,       // K: After Fuel Level %
+      p.afterCsu,       // L: After CSU Reading(L)
+      p.afterCm,        // M: After Fuel Liter/cm (cm reading)
+      p.filled,         // N: Actual Filled Qty(L)
+      p.price,          // O: Partner Price per Liter (MMK)
+      totalVal,         // P: Total Amount (MMK)
+      now,              // Q: Timestamp (metadata)
+      sender,           // R: Sender Name (metadata)
+      senderId          // S: Sender ID (metadata)
     ];
 
     insertAtTop(sheet, row);
