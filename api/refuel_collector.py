@@ -123,21 +123,29 @@ def process_update(update: dict):
 
     # Gửi reply 2 dòng xác nhận khi ghi thành công
     if result.get("status") == "ok":
-        # LETTER_SUBMIT / LETTER_APPROVED: GAS đã tự reply → Python không reply thêm
-        if category in ("LETTER_SUBMIT", "LETTER_APPROVED"):
-            return
+        ts = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
 
-        def_id  = result.get("def", "")
-        ts      = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
-        cat_label = {
-            "PLAN": "Plan refuel",
-            "REQUEST": "Team request",
-            "REFUELED": "Refueled",
-        }.get(category, category)
-        reply_text = (
-            f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
-            f"Done 📅 {ts}"
-        )
+        if category == "LETTER_SUBMIT":
+            reply_text = (
+                f"📋 <b>Letter Submit</b> ✅ Recorded\n"
+                f"📅 Date: <b>{result.get('date', ts)}</b>"
+            )
+        elif category == "LETTER_APPROVED":
+            reply_text = (
+                f"✅ <b>Letter Approved</b> ✅ Recorded\n"
+                f"📅 Date: <b>{result.get('date', ts)}</b>"
+            )
+        else:
+            def_id    = result.get("def", "")
+            cat_label = {
+                "PLAN":    "Plan refuel",
+                "REQUEST": "Team request",
+                "REFUELED":"Refueled",
+            }.get(category, category)
+            reply_text = (
+                f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
+                f"Done 📅 {ts}"
+            )
         tg_reply(chat_id, reply_text)
 
 
