@@ -406,7 +406,7 @@ def report_3(data: RefuelData):
         tg_send(f"🔄 <b>[Report 3] Plan vs Request</b>\n📅 {today_str}\n📭 No records today.", "report3")
         return
 
-    green_count = yellow_count = gray_count = 0
+    green_count = yellow_count = gray_count = purple_count = 0
 
     rows = []
     for i, site in enumerate(all_sites, 1):
@@ -418,11 +418,14 @@ def report_3(data: RefuelData):
             icon = "🟢"; green_count  += 1   # Trùng tên + trùng số lít
         elif p > 0 and q > 0 and diff != 0:
             icon = "🟡"; yellow_count += 1   # Trùng tên + khác số lít
+        elif q > 0 and p == 0:
+            icon = "🟣"; purple_count += 1   # Request có, Plan không có
         else:
-            icon = "⚫"; gray_count   += 1   # Chỉ có 1 bên (plan only hoặc request only)
+            icon = "⚫"; gray_count   += 1   # Plan có, Request không có
 
         diff_str = "=" if diff == 0 else f"{diff:+d}L"
         rows.append(f"{icon} {fmt_row_compare(site, f'{q}L', f'{p}L', diff_str)}")
+
 
     header_bar = "<code>" + "─────────────┼───────┼────────┼────────" + "</code>"
     footer_bar = "<code>" + "─────────────┴───────┴────────┴────────" + "</code>"
@@ -430,12 +433,12 @@ def report_3(data: RefuelData):
     lines = [
         f"🔄 <b>[Report 3] PLAN vs TEAM REQUEST — {today_str}</b>",
         f"⏰ {now.strftime('%H:%M')} Myanmar",
-        f"\n🟢 Match  🟡 Diff qty  ⚫ Plan≠Req",
+        f"\n🟢 Match  🟡 Diff qty  🟣 Req only  ⚫ Plan only",
         fmt_row_compare("Site ID", "Request", "Plan", "Diff"),
         header_bar,
     ] + rows + [
         footer_bar,
-        f"\n🟢 Match: <b>{green_count}</b>  🟡 Diff: <b>{yellow_count}</b>  ⚫ Solo: <b>{gray_count}</b>",
+        f"\n🟢 <b>{green_count}</b>  🟡 <b>{yellow_count}</b>  🟣 <b>{purple_count}</b>  ⚫ <b>{gray_count}</b>",
         "\n🤖 <i>Auto report — Refuel Plan System</i>"
     ]
     tg_send("\n".join(lines), "report3")
