@@ -10,11 +10,12 @@ on:
         required: false
         default: '1'
 
-# Concurrency riêng cho botlookup — cancel-in-progress: true
-# để tránh xếp hàng vô hạn khi bị delay
+# Concurrency riêng cho botlookup — cancel-in-progress: false
+# Để tránh job bị cancel khi GitHub cron delay (job trước chạy trễ, job sau fire và cancel nó)
+# Botlookup chạy <2 phút nên queue ngắn, không ảnh hưởng
 concurrency:
   group: botlookup-relay
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   botlookup:
