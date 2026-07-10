@@ -152,10 +152,18 @@ class RefuelData:
         if "Telegram ID" in wb.sheetnames:
             ws = wb["Telegram ID"]
             for r in range(2, ws.max_row + 1):
-                tg_id = ws.cell(row=r, column=1).value
-                name = ws.cell(row=r, column=6).value
+                tg_id = ws.cell(row=r, column=1).value   # Cột A: Telegram ID
+
+                # Thử lấy tên từ cột B→F (cột 2→6), lấy cái đầu tiên có chữ
+                name = None
+                for col in range(2, 7):
+                    val = ws.cell(row=r, column=col).value
+                    if val and str(val).strip() and str(val).strip().lower() not in ("none", "0"):
+                        name = str(val).strip()
+                        break
+
                 if not name and not tg_id:
-                    continue
+                    continue  # Dòng trống hoàn toàn → bỏ qua
 
                 tg_id_str = str(tg_id).strip() if tg_id is not None else ""
                 if not tg_id_str or tg_id_str == "None" or tg_id_str == "0" or not tg_id_str.isdigit():
