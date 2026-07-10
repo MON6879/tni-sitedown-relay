@@ -476,6 +476,24 @@ def report_5(data: RefuelData):
         lines.append(fmt_row_freq(short_name, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x"))
 
     lines.append("<code>" + "─────────────┴───────┴───────┴────────" + "</code>")
+
+    # Thêm nhắc nhở keyword để đối tác/nhân viên nhớ cách gửi đúng format
+    lines += [
+        "",
+        "📌 <b>KEYWORD REMINDER</b>",
+        "<code>─────────────────────────────────</code>",
+        "✏️ <b>Plan</b> — Partner sends fuel plan:",
+        "<code>Plan refuel DD/MM/YYYY Team X</code>",
+        "<code>TNI0061: 440L</code>",
+        "<code>TNI0319: 440L</code>",
+        "",
+        "📩 <b>Request</b> — Team requests fuel:",
+        "<code>Request refuel DD/MM/YYYY Team X</code>",
+        "<code>TNI0061: 440L</code>",
+        "<code>TNI0319: 440L</code>",
+        "<code>─────────────────────────────────</code>",
+    ]
+
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
     tg_send("\n".join(lines))
     print("✅ Report 5 sent.")
