@@ -270,9 +270,14 @@ function collectMessage(body) {
     updateLettelProgress(senderId, dateVal, "LETTER_SUBMIT");
     Logger.log("[Collect] LETTER_SUBMIT → Lettel Progress col B, date=" + dateVal);
 
-    // Reply vào nhóm xác nhận
+    // Reply vào nhóm xác nhận qua Telegram Bot API
     const replyText = "📋 <b>Letter Submit recorded</b>\n📅 Date: <b>" + dateVal + "</b>\n👤 By: " + sender + "\n🤖 <i>Auto — Refuel Plan System</i>";
-    sendTelegramMsg(replyText, "-" + PLAN_GROUP_ID);
+    UrlFetchApp.fetch("https://api.telegram.org/bot" + PLAN_BOT_TOKEN + "/sendMessage", {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({ chat_id: PLAN_CHAT_ID, text: replyText, parse_mode: "HTML" }),
+      muteHttpExceptions: true
+    });
 
     return jsonResp({ status: "ok", category: "LETTER_SUBMIT", date: dateVal, time: today + " " + timeStr });
   }
@@ -286,9 +291,14 @@ function collectMessage(body) {
     updateLettelProgress(senderId, dateVal, "LETTER_APPROVED");
     Logger.log("[Collect] LETTER_APPROVED → Lettel Progress col C, date=" + dateVal);
 
-    // Reply vào nhóm xác nhận
+    // Reply vào nhóm xác nhận qua Telegram Bot API
     const replyText = "✅ <b>Letter Approved recorded</b>\n📅 Date: <b>" + dateVal + "</b>\n👤 By: " + sender + "\n🤖 <i>Auto — Refuel Plan System</i>";
-    sendTelegramMsg(replyText, "-" + PLAN_GROUP_ID);
+    UrlFetchApp.fetch("https://api.telegram.org/bot" + PLAN_BOT_TOKEN + "/sendMessage", {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({ chat_id: PLAN_CHAT_ID, text: replyText, parse_mode: "HTML" }),
+      muteHttpExceptions: true
+    });
 
     return jsonResp({ status: "ok", category: "LETTER_APPROVED", date: dateVal, time: today + " " + timeStr });
   }
