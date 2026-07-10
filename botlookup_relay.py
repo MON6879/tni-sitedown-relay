@@ -79,14 +79,25 @@ async def main():
         print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ 04:30–21:30. Kết thúc.")
         return
 
-    # ── 1. Delay ngẫu nhiên ───────────────────────────────────────
+    # ── 1. Đợi đến phút :08 hoặc :38 Myanmar (consistent timing) ────
+    tz = timezone(timedelta(hours=6, minutes=30))
+    now_mm = datetime.now(tz)
+    target_minutes = [8, 38]  # phút mục tiêu
+
+    # Tìm phút mục tiêu gần nhất trong tương lai (tối đa 30 phút)
+    wait_sec = 0
+    for tm in target_minutes:
+        diff = (tm - now_mm.minute) * 60 - now_mm.second
+        if 0 < diff <= 30 * 60:  # còn trong vòng 30 phút
+            if wait_sec == 0 or diff < wait_sec:
+                wait_sec = diff
+
     if SKIP_DELAY:
         print(f"[{myanmar_now()}] ⚡ TEST — bỏ qua delay!")
-    else:
-        delay_sec = random.randint(MIN_DELAY_SEC, MAX_DELAY_SEC)
-        print(f"[{myanmar_now()}] ⏳ Delay {delay_sec//60}p {delay_sec%60}s...")
-        await asyncio.sleep(delay_sec)
-        print(f"[{myanmar_now()}] ✅ Hết delay!")
+    elif wait_sec > 0:
+        print(f"[{myanmar_now()}] ⏳ Đợi {wait_sec//60}p {wait_sec%60}s đến phút :{now_mm.minute + wait_sec//60 + (1 if wait_sec%60 > 0 else 0):02d}...")
+        await asyncio.sleep(wait_sec)
+        print(f"[{myanmar_now()}] ✅ Đến giờ gửi!")
 
     # ── 2. Kết nối Telegram ───────────────────────────────────────
     from telethon.sessions import StringSession
