@@ -89,6 +89,42 @@ function insertAtTop(sheet, rowData) {
   sheet.getRange(2, 1, 1, rowData.length).setValues([rowData]);
 }
 
+// ── Lettel Progress Tracker ────────────────────────────────────────────────
+
+/**
+ * Ghi ngày vào cột B (Plan) hoặc C (Refueled) của sheet 'Lettel Progress'
+ * khi sender_id khớp với cột J trong sheet đó.
+ * @param {string} senderId  Telegram ID của người gửi
+ * @param {string} dateStr   Ngày dạng dd/MM/yyyy
+ * @param {string} category  "PLAN" → ghi col B | "REFUELED" → ghi col C
+ */
+function updateLettelProgress(senderId, dateStr, category) {
+  try {
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Lettel Progress");
+    if (!sheet) return;
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+
+    // Quét cột J (cột 10) tìm senderId
+    const colJ = sheet.getRange(2, 10, lastRow - 1, 1).getValues(); // J = col 10
+    const writeCol = (category === "PLAN") ? 2 : 3;  // B=2 (Plan), C=3 (Refueled)
+
+    for (let i = 0; i < colJ.length; i++) {
+      const cellId = String(colJ[i][0]).trim();
+      if (cellId === String(senderId).trim()) {
+        const targetRow = i + 2; // offset vì bắt từ row 2
+        sheet.getRange(targetRow, writeCol).setValue(dateStr);
+        Logger.log("[LettelProgress] Row " + targetRow + " col " + writeCol + " = " + dateStr + " (sender=" + senderId + ")");
+        break;
+      }
+    }
+  } catch(e) {
+    Logger.log("[LettelProgress] Error: " + e.message);
+  }
+}
+
 // ── Message Collection & Parsing ───────────────────────────────────────────
 
 function collectMessage(body) {
@@ -143,6 +179,10 @@ function collectMessage(body) {
 
     insertAtTop(sheet, row);
     Logger.log("[Collect] REFUELED → Refueled sheet, DEF=" + defId);
+
+    // Cập nhật Lettel Progress col C (Date Letter approved)
+    updateLettelProgress(senderId, today, "REFUELED");
+
     return jsonResp({ status: "ok", category: "REFUELED", site: p.siteId, qty: p.filled, def: defId, time: today + " " + timeStr });
   }
 
@@ -177,6 +217,10 @@ function collectMessage(body) {
     });
 
     Logger.log("[Collect] PLAN → Plan refuel sheet, " + entries.length + " sites, first DEF=" + firstDefId);
+
+    // Cập nhật Lettel Progress col B (Date Letter Submit)
+    updateLettelProgress(senderId, today, "PLAN");
+
     return jsonResp({ status: "ok", category: "PLAN", sites: entries.length, def: firstDefId, time: today + " " + timeStr });
   }
 
