@@ -5,7 +5,7 @@
 // Deploy: New deployment → Web App → Execute as Me → Anyone
 // ============================================================
 
-const PLAN_GROUP_ID    = "6859790680";
+const PLAN_GROUP_ID    = "5469544739";   // ID group 9 TNI REQUEST REFUEL (đúng)
 const PLAN_BOT_TOKEN   = "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME";
 const PLAN_CHAT_ID     = "-5469544739";
 
