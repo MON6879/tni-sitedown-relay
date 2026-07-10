@@ -19,7 +19,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 REFUEL_BOT_TOKEN    = os.environ.get("REFUEL_BOT_TOKEN", "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME").strip()
-REFUEL_PLAN_GAS_URL = os.environ.get("REFUEL_PLAN_GAS_URL", "").strip()
+REFUEL_PLAN_GAS_URL = (
+    os.environ.get("REFUEL_APPS_SCRIPT_URL") or   # GitHub Actions secret name
+    os.environ.get("REFUEL_PLAN_GAS_URL") or       # Vercel env var name (fallback)
+    ""
+).strip()
 PLAN_GROUP_ID       = "6859790680"   # ID group refuel (dạng số dương)
 
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
