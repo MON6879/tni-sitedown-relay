@@ -393,8 +393,8 @@ function jsonResp(obj) {
 
 function getRefuelData() {
   const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Refueled");
-  if (!sheet) return jsonResp({ status: "error", message: "Sheet 'Refueled' not found" });
+  const sheet = ss.getSheetByName("Need Refuel");
+  if (!sheet) return jsonResp({ status: "error", message: "Sheet 'Need Refuel' not found" });
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return jsonResp({ status: "ok", data: [] });
