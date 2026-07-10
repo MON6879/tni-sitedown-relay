@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from tg_utils import tg_send_fresh, tg_delete
+
 # Cấu hình bot và chat ID mặc định của group 9 TNI REQUEST REFUEL
 REFUEL_BOT_TOKEN = os.getenv("REFUEL_BOT_TOKEN", "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME")
 REFUEL_CHAT_ID   = os.getenv("REFUEL_CHAT_ID", "-5469544739")
@@ -150,29 +152,38 @@ def format_and_send_report(rows: list[str]) -> list[int]:
         title = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>"
         if len(chunks) > 1:
             title += f" (Phần {idx + 1}/{len(chunks)})"
-            
+
         lines = [
             title,
             f"📅 {date_str}  ⏰ {time_str} (Myanmar)",
             "━━━━━━━━━━━━━━━━━━━━━",
             ""
         ]
-        
         for line in chunk_lines:
             lines.append(line)
-            
-        # Thêm footer nếu chưa có ở cuối phần
         if lines[-1] != "🤖 <i>Auto report by @TNI_REFUEL_BOT</i>":
             if lines[-1] != "":
                 lines.append("")
             lines.append("━━━━━━━━━━━━━━━━━━━━━")
             lines.append("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>")
-            
+
         msg = "\n".join(lines)
-        ok, msg_id = send_telegram(REFUEL_CHAT_ID, msg)
-        if ok and msg_id:
-            sent_ids.append(msg_id)
-            
+
+        # Chunk đầu tiên: dùng tg_send_fresh (ựa tin cũ + lưu ID mới)
+        # Chunk sau: gửi bình thường
+        if idx == 0:
+            state_key = f"refuel_daily_{REFUEL_CHAT_ID}"
+            msg_id = tg_send_fresh(REFUEL_CHAT_ID, msg, state_key=state_key)
+            if msg_id:
+                sent_ids.append(msg_id)
+                print(f"✅ Report sent to {REFUEL_CHAT_ID}")
+            else:
+                print(f"❌ Send failed", file=sys.stderr)
+        else:
+            ok, msg_id = send_telegram(REFUEL_CHAT_ID, msg)
+            if ok and msg_id:
+                sent_ids.append(msg_id)
+
     return sent_ids
 
 
@@ -183,30 +194,18 @@ def main():
         print("❌ REFUEL_BOT_TOKEN not set", file=sys.stderr)
         sys.exit(1)
 
-    # 1. Thực hiện xóa tin nhắn báo cáo Refuel cũ trong group
-    if REFUEL_APPS_SCRIPT_URL:
-        try:
-            from delete_old_helper import delete_old_messages_bot
-            delete_old_messages_bot(REFUEL_BOT_TOKEN, REFUEL_CHAT_ID, REFUEL_APPS_SCRIPT_URL, "REFUEL_DAILY_REPORT")
-        except Exception as e:
-            print(f"⚠️ Error deleting old refuel report: {e}", file=sys.stderr)
-
-    # 2. Lấy dữ liệu mới từ Apps Script
+    # Lấy dữ liệu mới từ Apps Script
     rows = fetch_refuel_data()
     if rows is None:
         print("⚠️ No data available from spreadsheet, exiting")
         sys.exit(1)
 
-    # 3. Chia nhỏ tin và gửi đi
-    new_ids = format_and_send_report(rows)
-    
-    # 4. Lưu lại danh sách message ID mới gửi qua Apps Script để xóa ở lần sau
-    if new_ids and REFUEL_APPS_SCRIPT_URL:
-        try:
-            from delete_old_helper import save_msgids
-            save_msgids(REFUEL_APPS_SCRIPT_URL, "REFUEL_DAILY_REPORT", new_ids)
-        except Exception as e:
-            print(f"⚠️ Error saving refuel report msgid: {e}", file=sys.stderr)
+    # Gửi báo cáo (xóa tin cũ tự động qua tg_send_fresh)
+    format_and_send_report(rows)
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
