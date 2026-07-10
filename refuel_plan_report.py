@@ -410,11 +410,14 @@ def report_5(data: RefuelData):
 
     # Kiểm tra xem danh sách đích có rỗng không
     if not data.target_members:
-        # Fallback: dùng toàn bộ danh sách thành viên từ Telegram ID nếu cột G trống
-        targets = [{"id": m["id"], "name": m["name"]} for m in data.members]
-        lines.append("<i>(Fallback: Using all Telegram ID members)</i>")
-    else:
-        targets = data.target_members
+        lines.append("\n⚠️ <b>No partner targets configured in Template sheet Column G & H!</b>")
+        lines.append("<i>Please add partner Telegram IDs to Col G and Names to Col H in the Template tab.</i>")
+        lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
+        tg_send("\n".join(lines))
+        print("⚠️ Report 5 sent (warning: empty targets).")
+        return
+
+    targets = data.target_members
 
     lines += [
         fmt_row_freq("Name/ID", "3Days", "7Days", "1Month"),
