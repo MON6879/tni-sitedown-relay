@@ -1,5 +1,5 @@
 """
-api/refuel_collector.py
+# api/refuel_collector.py (redeploy trigger)
 ========================
 Vercel webhook handler cho @TNI_FUEL bot.
 Thu thập tin nhắn từ group 9 TNI REQUEST REFUEL (-5469544739 / 6859790680)
