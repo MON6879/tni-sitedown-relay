@@ -79,11 +79,13 @@ def process_update(update: dict):
         logger.info("No keyword match — skip")
         return
 
-    # Lấy tên người gởi
+    # Lấy tên và ID người gởi
     sender = ""
+    sender_id = ""
     if msg.get("from"):
         f = msg["from"]
         sender = f"{f.get('first_name','')} {f.get('last_name','')}".strip()
+        sender_id = str(f.get("id", ""))
 
     now    = datetime.now(TZ_MM)
     result = post_gas({
@@ -91,9 +93,10 @@ def process_update(update: dict):
         "group_id": chat_id,
         "text":     text,
         "sender":   sender,
+        "sender_id": sender_id,
         "date":     now.strftime("%d/%m/%Y %H:%M"),
     })
-    logger.info(f"[{category}] sender={sender} | GAS={result.get('status')} sites={result.get('sites',0)}")
+    logger.info(f"[{category}] sender={sender} ({sender_id}) | GAS={result.get('status')} sites={result.get('sites',0)}")
 
 
 class handler(BaseHTTPRequestHandler):

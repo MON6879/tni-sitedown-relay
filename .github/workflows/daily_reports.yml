@@ -10,7 +10,8 @@ on:
     - cron: '30 0 * * *'   # 07:00 Myanmar / 00:30 UTC → plan_morning
     - cron: '30 14 * * *'  # 21:00 Myanmar / 14:30 UTC → plan_update
     - cron: '0 14 * * *'   # 20:30 Myanmar / 14:00 UTC → read_report
-    - cron: '30 11 * * *'  # 18:00 Myanmar / 11:30 UTC → refuel_plan_report
+    - cron: '30 11 * * *'  # 18:00 Myanmar / 11:30 UTC → refuel_plan_report (1, 2, 3)
+    - cron: '30 15 * * *'  # 22:00 Myanmar / 15:30 UTC → refuel_plan_report (4, 5)
   workflow_dispatch:
     inputs:
       report_type:
@@ -50,7 +51,8 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install python-telegram-bot requests pandas python-dotenv telethon
+        run: |
+          pip install python-telegram-bot requests pandas python-dotenv telethon openpyxl
 
       - name: Report 2 — BOD-assigned Tasks Stats
         if: |
@@ -173,11 +175,23 @@ jobs:
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
         run: python refuel_send.py
 
-      - name: Task — Refuel Plan Report (18:00 Myanmar or Manual)
+      - name: Task — Refuel Plan Report 1, 2, 3 (18:00 Myanmar)
         if: |
-          (github.event_name == 'schedule' && github.event.schedule == '30 11 * * *') ||
+          (github.event_name == 'schedule' && github.event.schedule == '30 11 * * *')
+        env:
+          REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}
+        run: python refuel_plan_report.py --report 1 2 3
+
+      - name: Task — Refuel Plan Report 4, 5 (22:00 Myanmar)
+        if: |
+          (github.event_name == 'schedule' && github.event.schedule == '30 15 * * *')
+        env:
+          REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}
+        run: python refuel_plan_report.py --report 4 5
+
+      - name: Task — Refuel Plan Report (Manual Dispatch)
+        if: |
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'refuel_plan_report')
         env:
           REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}
-          REFUEL_PLAN_GAS_URL: ${{ secrets.REFUEL_PLAN_GAS_URL }}
         run: python refuel_plan_report.py

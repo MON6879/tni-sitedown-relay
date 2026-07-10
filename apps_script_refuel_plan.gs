@@ -18,7 +18,7 @@ const PLAN_CHAT_ID     = "-5469544739"; // Group 9 TNI REQUEST REFUEL
 
 // Cột trong sheet PlanRefuel (1-indexed):
 // A(1): Timestamp | B(2): Date | C(3): Category | D(4): Group ID
-// E(5): Sender    | F(6): Site | G(7): Qty (L)  | H(8): Raw Message
+// E(5): Sender    | F(6): Sender ID | G(7): Site | H(8): Qty (L) | I(9): Raw Message
 
 // ── Authorization ──────────────────────────────────────────────────────────
 function authorizeUrlFetch() {
@@ -67,8 +67,8 @@ function getOrCreatePlanSheet() {
   let sheet = ss.getSheetByName(PLAN_SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(PLAN_SHEET_NAME);
-    const header = [["Timestamp", "Date", "Category", "Group ID", "Sender", "Site ID", "Qty (L)", "Raw Message"]];
-    sheet.getRange(1, 1, 1, 8).setValues(header).setFontWeight("bold");
+    const header = [["Timestamp", "Date", "Category", "Group ID", "Sender", "Sender ID", "Site ID", "Qty (L)", "Raw Message"]];
+    sheet.getRange(1, 1, 1, 9).setValues(header).setFontWeight("bold");
     Logger.log("✅ Tạo sheet mới: " + PLAN_SHEET_NAME);
   }
   return sheet;
@@ -80,6 +80,7 @@ function collectMessage(body) {
   const groupId = String(body.group_id || "").trim();
   const text    = String(body.text     || "").trim();
   const sender  = String(body.sender   || "Unknown").trim();
+  const senderId = String(body.sender_id || "").trim();
 
   // Filter theo group ID (chấp nhận có hoặc không có dấu -)
   if (groupId !== PLAN_GROUP_ID && groupId !== "-" + PLAN_GROUP_ID) {
@@ -114,9 +115,9 @@ function collectMessage(body) {
 
   // Ghi mỗi site thành 1 dòng
   const rows = entries.map(function(en) {
-    return [now, today, category, groupId, sender, en.site, en.qty, rawText];
+    return [now, today, category, groupId, sender, senderId, en.site, en.qty, rawText];
   });
-  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 8).setValues(rows);
+  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 9).setValues(rows);
 
   Logger.log("[Collect] " + category + " | " + entries.length + " sites | sender: " + sender);
   return jsonResp({ status: "ok", category: category, sites: entries.length, rows_added: rows.length });
@@ -154,7 +155,7 @@ function getPlanFrequency(params) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return jsonResp({ status: "ok", data: [] });
 
-  const data = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  const data = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
   const now  = new Date();
   const ms3d  = 3  * 86400000;
   const ms7d  = 7  * 86400000;
@@ -165,7 +166,7 @@ function getPlanFrequency(params) {
   for (let i = 0; i < data.length; i++) {
     const ts   = new Date(data[i][0]);
     const cat  = data[i][2];
-    const site = data[i][5];
+    const site = data[i][6]; // Col G
     if (cat !== "PLAN" || !site) continue;
 
     const diff = now.getTime() - ts.getTime();
@@ -188,7 +189,7 @@ function getCompareData(params) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return jsonResp({ status: "ok", plan: {}, refueled: {}, request: {}, date: "" });
 
-  const data  = sheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  const data  = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
   const now   = new Date();
   const today = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
 
@@ -197,8 +198,8 @@ function getCompareData(params) {
   for (let i = 0; i < data.length; i++) {
     const dateVal = data[i][1];
     const cat     = data[i][2];
-    const site    = data[i][5];
-    const qty     = parseInt(data[i][6], 10) || 0;
+    const site    = data[i][6]; // Col G
+    const qty     = parseInt(data[i][7], 10) || 0; // Col H
     if (!site || dateVal !== today) continue;
 
     if (cat === "PLAN")     plan[site]     = (plan[site]     || 0) + qty;
