@@ -130,8 +130,9 @@ class RefuelData:
         self.members = []          # list of dict: {id, name} — từ sheet "Telegram ID"
         self.not_joined = []       # list of str (names)
         self.target_members = []   # list of dict: {id, name} — từ Template col G & H
-        self.lettel_persons = []   # list of dict: {id, name} — từ "Lettel Progress" col J & K
+        self.lettel_persons = []   # list of dict: {id, name} — từ Template col J & K
         self.records = []          # list of dict: {ts, date, cat, sender, sender_id, site, qty}
+        self.letter_approved = "" # ngày Letter Approved mới nhất từ "Lettel Progress" col C
 
         if not os.path.exists(XLSX_FILE_PATH):
             if not download_spreadsheet():
@@ -142,6 +143,7 @@ class RefuelData:
             self._parse_members(wb)
             self._parse_targets(wb)
             self._parse_lettel(wb)
+            self._parse_lettel_progress(wb)
             self._parse_records(wb)
         except Exception as e:
             print(f"❌ Error loading Excel data: {e}", file=sys.stderr)
@@ -193,6 +195,20 @@ class RefuelData:
             name_str  = str(name).strip()  if name  is not None else ""
             if tg_id_str.isdigit() and len(tg_id_str) > 5 and name_str:
                 self.lettel_persons.append({"id": tg_id_str, "name": name_str})
+
+    def _parse_lettel_progress(self, wb):
+        """Đọc Lettel Progress col C (Date Letter Approved) — lấy giá trị mới nhất không rỗng."""
+        if "Lettel Progress" not in wb.sheetnames:
+            return
+        ws = wb["Lettel Progress"]
+        latest = ""
+        for r in range(2, ws.max_row + 1):
+            val = ws.cell(row=r, column=3).value  # C: Date Letter Approved
+            if val:
+                val_str = str(val).strip()
+                if val_str and val_str != "None":
+                    latest = val_str  # giữ cái cuối cùng có giá trị
+        self.letter_approved = latest
 
     def _parse_records(self, wb):
         # 1. Parse Plan refuel sheet
@@ -267,46 +283,50 @@ class RefuelData:
 def report_1(data: RefuelData):
     print("📊 Generating Report 1 — Plan Frequency by Person...")
     now = datetime.now(TZ_MM)
+    today_str = now.strftime("%d/%m/%Y")
 
-    # Ưu tiên Lettel Progress col J&K, fallback Template col G&H, fallback Telegram name
-    id_to_name = {m["id"]: m["name"] for m in data.lettel_persons}
-    if not id_to_name:
-        id_to_name = {m["id"]: m["name"] for m in data.target_members}
+    # Chỉ tính những người trong target_members (col H) — bỏ qua test/unknown
+    allowed_ids = {m["id"] for m in data.target_members}
+    id_to_name  = {m["id"]: m["name"] for m in data.target_members}
 
-    freq = {}   # key = display_name
+    # Khởi tạo freq cho TẤT CẢ target_members (kể cả người chưa submit)
+    freq = {m["name"]: {"d3": 0, "d7": 0, "d30": 0} for m in data.target_members}
+
     for r in data.records:
         if r["cat"] != "PLAN":
             continue
+        sid = r["sender_id"]
+        if sid not in allowed_ids:
+            continue   # bỏ qua test / người ngoài danh sách
         diff = now - r["ts"]
-        sid  = r["sender_id"]
-        name = id_to_name.get(sid) or r["sender"] or sid or "Unknown"
-
-        if name not in freq:
-            freq[name] = {"d3": 0, "d7": 0, "d30": 0}
+        name = id_to_name[sid]
         if diff <= timedelta(days=3):  freq[name]["d3"] += 1
         if diff <= timedelta(days=7):  freq[name]["d7"] += 1
         if diff <= timedelta(days=30): freq[name]["d30"] += 1
 
-    if not freq:
-        tg_send("📊 <b>[Report 1] Plan Frequency</b>\n📭 No plan records found.", "report1")
-        return
+    # Header: ngày hôm nay + Letter Approved
+    letter_line = ""
+    if data.letter_approved:
+        letter_line = f"\n✅ Letter Approved: <b>{data.letter_approved}</b>"
+
+    # Tổng số plan hôm nay (tất cả người)
+    total_today = sum(f["d3"] for f in freq.values())
 
     lines = [
         f"📊 <b>[Report 1] PLAN SUBMISSION FREQUENCY</b>",
-        f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
+        f"📅 Sum Plan Today {today_str}: <b>{total_today:03d}</b>{letter_line}",
         f"<code>{'No':<3} {'Name':<13} | {'3D':>4} | {'7D':>4} | {'1M':>5}</code>",
         "<code>" + "────┬──────────────┼──────┼──────┼───────" + "</code>"
     ]
     for i, name in enumerate(sorted(freq.keys()), 1):
         f = freq[name]
         short = name[:13]
-        lines.append(f"<code>{i:<3} {short:<13} | {f['d3']:>3}x | {f['d7']:>3}x | {f['d30']:>4}x</code>")
+        lines.append(f"<code>{i:<3} {short:<13} | {f['d3']:>03d}  | {f['d7']:>03d}  | {f['d30']:>04d} </code>")
 
     lines.append("<code>" + "────┴──────────────┴──────┴──────┴───────" + "</code>")
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
     tg_send("\n".join(lines), "report1")
     print("✅ Report 1 sent.")
-
 
 
 def report_2(data: RefuelData):
