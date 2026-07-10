@@ -257,7 +257,7 @@ function collectMessage(body) {
       insertAtTop(sheet, row);
     });
 
-    Logger.log("[Collect] REQUEST → Team request sheet, " + entries.length + " sites, first DEF=\" + firstDefId);
+    Logger.log("[Collect] REQUEST → Team request sheet, " + entries.length + " sites, first DEF=" + firstDefId);
     return jsonResp({ status: "ok", category: "REQUEST", sites: entries.length, def: firstDefId, time: today + " " + timeStr });
   }
 
