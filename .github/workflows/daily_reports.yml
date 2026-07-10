@@ -6,7 +6,7 @@ on:
     - cron: '0 11 * * *'   # 17:30 Myanmar / 11:00 UTC → cable_report
     - cron: '30 22 * * *'  # 05:00 Myanmar / 22:30 UTC → refuel_report
     - cron: '30 6 * * *'   # 13:00 Myanmar / 06:30 UTC → refuel_report
-    - cron: '1,31 0-15,21-23 * * *' # Fire at :01/:31 UTC + 7min delay = 16:08/16:38 Myanmar → botlookup_relay
+    - cron: '8,38 0-15,21-23 * * *' # :08/:38 UTC = Myanmar :38/:08, active hours → botlookup_relay
     - cron: '30 0 * * *'   # 07:00 Myanmar / 00:30 UTC → plan_morning
     - cron: '30 14 * * *'  # 21:00 Myanmar / 14:30 UTC → plan_update
     - cron: '0 14 * * *'   # 20:30 Myanmar / 14:00 UTC → read_report
@@ -145,7 +145,7 @@ jobs:
 
       - name: Task — Botlookup Relay
         if: |
-          (github.event_name == 'schedule' && github.event.schedule == '1,31 0-15,21-23 * * *') ||
+          (github.event_name == 'schedule' && github.event.schedule == '8,38 0-15,21-23 * * *') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'botlookup_relay')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}

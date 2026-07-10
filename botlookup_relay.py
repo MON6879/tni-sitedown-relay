@@ -79,14 +79,6 @@ async def main():
         print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ 04:30–21:30. Kết thúc.")
         return
 
-    # ── 1. Delay cố định 7 phút (:01 UTC start → :08 UTC send = Myanmar :38/:08) ──
-    FIXED_DELAY_SEC = 7 * 60  # 7 phút
-    if SKIP_DELAY:
-        print(f"[{myanmar_now()}] ⚡ SKIP_DELAY — chạy ngay!")
-    else:
-        print(f"[{myanmar_now()}] ⏳ Delay 7 phút để gửi đúng :08/:38 Myanmar...")
-        await asyncio.sleep(FIXED_DELAY_SEC)
-        print(f"[{myanmar_now()}] ✅ Hết delay — bắt đầu gửi!")
 
 
     # ── 2. Kết nối Telegram ───────────────────────────────────────
