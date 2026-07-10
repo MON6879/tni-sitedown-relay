@@ -60,6 +60,19 @@ def post_gas(payload: dict) -> dict:
         return {"status": "error", "message": str(e)}
 
 
+def tg_reply(chat_id: str, text: str):
+    """Gửi tin nhắn xác nhận 2 dòng vào group Telegram."""
+    try:
+        url = f"https://api.telegram.org/bot{REFUEL_BOT_TOKEN}/sendMessage"
+        requests.post(url, json={
+            "chat_id": "-" + chat_id,
+            "text": text,
+            "parse_mode": "HTML"
+        }, timeout=10)
+    except Exception as e:
+        logger.error(f"tg_reply error: {e}")
+
+
 def process_update(update: dict):
     """Xử lý 1 Telegram update."""
     msg = update.get("message") or update.get("channel_post")
@@ -101,6 +114,17 @@ def process_update(update: dict):
         "date":     now.strftime("%d/%m/%Y %H:%M"),
     })
     logger.info(f"[{category}] sender={sender} ({sender_id}) | GAS={result.get('status')} sites={result.get('sites',0)}")
+
+    # Gửi reply 2 dòng xác nhận khi ghi thành công
+    if result.get("status") == "ok":
+        def_id  = result.get("def", "")
+        ts      = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
+        cat_icon = {"PLAN": "📋", "REQUEST": "📩", "REFUELED": "⛽"}.get(category, "✅")
+        reply_text = (
+            f"{cat_icon} <b>Recorded</b> — 🪪 <code>{def_id}</code>\n"
+            f"Done 📅 {ts}"
+        )
+        tg_reply(chat_id, reply_text)
 
 
 class handler(BaseHTTPRequestHandler):
