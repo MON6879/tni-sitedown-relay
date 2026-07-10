@@ -123,7 +123,13 @@ def process_update(update: dict):
         "sender_id": sender_id,
         "date":     now.strftime("%d/%m/%Y %H:%M"),
     })
-    logger.info(f"[{category}] sender={sender} ({sender_id}) | GAS={result.get('status')} sites={result.get('sites',0)}")
+    logger.info(f"[{category}] GAS={result.get('status')} | {result}")
+    # DEBUG: gửi GAS result vào group để xem lỗi
+    requests.post(
+        f"https://api.telegram.org/bot{REFUEL_BOT_TOKEN}/sendMessage",
+        json={"chat_id": "-5469544739", "text": f"⚙️ GAS result:\n{str(result)[:150]}"},
+        timeout=8
+    )
 
     # Gửi reply 2 dòng xác nhận khi ghi thành công
     if result.get("status") == "ok":
