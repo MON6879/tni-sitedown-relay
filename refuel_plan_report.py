@@ -421,7 +421,7 @@ def report_3(data: RefuelData):
         elif q > 0 and p == 0:
             icon = "🟣"; purple_count += 1   # Request có, Plan không có
         else:
-            icon = "⚫"; gray_count   += 1   # Plan có, Request không có
+            icon = "🔴"; gray_count   += 1   # Plan có, Request không có
 
         diff_str = "=" if diff == 0 else f"{diff:+d}L"
         rows.append(f"{icon} {fmt_row_compare(site, f'{q}L', f'{p}L', diff_str)}")
@@ -433,12 +433,12 @@ def report_3(data: RefuelData):
     lines = [
         f"🔄 <b>[Report 3] PLAN vs TEAM REQUEST — {today_str}</b>",
         f"⏰ {now.strftime('%H:%M')} Myanmar",
-        f"\n🟢 Match  🟡 Diff qty  🟣 Req only  ⚫ Plan only",
+        f"\n🟢 Match  🟡 Diff qty  🟣 Req only  🔴 Plan only",
         fmt_row_compare("Site ID", "Request", "Plan", "Diff"),
         header_bar,
     ] + rows + [
         footer_bar,
-        f"\n🟢 <b>{green_count}</b>  🟡 <b>{yellow_count}</b>  🟣 <b>{purple_count}</b>  ⚫ <b>{gray_count}</b>",
+        f"\n🟢 <b>{green_count}</b>  🟡 <b>{yellow_count}</b>  🟣 <b>{purple_count}</b>  🔴 <b>{gray_count}</b>",
         "\n🤖 <i>Auto report — Refuel Plan System</i>"
     ]
     tg_send("\n".join(lines), "report3")
