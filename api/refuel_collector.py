@@ -119,9 +119,10 @@ def process_update(update: dict):
     if result.get("status") == "ok":
         def_id  = result.get("def", "")
         ts      = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
-        cat_icon = {"PLAN": "📋", "REQUEST": "📩", "REFUELED": "⛽"}.get(category, "✅")
+        # Tên tiêu đề theo đúng tab trong Template sheet
+        cat_label = {"PLAN": "Plan refuel", "REQUEST": "Team request", "REFUELED": "Refueled"}.get(category, category)
         reply_text = (
-            f"{cat_icon} <b>Recorded</b> — 🪪 <code>{def_id}</code>\n"
+            f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
             f"Done 📅 {ts}"
         )
         tg_reply(chat_id, reply_text)
