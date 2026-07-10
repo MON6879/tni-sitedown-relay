@@ -34,7 +34,7 @@ def get_msg_id(key: str) -> str:
     if not gas_url:
         return ""
     try:
-        r = requests.post(gas_url, json={"action": "get_msg_id", "key": key}, timeout=10)
+        r = requests.post(gas_url, json={"action": "get_msg_id", "key": key}, timeout=25)
         return r.json().get("msg_id", "")
     except Exception as e:
         logger.warning(f"get_msg_id error: {e}")
@@ -46,7 +46,7 @@ def set_msg_id(key: str, msg_id):
     if not gas_url:
         return
     try:
-        requests.post(gas_url, json={"action": "set_msg_id", "key": key, "msg_id": str(msg_id)}, timeout=10)
+        requests.post(gas_url, json={"action": "set_msg_id", "key": key, "msg_id": str(msg_id)}, timeout=25)
     except Exception as e:
         logger.warning(f"set_msg_id error: {e}")
 
