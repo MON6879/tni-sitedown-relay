@@ -25,6 +25,9 @@ SESSION_STRING = os.environ["TELEGRAM_SESSION"]
 SOURCE_GROUP   = "Botlookup"
 COMMAND        = "/down_tni@auto_nocpro_bot"
 
+REFUEL_GROUP_ID = -5469544739   # 9 TNI REQUEST REFUEL — scan Letter Submit/Approved
+REFUEL_GAS_URL  = os.environ.get("REFUEL_APPS_SCRIPT_URL", "")
+
 # Nhóm nhận Note từ @Phongha79 (để theo dõi ai đọc)
 ALL_GROUPS = {
     "CONTROL": -5251698940,
@@ -311,6 +314,53 @@ async def main():
                     print(f"[{myanmar_now()}] ⚠️ Lưu Note msgids lỗi: {ex}")
         else:
             print(f"[{myanmar_now()}] ℹ️ B2:B5 trống — bỏ qua gửi Note (Note cũ đã xóa ở trên)")
+
+        # ── 12. Scan nhóm REFUEL — bắt tin Letter Submit/Approved ───
+        if REFUEL_GAS_URL:
+            try:
+                refuel_entity = await client.get_entity(REFUEL_GROUP_ID)
+                tz_mm = timezone(timedelta(hours=6, minutes=30))
+                cutoff = datetime.now(timezone.utc) - timedelta(minutes=35)
+
+                refuel_history = await client(GetHistoryRequest(
+                    peer=refuel_entity, limit=50,
+                    offset_date=None, offset_id=0, max_id=0,
+                    min_id=0, add_offset=0, hash=0
+                ))
+
+                for msg in refuel_history.messages:
+                    if not msg.message:
+                        continue
+                    msg_date = msg.date.replace(tzinfo=timezone.utc) if msg.date.tzinfo is None else msg.date
+                    if msg_date < cutoff:
+                        break  # đã quá 35 phút, bỏ qua
+                    txt = msg.message.strip()
+                    txt_lower = txt.lower()
+                    # Chỉ xử lý Letter Submit / Approved
+                    if ("letter" in txt_lower and "submit" in txt_lower) or \
+                       ("government approved" in txt_lower) or \
+                       ("approved the letter" in txt_lower):
+                        sender_id = str(msg.sender_id) if msg.sender_id else ""
+                        try:
+                            sender_entity = await client.get_entity(msg.sender_id)
+                            sender_name = getattr(sender_entity, "first_name", "") or sender_id
+                        except Exception:
+                            sender_name = sender_id
+                        resp = requests.post(
+                            REFUEL_GAS_URL,
+                            json={
+                                "action": "collect_message",
+                                "group_id": str(REFUEL_GROUP_ID).lstrip("-"),
+                                "text": txt,
+                                "sender": sender_name,
+                                "sender_id": sender_id,
+                            },
+                            timeout=20,
+                            allow_redirects=True,
+                        )
+                        print(f"[{myanmar_now()}] 📬 Letter collect → {resp.status_code} | {resp.text[:80]}")
+            except Exception as ex:
+                print(f"[{myanmar_now()}] ⚠️ Letter scan lỗi: {ex}")
 
 
         print(f"[{myanmar_now()}] ✅ Xong tất cả.")

@@ -152,6 +152,7 @@ jobs:
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}
           SKIP_DELAY: ${{ github.event.inputs.skip_delay || '1' }}
         run: python botlookup_relay.py
 
