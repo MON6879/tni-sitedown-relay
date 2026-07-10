@@ -100,23 +100,24 @@ function insertAtTop(sheet, rowData) {
  */
 function updateLettelProgress(senderId, dateStr, category) {
   try {
-    const ss    = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName("Lettel Progress");
-    if (!sheet) return;
+    const ss       = SpreadsheetApp.getActiveSpreadsheet();
+    const tmplSheet = ss.getSheetByName("Template");
+    const lpSheet   = ss.getSheetByName("Lettel Progress");
+    if (!tmplSheet || !lpSheet) return;
 
-    const lastRow = sheet.getLastRow();
+    const lastRow = tmplSheet.getLastRow();
     if (lastRow < 2) return;
 
-    // Quét cột J (cột 10) tìm senderId
-    const colJ = sheet.getRange(2, 10, lastRow - 1, 1).getValues(); // J = col 10
+    // Tìm senderId trong Template cột J (cột 10)
+    const colJ = tmplSheet.getRange(2, 10, lastRow - 1, 1).getValues();
     const writeCol = (category === "PLAN") ? 2 : 3;  // B=2 (Plan), C=3 (Refueled)
 
     for (let i = 0; i < colJ.length; i++) {
       const cellId = String(colJ[i][0]).trim();
       if (cellId === String(senderId).trim()) {
-        const targetRow = i + 2; // offset vì bắt từ row 2
-        sheet.getRange(targetRow, writeCol).setValue(dateStr);
-        Logger.log("[LettelProgress] Row " + targetRow + " col " + writeCol + " = " + dateStr + " (sender=" + senderId + ")");
+        const targetRow = i + 2; // row tương ứng trong Lettel Progress
+        lpSheet.getRange(targetRow, writeCol).setValue(dateStr);
+        Logger.log("[LettelProgress] row=" + targetRow + " col=" + writeCol + " = " + dateStr + " (sender=" + senderId + ")");
         break;
       }
     }

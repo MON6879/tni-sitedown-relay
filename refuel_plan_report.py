@@ -179,13 +179,14 @@ class RefuelData:
                         })
 
     def _parse_lettel(self, wb):
-        """Đọc Lettel Progress: col J = Telegram ID, col K = Tên."""
-        if "Lettel Progress" not in wb.sheetnames:
+        """Đọc Template col J (Telegram ID) & K (Tên nhân viên phụ trách)."""
+        sheet_name = "Template"
+        if sheet_name not in wb.sheetnames:
             return
-        ws = wb["Lettel Progress"]
+        ws = wb[sheet_name]
         for r in range(2, ws.max_row + 1):
-            tg_id = ws.cell(row=r, column=10).value   # J
-            name  = ws.cell(row=r, column=11).value   # K
+            tg_id = ws.cell(row=r, column=10).value   # J: Telegram ID nhân viên
+            name  = ws.cell(row=r, column=11).value   # K: Tên nhân viên
             if not tg_id and not name:
                 continue
             tg_id_str = str(tg_id).strip() if tg_id is not None else ""
