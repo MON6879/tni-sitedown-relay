@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from tg_utils import tg_send_fresh, tg_delete
+from tg_utils import get_msg_id, set_msg_id, tg_delete
 
 # Cấu hình bot và chat ID mặc định của group 9 TNI REQUEST REFUEL
 REFUEL_BOT_TOKEN = os.getenv("REFUEL_BOT_TOKEN", "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME")
@@ -148,6 +148,13 @@ def format_and_send_report(rows: list[str]) -> list[int]:
         chunks.append(current_chunk)
         
     sent_ids = []
+    STATE_KEY = f"refuel_daily_{REFUEL_CHAT_ID}"
+
+    # Xóa tin cũ trước khi gửi mới
+    old_id = get_msg_id(STATE_KEY)
+    if old_id:
+        tg_delete(REFUEL_CHAT_ID, old_id)
+
     for idx, chunk_lines in enumerate(chunks):
         title = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>"
         if len(chunks) > 1:
@@ -168,21 +175,12 @@ def format_and_send_report(rows: list[str]) -> list[int]:
             lines.append("🤖 <i>Auto report by @TNI_REFUEL_BOT</i>")
 
         msg = "\n".join(lines)
-
-        # Chunk đầu tiên: dùng tg_send_fresh (ựa tin cũ + lưu ID mới)
-        # Chunk sau: gửi bình thường
-        if idx == 0:
-            state_key = f"refuel_daily_{REFUEL_CHAT_ID}"
-            msg_id = tg_send_fresh(REFUEL_CHAT_ID, msg, state_key=state_key)
-            if msg_id:
-                sent_ids.append(msg_id)
-                print(f"✅ Report sent to {REFUEL_CHAT_ID}")
-            else:
-                print(f"❌ Send failed", file=sys.stderr)
-        else:
-            ok, msg_id = send_telegram(REFUEL_CHAT_ID, msg)
-            if ok and msg_id:
-                sent_ids.append(msg_id)
+        ok, msg_id = send_telegram(REFUEL_CHAT_ID, msg)
+        if ok and msg_id:
+            sent_ids.append(msg_id)
+            # Lưu ID tin mới nhất để lần sau xóa
+            if idx == 0:
+                set_msg_id(STATE_KEY, msg_id)
 
     return sent_ids
 
@@ -202,10 +200,6 @@ def main():
 
     # Gửi báo cáo (xóa tin cũ tự động qua tg_send_fresh)
     format_and_send_report(rows)
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":
