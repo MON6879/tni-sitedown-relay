@@ -1,10 +1,10 @@
 **
 !10_DASHBOARD_REPORT.gs
-!apps_script_cable.js
-!apps_script_collector.js
-!apps_script_mdg.js
+!apps_script_cable.gs
+!apps_script_collector.gs
+!apps_script_mdg.gs
 !appsscript.json
 !daily_report_collector.gs
 !site_down_notify.gs
-!auto_copy_processor.js
+!auto_copy_processor.gs
 

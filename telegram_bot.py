@@ -35,6 +35,7 @@ BASE_URL       = (
 GID_SITE = "1095689918"  # 'Site down now'   – col B=TNI, cols R,T,U,V,Y,AA = alarm durations
 GID_TASK = "1755404595"  # 'Input task'      – col T=TNI, col J=""=pending, D:E:K+H
 GID_WO   = "1429089905"  # 'Input WO'(matrix)– col E=TNI, A+B:C+F
+GID_SITE_CLEAR = "610944071"  # Tab: Search Site  Clear
 
 df_site: pd.DataFrame = None
 df_task: pd.DataFrame = None
@@ -241,6 +242,68 @@ def lookup_tni(tni: str) -> str:
     lines.append("━━━━━━━━━━━━━━━━━━━━")
     return "\n".join(lines)
 
+def lookup_clear_site(tni: str) -> str:
+    """Tra cứu TNIxxxx trong dòng 4 (index 3) của sheet Search Site Clear (GID 610944071).
+    Sheet này nằm trên Spreadsheet Site Down: 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow."""
+    def e(s): return html.escape(str(s))
+    tni_upper = tni.upper()
+
+    # Sử dụng Spreadsheet ID riêng biệt của Site Down
+    sd_sheet_id = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow"
+    url = f"https://docs.google.com/spreadsheets/d/{sd_sheet_id}/export?format=csv&gid={GID_SITE_CLEAR}"
+
+    try:
+        hdrs = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=hdrs, timeout=30, allow_redirects=True)
+        resp.raise_for_status()
+        content = resp.content.decode("utf-8", errors="replace")
+        df = pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
+    except Exception as ex:
+        logger.error(f"lookup_clear_site fetch error: {ex}")
+        return f"❌ Error loading data: {e(str(ex)[:80])}"
+
+    if df is None or df.empty:
+        return "❌ No data available."
+
+    # Dòng 4 trong Sheet là index 3 (0-based) trong pandas DataFrame
+    if len(df) <= 3:
+        return "❌ Sheet has fewer than 4 rows."
+
+    col_idx = None
+    row_3 = df.iloc[3]
+    for col in range(1, len(df.columns)):
+        val = str(row_3.iloc[col]).strip().upper() if col < len(row_3) else ""
+        if val == tni_upper:
+            col_idx = col
+            break
+
+    if col_idx is None:
+        return f"❌ Not found <b>{e(tni_upper)}</b> in Row 4 of Search Site Clear."
+
+    # Lấy toàn bộ dữ liệu của cột đó
+    lines = []
+    lines.append(f"🔍 <b>Clear History for {e(tni_upper)}</b>")
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+
+    for r in range(len(df)):
+        val = str(df.iloc[r, col_idx]).strip() if col_idx < len(df.columns) else ""
+        label = str(df.iloc[r, 0]).strip() if 0 < len(df.columns) else ""
+
+        # Bỏ qua các giá trị rỗng, nan hoặc gạch ngang
+        if not val or val.lower() in ("nan", "", "-"):
+            continue
+
+        # Format label cho ngắn gọn
+        if label and label.lower() not in ("nan", ""):
+            if "newsite" in label.lower() or "salary" in label.lower():
+                label = "Site Code"
+            lines.append(f"• <b>{e(label)}:</b> {e(val)}")
+        else:
+            lines.append(f"• {e(val)}")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    return "\n".join(lines)
+
 
 MAX_LEN = 4096
 
@@ -280,7 +343,7 @@ def fetch_daily_fields() -> list[str]:
     try:
         resp = requests.get(
             DAILY_APPS_SCRIPT_URL + "?action=get_fields",
-            timeout=15
+            timeout=60
         )
         data = resp.json()
         if data.get("status") == "ok" and data.get("fields"):
@@ -461,6 +524,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await submit_daily_report(update, context)
         return
 
+    # ── 1.5 CLEAR Site Search
+    clear_match = re.match(r"^clear[:\s]+\s*(TNI\w+)", text, re.IGNORECASE)
+    if clear_match:
+        tni = clear_match.group(1).upper()
+        logger.info(f"Clear site lookup: {tni}")
+        wait_msg = await update.message.reply_text(
+            f"⏳ Loading clear data for <b>{html.escape(tni)}</b>...", parse_mode="HTML"
+        )
+        try:
+            reply = lookup_clear_site(tni)
+            chunks = split_messages(reply)
+            await wait_msg.edit_text(chunks[0], parse_mode="HTML")
+            for chunk in chunks[1:]:
+                await update.message.reply_text(chunk, parse_mode="HTML")
+
+            # Log tìm kiếm (fire & forget)
+            apps_url = os.getenv("APPS_SCRIPT_URL", "")
+            if apps_url:
+                user = update.effective_user
+                from datetime import datetime, timezone, timedelta
+                now_mm = datetime.now(timezone(timedelta(hours=6, minutes=30)))
+                payload = {
+                    "action":    "log_search",
+                    "user_name": user.full_name or user.first_name or str(user.id),
+                    "user_id":   str(user.id),
+                    "tni_code":  f"CLEAR {tni}",
+                    "date":      now_mm.strftime("%d/%m/%Y"),
+                    "time":      now_mm.strftime("%H:%M"),
+                }
+                threading.Thread(
+                    target=lambda: requests.post(apps_url, json=payload, timeout=60),
+                    daemon=True,
+                ).start()
+        except Exception as err:
+            logger.error(f"Clear search error [{tni}]: {err}")
+            await wait_msg.edit_text(
+                f"❌ <b>Error</b> – CLEAR {html.escape(tni)}\n<i>{html.escape(str(err))}</i>",
+                parse_mode="HTML",
+            )
+        return
+
     # ── 2. TNI Lookup (existing logic)
     m = re.search(r"(TNI\w+)", text, re.IGNORECASE)
     if not m:
@@ -494,7 +598,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "time":      now_mm.strftime("%H:%M"),
             }
             threading.Thread(
-                target=lambda: requests.post(apps_url, json=payload, timeout=15),
+                target=lambda: requests.post(apps_url, json=payload, timeout=60),
                 daemon=True,
             ).start()
 
@@ -525,7 +629,7 @@ async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "chat_title": title,
                 "chat_type":  chat.type,
                 "reg_by":     reg_by,
-            }, timeout=15)
+            }, timeout=60)
             res = r.json()
             if res.get("status") == "ok":
                 saved     = True
@@ -558,7 +662,7 @@ async def myid_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "action":    "register_user",
                 "user_id":   user_id,
                 "user_name": full_name,
-            }, timeout=15)
+            }, timeout=60)
             res = r.json()
             if res.get("status") == "ok":
                 msg_extra = "\n✅ Added to report list"

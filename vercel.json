@@ -1,12 +1,14 @@
 {
   "builds": [
-    { "src": "api/index.py",      "use": "@vercel/python", "config": { "maxDuration": 60 } },
-    { "src": "api/collector.py",  "use": "@vercel/python", "config": { "maxDuration": 30 } },
-    { "src": "api/search_bot.py", "use": "@vercel/python", "config": { "maxDuration": 30 } }
+    { "src": "api/index.py",           "use": "@vercel/python", "config": { "maxDuration": 60 } },
+    { "src": "api/collector.py",       "use": "@vercel/python", "config": { "maxDuration": 30 } },
+    { "src": "api/search_bot.py",      "use": "@vercel/python", "config": { "maxDuration": 30 } },
+    { "src": "api/refuel_collector.py","use": "@vercel/python", "config": { "maxDuration": 30 } }
   ],
   "routes": [
-    { "src": "/api/index",      "dest": "api/index.py" },
-    { "src": "/api/collector",  "dest": "api/collector.py" },
-    { "src": "/api/search_bot", "dest": "api/search_bot.py" }
+    { "src": "/api/index",             "dest": "api/index.py" },
+    { "src": "/api/collector",         "dest": "api/collector.py" },
+    { "src": "/api/search_bot",        "dest": "api/search_bot.py" },
+    { "src": "/api/refuel_collector",  "dest": "api/refuel_collector.py" }
   ]
 }

@@ -10,6 +10,7 @@ on:
     - cron: '30 0 * * *'   # 07:00 Myanmar / 00:30 UTC → plan_morning
     - cron: '30 14 * * *'  # 21:00 Myanmar / 14:30 UTC → plan_update
     - cron: '0 14 * * *'   # 20:30 Myanmar / 14:00 UTC → read_report
+    - cron: '30 11 * * *'  # 18:00 Myanmar / 11:30 UTC → refuel_plan_report
   workflow_dispatch:
     inputs:
       report_type:
@@ -27,6 +28,7 @@ on:
           - check_read_status
           - botlookup_relay
           - cable_report
+          - refuel_plan_report
           - refuel_report
       skip_delay:
         description: 'Skip random delay (1=yes, 0=no) - for botlookup_relay'
@@ -170,3 +172,12 @@ jobs:
           REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
         run: python refuel_send.py
+
+      - name: Task — Refuel Plan Report (18:00 Myanmar or Manual)
+        if: |
+          (github.event_name == 'schedule' && github.event.schedule == '30 11 * * *') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'refuel_plan_report')
+        env:
+          REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}
+          REFUEL_PLAN_GAS_URL: ${{ secrets.REFUEL_PLAN_GAS_URL }}
+        run: python refuel_plan_report.py

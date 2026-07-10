@@ -14,6 +14,7 @@ BASE_URL       = (f"https://docs.google.com/spreadsheets/d/"
                   f"{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=")
 GID_SITE, GID_TASK, GID_WO = "1095689918", "1755404595", "1429089905"
 GID_INFO = "171059303"   # Tab: Name Site / Site / Cable / Gpon / DIA (col A=TNI, B=Site, C=Cable, D=Gpon, E=DIA)
+GID_SITE_CLEAR = "610944071"  # Tab: Search Site  Clear
 MAX_LEN = 4096
 TZ_MM   = timezone(timedelta(hours=6, minutes=30))
 
@@ -27,7 +28,7 @@ def tg_send(chat_id, text, parse_mode="HTML"):
         r = requests.post(
             f"https://api.telegram.org/bot{TOKEN}/sendMessage",
             json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
-            timeout=15,
+            timeout=60,
         )
         if not r.ok:
             logger.error(f"Telegram sendMessage lỗi: {r.text[:200]}")
@@ -131,6 +132,68 @@ def build_info_reply(tni, info):
     lines.append("━━━━━━━━━━━━━━━━━━━━")
     return "\n".join(lines)
 
+def lookup_clear_site(tni: str) -> str:
+    """Tra cứu TNIxxxx trong dòng 4 (index 3) của sheet Search Site Clear (GID 610944071).
+    Sheet này nằm trên Spreadsheet Site Down: 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow."""
+    def e(s): return html.escape(str(s))
+    tni_upper = tni.upper()
+
+    # Sử dụng Spreadsheet ID riêng biệt của Site Down
+    sd_sheet_id = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow"
+    url = f"https://docs.google.com/spreadsheets/d/{sd_sheet_id}/export?format=csv&gid={GID_SITE_CLEAR}"
+
+    try:
+        hdrs = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=hdrs, timeout=30, allow_redirects=True)
+        resp.raise_for_status()
+        content = resp.content.decode("utf-8", errors="replace")
+        df = pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
+    except Exception as ex:
+        logger.error(f"lookup_clear_site fetch error: {ex}")
+        return f"❌ Error loading data: {e(str(ex)[:80])}"
+
+    if df is None or df.empty:
+        return "❌ No data available."
+
+    # Dòng 4 trong Sheet là index 3 (0-based) trong pandas DataFrame
+    if len(df) <= 3:
+        return "❌ Sheet has fewer than 4 rows."
+
+    col_idx = None
+    row_3 = df.iloc[3]
+    for col in range(1, len(df.columns)):
+        val = str(row_3.iloc[col]).strip().upper() if col < len(row_3) else ""
+        if val == tni_upper:
+            col_idx = col
+            break
+
+    if col_idx is None:
+        return f"❌ Not found <b>{e(tni_upper)}</b> in Row 4 of Search Site Clear."
+
+    # Lấy toàn bộ dữ liệu của cột đó
+    lines = []
+    lines.append(f"🔍 <b>Clear History for {e(tni_upper)}</b>")
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+
+    for r in range(len(df)):
+        val = str(df.iloc[r, col_idx]).strip() if col_idx < len(df.columns) else ""
+        label = str(df.iloc[r, 0]).strip() if 0 < len(df.columns) else ""
+
+        # Bỏ qua các giá trị rỗng, nan hoặc gạch ngang
+        if not val or val.lower() in ("nan", "", "-"):
+            continue
+
+        # Format label cho ngắn gọn
+        if label and label.lower() not in ("nan", ""):
+            if "newsite" in label.lower() or "salary" in label.lower():
+                label = "Site Code"
+            lines.append(f"• <b>{e(label)}:</b> {e(val)}")
+        else:
+            lines.append(f"• {e(val)}")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    return "\n".join(lines)
+
 def build_reply(tni):
     e  = html.escape
     ds = fetch(GID_SITE)
@@ -170,7 +233,7 @@ def send_to_sheet(payload):
     if not APPS_SCRIPT_URL:
         return None
     try:
-        r = requests.post(APPS_SCRIPT_URL, json=payload, timeout=15)
+        r = requests.post(APPS_SCRIPT_URL, json=payload, timeout=60)
         return r.json()
     except Exception as e:
         logger.error(f"Apps Script error: {e}")
@@ -283,6 +346,34 @@ def handle(data):
         else:
             err = res.get("message", "unknown") if res else "no response"
             tg_send(chat_id, f"⚠️ Không thể update #{ref_id}: {html.escape(str(err))}")
+        return
+
+    # ── CLEAR SITE SEARCH (CLEAR TNIxxxx) ────────────────────────
+    clear_match = re.match(r"^clear[:\s]+\s*(TNI\w+)", text.strip(), re.IGNORECASE)
+    if clear_match:
+        tni = clear_match.group(1).upper()
+        logger.info(f"Clear site lookup: {tni} | chat={chat_id}")
+        tg_send(chat_id, f"⏳ Loading clear data for <b>{html.escape(tni)}</b>...")
+        # Ghi log search
+        if APPS_SCRIPT_URL and user_id:
+            try:
+                now = datetime.now(TZ_MM)
+                send_to_sheet({
+                    "action":    "log_search",
+                    "user_name": full_name,
+                    "user_id":   user_id,
+                    "tni_code":  f"CLEAR {tni}",
+                    "date":      now.strftime("%d/%m/%Y"),
+                    "time":      now.strftime("%H:%M"),
+                })
+            except Exception as e:
+                logger.error(f"log_search failed: {e}")
+        try:
+            message = lookup_clear_site(tni)
+            tg_send(chat_id, message)
+        except Exception as err:
+            logger.error(f"Clear lookup error [{tni}]: {err}")
+            tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
     # ── Info: TNIxxxx — tra cứu cột A→B:E từ sheet gid=171059303 ──────────

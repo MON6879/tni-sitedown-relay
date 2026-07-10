@@ -55,7 +55,7 @@ def fetch_keywords() -> list[str]:
             return _keyword_cache
 
     try:
-        resp = requests.get(APPS_SCRIPT_URL, timeout=15)
+        resp = requests.get(APPS_SCRIPT_URL, timeout=60)
         data = resp.json()
         if data.get("status") == "ok" and data.get("keywords"):
             _keyword_cache      = data["keywords"]

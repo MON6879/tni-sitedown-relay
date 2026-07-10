@@ -97,7 +97,7 @@ def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
     resp = requests.post(
         url,
         json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-        timeout=15,
+        timeout=60,
     )
     res_json = resp.json()
     ok = res_json.get("ok", False)

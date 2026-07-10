@@ -229,7 +229,7 @@ async def main():
             # Clear saved IDs sau khi xóa
             if deleted_count > 0 and gas_url:
                 try:
-                    requests.post(gas_url, json={"action": "save_note_msgids", "msgids": {}}, timeout=15, allow_redirects=True)
+                    requests.post(gas_url, json={"action": "save_note_msgids", "msgids": {}}, timeout=60, allow_redirects=True)
                     print(f"[{myanmar_now()}] 🧹 Clear Note msgids sau khi xóa {deleted_count} tin cũ")
                 except Exception:
                     pass
@@ -304,7 +304,7 @@ async def main():
                     print(f"[{myanmar_now()}] 💾 save_note_msgids HTTP {save_resp.status_code} | body={save_resp.text[:200]}")
                     # Verify: đọc lại để xác nhận lưu thành công
                     try:
-                        verify_resp = requests.get(gas_url, params={"action": "get_note_msgids"}, timeout=15, allow_redirects=True)
+                        verify_resp = requests.get(gas_url, params={"action": "get_note_msgids"}, timeout=60, allow_redirects=True)
                         if verify_resp.status_code == 200:
                             vd = verify_resp.json()
                             saved = vd.get("msgids", {})

@@ -1,0 +1,22 @@
+Total rows: 10, columns: 13
+
+Row 0:   Alarm need repair: Exported Time: 30/06/2026 17:00:55 Task WO | TNI319 TNI0071 Battery Temperature High: 6.6 Fixing Fuel Level Monitoring : TNI0071 Need to fix fuel level cannot monitoring at NMS. :  +  WO_WFM-OTHERS_20260622_123602893 + TNI0071_Cleaning Radiator and change engine oil : 6.88 + myt_bhonehtet.aung |=***=| WO_QLCTKT_20260529_123389605 + TNI0071 MYT_Routine_Maintenance_Mytel_Station_VCM : 271.88 + myt_bonemyat.naing1 | Write full name Site TNI0009 TNI0061 DG.Start Alarm>16H: 3.8 No see WO_ICMS_20260623_123611289 + TNI0061 MYT_Routine_Maintenance_Towerco_Station MYT_RTE_MTE_TCO_STN : 931.38 + myt_bhonehtet.aung | Write full name Site TNI0009 TNI0038 DG Door Alarm: 3625.2, Battery Cabinet Smoke Alarm: 3625.2 Request Export material : TNI0038-TNI0051>>24F8 Cable 280M,closure 2pcs, Tension 2pcs :  +  |=***=| Request Export material : TNI0038-TNI0051>> cable 500M and JB 2pcs :  +  |=***=| DG Starter Battery : TNI0038 Need to confirm DG starter battery changing finish sites with M&E :  + VCM825430-Aung Thin Myat WO_QLCTKT_20260430_123146548 + TNI0038 MYT_Routine_Maintenance_Mytel_Station_VCM : -424.12 + myt_bonemyat.naing1 | Write full name Site TNI0009 TNI0328 DG Door Alarm: 2497.3, Time Abnormal Alarm: 1948.1, Time DC LOW: 0.2 Check DG run long time : TNI0328 Need to check DG non stop running :  +  No see | Write full name Site TNI0009 TNI0211 Time Abnormal Alarm: 27414 Check DG run long time : TNI0211 Need to check DG non stop running :  +  WO_WFM-OTHERS_20260622_123603184 + TNI0211_Cleaning Radiator and change engine oil : 6.88 + myt_bonemyat.naing1 | nan | Check Site Up down run MDG TNI0198 #REF!  | nan | nan | nan | nan | nan
+================================================================================
+Row 1: 5 | 03/06/2026 | 17:44 | TEST - Ha Duc Phong | @test | 6859790680 | 50 box cable cat6 | nan | 2 switch 24port | Server TNI0201 sang TNI0065 | nan | nan | nan
+================================================================================
+Row 2: 6 | 03/06/2026 | 19:52 | Ha Duc Phong (TEST) | @test | 6859790680 | 50 box cable cat6 | nan | 2 switch 24port | Server TNI0201 sang TNI0065 | nan | nan | nan
+================================================================================
+Row 3: 7 | 03/06/2026 | 21:26 | Ha Duc Phong _070756_TNI | @Phongha79 | 6859790680 | nan | nan | nan | nan | nan | nan | nan
+================================================================================
+Row 4: 8 | 03/06/2026 | 21:30 | Ha Duc Phong _070756_TNI | @Phongha79 | 6859790680 | TNI0002 1 battery start + 1 ATS charger | nan | nan | nan | nan | nan | nan
+================================================================================
+Row 5: 9 | 03/06/2026 | 21:35 | Ha Duc Phong _070756_TNI | @Phongha79 | 6859790680 | nan | nan | TNI0127 1 RRU | nan | nan | nan | nan
+================================================================================
+Row 6: 10 | 03/06/2026 | 21:49 | Ha Duc Phong _070756_TNI | @Phongha79 | 6859790680 | nan | nan | nan | nan | nan | nan | nan
+================================================================================
+Row 7: 11 | 03/06/2026 | 21:58 | Ha Duc Phong _070756_TNI | @Phongha79 | 6859790680 | nan | nan | TNI0127 1 RRU | nan | nan | nan | nan
+================================================================================
+Row 8: 12 | 03/06/2026 | 22:17 | Ha Duc Phong _070756_TNI | @Phongha79 | 6859790680 | nan | nan | TNI0127 1 RRU | nan | nan | nan | nan
+================================================================================
+Row 9: 13 | 03/06/2026 22:03 | nan | nan | nan | 123456789 | nan | nan | nan | nan | nan | nan | nan
+================================================================================
