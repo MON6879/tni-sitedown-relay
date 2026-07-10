@@ -23,20 +23,25 @@ def fetch_refuel_data() -> list[str] | None:
     if not REFUEL_APPS_SCRIPT_URL:
         print("❌ REFUEL_APPS_SCRIPT_URL not set in environment", file=sys.stderr)
         return None
-    try:
-        resp = requests.get(
-            REFUEL_APPS_SCRIPT_URL,
-            params={"action": "get_refuel_data"},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("status") == "ok":
-            return data["data"]
-        print(f"⚠️ GAS error: {data.get('message')}", file=sys.stderr)
-    except Exception as e:
-        print(f"❌ Refuel fetch error: {e}", file=sys.stderr)
-    return None
+    for attempt in range(1, 4):  # Retry tối đa 3 lần
+        try:
+            resp = requests.get(
+                REFUEL_APPS_SCRIPT_URL,
+                params={"action": "get_refuel_data"},
+                timeout=60,
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("status") == "ok":
+                return data["data"]
+            print(f"⚠️ GAS error: {data.get('message')}", file=sys.stderr)
+            return None
+        except Exception as e:
+            print(f"⚠️ Attempt {attempt}/3 failed: {e}", file=sys.stderr)
+            if attempt == 3:
+                print("❌ All retries failed", file=sys.stderr)
+                return None
 
 
 def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
