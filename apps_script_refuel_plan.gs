@@ -271,7 +271,7 @@ function collectMessage(body) {
     Logger.log("[Collect] LETTER_SUBMIT → Lettel Progress col B, date=" + dateVal);
 
     // Reply vào nhóm xác nhận qua Telegram Bot API
-    const replyText = "📋 <b>Letter Submit recorded</b>\n📅 Date: <b>" + dateVal + "</b>\n👤 By: " + sender + "\n🤖 <i>Auto — Refuel Plan System</i>";
+    const replyText = "📋 <b>Letter Submit recorded</b>\n📅 Date: <b>" + dateVal + "</b>";
     UrlFetchApp.fetch("https://api.telegram.org/bot" + PLAN_BOT_TOKEN + "/sendMessage", {
       method: "post",
       contentType: "application/json",
@@ -292,7 +292,7 @@ function collectMessage(body) {
     Logger.log("[Collect] LETTER_APPROVED → Lettel Progress col C, date=" + dateVal);
 
     // Reply vào nhóm xác nhận qua Telegram Bot API
-    const replyText = "✅ <b>Letter Approved recorded</b>\n📅 Date: <b>" + dateVal + "</b>\n👤 By: " + sender + "\n🤖 <i>Auto — Refuel Plan System</i>";
+    const replyText = "✅ <b>Letter Approved recorded</b>\n📅 Date: <b>" + dateVal + "</b>";
     UrlFetchApp.fetch("https://api.telegram.org/bot" + PLAN_BOT_TOKEN + "/sendMessage", {
       method: "post",
       contentType: "application/json",
