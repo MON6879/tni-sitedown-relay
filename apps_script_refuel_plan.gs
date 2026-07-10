@@ -80,28 +80,27 @@ function collectMessage(body) {
     const defId     = nextDefId(sheet);
 
     const row = [
-      defId,           // A: DEF  (#00001)
-      "",              // B: No
-      "",              // C: Branch
-      p.date || today, // D: Date
-      p.dgId,          // E: DG ID
-      p.siteId,        // F: Site ID
-      p.team,          // G: Team
-      "",              // H: Township
-      p.rh,            // I: DG RH (hours)
-      p.kwh,           // J: DG KWh (KWh)
-      p.beforeCsu,     // K: Before fuel CSU (L)
-      p.beforeLvl,     // L: Before fuel (%)
-      p.beforeCm,      // M: Before fuel (cm)
-      p.afterCsu,      // N: After fuel CSU (L)
-      p.afterLvl,      // O: After fuel (%)
-      p.afterCm,       // P: After fuel (cm)
-      p.filled,        // Q: Actual Filled Qty (Ltr)
-      p.price,         // R: Partner Price per Liter (MMK)
-      totalVal,        // S: Total Amount (MMK)
-      now,             // T: Timestamp (metadata)
-      sender,          // U: Sender Name (metadata)
-      senderId         // V: Sender ID (metadata)
+      defId,            // A: DEF (#00001)
+      "",               // B: No
+      "",               // C: Branch
+      p.date || today,  // D: Date
+      p.dgId,           // E: DG ID
+      p.siteId,         // F: Site ID
+      p.team,           // G: Team
+      p.rh,             // H: DG Running Hour
+      p.kwh,            // I: DG KWH Hour
+      p.beforeLvl,      // J: Before Fuel Level %
+      p.beforeCsu,      // K: Before CSU Reading(L)
+      p.beforeCm,       // L: Before Fuel Liter/cm (cm reading)
+      p.afterLvl,       // M: After Fuel Level %
+      p.afterCsu,       // N: After CSU Reading(L)
+      p.afterCm,        // O: After Fuel Liter/cm (cm reading)
+      p.filled,         // P: Actual Filled Qty(L)
+      p.price,          // Q: Partner Price per Liter (MMK)
+      totalVal,         // R: Total Amount (MMK)
+      now,              // S: Timestamp (metadata)
+      sender,           // T: Sender Name (metadata)
+      senderId          // U: Sender ID (metadata)
     ];
 
     insertAtTop(sheet, row);
