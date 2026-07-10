@@ -100,9 +100,9 @@ function insertAtTop(sheet, rowData) {
  */
 function updateLettelProgress(senderId, dateStr, category) {
   try {
-    const ss       = SpreadsheetApp.getActiveSpreadsheet();
-    const tmplSheet = ss.getSheetByName("Template");
-    const lpSheet   = ss.getSheetByName("Lettel Progress");
+    const ss        = SpreadsheetApp.getActiveSpreadsheet();
+    const tmplSheet = ss.getSheetByName("Template");       // dùng để lookup col J
+    const lpSheet   = ss.getSheetByName("Lettel Progress"); // đích ghi ngày
     if (!tmplSheet || !lpSheet) return;
 
     const lastRow = tmplSheet.getLastRow();
@@ -110,14 +110,14 @@ function updateLettelProgress(senderId, dateStr, category) {
 
     // Tìm senderId trong Template cột J (cột 10)
     const colJ = tmplSheet.getRange(2, 10, lastRow - 1, 1).getValues();
-    // D=4: Date Letter Submit (PLAN hoặc LETTER_SUBMIT)
-    // F=6: Date Letter Approved (REFUELED hoặc LETTER_APPROVED)
-    const writeCol = (category === "PLAN" || category === "LETTER_SUBMIT") ? 4 : 6;
+    // B=2: Date Letter Submit   (PLAN hoặc LETTER_SUBMIT)
+    // C=3: Date Letter Approved (REFUELED hoặc LETTER_APPROVED)
+    const writeCol = (category === "PLAN" || category === "LETTER_SUBMIT") ? 2 : 3;
 
     for (let i = 0; i < colJ.length; i++) {
       const cellId = String(colJ[i][0]).trim();
       if (cellId === String(senderId).trim()) {
-        const targetRow = i + 2; // row tương ứng trong Lettel Progress
+        const targetRow = i + 2; // cùng row số trong Lettel Progress
         lpSheet.getRange(targetRow, writeCol).setValue(dateStr);
         Logger.log("[LettelProgress] row=" + targetRow + " col=" + writeCol + " = " + dateStr + " (sender=" + senderId + ")");
         break;
