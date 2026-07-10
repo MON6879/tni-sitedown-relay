@@ -1,12 +1,6 @@
-import pandas as pd
-import requests
+import openpyxl
 
-url = "https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/export?format=xlsx"
-resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-with open("scratch/sheet.xlsx", "wb") as f:
-    f.write(resp.content)
-
-xls = pd.ExcelFile("scratch/sheet.xlsx")
-print("Sheet Names:")
-for sheet_name in xls.sheet_names:
-    print(sheet_name)
+wb = openpyxl.load_workbook("scratch/sheet.xlsx", read_only=True)
+print("Sheet names in workbook:")
+for name in wb.sheetnames:
+    print(f"- {name}")

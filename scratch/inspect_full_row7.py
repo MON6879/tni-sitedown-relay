@@ -1,16 +1,8 @@
-import pandas as pd
-import requests
-import io
+import openpyxl
 
-url = "https://docs.google.com/spreadsheets/d/1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow/gviz/tq?tqx=out:csv&gid=0"
-try:
-    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
-    resp.raise_for_status()
-    df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str)
-    
-    cols = [48, 49, 50, 51] # AW, AX, AY, AZ
-    for c in cols:
-        col_letter = chr(65 + c) if c < 26 else chr(65 + (c // 26) - 1) + chr(65 + (c % 26))
-        print(f"Col {col_letter}: '{df.iloc[6, c]}'")
-except Exception as e:
-    print("Error:", e)
+wb = openpyxl.load_workbook("scratch/sheet.xlsx", data_only=True)
+ws = wb["Template"]
+print(f"Template max_row: {ws.max_row}, max_column: {ws.max_column}")
+for r in range(1, 10):
+    row_vals = [ws.cell(row=r, column=c).value for c in range(1, 15)]
+    print(f"Row {r}: {row_vals}")

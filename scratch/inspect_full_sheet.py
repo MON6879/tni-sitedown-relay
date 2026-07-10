@@ -1,17 +1,16 @@
-import pandas as pd
-import requests
-import io
+import openpyxl
 
-url = "https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/gviz/tq?tqx=out:csv&gid=0"
-resp = requests.get(url)
-data = resp.text
+wb = openpyxl.load_workbook("scratch/sheet.xlsx", data_only=True)
 
-df = pd.read_csv(io.StringIO(data), header=None)
-
-with open("scratch/bod_assign_inspect.txt", "w", encoding="utf-8") as f:
-    f.write(f"Total rows: {len(df)}, columns: {df.shape[1]}\n\n")
-    for r_idx in range(min(50, len(df))):
-        f.write(f"Row {r_idx}: ")
-        row_vals = [str(x) for x in df.iloc[r_idx].tolist()]
-        f.write(" | ".join(row_vals))
-        f.write("\n" + "="*80 + "\n")
+for name in wb.sheetnames:
+    ws = wb[name]
+    max_r = ws.max_row
+    print(f"\nTab: {name} (Rows: {max_r})")
+    count = 0
+    for r in range(1, max_r + 1):
+        vals = [ws.cell(row=r, column=c).value for c in range(1, 15)]
+        if any(v is not None for v in vals):
+            count += 1
+            if count <= 5:
+                print(f"  Row {r}: {vals[:10]}")
+    print(f"  Total non-empty rows: {count}")

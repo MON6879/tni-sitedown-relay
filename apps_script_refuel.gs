@@ -63,9 +63,9 @@ function doPost(e) {
  */
 function getRefuelData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Refuel");
+  const sheet = ss.getSheetByName("Refueled");  // fix: renamed from 'Refuel' to 'Refueled'
   if (!sheet) {
-    return json({ status: "error", message: "Sheet 'Refuel' not found" });
+    return json({ status: "error", message: "Sheet 'Refueled' not found" });
   }
   
   const lastRow = sheet.getLastRow();
@@ -139,9 +139,9 @@ function sendRefuelReport() {
   
   // 2. Đọc dữ liệu cột R
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Refuel");
+  const sheet = ss.getSheetByName("Refueled");  // fix: renamed from 'Refuel' to 'Refueled'
   if (!sheet) {
-    Logger.log("❌ Không tìm thấy tab 'Refuel'");
+    Logger.log("❌ Không tìm thấy tab 'Refueled'");
     return;
   }
   

@@ -1,69 +1,93 @@
-import pandas as pd
-import requests
-import io
 import re
 
-url = "https://docs.google.com/spreadsheets/d/1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y/gviz/tq?tqx=out:csv&sheet=Daily+report+and+Bussiness"
+text = """1.Date =8/7/2026
+2. Mytel DG ID  TNI0004(DG2)
+3. DG Type        -YANMAR(30)kva
+4. Power  Mode - DG+Battery
+5. Goverment Price:
+6: Partner price:5500
+7: How many percent increase: %
+8: Reason price higher than Goverment:Currently Taningharyi township region cannot buy fuel from fuel station and Fuel take from Myeik and transport to TNI0004,on the way have many checking gate and have to paid fee those gate for pass with  fuel and price was higher than station price.
+9: Filling fuel: 
+DG Running Hour -35817hrs-mins
+DG KWH Hours-97527KWH
+Actual Filled Qty(L) -843L
+1Liter price=5500MMK
+Fuel Filling Team03
+Following Mr Myeat Ko Ko Aung
+Before
+Fuel Level %-00
+CSU Reading(L) -00
+Fuel Liter/cm        -(1)17L
 
-def extract_tni_codes(text: str) -> set:
-    if not text:
-        return set()
-    return set(code.upper() for code in re.findall(r'TNI\d{3,5}(?:_\d+)?', text, re.IGNORECASE))
+After
+Fuel Level %        -00
+CSU Reading(L)-00
+Fuel Liter/cm        -(49)860L
+Emergency Fuel Fill"""
 
-def get_employee_completed_tni_today_detailed(df_report, target_date: str) -> dict:
-    completed = {}
-    if df_report is None or df_report.empty:
-        return completed
-        
-    date_idx = 2
-    tg_idx = 17
-    for col_idx, col_name in enumerate(df_report.columns):
-        c_lower = col_name.lower().strip()
-        if "daily report" in c_lower and not ":" in c_lower:
-            date_idx = col_idx
-        elif "telegram id" in c_lower:
-            tg_idx = col_idx
+def parse_refueled(txt):
+    def search(pat, default=""):
+        m = re.search(pat, txt, re.IGNORECASE)
+        return m.group(1).strip() if m else default
+
+    date_val = search(r"Date\s*=\s*(\d{1,2}/\d{1,2}/\d{4})")
+    dg_id = search(r"DG\s*ID\s+([^\r\n]+)")
+    site_id = ""
+    if dg_id:
+        sm = re.search(r"TNI\d{4}", dg_id, re.IGNORECASE)
+        if sm:
+            site_id = sm.group(0).upper()
             
-    print(f"Date column: {df_report.columns[date_idx]} (idx: {date_idx})")
-    print(f"Telegram ID column: {df_report.columns[tg_idx]} (idx: {tg_idx})")
-
-    for idx, row in df_report.iterrows():
-        date_cell = str(row.iloc[date_idx]).strip() if not pd.isna(row.iloc[date_idx]) else ""
-        tg_id = str(row.iloc[tg_idx]).strip() if len(row) > tg_idx and not pd.isna(row.iloc[tg_idx]) else ""
+    team_val = search(r"Team\s*(\d+)")
+    if team_val:
+        team_val = f"Team {int(team_val)}"
         
-        if not tg_id or tg_id.lower() in ("nan", "none"): continue
-        if target_date and date_cell and target_date not in date_cell:
-            continue
-            
-        cid = tg_id.replace(".0", "") if tg_id.endswith(".0") else tg_id
-        
-        emp_details = completed.setdefault(cid, {})
-        for col_i in range(date_idx + 1, tg_idx):
-            if col_i >= len(row):
-                continue
-            val = row.iloc[col_i]
-            if pd.isna(val):
-                continue
-            val_str = str(val).strip()
-            codes = extract_tni_codes(val_str)
-            if codes:
-                col_header = df_report.columns[col_i]
-                for code in codes:
-                    emp_details[code] = col_header
-                    
-    return completed
-
-try:
-    resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
-    resp.raise_for_status()
-    df = pd.read_csv(io.StringIO(resp.text), header=0, dtype=str)
+    rh = search(r"Running\s*Hour\s*-?\s*(\d+)")
+    kwh = search(r"KWH\s*Hours?\s*-?\s*(\d+)")
     
-    # Test for July 8, 2026 (target_date = "8/7/2026")
-    results = get_employee_completed_tni_today_detailed(df, "8/7/2026")
-    print("\nDetailed Completed Map:")
-    for cid, detail in results.items():
-        print(f"Telegram ID: {cid}")
-        for code, header in detail.items():
-            print(f"  - {code} -> {header}")
-except Exception as e:
-    print("Error:", e)
+    # Parse Before block
+    before_part = ""
+    bm = re.search(r"Before([\s\S]*?)(?:After|$)", txt, re.IGNORECASE)
+    if bm:
+        before_part = bm.group(1)
+        
+    before_csu = re.search(r"CSU\s*Reading\s*\(L\)\s*-?\s*(\d+)", before_part, re.IGNORECASE)
+    before_csu = before_csu.group(1) if before_csu else ""
+    before_lvl = re.search(r"Level\s*%\s*-?\s*(\d+)", before_part, re.IGNORECASE)
+    before_lvl = before_lvl.group(1) if before_lvl else ""
+    before_cm = re.search(r"Liter/cm[\s\S]*?-\s*\(\d+\)\s*(\d+)\s*[Ll]", before_part, re.IGNORECASE)
+    before_cm = before_cm.group(1) if before_cm else ""
+
+    # Parse After block
+    after_part = ""
+    am = re.search(r"After([\s\S]*?)$", txt, re.IGNORECASE)
+    if am:
+        after_part = am.group(1)
+        
+    after_csu = re.search(r"CSU\s*Reading\s*\(L\)\s*-?\s*(\d+)", after_part, re.IGNORECASE)
+    after_csu = after_csu.group(1) if after_csu else ""
+    after_lvl = re.search(r"Level\s*%\s*-?\s*(\d+)", after_part, re.IGNORECASE)
+    after_lvl = after_lvl.group(1) if after_lvl else ""
+    after_cm = re.search(r"Liter/cm[\s\S]*?-\s*\(\d+\)\s*(\d+)\s*[Ll]", after_part, re.IGNORECASE)
+    after_cm = after_cm.group(1) if after_cm else ""
+
+    filled = search(r"Actual\s*Filled\s*Qty\s*\(L\)\s*-?\s*(\d+)")
+    price = search(r"1Liter\s*price\s*=\s*(\d+)")
+    if not price:
+        price = search(r"Partner\s*price\s*:\s*(\d+)")
+
+    print("Parsed values:")
+    print("  Date:", date_val)
+    print("  DG ID:", dg_id)
+    print("  Site ID:", site_id)
+    print("  Team:", team_val)
+    print("  RH:", rh)
+    print("  KWh:", kwh)
+    print("  Before: CSU:", before_csu, "Lvl%:", before_lvl, "Cm:", before_cm)
+    print("  After: CSU:", after_csu, "Lvl%:", after_lvl, "Cm:", after_cm)
+    print("  Filled Qty:", filled)
+    print("  Price:", price)
+
+if __name__ == "__main__":
+    parse_refueled(text)

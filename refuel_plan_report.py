@@ -84,6 +84,26 @@ def parse_datetime(val) -> datetime | None:
     return None
 
 
+def parse_date_str(val) -> str:
+    """Chuyển đổi giá trị ngày (datetime hoặc string) sang chuỗi dd/MM/YYYY.
+    openpyxl trả về datetime object cho các ô date, nên cần format đúng."""
+    if val is None:
+        return ""
+    if isinstance(val, datetime):
+        return val.strftime("%d/%m/%Y")
+    s = str(val).strip()
+    # Nếu đã đúng format dd/MM/YYYY thì giữ nguyên
+    if len(s) == 10 and s[2] == "/" and s[5] == "/":
+        return s
+    # Thử parse ISO hoặc các format khác rồi reformat
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(s[:len(fmt)], fmt).strftime("%d/%m/%Y")
+        except ValueError:
+            pass
+    return s
+
+
 def fmt_row_freq(col_a: str, col_b: str, col_c: str, col_d: str) -> str:
     """Format dòng tần suất (Site/Name | 3D | 7D | 1M) dạng monospace có gạch dọc '|'."""
     return f"<code>{col_a:<12} | {col_b:>5} | {col_c:>5} | {col_d:>6}</code>"
@@ -162,7 +182,7 @@ class RefuelData:
                 if site:
                     self.records.append({
                         "ts": ts,
-                        "date": str(date_val).strip() if date_val else "",
+                        "date": parse_date_str(date_val),  # fix: dùng parse_date_str thay vì str()
                         "cat": "PLAN",
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
@@ -184,7 +204,7 @@ class RefuelData:
                 if site:
                     self.records.append({
                         "ts": ts,
-                        "date": str(date_val).strip() if date_val else "",
+                        "date": parse_date_str(date_val),  # fix: dùng parse_date_str thay vì str()
                         "cat": "REQUEST",
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
@@ -206,7 +226,7 @@ class RefuelData:
                 if site:
                     self.records.append({
                         "ts": ts,
-                        "date": str(date_val).strip() if date_val else "",
+                        "date": parse_date_str(date_val),  # fix: dùng parse_date_str thay vì str()
                         "cat": "REFUELED",
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
