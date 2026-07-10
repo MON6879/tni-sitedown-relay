@@ -2,7 +2,7 @@
 # api/refuel_collector.py (redeploy trigger)
 ========================
 Vercel webhook handler cho @TNI_FUEL bot.
-Thu thập tin nhắn từ group 9 TNI REQUEST REFUEL (-5469544739 / 6859790680)
+Thu thập tin nhắn từ group 9 TNI REQUEST REFUEL (chat_id: -5469544739)
 Phân loại:
   - Chứa "DG Type"  → REFUELED  (đổ xăng thực tế)
   - Chứa "Plan"     → PLAN      (kế hoạch đổ)
@@ -24,7 +24,7 @@ REFUEL_PLAN_GAS_URL = (
     os.environ.get("REFUEL_PLAN_GAS_URL") or       # Vercel env var name (fallback)
     ""
 ).strip()
-PLAN_GROUP_ID       = "6859790680"   # ID group refuel (dạng số dương)
+PLAN_GROUP_ID       = "5469544739"   # ID group 9 TNI REQUEST REFUEL (dạng số dương, không có dấu -)
 
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 
