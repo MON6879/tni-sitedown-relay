@@ -123,15 +123,16 @@ def process_update(update: dict):
 
     # Gửi reply 2 dòng xác nhận khi ghi thành công
     if result.get("status") == "ok":
+        # LETTER_SUBMIT / LETTER_APPROVED: GAS đã tự reply → Python không reply thêm
+        if category in ("LETTER_SUBMIT", "LETTER_APPROVED"):
+            return
+
         def_id  = result.get("def", "")
         ts      = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
-        # Tên tiêu đề theo đúng tab trong Template sheet
         cat_label = {
             "PLAN": "Plan refuel",
             "REQUEST": "Team request",
             "REFUELED": "Refueled",
-            "LETTER_SUBMIT": "Letter Submit",
-            "LETTER_APPROVED": "Letter Approved",
         }.get(category, category)
         reply_text = (
             f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
