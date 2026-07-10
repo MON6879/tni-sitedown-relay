@@ -13,9 +13,13 @@ const PLAN_CHAT_ID     = "-5469544739";
 // ── Web App Entry Points ───────────────────────────────────────────────────
 
 function doGet(e) {
-  const action = (e && e.parameter && e.parameter.action) || "";
-  if (action === "get_refuel_data") return getRefuelData();
-  return jsonResp({ status: "ok", message: "TNI Refuel GAS running" });
+  try {
+    const action = (e && e.parameter && e.parameter.action) || "";
+    if (action === "get_refuel_data") return getRefuelData();
+    return jsonResp({ status: "ok", message: "TNI Refuel GAS running" });
+  } catch (err) {
+    return jsonResp({ status: "error", message: err.message });
+  }
 }
 
 function doPost(e) {
@@ -392,7 +396,7 @@ function jsonResp(obj) {
 // ── Need Refuel: đọc cột R của sheet Refueled ──────────────────────────────
 
 function getRefuelData() {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const ss    = SpreadsheetApp.openById("1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM");
   const sheet = ss.getSheetByName("Need Refuel");
   if (!sheet) return jsonResp({ status: "error", message: "Sheet 'Need Refuel' not found" });
 
