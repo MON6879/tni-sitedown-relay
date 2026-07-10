@@ -85,23 +85,32 @@ def parse_datetime(val) -> datetime | None:
 
 
 def parse_date_str(val) -> str:
-    """Chuyển đổi giá trị ngày (datetime hoặc string) sang chuỗi dd/MM/YYYY.
-    openpyxl trả về datetime object cho các ô date, nên cần format đúng."""
+    """Chuyển đổi giá trị ngày (datetime hoặc string) sang chuỗi dd/MM/YYYY."""
     if val is None:
         return ""
     if isinstance(val, datetime):
         return val.strftime("%d/%m/%Y")
     s = str(val).strip()
-    # Nếu đã đúng format dd/MM/YYYY thì giữ nguyên
     if len(s) == 10 and s[2] == "/" and s[5] == "/":
         return s
-    # Thử parse ISO hoặc các format khác rồi reformat
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
             return datetime.strptime(s[:len(fmt)], fmt).strftime("%d/%m/%Y")
         except ValueError:
             pass
     return s
+
+
+def safe_int(val) -> int:
+    """Chuyển đổi giá trị số nguyên an toàn — trả 0 nếu không parse được."""
+    if val is None:
+        return 0
+    if isinstance(val, (int, float)):
+        return int(val)
+    try:
+        return int(str(val).strip())
+    except (ValueError, TypeError):
+        return 0
 
 
 def fmt_row_freq(col_a: str, col_b: str, col_c: str, col_d: str) -> str:
@@ -187,7 +196,7 @@ class RefuelData:
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
                         "site": str(site).strip() if site else "",
-                        "qty": int(qty) if qty is not None else 0
+                        "qty": safe_int(qty)
                     })
                     
         # 2. Parse Team request sheet
@@ -209,7 +218,7 @@ class RefuelData:
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
                         "site": str(site).strip() if site else "",
-                        "qty": int(qty) if qty is not None else 0
+                        "qty": safe_int(qty)
                     })
                     
         # 3. Parse Refueled sheet
@@ -231,7 +240,7 @@ class RefuelData:
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
                         "site": str(site).strip() if site else "",
-                        "qty": int(qty) if qty is not None else 0
+                        "qty": safe_int(qty)
                     })
 
 
