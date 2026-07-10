@@ -34,6 +34,12 @@ def classify(text: str) -> str | None:
     t = text.lower()
     if "dg type" in t:
         return "REFUELED"
+    # Letter Submit: "letter" + "submit"/"submitted"
+    if "letter" in t and ("submit" in t or "submitted" in t):
+        return "LETTER_SUBMIT"
+    # Letter Approved: "letter" + "approved"
+    if "letter" in t and "approved" in t:
+        return "LETTER_APPROVED"
     if "plan" in t:
         return "PLAN"
     if "request" in t:
@@ -120,7 +126,13 @@ def process_update(update: dict):
         def_id  = result.get("def", "")
         ts      = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
         # Tên tiêu đề theo đúng tab trong Template sheet
-        cat_label = {"PLAN": "Plan refuel", "REQUEST": "Team request", "REFUELED": "Refueled"}.get(category, category)
+        cat_label = {
+            "PLAN": "Plan refuel",
+            "REQUEST": "Team request",
+            "REFUELED": "Refueled",
+            "LETTER_SUBMIT": "Letter Submit",
+            "LETTER_APPROVED": "Letter Approved",
+        }.get(category, category)
         reply_text = (
             f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
             f"Done 📅 {ts}"
