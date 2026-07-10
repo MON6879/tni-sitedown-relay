@@ -110,7 +110,9 @@ function updateLettelProgress(senderId, dateStr, category) {
 
     // Tìm senderId trong Template cột J (cột 10)
     const colJ = tmplSheet.getRange(2, 10, lastRow - 1, 1).getValues();
-    const writeCol = (category === "PLAN") ? 2 : 3;  // B=2 (Plan), C=3 (Refueled)
+    // B=2: Letter Submit (PLAN hoặc LETTER_SUBMIT)
+    // C=3: Letter Approved (REFUELED hoặc LETTER_APPROVED)
+    const writeCol = (category === "PLAN" || category === "LETTER_SUBMIT") ? 2 : 3;
 
     for (let i = 0; i < colJ.length; i++) {
       const cellId = String(colJ[i][0]).trim();
@@ -255,8 +257,40 @@ function collectMessage(body) {
       insertAtTop(sheet, row);
     });
 
-    Logger.log("[Collect] REQUEST → Team request sheet, " + entries.length + " sites, first DEF=" + firstDefId);
+    Logger.log("[Collect] REQUEST → Team request sheet, " + entries.length + " sites, first DEF=\" + firstDefId);
     return jsonResp({ status: "ok", category: "REQUEST", sites: entries.length, def: firstDefId, time: today + " " + timeStr });
+  }
+
+  // ==================== 4. LETTER SUBMIT ====================
+  // Keywords: "letter submit" hoặc "submitted to the government" hoặc "submit to gov"
+  if (textLower.includes("letter") && (textLower.includes("submit") || textLower.includes("submitted"))) {
+    const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    const dateVal   = dateMatch ? dateMatch[1] : today;
+
+    updateLettelProgress(senderId, dateVal, "LETTER_SUBMIT");
+    Logger.log("[Collect] LETTER_SUBMIT → Lettel Progress col B, date=" + dateVal);
+
+    // Reply vào nhóm xác nhận
+    const replyText = "📋 <b>Letter Submit recorded</b>\n📅 Date: <b>" + dateVal + "</b>\n👤 By: " + sender + "\n🤖 <i>Auto — Refuel Plan System</i>";
+    sendTelegramMsg(replyText, "-" + PLAN_GROUP_ID);
+
+    return jsonResp({ status: "ok", category: "LETTER_SUBMIT", date: dateVal, time: today + " " + timeStr });
+  }
+
+  // ==================== 5. LETTER APPROVED ====================
+  // Keywords: "approved" + "letter"
+  if (textLower.includes("approved") && textLower.includes("letter")) {
+    const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    const dateVal   = dateMatch ? dateMatch[1] : today;
+
+    updateLettelProgress(senderId, dateVal, "LETTER_APPROVED");
+    Logger.log("[Collect] LETTER_APPROVED → Lettel Progress col C, date=" + dateVal);
+
+    // Reply vào nhóm xác nhận
+    const replyText = "✅ <b>Letter Approved recorded</b>\n📅 Date: <b>" + dateVal + "</b>\n👤 By: " + sender + "\n🤖 <i>Auto — Refuel Plan System</i>";
+    sendTelegramMsg(replyText, "-" + PLAN_GROUP_ID);
+
+    return jsonResp({ status: "ok", category: "LETTER_APPROVED", date: dateVal, time: today + " " + timeStr });
   }
 
   return jsonResp({ status: "skip", message: "No matching keyword" });
