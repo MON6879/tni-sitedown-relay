@@ -1,5 +1,6 @@
 // ============================================================
-// SYSTEM: TNI Refuel Plan Collector & Reporter — Updated 10/07/2026
+// SYSTEM: TNI Refuel Plan Collector & Reporter — Updated 10/07/2026 v2
+// BotState: get_msg_id / set_msg_id → xóa tin cũ trước khi gửi mới
 // Spreadsheet: https://docs.google.com/spreadsheets/d/1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM/edit
 // Tabs: Refueled, Plan refuel, Team request, Telegram ID, Template
 // Deploy: New deployment → Web App → Execute as Me → Anyone
