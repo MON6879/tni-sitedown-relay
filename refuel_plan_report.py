@@ -144,22 +144,66 @@ class RefuelData:
                         })
 
     def _parse_records(self, wb):
-        if "PlanRefuel" in wb.sheetnames:
-            ws = wb["PlanRefuel"]
+        # 1. Parse Plan refuel sheet
+        if "Plan refuel" in wb.sheetnames:
+            ws = wb["Plan refuel"]
             for r in range(2, ws.max_row + 1):
-                ts = parse_datetime(ws.cell(row=r, column=1).value)
                 date_val = ws.cell(row=r, column=2).value
-                cat = ws.cell(row=r, column=3).value
-                sender = ws.cell(row=r, column=5).value
-                sender_id = ws.cell(row=r, column=6).value
-                site = ws.cell(row=r, column=7).value
-                qty = ws.cell(row=r, column=8).value
-
-                if ts and cat:
+                site = ws.cell(row=r, column=4).value
+                qty = ws.cell(row=r, column=5).value
+                ts = parse_datetime(ws.cell(row=r, column=6).value) or datetime.now(TZ_MM)
+                sender = ws.cell(row=r, column=7).value
+                sender_id = ws.cell(row=r, column=8).value
+                
+                if site:
                     self.records.append({
                         "ts": ts,
                         "date": str(date_val).strip() if date_val else "",
-                        "cat": str(cat).strip().upper(),
+                        "cat": "PLAN",
+                        "sender": str(sender).strip() if sender else "",
+                        "sender_id": str(sender_id).strip() if sender_id else "",
+                        "site": str(site).strip() if site else "",
+                        "qty": int(qty) if qty is not None else 0
+                    })
+                    
+        # 2. Parse Team request sheet
+        if "Team request" in wb.sheetnames:
+            ws = wb["Team request"]
+            for r in range(2, ws.max_row + 1):
+                date_val = ws.cell(row=r, column=2).value
+                site = ws.cell(row=r, column=5).value
+                qty = ws.cell(row=r, column=6).value
+                ts = parse_datetime(ws.cell(row=r, column=7).value) or datetime.now(TZ_MM)
+                sender = ws.cell(row=r, column=8).value
+                sender_id = ws.cell(row=r, column=9).value
+                
+                if site:
+                    self.records.append({
+                        "ts": ts,
+                        "date": str(date_val).strip() if date_val else "",
+                        "cat": "REQUEST",
+                        "sender": str(sender).strip() if sender else "",
+                        "sender_id": str(sender_id).strip() if sender_id else "",
+                        "site": str(site).strip() if site else "",
+                        "qty": int(qty) if qty is not None else 0
+                    })
+                    
+        # 3. Parse Refueled sheet
+        if "Refueled" in wb.sheetnames:
+            ws = wb["Refueled"]
+            for r in range(2, ws.max_row + 1):
+                date_val = ws.cell(row=r, column=4).value
+                site = ws.cell(row=r, column=6).value
+                qty = ws.cell(row=r, column=17).value
+                ts = parse_datetime(ws.cell(row=r, column=20).value) or datetime.now(TZ_MM)
+                sender = ws.cell(row=r, column=21).value
+                sender_id = ws.cell(row=r, column=22).value
+                
+                if site:
+                    self.records.append({
+                        "ts": ts,
+                        "date": str(date_val).strip() if date_val else "",
+                        "cat": "REFUELED",
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
                         "site": str(site).strip() if site else "",

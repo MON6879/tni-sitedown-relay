@@ -1,44 +1,18 @@
 // ============================================================
 // SYSTEM: TNI Refuel Plan Collector & Reporter
 // Spreadsheet: https://docs.google.com/spreadsheets/d/1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM/edit
-// Tab: PlanRefuel (tự tạo nếu chưa có)
+// Tabs: Refueled, Plan refuel, Team request, Telegram ID, Template
 // Deploy: New deployment → Web App → Execute as Me → Anyone
-// ============================================================
-// Thu thập tin nhắn từ group 9 TNI REQUEST REFUEL (ID: 6859790680)
-// Phân loại:
-//   "DG Type"  → REFUELED  (đã đổ thực tế)
-//   "Plan"     → PLAN      (kế hoạch đổ)
-//   "request"  → REQUEST   (yêu cầu từ trạm)
 // ============================================================
 
 const PLAN_GROUP_ID    = "6859790680";  // Group filter (cả dạng + và -)
-const PLAN_SHEET_NAME  = "PlanRefuel"; // Tab trong spreadsheet
 const PLAN_BOT_TOKEN   = "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME";
 const PLAN_CHAT_ID     = "-5469544739"; // Group 9 TNI REQUEST REFUEL
-
-// Cột trong sheet PlanRefuel (1-indexed):
-// A(1): Timestamp | B(2): Date | C(3): Category | D(4): Group ID
-// E(5): Sender    | F(6): Sender ID | G(7): Site | H(8): Qty (L) | I(9): Raw Message
-
-// ── Authorization ──────────────────────────────────────────────────────────
-function authorizeUrlFetch() {
-  Logger.log("🔐 Kích hoạt cấp quyền...");
-  UrlFetchApp.fetch("https://api.telegram.org");
-  Logger.log("✅ Đã cấp quyền!");
-}
 
 // ── Web App Entry Points ───────────────────────────────────────────────────
 
 function doGet(e) {
-  const action = (e && e.parameter && e.parameter.action) || "";
-  try {
-    if (action === "get_plan_frequency") return getPlanFrequency(e.parameter);
-    if (action === "get_compare_data")   return getCompareData(e.parameter);
-    if (action === "get_msgids")         return handleGetMsgIds(e.parameter || {});
-    return jsonResp({ status: "ok", message: "TNI Refuel Plan GAS v1.0 running" });
-  } catch (err) {
-    return jsonResp({ status: "error", message: err.message });
-  }
+  return jsonResp({ status: "ok", message: "TNI Refuel GAS running" });
 }
 
 function doPost(e) {
@@ -53,28 +27,13 @@ function doPost(e) {
   const action = body.action || "";
   try {
     if (action === "collect_message") return collectMessage(body);
-    if (action === "save_msgids")     return handleSaveMsgIds(body);
     return jsonResp({ status: "error", message: "Unknown action: " + action });
   } catch (err) {
     return jsonResp({ status: "error", message: err.message });
   }
 }
 
-// ── Sheet Setup ────────────────────────────────────────────────────────────
-
-function getOrCreatePlanSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(PLAN_SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(PLAN_SHEET_NAME);
-    const header = [["Timestamp", "Date", "Category", "Group ID", "Sender", "Sender ID", "Site ID", "Qty (L)", "Raw Message"]];
-    sheet.getRange(1, 1, 1, 9).setValues(header).setFontWeight("bold");
-    Logger.log("✅ Tạo sheet mới: " + PLAN_SHEET_NAME);
-  }
-  return sheet;
-}
-
-// ── Message Collection ─────────────────────────────────────────────────────
+// ── Message Collection & Parsing ───────────────────────────────────────────
 
 function collectMessage(body) {
   const groupId = String(body.group_id || "").trim();
@@ -88,54 +47,200 @@ function collectMessage(body) {
   }
   if (!text) return jsonResp({ status: "skip", message: "Empty message" });
 
-  // Phân loại tin nhắn
   const textLower = text.toLowerCase();
-  let category;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const now = new Date();
+  const today = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
+  const timeStr = Utilities.formatDate(now, "Asia/Rangoon", "HH:mm");
+
+  // ==================== 1. REFUELED (DG Type) ====================
   if (textLower.includes("dg type")) {
-    category = "REFUELED";
-  } else if (textLower.includes("plan")) {
-    category = "PLAN";
-  } else if (textLower.includes("request")) {
-    category = "REQUEST";
-  } else {
-    return jsonResp({ status: "skip", message: "No matching keyword" });
+    const sheet = ss.getSheetByName("Refueled");
+    if (!sheet) return jsonResp({ status: "error", message: "Sheet 'Refueled' not found" });
+
+    const p = parseRefueledText(text);
+    
+    // Total amount calculation
+    const filledNum = parseFloat(p.filled) || 0;
+    const priceNum = parseFloat(p.price) || 0;
+    const totalVal = filledNum && priceNum ? filledNum * priceNum : "";
+
+    // 19 columns + 3 metadata
+    const row = [
+      "",        // A: DEF
+      "",        // B: No
+      "",        // C: Branch
+      p.date || today, // D: Date
+      p.dgId,    // E: DG ID
+      p.siteId,  // F: Site ID
+      p.team,    // G: Team
+      "",        // H: Township
+      p.rh,      // I: DG RH (hours)
+      p.kwh,     // J: DG KWh (KWh)
+      p.beforeCsu, // K: Before fuel CSU (L)
+      p.beforeLvl, // L: Before fuel (%)
+      p.beforeCm,  // M: Before fuel (cm)
+      p.afterCsu,  // N: After fuel CSU (L)
+      p.afterLvl,  // O: After fuel (%)
+      p.afterCm,   // P: After fuel (cm)
+      p.filled,    // Q: Actual Filled Qty (Ltr)
+      p.price,     // R: Partner Price per Liter (MMK)
+      totalVal,    // S: Total Amount (MMK)
+      now,         // T: Timestamp (metadata)
+      sender,      // U: Sender Name (metadata)
+      senderId     // V: Sender ID (metadata)
+    ];
+
+    sheet.appendRow(row);
+    Logger.log("[Collect] REFUELED written to Refueled sheet");
+    return jsonResp({ status: "ok", category: "REFUELED", site: p.siteId, qty: p.filled });
   }
 
-  // Parse site IDs và số lượng xăng
-  const entries = parseSitesAndQty(text);
-  if (entries.length === 0) {
-    // Lưu 1 dòng không có site nếu không parse được
-    entries.push({ site: "", qty: 0 });
+  // ==================== 2. PLAN ====================
+  if (textLower.includes("plan")) {
+    const sheet = ss.getSheetByName("Plan refuel");
+    if (!sheet) return jsonResp({ status: "error", message: "Sheet 'Plan refuel' not found" });
+
+    const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    const dateVal = dateMatch ? dateMatch[1] : today;
+    const teamMatch = text.match(/Team\s*(\d+)/i);
+    const teamVal = teamMatch ? "Team " + parseInt(teamMatch[1], 10) : "";
+
+    const entries = parseSitesAndQty(text);
+    if (entries.length === 0) return jsonResp({ status: "skip", message: "No sites parsed in Plan" });
+
+    const rows = entries.map(function(en) {
+      return [
+        "",       // A: DEF
+        dateVal,  // B: Date Plan
+        teamVal,  // C: Name Team Plan
+        en.site,  // D: Name Site
+        en.qty,   // E: Plan will refuel
+        now,      // F: Timestamp (metadata)
+        sender,   // G: Sender Name (metadata)
+        senderId  // H: Sender ID (metadata)
+      ];
+    });
+
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 8).setValues(rows);
+    Logger.log("[Collect] PLAN written to Plan refuel sheet");
+    return jsonResp({ status: "ok", category: "PLAN", sites: entries.length });
   }
 
-  const sheet   = getOrCreatePlanSheet();
-  const now     = new Date();
-  const today   = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
-  const rawText = text.length > 500 ? text.substring(0, 497) + "..." : text;
+  // ==================== 3. REQUEST ====================
+  if (textLower.includes("request")) {
+    const sheet = ss.getSheetByName("Team request");
+    if (!sheet) return jsonResp({ status: "error", message: "Sheet 'Team request' not found" });
 
-  // Ghi mỗi site thành 1 dòng
-  const rows = entries.map(function(en) {
-    return [now, today, category, groupId, sender, senderId, en.site, en.qty, rawText];
-  });
-  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 9).setValues(rows);
+    const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    const dateVal = dateMatch ? dateMatch[1] : today;
+    const teamMatch = text.match(/Team\s*(\d+)/i);
+    const teamVal = teamMatch ? "Team " + parseInt(teamMatch[1], 10) : "";
 
-  Logger.log("[Collect] " + category + " | " + entries.length + " sites | sender: " + sender);
-  return jsonResp({ status: "ok", category: category, sites: entries.length, rows_added: rows.length });
+    const entries = parseSitesAndQty(text);
+    if (entries.length === 0) return jsonResp({ status: "skip", message: "No sites parsed in Request" });
+
+    const rows = entries.map(function(en) {
+      return [
+        "",       // A: DEF
+        dateVal,  // B: Date sent request
+        timeStr,  // C: Time
+        teamVal,  // D: Name Team
+        en.site,  // E: Name Site
+        en.qty,   // F: Order litter
+        now,      // G: Timestamp (metadata)
+        sender,   // H: Sender Name (metadata)
+        senderId  // I: Sender ID (metadata)
+      ];
+    });
+
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 9).setValues(rows);
+    Logger.log("[Collect] REQUEST written to Team request sheet");
+    return jsonResp({ status: "ok", category: "REQUEST", sites: entries.length });
+  }
+
+  return jsonResp({ status: "skip", message: "No matching keyword" });
 }
 
-// ── Parse Site IDs + Quantities ────────────────────────────────────────────
+// ── Text Parsers ───────────────────────────────────────────────────────────
+
+function parseRefueledText(text) {
+  function search(pat, defaultVal) {
+    const m = text.match(pat);
+    return m ? m[1].trim() : (defaultVal || "");
+  }
+
+  const dateVal = search(/Date\s*=\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+  const dgId = search(/DG\s*ID\s+([^\r\n]+)/i);
+  let siteId = "";
+  if (dgId) {
+    const sm = dgId.match(/TNI\d{4}/i);
+    if (sm) siteId = sm[0].toUpperCase();
+  }
+
+  let teamVal = search(/Team\s*(\d+)/i);
+  if (teamVal) teamVal = "Team " + parseInt(teamVal, 10);
+
+  const rh = search(/Running\s*Hour\s*-?\s*(\d+)/i);
+  const kwh = search(/KWH\s*Hours?\s*-?\s*(\d+)/i);
+
+  // Parse Before block
+  let beforePart = "";
+  const bm = text.match(/Before([\s\S]*?)(?:After|$)/i);
+  if (bm) beforePart = bm[1];
+
+  let beforeCsu = beforePart.match(/CSU\s*Reading\s*\(L\)\s*-?\s*(\d+)/i);
+  beforeCsu = beforeCsu ? beforeCsu[1] : "";
+  let beforeLvl = beforePart.match(/Level\s*%\s*-?\s*(\d+)/i);
+  beforeLvl = beforeLvl ? beforeLvl[1] : "";
+  let beforeCm = beforePart.match(/Liter\/cm[\s\S]*?-\s*\(\d+\)\s*(\d+)\s*[Ll]/i);
+  beforeCm = beforeCm ? beforeCm[1] : "";
+
+  // Parse After block
+  let afterPart = "";
+  const am = text.match(/After([\s\S]*?)$/i);
+  if (am) afterPart = am[1];
+
+  let afterCsu = afterPart.match(/CSU\s*Reading\s*\(L\)\s*-?\s*(\d+)/i);
+  afterCsu = afterCsu ? afterCsu[1] : "";
+  let afterLvl = afterPart.match(/Level\s*%\s*-?\s*(\d+)/i);
+  afterLvl = afterLvl ? afterLvl[1] : "";
+  let afterCm = afterPart.match(/Liter\/cm[\s\S]*?-\s*\(\d+\)\s*(\d+)\s*[Ll]/i);
+  afterCm = afterCm ? afterCm[1] : "";
+
+  const filled = search(/Actual\s*Filled\s*Qty\s*\(L\)\s*-?\s*(\d+)/i);
+  let price = search(/1Liter\s*price\s*=\s*(\d+)/i);
+  if (!price) price = search(/Partner\s*price\s*:\s*(\d+)/i);
+
+  return {
+    date: dateVal,
+    dgId: dgId,
+    siteId: siteId,
+    team: teamVal,
+    rh: rh,
+    kwh: kwh,
+    beforeCsu: beforeCsu,
+    beforeLvl: beforeLvl,
+    beforeCm: beforeCm,
+    afterCsu: afterCsu,
+    afterLvl: afterLvl,
+    afterCm: afterCm,
+    filled: filled,
+    price: price
+  };
+}
 
 function parseSitesAndQty(text) {
   const results = [];
   // Pattern 1: TNI0061: 440L hoặc TNI0061 440L hoặc TNI0061(DG2): 440L
-  const pat1 = /TNI(\d{4})(?:\([^)]*\))?[\s:]+(\d+)\s*[Ll]/g;
+  const pat1 = /TNI(\d{4})(?:\([^)]*\))?[\s:]+(\d+)\s*[Ll]/gi;
   let m;
   while ((m = pat1.exec(text)) !== null) {
     results.push({ site: "TNI" + m[1], qty: parseInt(m[2], 10) });
   }
   // Pattern 2 fallback: TNI0061 440 (không có chữ L)
   if (results.length === 0) {
-    const pat2 = /TNI(\d{4})(?:\([^)]*\))?\s+(\d+)/g;
+    const pat2 = /TNI(\d{4})(?:\([^)]*\))?\s+(\d+)/gi;
     while ((m = pat2.exec(text)) !== null) {
       results.push({ site: "TNI" + m[1], qty: parseInt(m[2], 10) });
     }
@@ -143,93 +248,10 @@ function parseSitesAndQty(text) {
   // Dedup theo site (lấy qty lớn nhất nếu trùng)
   const seen = {};
   results.forEach(function(r) {
-    if (!seen[r.site] || r.qty > seen[r.site]) seen[r.site] = r.qty;
+    const sUpper = r.site.toUpperCase();
+    if (!seen[sUpper] || r.qty > seen[sUpper]) seen[sUpper] = r.qty;
   });
   return Object.keys(seen).sort().map(function(s) { return { site: s, qty: seen[s] }; });
-}
-
-// ── Report 1: Plan Frequency (3day / 7day / 1month) ───────────────────────
-
-function getPlanFrequency(params) {
-  const sheet   = getOrCreatePlanSheet();
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return jsonResp({ status: "ok", data: [] });
-
-  const data = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
-  const now  = new Date();
-  const ms3d  = 3  * 86400000;
-  const ms7d  = 7  * 86400000;
-  const ms30d = 30 * 86400000;
-
-  const freq = {}; // site → { d3, d7, d30 }
-
-  for (let i = 0; i < data.length; i++) {
-    const ts   = new Date(data[i][0]);
-    const cat  = data[i][2];
-    const site = data[i][6]; // Col G
-    if (cat !== "PLAN" || !site) continue;
-
-    const diff = now.getTime() - ts.getTime();
-    if (!freq[site]) freq[site] = { d3: 0, d7: 0, d30: 0 };
-    if (diff <= ms3d)  freq[site].d3++;
-    if (diff <= ms7d)  freq[site].d7++;
-    if (diff <= ms30d) freq[site].d30++;
-  }
-
-  const result = Object.keys(freq).sort().map(function(site) {
-    return { site: site, d3: freq[site].d3, d7: freq[site].d7, d30: freq[site].d30 };
-  });
-  return jsonResp({ status: "ok", data: result });
-}
-
-// ── Report 2 & 3: Compare Today Plan vs Refueled vs Request ───────────────
-
-function getCompareData(params) {
-  const sheet   = getOrCreatePlanSheet();
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return jsonResp({ status: "ok", plan: {}, refueled: {}, request: {}, date: "" });
-
-  const data  = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
-  const now   = new Date();
-  const today = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
-
-  const plan = {}, refueled = {}, request = {};
-
-  for (let i = 0; i < data.length; i++) {
-    const dateVal = data[i][1];
-    const cat     = data[i][2];
-    const site    = data[i][6]; // Col G
-    const qty     = parseInt(data[i][7], 10) || 0; // Col H
-    if (!site || dateVal !== today) continue;
-
-    if (cat === "PLAN")     plan[site]     = (plan[site]     || 0) + qty;
-    if (cat === "REFUELED") refueled[site] = (refueled[site] || 0) + qty;
-    if (cat === "REQUEST")  request[site]  = (request[site]  || 0) + qty;
-  }
-
-  return jsonResp({ status: "ok", plan: plan, refueled: refueled, request: request, date: today });
-}
-
-// ── Message ID Helpers (xóa báo cáo cũ) ───────────────────────────────────
-
-function handleGetMsgIds(params) {
-  const key = (params && params.key) ? params.key.toString().trim() : "";
-  if (!key) return jsonResp({ status: "error", message: "Missing key" });
-  const props = PropertiesService.getScriptProperties();
-  const raw   = props.getProperty("PLAN_MSGID_" + key) || "[]";
-  try {
-    return jsonResp({ status: "ok", key: key, msgids: JSON.parse(raw) });
-  } catch (_) {
-    return jsonResp({ status: "ok", key: key, msgids: [] });
-  }
-}
-
-function handleSaveMsgIds(body) {
-  const key    = (body && body.key)    ? body.key.toString().trim() : "";
-  const msgids = (body && body.msgids) ? body.msgids : [];
-  if (!key) return jsonResp({ status: "error", message: "Missing key" });
-  PropertiesService.getScriptProperties().setProperty("PLAN_MSGID_" + key, JSON.stringify(msgids));
-  return jsonResp({ status: "ok", key: key, count: msgids.length });
 }
 
 // ── JSON Helper ────────────────────────────────────────────────────────────
