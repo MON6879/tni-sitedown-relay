@@ -86,16 +86,6 @@ def process_update(update: dict):
     if not text:
         return
 
-    # DEBUG: log và gửi chat_id thực tế về group để xác nhận
-    if text:
-        logger.warning(f"[DEBUG] Incoming chat_id={chat_id} PLAN_GROUP_ID={PLAN_GROUP_ID} text={text[:40]}")
-        # Tạm gửi debug vào group refuel để xem chat_id thực tế
-        requests.post(
-            f"https://api.telegram.org/bot{REFUEL_BOT_TOKEN}/sendMessage",
-            json={"chat_id": "-5469544739", "text": f"🔍 DEBUG\nchat_id={chat_id}\nfilter={PLAN_GROUP_ID}\nmatch={chat_id==PLAN_GROUP_ID}\ntext={text[:30]}"},
-            timeout=8
-        )
-
     # Chỉ xử lý tin từ group refuel
     if chat_id != PLAN_GROUP_ID:
         logger.info(f"Skip chat_id={chat_id}")
@@ -123,13 +113,7 @@ def process_update(update: dict):
         "sender_id": sender_id,
         "date":     now.strftime("%d/%m/%Y %H:%M"),
     })
-    logger.info(f"[{category}] GAS={result.get('status')} | {result}")
-    # DEBUG: gửi GAS result vào group để xem lỗi
-    requests.post(
-        f"https://api.telegram.org/bot{REFUEL_BOT_TOKEN}/sendMessage",
-        json={"chat_id": "-5469544739", "text": f"⚙️ GAS result:\n{str(result)[:150]}"},
-        timeout=8
-    )
+    logger.info(f"[{category}] sender={sender} | GAS={result.get('status')} def={result.get('def','')}")
 
     # Gửi reply 2 dòng xác nhận khi ghi thành công
     if result.get("status") == "ok":
