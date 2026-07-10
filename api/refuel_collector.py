@@ -148,16 +148,7 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        import json as _json
-        debug = {
-            "status": "ok",
-            "service": "TNI Refuel Collector",
-            "group_id_filter": PLAN_GROUP_ID,
-            "gas_url_set": bool(REFUEL_PLAN_GAS_URL),
-            "gas_url_prefix": REFUEL_PLAN_GAS_URL[:30] if REFUEL_PLAN_GAS_URL else "(not set)",
-            "bot_token_prefix": REFUEL_BOT_TOKEN[:10] if REFUEL_BOT_TOKEN else "(not set)",
-        }
-        self.wfile.write(_json.dumps(debug).encode())
+        self.wfile.write(json.dumps({"status": "ok", "service": "TNI Refuel Collector"}).encode())
 
     def log_message(self, fmt, *args):
         logger.info(fmt % args)
