@@ -247,24 +247,29 @@ class RefuelData:
 # ── Reports implementation ──────────────────────────────────────────────────
 
 def report_1(data: RefuelData):
-    print("📊 Generating Report 1 — Plan Frequency...")
+    print("📊 Generating Report 1 — Plan Frequency by Person...")
     now = datetime.now(TZ_MM)
-    freq = {}
 
+    # Map Telegram ID → tên từ Template col H
+    id_to_name = {m["id"]: m["name"] for m in data.target_members}
+
+    freq = {}   # key = display_name
     for r in data.records:
-        if r["cat"] != "PLAN" or not r["site"]:
+        if r["cat"] != "PLAN":
             continue
         diff = now - r["ts"]
-        site = r["site"]
+        sid  = r["sender_id"]
+        # Ưu tiên tên từ Template col H, fallback → tên Telegram, fallback → ID
+        name = id_to_name.get(sid) or r["sender"] or sid or "Unknown"
 
-        if site not in freq:
-            freq[site] = {"d3": 0, "d7": 0, "d30": 0}
+        if name not in freq:
+            freq[name] = {"d3": 0, "d7": 0, "d30": 0}
         if diff <= timedelta(days=3):
-            freq[site]["d3"] += 1
+            freq[name]["d3"] += 1
         if diff <= timedelta(days=7):
-            freq[site]["d7"] += 1
+            freq[name]["d7"] += 1
         if diff <= timedelta(days=30):
-            freq[site]["d30"] += 1
+            freq[name]["d30"] += 1
 
     if not freq:
         tg_send("📊 <b>Report 1 — Plan Frequency</b>\n📭 No plan records found.", "report1")
@@ -273,17 +278,20 @@ def report_1(data: RefuelData):
     lines = [
         f"📊 <b>PLAN SUBMISSION FREQUENCY</b>",
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
-        fmt_row_freq("Site ID", "3Days", "7Days", "1Month"),
-        "<code>" + "─────────────┼───────┼───────┼────────" + "</code>"
+        f"<code>{'Name':<14} | {'3Days':>5} | {'7Days':>5} | {'1Month':>6}</code>",
+        "<code>" + "───────────────┼───────┼───────┼────────" + "</code>"
     ]
-    for site in sorted(freq.keys()):
-        f = freq[site]
-        lines.append(fmt_row_freq(site, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x"))
+    for name in sorted(freq.keys()):
+        f = freq[name]
+        # Rút ngắn tên nếu quá dài
+        short = name[:14]
+        lines.append(f"<code>{short:<14} | {f['d3']:>4}x | {f['d7']:>4}x | {f['d30']:>5}x</code>")
 
-    lines.append("<code>" + "─────────────┴───────┴───────┴────────" + "</code>")
+    lines.append("<code>" + "───────────────┴───────┴───────┴────────" + "</code>")
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
     tg_send("\n".join(lines), "report1")
     print("✅ Report 1 sent.")
+
 
 
 def report_2(data: RefuelData):
