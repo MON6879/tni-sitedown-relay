@@ -110,9 +110,9 @@ function updateLettelProgress(senderId, dateStr, category) {
 
     // Tìm senderId trong Template cột J (cột 10)
     const colJ = tmplSheet.getRange(2, 10, lastRow - 1, 1).getValues();
-    // B=2: Letter Submit (PLAN hoặc LETTER_SUBMIT)
-    // C=3: Letter Approved (REFUELED hoặc LETTER_APPROVED)
-    const writeCol = (category === "PLAN" || category === "LETTER_SUBMIT") ? 2 : 3;
+    // D=4: Date Letter Submit (PLAN hoặc LETTER_SUBMIT)
+    // F=6: Date Letter Approved (REFUELED hoặc LETTER_APPROVED)
+    const writeCol = (category === "PLAN" || category === "LETTER_SUBMIT") ? 4 : 6;
 
     for (let i = 0; i < colJ.length; i++) {
       const cellId = String(colJ[i][0]).trim();
