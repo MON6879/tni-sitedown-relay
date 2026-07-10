@@ -86,10 +86,19 @@ def post_sheet(payload: dict, timeout: int = 15):
         resp = requests.post(APPS_SCRIPT_URL, json=payload, timeout=timeout)
         resp.raise_for_status()
         logger.info(f"Apps Script response: {resp.text[:300]}")
-        return resp.json()
+        # Handle empty response body (GAS timeout / redirect trả về HTML rỗng)
+        if not resp.text or not resp.text.strip():
+            logger.error("Apps Script returned empty response")
+            return {"status": "error", "message": "Apps Script returned empty response (possible timeout or session expired)"}
+        try:
+            return resp.json()
+        except ValueError as je:
+            logger.error(f"Apps Script non-JSON response: {resp.text[:200]}")
+            return {"status": "error", "message": f"Invalid response from Apps Script: {resp.text[:100]}"}
     except Exception as e:
         logger.error(f"Apps Script POST error: {e}")
         return {"status": "error", "message": str(e)}
+
 
 
 # ── Send data to Cable Google Sheet via Apps Script ───────────────────────
