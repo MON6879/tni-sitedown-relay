@@ -127,9 +127,10 @@ def fmt_row_compare(col_a: str, col_b: str, col_c: str, col_d: str) -> str:
 
 class RefuelData:
     def __init__(self):
-        self.members = []          # list of dict: {id, name}
+        self.members = []          # list of dict: {id, name} — từ sheet "Telegram ID"
         self.not_joined = []       # list of str (names)
-        self.target_members = []   # list of dict: {id, name} (từ sheet Template cột G & H)
+        self.target_members = []   # list of dict: {id, name} — từ Template col G & H
+        self.lettel_persons = []   # list of dict: {id, name} — từ "Lettel Progress" col J & K
         self.records = []          # list of dict: {ts, date, cat, sender, sender_id, site, qty}
 
         if not os.path.exists(XLSX_FILE_PATH):
@@ -140,6 +141,7 @@ class RefuelData:
             wb = openpyxl.load_workbook(XLSX_FILE_PATH, data_only=True)
             self._parse_members(wb)
             self._parse_targets(wb)
+            self._parse_lettel(wb)
             self._parse_records(wb)
         except Exception as e:
             print(f"❌ Error loading Excel data: {e}", file=sys.stderr)
@@ -175,6 +177,21 @@ class RefuelData:
                             "id": val_str,
                             "name": str(name).strip() if name else f"ID:{val_str[-6:]}"
                         })
+
+    def _parse_lettel(self, wb):
+        """Đọc Lettel Progress: col J = Telegram ID, col K = Tên."""
+        if "Lettel Progress" not in wb.sheetnames:
+            return
+        ws = wb["Lettel Progress"]
+        for r in range(2, ws.max_row + 1):
+            tg_id = ws.cell(row=r, column=10).value   # J
+            name  = ws.cell(row=r, column=11).value   # K
+            if not tg_id and not name:
+                continue
+            tg_id_str = str(tg_id).strip() if tg_id is not None else ""
+            name_str  = str(name).strip()  if name  is not None else ""
+            if tg_id_str.isdigit() and len(tg_id_str) > 5 and name_str:
+                self.lettel_persons.append({"id": tg_id_str, "name": name_str})
 
     def _parse_records(self, wb):
         # 1. Parse Plan refuel sheet
@@ -250,8 +267,10 @@ def report_1(data: RefuelData):
     print("📊 Generating Report 1 — Plan Frequency by Person...")
     now = datetime.now(TZ_MM)
 
-    # Map Telegram ID → tên từ Template col H
-    id_to_name = {m["id"]: m["name"] for m in data.target_members}
+    # Ưu tiên Lettel Progress col J&K, fallback Template col G&H, fallback Telegram name
+    id_to_name = {m["id"]: m["name"] for m in data.lettel_persons}
+    if not id_to_name:
+        id_to_name = {m["id"]: m["name"] for m in data.target_members}
 
     freq = {}   # key = display_name
     for r in data.records:
@@ -259,17 +278,13 @@ def report_1(data: RefuelData):
             continue
         diff = now - r["ts"]
         sid  = r["sender_id"]
-        # Ưu tiên tên từ Template col H, fallback → tên Telegram, fallback → ID
         name = id_to_name.get(sid) or r["sender"] or sid or "Unknown"
 
         if name not in freq:
             freq[name] = {"d3": 0, "d7": 0, "d30": 0}
-        if diff <= timedelta(days=3):
-            freq[name]["d3"] += 1
-        if diff <= timedelta(days=7):
-            freq[name]["d7"] += 1
-        if diff <= timedelta(days=30):
-            freq[name]["d30"] += 1
+        if diff <= timedelta(days=3):  freq[name]["d3"] += 1
+        if diff <= timedelta(days=7):  freq[name]["d7"] += 1
+        if diff <= timedelta(days=30): freq[name]["d30"] += 1
 
     if not freq:
         tg_send("📊 <b>Report 1 — Plan Frequency</b>\n📭 No plan records found.", "report1")
@@ -278,16 +293,15 @@ def report_1(data: RefuelData):
     lines = [
         f"📊 <b>PLAN SUBMISSION FREQUENCY</b>",
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
-        f"<code>{'Name':<14} | {'3Days':>5} | {'7Days':>5} | {'1Month':>6}</code>",
-        "<code>" + "───────────────┼───────┼───────┼────────" + "</code>"
+        f"<code>{'No':<3} {'Name':<13} | {'3D':>4} | {'7D':>4} | {'1M':>5}</code>",
+        "<code>" + "────┬──────────────┼──────┼──────┼───────" + "</code>"
     ]
-    for name in sorted(freq.keys()):
+    for i, name in enumerate(sorted(freq.keys()), 1):
         f = freq[name]
-        # Rút ngắn tên nếu quá dài
-        short = name[:14]
-        lines.append(f"<code>{short:<14} | {f['d3']:>4}x | {f['d7']:>4}x | {f['d30']:>5}x</code>")
+        short = name[:13]
+        lines.append(f"<code>{i:<3} {short:<13} | {f['d3']:>3}x | {f['d7']:>3}x | {f['d30']:>4}x</code>")
 
-    lines.append("<code>" + "───────────────┴───────┴───────┴────────" + "</code>")
+    lines.append("<code>" + "────┴──────────────┴──────┴──────┴───────" + "</code>")
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
     tg_send("\n".join(lines), "report1")
     print("✅ Report 1 sent.")
@@ -324,26 +338,22 @@ def report_2(data: RefuelData):
 
     ok_count = warn_count = miss_count = 0
 
-    for site in all_sites:
+    for i, site in enumerate(all_sites, 1):
         p = plan.get(site, 0)
         f = refueled.get(site, 0)
         diff = f - p
         diff_str = f"+{diff}L" if diff > 0 else f"{diff}L"
 
         if f == 0 and p > 0:
-            icon = "❌"
-            miss_count += 1
+            icon = "❌"; miss_count += 1
         elif diff == 0:
-            icon = "✅"
-            ok_count += 1
+            icon = "✅"; ok_count += 1
         elif abs(diff) <= 50:
-            icon = "⚠️"
-            warn_count += 1
+            icon = "⚠️"; warn_count += 1
         else:
-            icon = "❌"
-            miss_count += 1
+            icon = "❌"; miss_count += 1
 
-        lines.append(f"{icon} {fmt_row_compare(site, f'{p}L', f'{f}L', diff_str)}")
+        lines.append(f"{i}. {icon} {fmt_row_compare(site, f'{p}L', f'{f}L', diff_str)}")
 
     lines += [
         "<code>" + "─────────────┴───────┴────────┴────────" + "</code>",
@@ -378,12 +388,11 @@ def report_3(data: RefuelData):
     match_rows = []
     diff_rows = []
 
-    for site in all_sites:
+    for i, site in enumerate(all_sites, 1):
         p = plan.get(site, 0)
         q = request.get(site, 0)
         diff = p - q
-
-        row_str = fmt_row_compare(site, f"{q}L", f"{p}L", "=" if diff == 0 else f"{diff}L")
+        row_str = f"{i}. {fmt_row_compare(site, f'{q}L', f'{p}L', '=' if diff == 0 else f'{diff}L')}"
         if diff == 0:
             match_rows.append(row_str)
         else:
@@ -446,11 +455,11 @@ def report_4(data: RefuelData):
         "<code>" + "─────────────┼───────┼───────┼────────" + "</code>"
     ]
 
-    # Hiển thị từng thành viên đã tham gia nhóm (có ID)
-    for m in data.members:
+    # Hiển thị từng thành viên đã tham gia nhóm (có ID) — có số thứ tự
+    for i, m in enumerate(data.members, 1):
         f = freq.get(m["id"], {"d3": 0, "d7": 0, "d30": 0})
         short_name = m["name"][:12]
-        lines.append(fmt_row_freq(short_name, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x"))
+        lines.append(f"<code>{i:<3}</code> {fmt_row_freq(short_name, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x")}")
 
     lines.append("<code>" + "─────────────┴───────┴───────┴────────" + "</code>")
 
@@ -493,30 +502,29 @@ def report_5(data: RefuelData):
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
     ]
 
-    # Kiểm tra xem danh sách đích có rỗng không
-    if not data.target_members:
-        lines.append("\n⚠️ <b>No partner targets configured in Template sheet Column G & H!</b>")
-        lines.append("<i>Please add partner Telegram IDs to Col G and Names to Col H in the Template tab.</i>")
+    # Fallback: dùng lettel_persons nếu target_members rỗng
+    targets = data.target_members or data.lettel_persons
+
+    if not targets:
+        lines.append("\n⚠️ <b>No partner targets in Template col G&H or Lettel Progress col J&K!</b>")
         lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
         tg_send("\n".join(lines), "report5")
         print("⚠️ Report 5 sent (warning: empty targets).")
         return
 
-    targets = data.target_members
-
     lines += [
-        fmt_row_freq("Name/ID", "3Days", "7Days", "1Month"),
-        "<code>" + "─────────────┼───────┼───────┼────────" + "</code>"
+        f"<code>{'No':<3} {'Name':<12} | {'3D':>4} | {'7D':>4} | {'1M':>5}</code>",
+        "<code>" + "────┬─────────────┼──────┼──────┼───────" + "</code>"
     ]
 
-    for t in targets:
+    for i, t in enumerate(targets, 1):
         name = t["name"]
         tid = t["id"]
         f = freq.get(tid, {"d3": 0, "d7": 0, "d30": 0})
         short_name = name[:12]
-        lines.append(fmt_row_freq(short_name, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x"))
+        lines.append(f"<code>{i:<3} {short_name:<12} | {f['d3']:>3}x | {f['d7']:>3}x | {f['d30']:>4}x</code>")
 
-    lines.append("<code>" + "─────────────┴───────┴───────┴────────" + "</code>")
+    lines.append("<code>" + "────┴─────────────┴──────┴──────┴───────" + "</code>")
 
     # Thêm nhắc nhở keyword để đối tác/nhân viên nhớ cách gửi đúng format
     lines += [
