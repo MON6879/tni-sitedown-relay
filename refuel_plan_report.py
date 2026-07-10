@@ -390,14 +390,14 @@ def report_3(data: RefuelData):
     now = datetime.now(TZ_MM)
     today_str = now.strftime("%d/%m/%Y")
 
-    plan = {}
+    plan    = {}
     request = {}
 
     for r in data.records:
         if r["date"] != today_str or not r["site"]:
             continue
         if r["cat"] == "PLAN":
-            plan[r["site"]] = plan.get(r["site"], 0) + r["qty"]
+            plan[r["site"]]    = plan.get(r["site"], 0)    + r["qty"]
         elif r["cat"] == "REQUEST":
             request[r["site"]] = request.get(r["site"], 0) + r["qty"]
 
@@ -406,47 +406,41 @@ def report_3(data: RefuelData):
         tg_send(f"🔄 <b>[Report 3] Plan vs Request</b>\n📅 {today_str}\n📭 No records today.", "report3")
         return
 
-    match_rows = []
-    diff_rows = []
+    green_count = yellow_count = gray_count = 0
 
+    rows = []
     for i, site in enumerate(all_sites, 1):
         p = plan.get(site, 0)
         q = request.get(site, 0)
         diff = p - q
-        row_str = f"{i}. {fmt_row_compare(site, f'{q}L', f'{p}L', '=' if diff == 0 else f'{diff}L')}"
-        if diff == 0:
-            match_rows.append(row_str)
-        else:
-            diff_rows.append(row_str)
 
-    lines = [
-        f"🔄 <b>[Report 3] PLAN vs TEAM REQUEST — {today_str}</b>",
-        f"⏰ {now.strftime('%H:%M')} Myanmar",
-    ]
+        if p > 0 and q > 0 and diff == 0:
+            icon = "🟢"; green_count  += 1   # Trùng tên + trùng số lít
+        elif p > 0 and q > 0 and diff != 0:
+            icon = "🟡"; yellow_count += 1   # Trùng tên + khác số lít
+        else:
+            icon = "⚫"; gray_count   += 1   # Chỉ có 1 bên (plan only hoặc request only)
+
+        diff_str = "=" if diff == 0 else f"{diff:+d}L"
+        rows.append(f"{icon} {fmt_row_compare(site, f'{q}L', f'{p}L', diff_str)}")
 
     header_bar = "<code>" + "─────────────┼───────┼────────┼────────" + "</code>"
     footer_bar = "<code>" + "─────────────┴───────┴────────┴────────" + "</code>"
 
-    if match_rows:
-        lines += [
-            "\n✅ <b>MATCH (same quantity)</b>",
-            fmt_row_compare("Site ID", "Request", "Plan", "Diff"),
-            header_bar
-        ] + match_rows + [footer_bar]
-
-    if diff_rows:
-        lines += [
-            "\n⚠️ <b>DIFF (different quantity)</b>",
-            fmt_row_compare("Site ID", "Request", "Plan", "Diff"),
-            header_bar
-        ] + diff_rows + [footer_bar]
-
-    lines += [
-        f"\n📊 Match: <b>{len(match_rows)}</b>  Diff: <b>{len(diff_rows)}</b>",
+    lines = [
+        f"🔄 <b>[Report 3] PLAN vs TEAM REQUEST — {today_str}</b>",
+        f"⏰ {now.strftime('%H:%M')} Myanmar",
+        f"\n🟢 Match  🟡 Diff qty  ⚫ Plan≠Req",
+        fmt_row_compare("Site ID", "Request", "Plan", "Diff"),
+        header_bar,
+    ] + rows + [
+        footer_bar,
+        f"\n🟢 Match: <b>{green_count}</b>  🟡 Diff: <b>{yellow_count}</b>  ⚫ Solo: <b>{gray_count}</b>",
         "\n🤖 <i>Auto report — Refuel Plan System</i>"
     ]
     tg_send("\n".join(lines), "report3")
     print("✅ Report 3 sent.")
+
 
 
 def report_4(data: RefuelData):
