@@ -13,6 +13,8 @@ const PLAN_CHAT_ID     = "-5469544739";
 // ── Web App Entry Points ───────────────────────────────────────────────────
 
 function doGet(e) {
+  const action = (e && e.parameter && e.parameter.action) || "";
+  if (action === "get_refuel_data") return getRefuelData();
   return jsonResp({ status: "ok", message: "TNI Refuel GAS running" });
 }
 
@@ -384,4 +386,24 @@ function jsonResp(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+// ── Need Refuel: đọc cột R của sheet Refueled ──────────────────────────────
+
+function getRefuelData() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Refueled");
+  if (!sheet) return jsonResp({ status: "error", message: "Sheet 'Refueled' not found" });
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return jsonResp({ status: "ok", data: [] });
+
+  const values = sheet.getRange(2, 18, lastRow - 1, 1).getValues();  // Cột R = 18
+  const data   = [];
+  for (let i = 0; i < values.length; i++) {
+    const val = String(values[i][0] || "").trim();
+    if (val) data.push(val);
+  }
+  return jsonResp({ status: "ok", data: data });
 }
