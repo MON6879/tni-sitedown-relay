@@ -185,7 +185,19 @@ function parseRefueledText(text) {
     return m ? m[1].trim() : (defaultVal || "");
   }
 
-  const dateVal = search(/Date\s*[=:]\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+  // Parse ngày DD/MM/YYYY → JavaScript Date (tránh parse kiểu MM/DD/YYYY)
+  let dateVal = "";
+  const dateRaw = search(/Date\s*[=:]\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+  if (dateRaw) {
+    const parts = dateRaw.split("/");
+    if (parts.length === 3) {
+      // Chuyển DD/MM/YYYY → Date object đúng
+      dateVal = new Date(parseInt(parts[2],10), parseInt(parts[1],10)-1, parseInt(parts[0],10));
+    } else {
+      dateVal = dateRaw;
+    }
+  }
+
   const dgId    = search(/(?:DG\s*ID|site\s*ID)\s+([^\r\n]+)/i);
   let siteId = "";
   if (dgId) {
@@ -203,13 +215,15 @@ function parseRefueledText(text) {
   const beforePart = bm ? bm[1] : "";
   let beforeCsu = (beforePart.match(/CSU\s*Reading\s*\(L\)\s*-?\s*(\d+)/i) || [])[1] || "";
   let beforeLvl = (beforePart.match(/Level\s*%\s*-?\s*(\d+)/i) || [])[1] || "";
-  let beforeCm  = (beforePart.match(/Liter\/cm[\s\S]*?-\s*\(\d+\)\s*(\d+)\s*[Ll]?/i) || [])[1] || "";
+  // Lấy số cm trong ngoặc: -(10)44L → 10
+  let beforeCm  = (beforePart.match(/Liter\/cm[\s\S]*?-\s*\((\d+)\)/i) || [])[1] || "";
 
   const am = text.match(/After([\s\S]*?)(?:Emergency|Note|Mention|$)/i);
   const afterPart = am ? am[1] : "";
   let afterCsu = (afterPart.match(/CSU\s*Reading\s*\(L\)\s*-?\s*(\d+)/i) || [])[1] || "";
   let afterLvl = (afterPart.match(/Level\s*%\s*-?\s*(\d+)/i) || [])[1] || "";
-  let afterCm  = (afterPart.match(/Liter\/cm[\s\S]*?-\s*\(\d+\)\s*(\d+)\s*[Ll]?/i) || [])[1] || "";
+  // Lấy số cm trong ngoặc: -(28)235L → 28
+  let afterCm  = (afterPart.match(/Liter\/cm[\s\S]*?-\s*\((\d+)\)/i) || [])[1] || "";
 
   const filled = search(/Actual\s*Filled\s*Qty\s*\(L\)\s*-?\s*(\d+)/i);
   let price = search(/1Liter\s*price\s*=\s*(\d+)/i);
