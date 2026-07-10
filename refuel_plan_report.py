@@ -288,11 +288,11 @@ def report_1(data: RefuelData):
         if diff <= timedelta(days=30): freq[name]["d30"] += 1
 
     if not freq:
-        tg_send("📊 <b>Report 1 — Plan Frequency</b>\n📭 No plan records found.", "report1")
+        tg_send("📊 <b>[Report 1] Plan Frequency</b>\n📭 No plan records found.", "report1")
         return
 
     lines = [
-        f"📊 <b>PLAN SUBMISSION FREQUENCY</b>",
+        f"📊 <b>[Report 1] PLAN SUBMISSION FREQUENCY</b>",
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
         f"<code>{'No':<3} {'Name':<13} | {'3D':>4} | {'7D':>4} | {'1M':>5}</code>",
         "<code>" + "────┬──────────────┼──────┼──────┼───────" + "</code>"
@@ -327,11 +327,11 @@ def report_2(data: RefuelData):
 
     all_sites = sorted(set(list(plan.keys()) + list(refueled.keys())))
     if not all_sites:
-        tg_send(f"⛽ <b>Report 2 — Plan vs Refueled</b>\n📅 {today_str}\n📭 No refuel records today.", "report2")
+        tg_send(f"⛽ <b>[Report 2] Plan vs Refueled</b>\n📅 {today_str}\n📭 No refuel records today.", "report2")
         return
 
     lines = [
-        f"⛽ <b>PLAN vs REFUELED — {today_str}</b>",
+        f"⛽ <b>[Report 2] PLAN vs REFUELED — {today_str}</b>",
         f"⏰ {now.strftime('%H:%M')} Myanmar",
         fmt_row_compare("Site ID", "Plan", "Filled", "Diff"),
         "<code>" + "─────────────┼───────┼────────┼────────" + "</code>"
@@ -383,7 +383,7 @@ def report_3(data: RefuelData):
 
     all_sites = sorted(set(list(plan.keys()) + list(request.keys())))
     if not all_sites:
-        tg_send(f"🔄 <b>Report 3 — Plan vs Request</b>\n📅 {today_str}\n📭 No records today.", "report3")
+        tg_send(f"🔄 <b>[Report 3] Plan vs Request</b>\n📅 {today_str}\n📭 No records today.", "report3")
         return
 
     match_rows = []
@@ -400,7 +400,7 @@ def report_3(data: RefuelData):
             diff_rows.append(row_str)
 
     lines = [
-        f"🔄 <b>PLAN vs TEAM REQUEST — {today_str}</b>",
+        f"🔄 <b>[Report 3] PLAN vs TEAM REQUEST — {today_str}</b>",
         f"⏰ {now.strftime('%H:%M')} Myanmar",
     ]
 
@@ -450,7 +450,7 @@ def report_4(data: RefuelData):
             freq[sid]["d30"] += 1
 
     lines = [
-        f"👤 <b>REFUEL REQUESTS BY PERSON (Col F)</b>",
+        f"👤 <b>[Report 4] REFUEL REQUESTS BY PERSON</b>",
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
         fmt_row_freq("Name", "3Days", "7Days", "1Month"),
         "<code>" + "─────────────┼───────┼───────┼────────" + "</code>"
@@ -499,7 +499,7 @@ def report_5(data: RefuelData):
             freq[sid]["d30"] += 1
 
     lines = [
-        f"📋 <b>PLAN SUBMISSIONS BY TARGET LIST</b>",
+        f"📋 <b>[Report 5] PLAN SUBMISSIONS BY TARGET LIST</b>",
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
     ]
 
