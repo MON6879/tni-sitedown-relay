@@ -127,12 +127,12 @@ def process_update(update: dict):
 
         if category == "LETTER_SUBMIT":
             reply_text = (
-                f"📋 <b>Letter Submit</b> ✅ Recorded\n"
+                f"📋 <b>Letter Submit</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
                 f"📅 Date: <b>{result.get('date', ts)}</b>"
             )
         elif category == "LETTER_APPROVED":
             reply_text = (
-                f"✅ <b>Letter Approved</b> ✅ Recorded\n"
+                f"✅ <b>Letter Approved</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
                 f"📅 Date: <b>{result.get('date', ts)}</b>"
             )
         else:

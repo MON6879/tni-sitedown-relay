@@ -101,32 +101,40 @@ function insertAtTop(sheet, rowData) {
 function updateLettelProgress(senderId, dateStr, category) {
   try {
     const ss        = SpreadsheetApp.getActiveSpreadsheet();
-    const tmplSheet = ss.getSheetByName("Template");       // dùng để lookup col J
-    const lpSheet   = ss.getSheetByName("Lettel Progress"); // đích ghi ngày
-    if (!tmplSheet || !lpSheet) return;
+    const tmplSheet = ss.getSheetByName("Template");
+    const lpSheet   = ss.getSheetByName("Lettel Progress");
+    if (!tmplSheet || !lpSheet) return "";
 
     const lastRow = tmplSheet.getLastRow();
-    if (lastRow < 2) return;
+    if (lastRow < 2) return "";
 
-    // Tìm senderId trong Template cột J (cột 10)
-    const colJ = tmplSheet.getRange(2, 10, lastRow - 1, 1).getValues();
-    // B=2: Date Letter Submit   (PLAN hoặc LETTER_SUBMIT)
-    // C=3: Date Letter Approved (REFUELED hoặc LETTER_APPROVED)
+    const colJ     = tmplSheet.getRange(2, 10, lastRow - 1, 1).getValues();
     const writeCol = (category === "PLAN" || category === "LETTER_SUBMIT") ? 2 : 3;
 
     for (let i = 0; i < colJ.length; i++) {
       const cellId = String(colJ[i][0]).trim();
       if (cellId === String(senderId).trim()) {
-        const targetRow = i + 2; // cùng row số trong Lettel Progress
+        const targetRow = i + 2;
+
+        // Tự sinh DEF vào cột A nếu chưa có
+        let defId = String(lpSheet.getRange(targetRow, 1).getValue()).trim();
+        if (!defId) {
+          defId = nextDefId(lpSheet);
+          lpSheet.getRange(targetRow, 1).setValue(defId);
+          Logger.log("[LettelProgress] Auto DEF=" + defId + " → row=" + targetRow);
+        }
+
         lpSheet.getRange(targetRow, writeCol).setValue(dateStr);
         Logger.log("[LettelProgress] row=" + targetRow + " col=" + writeCol + " = " + dateStr + " (sender=" + senderId + ")");
-        break;
+        return defId;  // trả về DEF để caller đưa vào response
       }
     }
   } catch(e) {
     Logger.log("[LettelProgress] Error: " + e.message);
   }
+  return "";
 }
+
 
 // ── Message Collection & Parsing ───────────────────────────────────────────
 
@@ -267,10 +275,10 @@ function collectMessage(body) {
     const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
     const dateVal   = dateMatch ? dateMatch[1] : today;
 
-    updateLettelProgress(senderId, dateVal, "LETTER_SUBMIT");
-    Logger.log("[Collect] LETTER_SUBMIT → Lettel Progress col B, date=" + dateVal);
+    const defId = updateLettelProgress(senderId, dateVal, "LETTER_SUBMIT");
+    Logger.log("[Collect] LETTER_SUBMIT → Lettel Progress col B, date=" + dateVal + " def=" + defId);
     // Reply do Python (refuel_collector.py) xử lý — GAS không reply để tránh double message
-    return jsonResp({ status: "ok", category: "LETTER_SUBMIT", date: dateVal, time: today + " " + timeStr });
+    return jsonResp({ status: "ok", category: "LETTER_SUBMIT", date: dateVal, def: defId, time: today + " " + timeStr });
   }
 
   // ==================== 5. LETTER APPROVED ====================
@@ -279,10 +287,10 @@ function collectMessage(body) {
     const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
     const dateVal   = dateMatch ? dateMatch[1] : today;
 
-    updateLettelProgress(senderId, dateVal, "LETTER_APPROVED");
-    Logger.log("[Collect] LETTER_APPROVED → Lettel Progress col C, date=" + dateVal);
+    const defId = updateLettelProgress(senderId, dateVal, "LETTER_APPROVED");
+    Logger.log("[Collect] LETTER_APPROVED → Lettel Progress col C, date=" + dateVal + " def=" + defId);
     // Reply do Python (refuel_collector.py) xử lý — GAS không reply để tránh double message
-    return jsonResp({ status: "ok", category: "LETTER_APPROVED", date: dateVal, time: today + " " + timeStr });
+    return jsonResp({ status: "ok", category: "LETTER_APPROVED", date: dateVal, def: defId, time: today + " " + timeStr });
   }
 
   return jsonResp({ status: "skip", message: "No matching keyword" });
