@@ -145,7 +145,7 @@ jobs:
 
       - name: Task — Botlookup Relay
         if: |
-          (github.event_name == 'schedule' && github.event.schedule == '5,35 0-15,21-23 * * *') ||
+          (github.event_name == 'schedule' && github.event.schedule == '8,38 0-15,21-23 * * *') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'botlookup_relay')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
