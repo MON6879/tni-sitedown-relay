@@ -67,8 +67,9 @@ function checkAndSend() {
   // ── Khung giờ: 03:xx–21:xx Myanmar ──
   if (hour < 3 || hour > 21) return;
   if (hour === 3 && minute < 8) return;   // 03:08 là sớm nhất
+  if (hour === 21 && minute > 38) return; // 21:38 là muộn nhất
 
-  // ── Chống chạy 2 lần trong cùng phút (trigger đôi khi fire nhiều lần) ──
+  // ── Chống chạy 2 lần trong cùng phút ──
   const props   = PropertiesService.getScriptProperties();
   const doneKey = "SD_DONE_" + Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHHmm");
   if (props.getProperty(doneKey)) {
@@ -76,13 +77,11 @@ function checkAndSend() {
     return;
   }
   props.setProperty(doneKey, "1");
-  // Tự xóa key sau 2 phút (tránh tích lũy rác trong Properties)
-  Utilities.sleep(0);  // placeholder — key sẽ bị ghi đè tự nhiên
 
   Logger.log("✅ checkAndSend — " + mytime + " Myanmar");
 
   const lock = LockService.getScriptLock();
-  if (!lock.tryLock(3000)) {
+  if (!lock.tryLock(5000)) {
     Logger.log("⏭️ Lock bận — bỏ qua");
     return;
   }
@@ -91,17 +90,57 @@ function checkAndSend() {
     const sheet = getSheetByGid(ss, SD_SHEET_GID);
     if (!sheet) { Logger.log("❌ Không tìm thấy sheet GID=" + SD_SHEET_GID); return; }
 
-    // Bước 1: Poll Telegram → ghi Col A nếu có báo cáo mới
-    fetchTelegramUpdates(sheet);
+    // Bước 1: Dispatch botlookup_relay → gửi lệnh lấy data từ BOT LOOKUP
+    //   botlookup_relay.py sẽ: gửi /down_tni → đọc kết quả → ghi Col A + Note B2:B5
+    triggerBotlookupRelay();
 
-    // Bước 2: Kiểm tra và gửi
-    checkColC(sheet);   // Tin 1: A1 thay đổi → gửi Col C
-    checkAwAz(sheet);   // Tin 2: AW7 thay đổi → gửi SUMMARY
+    // Bước 2: Kiểm tra và gửi (data được botlookup_relay ghi từ lần trước)
+    checkColC(sheet);   // Tin 1: A1 thay đổi → gửi Col C vào T1/T2/T3/T4 + CONTROL
+    checkAwAz(sheet);   // Tin 2: AW7 thay đổi → gửi SUMMARY vào T1/T2/T3/T4 + CONTROL
 
   } catch(e) {
     Logger.log("❌ checkAndSend error: " + e.message);
   } finally {
     lock.releaseLock();
+  }
+}
+
+
+// ============================================================
+// DISPATCH botlookup_relay → GitHub Actions
+// botlookup_relay.py sẽ:
+//   1. Gửi /down_tni@auto_nocpro_bot vào BOT LOOKUP group
+//   2. Đọc kết quả từ Auto Report NocPro bot
+//   3. Ghi dữ liệu vào Col A của sheet
+//   4. Gửi Note B2:B5 bằng tài khoản @Phongha79
+// Kết quả sẽ có sau ~2–3 phút → trigger tiếp theo sẽ gửi Tin 1
+// ============================================================
+function triggerBotlookupRelay() {
+  const pat   = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
+  const owner = "phonghdpxd-cmd";
+  const repo  = "tni-bot";
+  if (!pat) { Logger.log("[Relay] ⚠️ GITHUB_PAT chưa set — bỏ qua dispatch"); return; }
+
+  try {
+    const url  = "https://api.github.com/repos/" + owner + "/" + repo + "/actions/workflows/daily_reports.yml/dispatches";
+    const resp = UrlFetchApp.fetch(url, {
+      method:  "post",
+      headers: {
+        "Authorization": "token " + pat,
+        "Accept":        "application/vnd.github.v3+json",
+      },
+      contentType:        "application/json",
+      payload:            JSON.stringify({ ref: "main", inputs: { job: "botlookup_relay" } }),
+      muteHttpExceptions: true,
+    });
+    const code = resp.getResponseCode();
+    if (code === 204) {
+      Logger.log("[Relay] ✅ Dispatched botlookup_relay → GitHub Actions");
+    } else {
+      Logger.log("[Relay] ⚠️ HTTP " + code + ": " + resp.getContentText().substring(0, 200));
+    }
+  } catch(e) {
+    Logger.log("[Relay] ❌ " + e.message);
   }
 }
 
@@ -616,11 +655,18 @@ function checkWebhook() {
 // TEST — Ép gửi ngay (bỏ qua dedup timestamp)
 // ============================================================
 function testSendNow() {
+  // Bypass minute check — gọi thẳng logic không qua checkAndSend()
   const props = PropertiesService.getScriptProperties();
   props.deleteProperty(TS_KEY_A1);
   props.deleteProperty(TS_KEY_AW7);
-  Logger.log("🧪 Xóa timestamp → ép gửi cả Tin 1 + Tin 2...");
-  checkAndSend();
+  Logger.log("🧪 testSendNow — ép gửi Tin 1 + Tin 2 (bypass minute check)...");
+  const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
+  const sheet = getSheetByGid(ss, SD_SHEET_GID);
+  if (!sheet) { Logger.log("❌ Không tìm thấy sheet"); return; }
+  fetchTelegramUpdates(sheet);
+  checkColC(sheet);
+  checkAwAz(sheet);
+  Logger.log("🧪 testSendNow — xong.");
 }
 
 function testTin1Only() {
