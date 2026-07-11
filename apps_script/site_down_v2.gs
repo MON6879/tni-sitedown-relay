@@ -242,7 +242,7 @@ function checkAndSend(isWebhookCall) {
 function triggerBotlookupRelay() {
   const pat   = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
   const owner = "phonghdpxd-cmd";
-  const repo  = "tni-bot";
+  const repo  = "TNI-SITE-DOWN";
   if (!pat) { Logger.log("[Relay] ⚠️ GITHUB_PAT chưa set — bỏ qua dispatch"); return; }
 
   try {
