@@ -113,40 +113,69 @@ async def main():
         print(f"[{myanmar_now()}] ⏳ Chờ {WAIT_REPLY_SEC}s...")
         await asyncio.sleep(WAIT_REPLY_SEC)
 
-        # ── 7. Đọc lịch sử Botlookup ─────────────────────────────
+        # -- 7. Doc lich su Botlookup (newest-first tu API) --
         history = await client(GetHistoryRequest(
-            peer=source, limit=30,
+            peer=source, limit=50,
             offset_date=None, offset_id=0,
             max_id=0, min_id=0, add_offset=0, hash=0,
         ))
 
-        # ── 8. Lọc tin từ @auto_nocpro_bot ───────────────────────
-        bot_messages = []
-        for msg in history.messages:
-            if msg.date < send_time:
+        # -- 8. Thu thap tin sau send_time, sort oldest-first --
+        all_after = [msg for msg in history.messages if msg.date >= send_time]
+        all_after.sort(key=lambda m: m.date)  # oldest-first = tu tren xuong
+
+        # -- 9. Gom tin bot: tu lenh /down_tni -> dung khi co nguoi khac --
+        found_command = False
+        bot_messages  = []
+
+        for msg in all_after:
+            # Tim lenh /down_tni do chinh minh gui
+            if not found_command:
+                if msg.sender_id == me.id and "/down_tni" in (msg.message or "").lower():
+                    found_command = True
                 continue
-            sender = None
+
+            # Sau lenh: kiem tra sender
+            sender_uname = ""
             if msg.sender_id:
                 try:
-                    sender = await client.get_entity(msg.sender_id)
+                    s = await client.get_entity(msg.sender_id)
+                    sender_uname = getattr(s, "username", "") or ""
                 except Exception:
                     pass
-            if not sender:
-                continue
-            uname = getattr(sender, "username", "") or ""
-            if uname.lower() == BOT_USERNAME.lower() and msg.message:
+
+            if sender_uname.lower() == BOT_USERNAME.lower() and msg.message:
+                # Tin tu bot -> gom vao (thu tu tu tren xuong)
                 bot_messages.append(msg.message)
-                print(f"[{myanmar_now()}] ✅ Tin từ @{BOT_USERNAME} ({len(msg.message)} ký tự)")
+                print(f"[{myanmar_now()}] Bot tin #{len(bot_messages)}: {len(msg.message)} ky tu")
+            else:
+                # Nguoi khac gui -> ket thuc vung tra loi cua bot
+                if msg.sender_id != me.id:
+                    print(f"[{myanmar_now()}] STOP: nguoi khac gui (sender_id={msg.sender_id})")
+                    break
+
+        if not found_command:
+            print(f"[{myanmar_now()}] Khong tim thay lenh /down_tni -> fallback: lay toan bo tin bot")
+            for msg in all_after:
+                s_name = ""
+                if msg.sender_id:
+                    try:
+                        s = await client.get_entity(msg.sender_id)
+                        s_name = getattr(s, "username", "") or ""
+                    except Exception:
+                        pass
+                if s_name.lower() == BOT_USERNAME.lower() and msg.message:
+                    bot_messages.append(msg.message)
 
         gas_url = os.environ.get("APPS_SCRIPT_URL", "")
 
         if not bot_messages:
-            err = f"⚠️ [{myanmar_now()}] @{BOT_USERNAME} không phản hồi trong {WAIT_REPLY_SEC}s"
+            err = f"[{myanmar_now()}] @{BOT_USERNAME} khong phan hoi trong {WAIT_REPLY_SEC}s"
             print(err)
             await client.send_message(TARGET_CHAT_ID, err)
-            # Không return sớm! Vẫn gửi Note B2:B5 bên dưới
 
         raw_text = "\n".join(bot_messages) if bot_messages else ""
+
 
         # ── 9. Gọi GAS webhook → ghi Cột A → checkAndSend() gửi tổng hợp ──
         # Chỉ gọi nếu có data (bot phản hồi)

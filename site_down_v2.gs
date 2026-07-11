@@ -51,6 +51,108 @@ const AWAZ_LABELS = [
 const TEAM_COLORS = { T1: "🔵", T2: "🟡", T3: "🟢", T4: "🔴" };
 
 
+
+// ============================================================
+// WEB APP — doPost() nhận data từ botlookup_relay.py
+// Deploy: Extensions → Deploy → New deployment → Web App
+//   Execute as: Me | Who has access: Anyone
+// Actions:
+//   store_site_down  → ghi text vào Col A (từng dòng = 1 ô)
+//   get_note_b2b5    → đọc B2:B5 (Note gửi bằng @Phongha79)
+//   save_note_msgids → lưu message IDs của Note vào Properties
+//   get_note_msgids  → đọc message IDs đã lưu
+// ============================================================
+function doPost(e) {
+  try {
+    const data   = JSON.parse(e.postData.contents);
+    const action = data.action || "";
+
+    if (action === "store_site_down") {
+      // Ghi text từ botlookup_relay vào Col A (mỗi dòng = 1 ô)
+      const text  = (data.text || "").trim();
+      const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
+      const sheet = getSheetByGid(ss, SD_SHEET_GID);
+      if (!sheet) return _json({ ok: false, msg: "Sheet not found" });
+
+      // Xóa Col A cũ
+      const lastRow = Math.max(sheet.getLastRow(), 1);
+      sheet.getRange(1, 1, lastRow, 1).clearContent();
+
+      // Ghi từng dòng vào Col A (A1, A2, A3, ...)
+      const lines = text.split("\n");
+      if (lines.length > 0) {
+        const values = lines.map(l => [l]);
+        sheet.getRange(1, 1, values.length, 1).setValues(values);
+      }
+      Logger.log("[doPost] store_site_down — " + lines.length + " dòng ghi vào Col A");
+
+      // Reset dedup key Tin 1 để checkAndSend() gửi ngay khi trigger tiếp theo
+      PropertiesService.getScriptProperties().deleteProperty(TS_KEY_A1);
+
+      return _json({ ok: true, lines: lines.length });
+    }
+
+    if (action === "get_note_b2b5") {
+      const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
+      const sheet = getSheetByGid(ss, SD_SHEET_GID);
+      if (!sheet) return _json({ ok: false, msg: "Sheet not found" });
+      const vals = sheet.getRange("B2:B5").getValues();
+      const note = vals.map(r => (r[0] || "").toString().trim()).filter(v => v).join("\n");
+      return ContentService.createTextOutput(note).setMimeType(ContentService.MimeType.TEXT);
+    }
+
+    if (action === "save_note_msgids") {
+      const msgids = data.msgids || {};
+      PropertiesService.getScriptProperties().setProperty("SD_NOTE_MSGIDS", JSON.stringify(msgids));
+      return _json({ ok: true });
+    }
+
+    if (action === "get_note_msgids") {
+      const raw    = PropertiesService.getScriptProperties().getProperty("SD_NOTE_MSGIDS") || "{}";
+      const msgids = JSON.parse(raw);
+      return _json({ ok: true, msgids: msgids });
+    }
+
+    return _json({ ok: false, msg: "Unknown action: " + action });
+
+  } catch (err) {
+    return _json({ ok: false, msg: err.message });
+  }
+}
+
+function doGet(e) {
+  try {
+    const action = (e.parameter && e.parameter.action) || "";
+
+    if (action === "get_note_b2b5") {
+      const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
+      const sheet = getSheetByGid(ss, SD_SHEET_GID);
+      if (!sheet) return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
+      const vals = sheet.getRange("B2:B5").getValues();
+      const note = vals.map(r => (r[0] || "").toString().trim()).filter(v => v).join("\n");
+      return ContentService.createTextOutput(note).setMimeType(ContentService.MimeType.TEXT);
+    }
+
+    if (action === "get_note_msgids") {
+      const raw    = PropertiesService.getScriptProperties().getProperty("SD_NOTE_MSGIDS") || "{}";
+      const msgids = JSON.parse(raw);
+      return _json({ ok: true, msgids: msgids });
+    }
+
+    return _json({ ok: false, msg: "Unknown GET action: " + action });
+  } catch (err) {
+    return _json({ ok: false, msg: err.message });
+  }
+}
+
+function _json(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+
 // ============================================================
 // ENTRY POINT — trigger 1 phút, chỉ chạy đúng phút :08 và :38
 // Lịch: 03:08 → 03:38 → 04:08 → 04:38 → ... → 21:08 → 21:38
