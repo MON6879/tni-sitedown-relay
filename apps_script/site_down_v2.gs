@@ -187,9 +187,9 @@ function checkAndSend(isWebhookCall) {
   const props = PropertiesService.getScriptProperties();
   if (!isWebhookCall) {
     if (minute !== 8 && minute !== 38) return { sent_tin1: false, sent_tin2: false };
-    if (hour < 3 || hour > 21) return { sent_tin1: false, sent_tin2: false };
-    if (hour === 3 && minute < 8) return { sent_tin1: false, sent_tin2: false };   // 03:08 là sớm nhất
-    if (hour === 21 && minute > 38) return { sent_tin1: false, sent_tin2: false }; // 21:38 là muộn nhất
+    if (hour < 3 || hour > 22) return { sent_tin1: false, sent_tin2: false };
+    if (hour === 3 && minute < 38) return { sent_tin1: false, sent_tin2: false };   // 03:38 là sớm nhất
+    if (hour === 22 && minute > 8) return { sent_tin1: false, sent_tin2: false };  // 22:08 là muộn nhất
 
     // ── Chống chạy 2 lần trong cùng phút (chỉ áp dụng cho time trigger) ──
     const doneKey = "SD_DONE_" + Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHHmm");
@@ -756,18 +756,18 @@ function getSheetByGid(ss, gid) {
 /**
  * Cài trigger checkAndSend() mỗi 1 phút.
  * Trigger chạy mỗi phút nhưng chỉ làm việc thực sự khi
- * đồng hồ Myanmar đúng phút :01 hoặc :31 — không trễ.
- * Lịch: 03:01 → 03:31 → 04:01 → ... → 21:01 → 21:31
+ * đồng hồ Myanmar đúng phút :08 hoặc :38 — không trễ.
+ * Lịch: 03:38 → 04:08 → ... → 22:08 Myanmar.
  */
 function setupSdTrigger() {
   // Xóa trigger cũ cùng tên
   ScriptApp.getProjectTriggers()
     .filter(t => t.getHandlerFunction() === "checkAndSend")
     .forEach(t => ScriptApp.deleteTrigger(t));
-  // Tạo mới — mỗi 1 phút (check đúng :01 và :31)
+  // Tạo mới — mỗi 1 phút (check đúng :08 và :38)
   ScriptApp.newTrigger("checkAndSend").timeBased().everyMinutes(1).create();
   Logger.log("✅ Trigger checkAndSend() mỗi 1 phút đã cài.");
-  Logger.log("   Chỉ thực sự chạy lúc :01 và :31 mỗi giờ (03:01–21:31 Myanmar). Không trễ.");
+  Logger.log("   Chỉ thực sự chạy lúc :08 và :38 mỗi giờ (03:38–22:08 Myanmar). Không trễ.");
 }
 
 /** Xóa webhook (bắt buộc trước khi dùng polling) */
