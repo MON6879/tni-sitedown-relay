@@ -90,7 +90,12 @@ async def main():
 
     async with client:
         me = await client.get_me()
-        print(f"[{myanmar_now()}] 🔑 Đăng nhập: @{me.username} ({me.first_name})")
+        print(f"[{myanmar_now()}] Dang nhap: @{me.username} ({me.first_name})")
+
+        # Cache toan bo dialogs de Telethon resolve duoc T1/T2/T3/T4 peer
+        print(f"[{myanmar_now()}] Cache dialogs...")
+        await client.get_dialogs(limit=200)
+        print(f"[{myanmar_now()}] Cache xong")
 
         # ── 3. Lấy entity nhóm Botlookup ─────────────────────────
         try:
@@ -131,7 +136,9 @@ async def main():
         for msg in all_after:
             # Tim lenh /down_tni do chinh minh gui
             if not found_command:
-                if msg.sender_id == me.id and "/down_tni" in (msg.message or "").lower():
+                # Check via sender_id OR msg.out flag (some groups use out=True)
+                is_mine = (msg.sender_id == me.id) or getattr(msg, 'out', False)
+                if is_mine and "/down_tni" in (msg.message or "").lower():
                     found_command = True
                 continue
 
@@ -155,8 +162,11 @@ async def main():
                     break
 
         if not found_command:
-            print(f"[{myanmar_now()}] Khong tim thay lenh /down_tni -> fallback: lay toan bo tin bot")
+            print(f"[{myanmar_now()}] Khong tim thay lenh /down_tni -> fallback: lay toan bo tin bot sau send_time")
             for msg in all_after:
+                is_mine = (msg.sender_id == me.id) or getattr(msg, 'out', False)
+                if is_mine:
+                    continue  # skip own messages
                 s_name = ""
                 if msg.sender_id:
                     try:
