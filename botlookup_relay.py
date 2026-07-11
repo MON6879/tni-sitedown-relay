@@ -92,11 +92,21 @@ async def main():
         me = await client.get_me()
         print(f"[{myanmar_now()}] Dang nhap: @{me.username} ({me.first_name})")
 
-        # Cache TAT CA dialogs -> Telethon resolve duoc T1/T2/T3/T4 peer
-        print(f"[{myanmar_now()}] Cache ALL dialogs...")
-        async for _d in client.iter_dialogs():
-            pass  # iterate het de cache entity
-        print(f"[{myanmar_now()}] Cache xong")
+        # Build entity map tu tat ca dialogs
+        print(f"[{myanmar_now()}] Building entity map from dialogs...")
+        entity_map = {}  # gname -> entity
+        all_gids = set(str(abs(gid)) for gid in ALL_GROUPS.values())
+        async for dialog in client.iter_dialogs():
+            did = str(getattr(dialog.entity, 'id', 0))
+            for gname, gid in ALL_GROUPS.items():
+                if did == str(abs(int(gid))):
+                    entity_map[gname] = dialog.entity
+                    print(f"[{myanmar_now()}] Found {gname}: {dialog.title}")
+        # Bao cao nhom nao tim thay
+        for gname in ALL_GROUPS:
+            if gname not in entity_map:
+                print(f"[{myanmar_now()}] WARNING: {gname} not in dialogs!")
+        print(f"[{myanmar_now()}] Entity map: {list(entity_map.keys())}")
 
         # ── 3. Lấy entity nhóm Botlookup ─────────────────────────
         try:
@@ -284,7 +294,7 @@ async def main():
                     for attempt in range(6):
                         try:
                             grp_hist = await client(GetHistoryRequest(
-                                peer=gid, limit=15,
+                                peer=entity_map.get(gname, int(gid)), limit=15,
                                 offset_date=None, offset_id=0,
                                 max_id=0, min_id=0, add_offset=0, hash=0,
                             ))
@@ -317,7 +327,9 @@ async def main():
                         if attempt < 5:
                             await asyncio.sleep(3)
 
-                    sent_msg = await client.send_message(gid, note_text, reply_to=reply_to_id)
+                    # Dung entity tu entity_map neu co, fallback sang gid
+                    target = entity_map.get(gname, int(gid))
+                    sent_msg = await client.send_message(target, note_text, reply_to=reply_to_id)
                     new_note_ids[gname] = sent_msg.id
                     status = f"reply→{reply_to_id}" if reply_to_id else "standalone"
                     print(f"[{myanmar_now()}] ✅ Note → {gname} ({status}) msg_id={sent_msg.id}")
