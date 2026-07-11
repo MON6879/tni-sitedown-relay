@@ -101,6 +101,23 @@ function doGet(e) {
 
     // ── Site Down data endpoint (cho Python Telethon sender) ──
     if (action === "get_site_down_data") return getSiteDownData();
+    if (action === "debug_properties") {
+      var props = PropertiesService.getScriptProperties().getProperties();
+      var ss = SpreadsheetApp.openById("1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow");
+      var sheet = ss.getSheets()[0];
+      var a1 = sheet.getRange("A1").getValue().toString().trim();
+      var ts1 = "";
+      try {
+        var m1 = a1.match(/(\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2}:\d{2})/);
+        if (m1) ts1 = m1[1].replace(/[\-T]/g, " ").trim();
+        else {
+          var m2 = a1.match(/(\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2})/);
+          if (m2) ts1 = m2[1].replace(/[\-T]/g, " ").trim();
+        }
+      } catch(e) {}
+      var storeKey = ts1 ? (ts1 + "|" + a1.substring(0, 60)) : a1.substring(0, 200);
+      return json({ status: "ok", props: props, a1: a1, ts1: ts1, storeKey: storeKey });
+    }
 
     // ── Note B2:B5 từ SD Sheet (cho botlookup_relay.py gửi từ @Phongha79) ──
     if (action === "get_note_b2b5")       return getNoteB2B5();
