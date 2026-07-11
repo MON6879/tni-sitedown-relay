@@ -214,18 +214,18 @@ function checkAndSend() {
 
   if (currentMinutes < activeStart || currentMinutes > activeEnd) {
     Logger.log("😴 Ngoài khung giờ hoạt động checkAndSend (03:30-22:10 Myanmar) — Bỏ qua.");
-    return;
+    return { sent_tin1: false, sent_tin2: false };
   }
 
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(3000)) {
     Logger.log("⏭️ checkAndSend: đang có execution khác — bỏ qua");
-    return;
+    return { sent_tin1: false, sent_tin2: false };
   }
   try {
     const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
     const sheet = getSheetByGid(ss, SD_SHEET_GID);
-    if (!sheet) { Logger.log("❌ Không tìm thấy sheet"); return; }
+    if (!sheet) { Logger.log("❌ Không tìm thấy sheet"); return { sent_tin1: false, sent_tin2: false }; }
 
     const config = loadTeamConfig(sheet);
 
@@ -233,9 +233,10 @@ function checkAndSend() {
     fetchTelegramUpdates(sheet);
 
     // ── BƯỚC 2: Kiểm tra và gửi tin ─────────────────────────
-    checkColC(sheet, config);   // Tin 1: A1 thay đổi → Col C per-team + CONTROL
-    checkAwAz(sheet, config);   // Tin 2: AW7 thay đổi → AW:AZ summary per-team
+    const sentTin1 = checkColC(sheet, config);   // Tin 1: A1 thay đổi → Col C per-team + CONTROL
+    const sentTin2 = checkAwAz(sheet, config);   // Tin 2: AW7 thay đổi → AW:AZ summary per-team
 
+    return { sent_tin1: sentTin1, sent_tin2: sentTin2 };
   } finally {
     lock.releaseLock();
   }
@@ -601,7 +602,7 @@ function triggerBotlookupRelay() {
 function checkColC(sheet, config) {
   if (!config) { config = loadTeamConfig(sheet); }
   const raw = sheet.getRange("A1").getValue().toString().trim();
-  if (!raw) { Logger.log("[Tin1] A1 rỗng — bỏ qua"); return; }
+  if (!raw) { Logger.log("[Tin1] A1 rỗng — bỏ qua"); return false; }
 
   // Dùng timestamp + 60 ký tự đầu làm key (tránh vượt giới hạn 9KB của PropertiesService)
   // Ưu tiên parse timestamp từ A1; nếu không được thì lấy 200 ký tự đầu
@@ -610,23 +611,27 @@ function checkColC(sheet, config) {
 
   const props   = PropertiesService.getScriptProperties();
   const lastKey = props.getProperty(TS_KEY_A1) || "";
-  if (storeKey === lastKey) { Logger.log("[Tin1] A1 không đổi (" + storeKey.substring(0,40) + ") — bỏ qua"); return; }
+  if (storeKey === lastKey) { Logger.log("[Tin1] A1 không đổi (" + storeKey.substring(0,40) + ") — bỏ qua"); return false; }
 
   Logger.log("[Tin1] 🆕 A1 thay đổi (" + storeKey.substring(0,40) + ") → gửi Col C...");
 
   const colCRaw = readColCRaw(sheet);
-  if (!colCRaw) { Logger.log("[Tin1] Col C trống — bỏ qua"); return; }
+  if (!colCRaw) { Logger.log("[Tin1] Col C trống — bỏ qua"); return false; }
 
   const lines = colCRaw.split("\n");
 
   // ① CONTROL: nhận TOÀN BỘ Col C (có tô màu team)
   const controlId = config.groups["CONTROL"] || SD_GROUPS["CONTROL"];
   if (controlId) {
-    const coloredRaw = colorizeTeams(colCRaw, config);
-    // Fix: split nội dung TRƯỚC khi bọc <pre></pre>
-    // Tránh lỗi Telegram "Unclosed tag" khi split cắt giữa <pre>...</pre>
-    // Edit-in-place: edit tin cũ trong ngày, gửi mới nếu chưa có hoặc tin dài
-    sendOrEditTelegramPre(controlId, coloredRaw, "TIN1_CONTROL", "[Tin1][CONTROL]");
+    try {
+      const coloredRaw = colorizeTeams(colCRaw, config);
+      // Fix: split nội dung TRƯỚC khi bọc <pre></pre>
+      // Tránh lỗi Telegram "Unclosed tag" khi split cắt giữa <pre>...</pre>
+      // Edit-in-place: edit tin cũ trong ngày, gửi mới nếu chưa có hoặc tin dài
+      sendOrEditTelegramPre(controlId, coloredRaw, "TIN1_CONTROL", "[Tin1][CONTROL]");
+    } catch (controlErr) {
+      Logger.log("[Tin1][CONTROL] ❌ Lỗi gửi: " + controlErr.message);
+    }
   }
 
   // ② Mỗi Team: header chung + summary team đó + site của team đó
@@ -648,30 +653,34 @@ function checkColC(sheet, config) {
   }
 
   for (const team of teams) {
-    const chatId = config.groups[team];
-    if (!chatId) continue;
+    try {
+      const chatId = config.groups[team];
+      if (!chatId) continue;
 
-    // Lấy header chung (không phải site, không phải "Team X:" của team khác)
-    const headerLines = lines.filter(line => {
-      if (!line.trim()) return false;
-      if (/^\d+:/.test(line)) return false;                     // site line → bỏ
-      if (/^Team\s*\d+\s*:/i.test(line)) {
-        return summaryPattern[team] && summaryPattern[team].test(line); // chỉ giữ summary của team này
-      }
-      return true;                                               // header chung → giữ
-    });
+      // Lấy header chung (không phải site, không phải "Team X:" của team khác)
+      const headerLines = lines.filter(line => {
+        if (!line.trim()) return false;
+        if (/^\d+:/.test(line)) return false;                     // site line → bỏ
+        if (/^Team\s*\d+\s*:/i.test(line)) {
+          return summaryPattern[team] && summaryPattern[team].test(line); // chỉ giữ summary của team này
+        }
+        return true;                                               // header chung → giữ
+      });
 
-    // Lấy site lines của team này
-    const siteLines = lines.filter(line => sitePattern[team] && sitePattern[team].test(line));
+      // Lấy site lines của team này
+      const siteLines = lines.filter(line => sitePattern[team] && sitePattern[team].test(line));
 
-    const teamContent = siteLines.length > 0
-      ? [...headerLines, "...", ...siteLines].join("\n")
-      : [...headerLines, "Không có site down"].join("\n");
+      const teamContent = siteLines.length > 0
+        ? [...headerLines, "...", ...siteLines].join("\n")
+        : [...headerLines, "Không có site down"].join("\n");
 
-    // Tô màu team code trong tin nhắn
-    const coloredContent = colorizeTeams(teamContent, config);
-    // Edit-in-place: edit tin cũ trong ngày, gửi mới nếu chưa có hoặc tin dài
-    sendOrEditTelegramPre(chatId, coloredContent, "TIN1_" + team, "[Tin1][" + team + "]");
+      // Tô màu team code trong tin nhắn
+      const coloredContent = colorizeTeams(teamContent, config);
+      // Edit-in-place: edit tin cũ trong ngày, gửi mới nếu chưa có hoặc tin dài
+      sendOrEditTelegramPre(chatId, coloredContent, "TIN1_" + team, "[Tin1][" + team + "]");
+    } catch (teamErr) {
+      Logger.log("[Tin1][" + team + "] ❌ Lỗi gửi: " + teamErr.message);
+    }
   }
 
   // ③ TNI cá nhân → KHÔNG nhận Tin1 (site list), chỉ nhận Tin2 (summary)
@@ -680,6 +689,7 @@ function checkColC(sheet, config) {
   Logger.log("[Tin1] ✅ Xong — lưu key: " + storeKey.substring(0, 60));
   // NOTE: sendNoteB2B5 đã chuyển sang gửi từ @Phongha79 (Telethon) trong botlookup_relay.py
   //       để hỗ trợ theo dõi ai đã đọc (GetMessageReadParticipantsRequest)
+  return true;
 }
 
 
@@ -723,7 +733,7 @@ function sendNoteB2B5(sheet) {
 function checkAwAz(sheet, config) {
   if (!config) { config = loadTeamConfig(sheet); }
   const ts = parseAW7Timestamp(sheet);
-  if (!ts) { Logger.log("[Tin2] Không có timestamp trong AW7"); return; }
+  if (!ts) { Logger.log("[Tin2] Không có timestamp trong AW7"); return false; }
 
   // Chỉ so sánh timestamp AW7 — KHÔNG dùng hash nội dung AW7:AZ15
   // Lý do: hash quá nhạy, trigger gửi lại khi Col C cập nhật (botlookup mới)
@@ -731,7 +741,7 @@ function checkAwAz(sheet, config) {
   // Logic đúng: SUMMARY chỉ gửi khi AW7 có timestamp MỚI (cập nhật từ hệ thống)
   const props  = PropertiesService.getScriptProperties();
   const lastTs = props.getProperty(TS_KEY_AW7) || "";
-  if (ts === lastTs) { Logger.log("[Tin2] AW7 không đổi (" + ts + ") — bỏ qua"); return; }
+  if (ts === lastTs) { Logger.log("[Tin2] AW7 không đổi (" + ts + ") — bỏ qua"); return false; }
 
   Logger.log("[Tin2] 🆕 " + ts + " → gửi summary...");
 
@@ -740,12 +750,16 @@ function checkAwAz(sheet, config) {
 
   // Gửi từng team
   for (const team of teams) {
-    const chatId = config.groups[team];
-    if (!chatId) continue;
-    const colIdx = config.awazCol[team];
-    if (colIdx === undefined || colIdx === null || colIdx === "") continue;
-    const msg = buildAwAzTeamMessage(team, ts, awaz, colIdx, config);
-    sendOrEditTelegram(chatId, msg, "TIN2_" + team, "[Tin2][" + team + "]");
+    try {
+      const chatId = config.groups[team];
+      if (!chatId) continue;
+      const colIdx = config.awazCol[team];
+      if (colIdx === undefined || colIdx === null || colIdx === "") continue;
+      const msg = buildAwAzTeamMessage(team, ts, awaz, colIdx, config);
+      sendOrEditTelegram(chatId, msg, "TIN2_" + team, "[Tin2][" + team + "]");
+    } catch(teamErr) {
+      Logger.log("[Tin2][" + team + "] ❌ Lỗi gửi: " + teamErr.message);
+    }
   }
 
   // Gửi Tin 2 tổng hợp vào Control (HTML + emoji)
@@ -772,6 +786,7 @@ function checkAwAz(sheet, config) {
 
   props.setProperty(TS_KEY_AW7, ts);  // lưu chỉ timestamp AW7
   Logger.log("[Tin2] ✅ Xong — lưu timestamp: " + ts);
+  return true;
 }
 
 

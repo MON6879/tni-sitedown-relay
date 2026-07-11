@@ -1751,14 +1751,24 @@ function handleStoreSiteDownDirect(body) {
     Utilities.sleep(10000);   // Chờ công thức Cột C và AW7:AZ15 cập nhật hoàn toàn
 
     // ── Gọi checkAndSend() nếu cùng GAS project; nếu khác project thì GAS trigger 5p sẽ xử lý ──
+    var checkResult = { sent_tin1: false, sent_tin2: false };
     try {
-      checkAndSend();
-      Logger.log("[store_site_down] ✅ checkAndSend() xong");
+      var r = checkAndSend();
+      if (r && typeof r === "object") {
+        checkResult = r;
+      }
+      Logger.log("[store_site_down] ✅ checkAndSend() xong. Result: " + JSON.stringify(checkResult));
     } catch(callErr) {
       Logger.log("[store_site_down] ⚠️ checkAndSend() không khả dụng từ project này — GAS trigger 5p sẽ xử lý. Chi tiết: " + callErr.message);
     }
 
-    return json({ status: "ok", lines: writeData.length, sheet: sheet.getName() });
+    return json({ 
+      status: "ok", 
+      lines: writeData.length, 
+      sheet: sheet.getName(),
+      sent_tin1: !!checkResult.sent_tin1,
+      sent_tin2: !!checkResult.sent_tin2
+    });
   } catch(err) {
     Logger.log("[store_site_down] ❌ " + err.message);
     return json({ status: "error", message: err.message });
