@@ -831,3 +831,11 @@ function resetSiteDownProperties() {
   props.deleteProperty(TS_KEY_AW7);
   Logger.log("✅ resetSiteDownProperties: Đã xóa bộ nhớ đệm A1 và AW7.");
 }
+
+function testFullFlow() {
+  const props = PropertiesService.getScriptProperties();
+  props.deleteProperty(TS_KEY_A1);
+  props.deleteProperty(TS_KEY_AW7);
+  Logger.log("🧪 testFullFlow — ép trigger GitHub Actions + gửi tin...");
+  triggerBotlookupRelay();
+}
