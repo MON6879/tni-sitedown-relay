@@ -92,9 +92,10 @@ async def main():
         me = await client.get_me()
         print(f"[{myanmar_now()}] Dang nhap: @{me.username} ({me.first_name})")
 
-        # Cache toan bo dialogs de Telethon resolve duoc T1/T2/T3/T4 peer
-        print(f"[{myanmar_now()}] Cache dialogs...")
-        await client.get_dialogs(limit=200)
+        # Cache TAT CA dialogs -> Telethon resolve duoc T1/T2/T3/T4 peer
+        print(f"[{myanmar_now()}] Cache ALL dialogs...")
+        async for _d in client.iter_dialogs():
+            pass  # iterate het de cache entity
         print(f"[{myanmar_now()}] Cache xong")
 
         # ── 3. Lấy entity nhóm Botlookup ─────────────────────────
@@ -107,12 +108,11 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 4. Ghi nhớ thời điểm gửi lệnh ───────────────────────
-        send_time = datetime.now(timezone.utc)
-
-        # ── 5. Gửi lệnh ──────────────────────────────────────────
+        # ── 4+5. Gui lenh va ghi nho thoi diem SAU khi gui ─────
         print(f"[{myanmar_now()}] 📤 Gửi: {COMMAND}")
         await client.send_message(source, COMMAND)
+        # send_time dat SAU khi gui, tru 5s buffer de chac chan include command
+        send_time = datetime.now(timezone.utc) - timedelta(seconds=5)
 
         # ── 6. Chờ bot phản hồi ───────────────────────────────────
         print(f"[{myanmar_now()}] ⏳ Chờ {WAIT_REPLY_SEC}s...")
