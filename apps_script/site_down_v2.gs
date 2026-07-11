@@ -214,7 +214,9 @@ function checkAndSend(isWebhookCall) {
 
     // Bước 1: Dispatch botlookup_relay → gửi lệnh lấy data từ BOT LOOKUP
     //   botlookup_relay.py sẽ: gửi /down_tni → đọc kết quả → ghi Col A + Note B2:B5
-    triggerBotlookupRelay();
+    if (!isWebhookCall) {
+      triggerBotlookupRelay();
+    }
 
     // Bước 2: Kiểm tra và gửi (data được botlookup_relay ghi từ lần trước)
     const sentTin1 = checkColC(sheet);   // Tin 1: A1 thay đổi → gửi Col C vào T1/T2/T3/T4 + CONTROL
