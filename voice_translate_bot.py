@@ -67,13 +67,7 @@ TELEGRAM_SESSION  = os.getenv("TELEGRAM_SESSION", "")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ─── Group mapping ─────────────────────────────────────────
-GROUP_MAP = {
-    "T1":      -1004215695747,   # Dawei
-    "T2":      -1004480845549,   # Myeik + Team5
-    "T3":      -1004369170658,   # Bokpyin
-    "T4":      -1004293741999,   # Kawthoung
-    "CONTROL": -5251698940,   # Control group
-}
+from tni_config import TELEGRAM_GROUPS as GROUP_MAP
 
 # ─── Per-user settings (in-memory) ─────────────────────────
 user_settings = {}   # user_id -> { "target": chat_id, "lang": "vi-en" }

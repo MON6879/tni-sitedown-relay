@@ -36,13 +36,7 @@ GAS_URL        = os.environ.get("APPS_SCRIPT_URL", "")
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
-GROUPS = {
-    "T1":      -1004215695747,   # TNI TEAM 1
-    "T2":      -1004480845549,   # TNI TEAM 2 (T2+T5)
-    "T3":      -1004369170658,   # TNI TEAM 3
-    "T4":      -1004293741999,   # TNI TEAM 4
-    "CONTROL": -5251698940,   # 5 TNI TECHNICA DEP CONTROL SITE
-}
+from tni_config import TELEGRAM_GROUPS as GROUPS
 
 # Map team string patterns → group key
 TEAM_TO_GROUP = {

@@ -25,12 +25,13 @@ GAS_URL        = os.environ.get("APPS_SCRIPT_URL", "")
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
+from tni_config import TELEGRAM_GROUPS
 GROUPS = {
-    "CONTROL": { "name": "5 TNI TECHNICA DEP CONTROL", "id": -5251698940 },
-    "T1":      { "name": "Team 1",                      "id": -1004215695747 },
-    "T2":      { "name": "Team 2 (T2+T5)",              "id": -1004480845549 },
-    "T3":      { "name": "Team 3",                      "id": -1004369170658 },
-    "T4":      { "name": "Team 4",                      "id": -1004293741999 },
+    "CONTROL": { "name": "5 TNI TECHNICA DEP CONTROL", "id": TELEGRAM_GROUPS["CONTROL"] },
+    "T1":      { "name": "Team 1",                      "id": TELEGRAM_GROUPS["T1"] },
+    "T2":      { "name": "Team 2 (T2+T5)",              "id": TELEGRAM_GROUPS["T2"] },
+    "T3":      { "name": "Team 3",                      "id": TELEGRAM_GROUPS["T3"] },
+    "T4":      { "name": "Team 4",                      "id": TELEGRAM_GROUPS["T4"] },
 }
 
 # Check last N messages sent by this account

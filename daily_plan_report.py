@@ -60,20 +60,9 @@ DAILY_REPORT_CSV = (
 )
 
 # ── Telegram Groups ────────────────────────────────────────────
-GROUPS = {
-    "T1": -1004215695747,   # TNI TEAM 1 (Dawei)
-    "T2": -1004480845549,   # TNI TEAM 2 (Myeik + Team5)
-    "T3": -1004369170658,   # TNI TEAM 3 (Bokpyin)
-    "T4": -1004293741999,   # TNI TEAM 4 (Kawthoung)
-}
-CONTROL_CHAT_ID = -5251698940
-
-GROUP_NAMES = {
-    "T1": "Team1 Dawei",
-    "T2": "Team2 Myeik",
-    "T3": "Team3 Bokpyin",
-    "T4": "Team4 Kawthoung",
-}
+from tni_config import TELEGRAM_GROUPS, GROUP_NAMES
+GROUPS = {k: v for k, v in TELEGRAM_GROUPS.items() if k != "CONTROL"}
+CONTROL_CHAT_ID = TELEGRAM_GROUPS["CONTROL"]
 
 # Team number → group key  (dùng để map nhân viên)
 # Lấy team từ sheet "Task remain" col A hoặc "ID Telegram" tab

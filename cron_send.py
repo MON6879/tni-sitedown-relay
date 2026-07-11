@@ -36,11 +36,12 @@ HEADER_ROWS = 3  # rows 1-3 là header (row 3 có 'export sms')
 COL_A, COL_B, COL_C, COL_D, COL_E = 0, 1, 2, 3, 4
 
 # ── Group Chat IDs của 4 team (từ botlookup_relay.py) ───────────
+from tni_config import TELEGRAM_GROUPS
 TEAM_GROUPS = {
-    "MYT_TNI_TEAM01_Dawei":     -1004215695747,
-    "MYT_TNI_TEAM02_Myeik":     -1004480845549,
-    "MYT_TNI_TEAM03_Bokpyin":   -1004369170658,
-    "MYT_TNI_TEAM04_Kawthoung": -1004293741999,
+    "MYT_TNI_TEAM01_Dawei":     TELEGRAM_GROUPS["T1"],
+    "MYT_TNI_TEAM02_Myeik":     TELEGRAM_GROUPS["T2"],
+    "MYT_TNI_TEAM03_Bokpyin":   TELEGRAM_GROUPS["T3"],
+    "MYT_TNI_TEAM04_Kawthoung": TELEGRAM_GROUPS["T4"],
 }
 TEAM_ICON = {
     "MYT_TNI_TEAM01_Dawei":     "1️⃣",
@@ -180,11 +181,11 @@ def get_no_id_members(bot_token: str = "") -> dict:
     # Mapping col N → team_key (và group chat_id để check membership)
     # Map col M values: 'Team 01' -> team_key (Team 05 gộp vào Team 2)
     TEAM_N_MAP = {
-        "Team 01": ("MYT_TNI_TEAM01_Dawei",     -1004215695747),
-        "Team 02": ("MYT_TNI_TEAM02_Myeik",     -1004480845549),
-        "Team 03": ("MYT_TNI_TEAM03_Bokpyin",   -1004369170658),
-        "Team 04": ("MYT_TNI_TEAM04_Kawthoung", -1004293741999),
-        "Team 05": ("MYT_TNI_TEAM02_Myeik",     -1004480845549),  # Team 5 ⇒ Team 2
+        "Team 01": ("MYT_TNI_TEAM01_Dawei",     TELEGRAM_GROUPS["T1"]),
+        "Team 02": ("MYT_TNI_TEAM02_Myeik",     TELEGRAM_GROUPS["T2"]),
+        "Team 03": ("MYT_TNI_TEAM03_Bokpyin",   TELEGRAM_GROUPS["T3"]),
+        "Team 04": ("MYT_TNI_TEAM04_Kawthoung", TELEGRAM_GROUPS["T4"]),
+        "Team 05": ("MYT_TNI_TEAM02_Myeik",     TELEGRAM_GROUPS["T2"]),  # Team 5 ⇒ Team 2
     }
 
     # Collect: no_id và candidates cần check
@@ -1492,10 +1493,10 @@ async def main():
     def get_target_group(team_str: str):
         if not team_str: return None
         ts = team_str.upper()
-        if "TEAM01" in ts or "TEAM 1" in ts or "TEAM1" in ts: return -1004215695747
-        if "TEAM02" in ts or "TEAM 2" in ts or "TEAM2" in ts or "TEAM05" in ts or "TEAM 5" in ts or "TEAM5" in ts: return -1004480845549
-        if "TEAM03" in ts or "TEAM 3" in ts or "TEAM3" in ts: return -1004369170658
-        if "TEAM04" in ts or "TEAM 4" in ts or "TEAM4" in ts: return -1004293741999
+        if "TEAM01" in ts or "TEAM 1" in ts or "TEAM1" in ts: return TELEGRAM_GROUPS["T1"]
+        if "TEAM02" in ts or "TEAM 2" in ts or "TEAM2" in ts or "TEAM05" in ts or "TEAM 5" in ts or "TEAM5" in ts: return TELEGRAM_GROUPS["T2"]
+        if "TEAM03" in ts or "TEAM 3" in ts or "TEAM3" in ts: return TELEGRAM_GROUPS["T3"]
+        if "TEAM04" in ts or "TEAM 4" in ts or "TEAM4" in ts: return TELEGRAM_GROUPS["T4"]
         return None
 
     for sheet_row, content, cid, col_c, col_a_val, col_b in all_rows:
@@ -1724,10 +1725,10 @@ async def main():
 
     # ── Mapping chat_id → GAS key để delete-old / save-new ──
     CHATID_TO_KEY = {
-        "-1004215695747": "CRON_TEAM_T1",
-        "-1004480845549": "CRON_TEAM_T2",
-        "-1004369170658": "CRON_TEAM_T3",
-        "-1004293741999": "CRON_TEAM_T4",
+        str(TELEGRAM_GROUPS["T1"]): "CRON_TEAM_T1",
+        str(TELEGRAM_GROUPS["T2"]): "CRON_TEAM_T2",
+        str(TELEGRAM_GROUPS["T3"]): "CRON_TEAM_T3",
+        str(TELEGRAM_GROUPS["T4"]): "CRON_TEAM_T4",
     }
 
     # ── Delete old messages trước khi gửi mới ──
@@ -1779,10 +1780,10 @@ async def main():
         try:
             delete_old_messages_bot(SEND_BOT_TOKEN, -5251698940, APPS_SCRIPT_URL, "CRON_ASSET_CONTROL")
             ASSET_DELETE_RECIPIENTS = {
-                "CRON_ASSET_T1": -1004215695747,
-                "CRON_ASSET_T2": -1004480845549,
-                "CRON_ASSET_T3": -1004369170658,
-                "CRON_ASSET_T4": -1004293741999,
+                "CRON_ASSET_T1": TELEGRAM_GROUPS["T1"],
+                "CRON_ASSET_T2": TELEGRAM_GROUPS["T2"],
+                "CRON_ASSET_T3": TELEGRAM_GROUPS["T3"],
+                "CRON_ASSET_T4": TELEGRAM_GROUPS["T4"],
             }
             for key, cid in ASSET_DELETE_RECIPIENTS.items():
                 delete_old_messages_bot(SEND_BOT_TOKEN, cid, APPS_SCRIPT_URL, key)

@@ -28,14 +28,14 @@ LOOP_INTERVAL  = 15 * 60          # Edit mỗi 15 phút
 DURATION_HOURS = float(os.environ.get("DURATION_HOURS", "2"))
 CHECK_LAST_N   = 3                # Kiểm tra N tin nhắn gần nhất
 
-# CONTROL = phòng ban → dùng để loại trừ khỏi T1/T2/T3/T4
-CONTROL_ID = -5251698940
+from tni_config import TELEGRAM_GROUPS
+CONTROL_ID = TELEGRAM_GROUPS["CONTROL"]
 
 TEAMS = {
-    "T1": {"name": "Team 1",         "id": -1004215695747},
-    "T2": {"name": "Team 2 (T2+T5)", "id": -1004480845549},
-    "T3": {"name": "Team 3",         "id": -1004369170658},
-    "T4": {"name": "Team 4",         "id": -1004293741999},
+    "T1": {"name": "Team 1",         "id": TELEGRAM_GROUPS["T1"]},
+    "T2": {"name": "Team 2 (T2+T5)", "id": TELEGRAM_GROUPS["T2"]},
+    "T3": {"name": "Team 3",         "id": TELEGRAM_GROUPS["T3"]},
+    "T4": {"name": "Team 4",         "id": TELEGRAM_GROUPS["T4"]},
 }
 # ──────────────────────────────────────────────────────────────
 

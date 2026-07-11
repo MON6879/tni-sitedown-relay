@@ -25,27 +25,22 @@ SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?for
 
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 
-TEAM_GROUPS = {
-    1: -1004215695747,  # Team 1 Dawei
-    2: -1004480845549,  # Team 2 Myeik (gồm Team 5)
-    3: -1004369170658,  # Team 3 Bokpyin
-    4: -1004293741999,  # Team 4 Kawthoung
-}
+from tni_config import TELEGRAM_GROUPS, TEAM_NAMES
 
-TEAM_NAMES = {
-    1: "Team 1 Dawei",
-    2: "Team 2 Myeik",
-    3: "Team 3 Bokpyin",
-    4: "Team 4 Kawthoung",
+TEAM_GROUPS = {
+    1: TELEGRAM_GROUPS["T1"],
+    2: TELEGRAM_GROUPS["T2"],
+    3: TELEGRAM_GROUPS["T3"],
+    4: TELEGRAM_GROUPS["T4"],
 }
 
 APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL", "")
 
 CHATID_TO_KEY = {
-    -1004215695747: "BACKLOG_TEAM_T1",
-    -1004480845549: "BACKLOG_TEAM_T2",
-    -1004369170658: "BACKLOG_TEAM_T3",
-    -1004293741999: "BACKLOG_TEAM_T4",
+    TELEGRAM_GROUPS["T1"]: "BACKLOG_TEAM_T1",
+    TELEGRAM_GROUPS["T2"]: "BACKLOG_TEAM_T2",
+    TELEGRAM_GROUPS["T3"]: "BACKLOG_TEAM_T3",
+    TELEGRAM_GROUPS["T4"]: "BACKLOG_TEAM_T4",
 }
 
 
