@@ -186,10 +186,10 @@ function checkAndSend(isWebhookCall) {
   // ── Kiểm tra thời gian nếu không phải là Webhook call ──
   const props = PropertiesService.getScriptProperties();
   if (!isWebhookCall) {
-    if (minute !== 1 && minute !== 31) return { sent_tin1: false, sent_tin2: false };
+    if (minute !== 8 && minute !== 38) return { sent_tin1: false, sent_tin2: false };
     if (hour < 3 || hour > 21) return { sent_tin1: false, sent_tin2: false };
-    if (hour === 3 && minute < 1) return { sent_tin1: false, sent_tin2: false };   // 03:01 là sớm nhất
-    if (hour === 21 && minute > 31) return { sent_tin1: false, sent_tin2: false }; // 21:31 là muộn nhất
+    if (hour === 3 && minute < 8) return { sent_tin1: false, sent_tin2: false };   // 03:08 là sớm nhất
+    if (hour === 21 && minute > 38) return { sent_tin1: false, sent_tin2: false }; // 21:38 là muộn nhất
 
     // ── Chống chạy 2 lần trong cùng phút (chỉ áp dụng cho time trigger) ──
     const doneKey = "SD_DONE_" + Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHHmm");
