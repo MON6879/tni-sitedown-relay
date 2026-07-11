@@ -34,6 +34,7 @@ function doPost(e) {
   const action = body.action || "";
   try {
     if (action === "collect_message") return collectMessage(body);
+    if (action === "collect_photo")   return collectPhoto(body);   // ← NEW: thu thập ảnh refuel
     if (action === "get_msg_id")      return getMsgId(body.key || "");
     if (action === "set_msg_id")      return setMsgId(body.key || "", body.msg_id || "");
     return jsonResp({ status: "error", message: "Unknown action: " + action });
@@ -411,3 +412,271 @@ function getRefuelData() {
   }
   return jsonResp({ status: "ok", data: data });
 }
+
+
+// ============================================================
+// PHOTO COLLECTION — Cột T, U, V, W, X, Y, Z, AA
+// ============================================================
+//
+// Layout cột trong sheet Refueled (1-indexed):
+//   T  = 20  : QI4 Code      — 3 ký tự cuối KeyPhoto ngày hôm nay
+//   U  = 21  : QI4 Match     — MATCH / NEAR / NO
+//   V  = 22  : Lng (Photo)   — GPS longitude từ EXIF ảnh
+//   W  = 23  : Lat (Photo)   — GPS latitude từ EXIF ảnh
+//   X  = 24  : Lng (Real)    — User tự điền thủ công
+//   Y  = 25  : Lat (Real)    — User tự điền thủ công
+//   Z  = 26  : Distance (m)  — Haversine tự tính khi user điền X/Y
+//   AA = 27  : Photo Auth    — ORIGINAL / EDITED / SUSPECT
+
+const COL_T  = 20;
+const COL_U  = 21;
+const COL_V  = 22;
+const COL_W  = 23;
+const COL_X  = 24;
+const COL_Y  = 25;
+const COL_Z  = 26;
+const COL_AA = 27;
+
+
+/**
+ * collectPhoto: nhận payload từ Python bot (refuel_photo_collector.py),
+ * tìm row trong sheet Refueled khớp sender_id + ngày hôm nay,
+ * rồi ghi các cột T, U, V, W, AA.
+ */
+function collectPhoto(body) {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Refueled");
+  if (!sheet) return jsonResp({ status: "error", message: "Sheet 'Refueled' not found" });
+
+  const senderId   = String(body.sender_id   || "").trim();
+  const senderName = String(body.sender_name || "").trim();
+  const dateStr    = String(body.date        || "").trim();   // dd/MM/yyyy
+  const qi4Code    = String(body.qi4_code    || "").trim().toUpperCase();
+  const fileId     = String(body.file_id     || "").trim();
+  const caption    = String(body.caption     || "").trim();
+  const latPhoto   = (body.lat_photo !== undefined && body.lat_photo !== null)
+                     ? Number(body.lat_photo) : null;
+  const lngPhoto   = (body.lng_photo !== undefined && body.lng_photo !== null)
+                     ? Number(body.lng_photo) : null;
+  const auth       = String(body.auth || "SUSPECT").trim().toUpperCase();
+
+  if (!senderId) return jsonResp({ status: "error", message: "Missing sender_id" });
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return jsonResp({ status: "skip", message: "Refueled sheet empty" });
+
+  const numRows   = lastRow - 1;
+  const dateCol   = sheet.getRange(2, 2,  numRows, 1).getValues();  // col B: Date
+  const dgIdCol   = sheet.getRange(2, 3,  numRows, 1).getValues();  // col C: DG ID
+  const senderCol = sheet.getRange(2, 19, numRows, 1).getValues();  // col S: sender_id
+
+  let targetRow = -1;
+  let dgId      = "";
+
+  // Ưu tiên: tìm row khớp sender_id + ngày hôm nay
+  for (let i = 0; i < numRows; i++) {
+    const rowDate   = String(dateCol[i][0]   || "").trim();
+    const rowSender = String(senderCol[i][0] || "").trim();
+    if (rowSender === senderId && rowDate === dateStr) {
+      targetRow = i + 2;
+      dgId      = String(dgIdCol[i][0] || "").trim().toUpperCase();
+      break;
+    }
+  }
+
+  // Fallback: tìm row đầu tiên có ngày hôm nay mà cột T chưa điền
+  if (targetRow === -1) {
+    for (let i = 0; i < numRows; i++) {
+      const rowDate = String(dateCol[i][0] || "").trim();
+      const rowT    = sheet.getRange(i + 2, COL_T).getValue();
+      if (rowDate === dateStr && !rowT) {
+        targetRow = i + 2;
+        dgId      = String(dgIdCol[i][0] || "").trim().toUpperCase();
+        break;
+      }
+    }
+  }
+
+  // Nếu vẫn không tìm thấy → thêm dòng mới
+  if (targetRow === -1) {
+    const now     = new Date();
+    const defId   = nextDefId(sheet);
+    const newRow  = [
+      defId, dateStr, "", "", "", "", "", "", "", "",  // A–J
+      "", "", "", "", "", "", now, senderName, senderId // K–S
+    ];
+    insertAtTop(sheet, newRow);
+    targetRow = 2;
+    Logger.log("[collectPhoto] New row inserted: DEF=" + defId);
+  }
+
+  // ── QI4 matching ──
+  const matchResult = matchQi4(caption, dgId, qi4Code);
+
+  // ── Ghi các cột T, U, V, W, AA ──
+  sheet.getRange(targetRow, COL_T).setValue(qi4Code);
+  sheet.getRange(targetRow, COL_U).setValue(matchResult);
+  sheet.getRange(targetRow, COL_V).setValue(lngPhoto !== null ? lngPhoto : "");
+  sheet.getRange(targetRow, COL_W).setValue(latPhoto !== null ? latPhoto : "");
+  // COL_X, COL_Y: user điền thủ công → không ghi
+  sheet.getRange(targetRow, COL_AA).setValue(auth);
+
+  // Lưu file_id vào note của cell AA để tra cứu sau
+  if (fileId) {
+    const note = sheet.getRange(targetRow, COL_AA).getNote() || "";
+    if (!note.includes(fileId)) {
+      sheet.getRange(targetRow, COL_AA).setNote((note ? note + "\n" : "") + fileId);
+    }
+  }
+
+  Logger.log("[collectPhoto] row=" + targetRow + " DG=" + dgId +
+             " T=" + qi4Code + " U=" + matchResult +
+             " V=" + lngPhoto + " W=" + latPhoto + " AA=" + auth);
+
+  return jsonResp({
+    status: "ok",
+    row:    targetRow,
+    dg_id:  dgId,
+    qi4:    qi4Code,
+    match:  matchResult,
+    auth:   auth,
+    lat:    latPhoto,
+    lng:    lngPhoto
+  });
+}
+
+
+/**
+ * matchQi4: so sánh caption ảnh với DG ID từ sheet và mã QI4.
+ * Returns: 'MATCH' | 'NEAR' | 'NO'
+ */
+function matchQi4(caption, dgId, qi4Code) {
+  if (!caption) return "NO";
+  const capU = caption.toUpperCase().trim();
+  const qi4U = (qi4Code || "QI4").toUpperCase();
+  const dgU  = (dgId || "").toUpperCase().trim();
+
+  // MATCH: caption chứa đúng pattern TNIXXXX_NQI4 với DG ID khớp
+  if (dgU) {
+    const esc = dgU.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const qi4Esc = qi4U.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp(esc + "_\\d+" + qi4Esc).test(capU)) return "MATCH";
+  }
+
+  // NEAR: không đúng DG ID nhưng có chuỗi QI4 trong caption
+  if (qi4U && capU.includes(qi4U)) return "NEAR";
+
+  return "NO";
+}
+
+
+/**
+ * haversineMeters: tính khoảng cách Haversine giữa 2 điểm GPS, đơn vị mét.
+ * @param {number} lat1  Vĩ độ điểm 1 (Photo)
+ * @param {number} lon1  Kinh độ điểm 1 (Photo)
+ * @param {number} lat2  Vĩ độ điểm 2 (Real)
+ * @param {number} lon2  Kinh độ điểm 2 (Real)
+ * @returns {number} Khoảng cách tính bằng mét
+ */
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R  = 6371000;  // Bán kính Trái Đất (mét)
+  const f1 = lat1 * Math.PI / 180;
+  const f2 = lat2 * Math.PI / 180;
+  const df = (lat2 - lat1) * Math.PI / 180;
+  const dl = (lon2 - lon1) * Math.PI / 180;
+  const a  = Math.sin(df / 2) * Math.sin(df / 2)
+             + Math.cos(f1) * Math.cos(f2)
+             * Math.sin(dl / 2) * Math.sin(dl / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+
+/**
+ * onEditRefuelPhoto: trigger tự động tính cột Z (khoảng cách mét)
+ * khi user điền cột X (Lng Real) hoặc Y (Lat Real).
+ * Cần cài bằng setupOnEditTrigger().
+ */
+function onEditRefuelPhoto(e) {
+  if (!e) return;
+  const sheet = e.source.getActiveSheet();
+  if (!sheet || sheet.getName() !== "Refueled") return;
+
+  const col = e.range.getColumn();
+  const row = e.range.getRow();
+
+  if (row < 2) return;
+  if (col !== COL_X && col !== COL_Y) return;
+
+  const lngPhoto = parseFloat(sheet.getRange(row, COL_V).getValue());
+  const latPhoto = parseFloat(sheet.getRange(row, COL_W).getValue());
+  const lngReal  = parseFloat(sheet.getRange(row, COL_X).getValue());
+  const latReal  = parseFloat(sheet.getRange(row, COL_Y).getValue());
+
+  // Cần cả 4 giá trị hợp lệ mới tính
+  if (isNaN(lngPhoto) || isNaN(latPhoto) || isNaN(lngReal) || isNaN(latReal)) {
+    sheet.getRange(row, COL_Z).setValue("");
+    return;
+  }
+
+  const dist = haversineMeters(latPhoto, lngPhoto, latReal, lngReal);
+  sheet.getRange(row, COL_Z).setValue(Math.round(dist));  // làm tròn tới mét
+  Logger.log("[onEditRefuelPhoto] row=" + row + " dist=" + Math.round(dist) + "m");
+}
+
+
+/**
+ * setupRefuelPhotoHeaders: thiết lập tiêu đề cột T → AA trong sheet Refueled.
+ * Chạy 1 lần từ Apps Script Editor để khởi tạo.
+ */
+function setupRefuelPhotoHeaders() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Refueled");
+  if (!sheet) { Logger.log("❌ Sheet 'Refueled' not found"); return; }
+
+  const headers = [[
+    "QI4 Code",    // T
+    "QI4 Match",   // U
+    "Lng (Photo)", // V
+    "Lat (Photo)", // W
+    "Lng (Real)",  // X  ← user điền
+    "Lat (Real)",  // Y  ← user điền
+    "Distance (m)",// Z  ← auto Haversine
+    "Photo Auth"   // AA
+  ]];
+  sheet.getRange(1, COL_T, 1, 8).setValues(headers);
+
+  // Header màu xanh
+  const hdr = sheet.getRange(1, COL_T, 1, 8);
+  hdr.setBackground("#1a73e8");
+  hdr.setFontColor("#ffffff");
+  hdr.setFontWeight("bold");
+
+  // Cột X, Y (user fill) → nền vàng nhạt
+  const maxR = sheet.getMaxRows();
+  sheet.getRange(2, COL_X, maxR - 1, 2).setBackground("#fff9c4");
+
+  // Cột Z, AA (auto) → nền xanh lá nhạt
+  sheet.getRange(2, COL_Z, maxR - 1, 2).setBackground("#e8f5e9");
+
+  Logger.log("✅ Headers T→AA đã thiết lập trong sheet Refueled.");
+}
+
+
+/**
+ * setupOnEditTrigger: cài trigger onEdit cho onEditRefuelPhoto.
+ * Chạy 1 lần từ Apps Script Editor.
+ */
+function setupOnEditTrigger() {
+  const existing = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < existing.length; i++) {
+    if (existing[i].getHandlerFunction() === "onEditRefuelPhoto") {
+      ScriptApp.deleteTrigger(existing[i]);
+    }
+  }
+  ScriptApp.newTrigger("onEditRefuelPhoto")
+    .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
+    .onEdit()
+    .create();
+  Logger.log("✅ onEditRefuelPhoto trigger installed.");
+}
+
