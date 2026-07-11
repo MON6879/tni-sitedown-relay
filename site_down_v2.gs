@@ -822,3 +822,10 @@ function testTin2Only() {
   const sheet = getSheetByGid(ss, SD_SHEET_GID);
   if (sheet) checkAwAz(sheet);
 }
+
+function resetSiteDownProperties() {
+  const props = PropertiesService.getScriptProperties();
+  props.deleteProperty(TS_KEY_A1);
+  props.deleteProperty(TS_KEY_AW7);
+  Logger.log("✅ resetSiteDownProperties: Đã xóa bộ nhớ đệm A1 và AW7.");
+}
