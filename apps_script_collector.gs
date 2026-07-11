@@ -103,9 +103,9 @@ function doGet(e) {
     if (action === "get_site_down_data") return getSiteDownData();
     if (action === "debug_properties") {
       var props = PropertiesService.getScriptProperties().getProperties();
-      var ss = SpreadsheetApp.openById("1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow");
-      var sheet = ss.getSheets()[0];
-      var a1 = sheet.getRange("A1").getValue().toString().trim();
+      var debugSs = SpreadsheetApp.openById("1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow");
+      var debugSheet = debugSs.getSheets()[0];
+      var a1 = debugSheet.getRange("A1").getValue().toString().trim();
       var ts1 = "";
       try {
         var m1 = a1.match(/(\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2}:\d{2})/);
