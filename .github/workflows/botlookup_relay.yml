@@ -2,7 +2,10 @@ name: Botlookup Relay  # last-updated: 2026-07-10
 
 on:
   schedule:
-    - cron: '8,38 0-15,21-23 * * *'  # :08/:38 UTC = Myanmar :38/:08, active hours
+    - cron: '8,38 20-23,0-15 * * *'
+      # Myanmar :08/:38 → UTC :38/:08 (Myanmar = UTC+6:30)
+      # Myanmar 03:08 = UTC 20:38, 03:38 = UTC 21:08 ... 21:38 = UTC 15:08
+      # Extra: UTC 20:08 = Myanmar 02:38 (harmless, GAS has own gate)
   workflow_dispatch:
     inputs:
       skip_delay:

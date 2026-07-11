@@ -122,7 +122,7 @@ function triggerBotlookupRelay() {
   if (!pat) { Logger.log("[Relay] ⚠️ GITHUB_PAT chưa set — bỏ qua dispatch"); return; }
 
   try {
-    const url  = "https://api.github.com/repos/" + owner + "/" + repo + "/actions/workflows/daily_reports.yml/dispatches";
+    const url  = "https://api.github.com/repos/" + owner + "/" + repo + "/actions/workflows/botlookup_relay.yml/dispatches";
     const resp = UrlFetchApp.fetch(url, {
       method:  "post",
       headers: {
@@ -130,7 +130,7 @@ function triggerBotlookupRelay() {
         "Accept":        "application/vnd.github.v3+json",
       },
       contentType:        "application/json",
-      payload:            JSON.stringify({ ref: "main", inputs: { job: "botlookup_relay" } }),
+      payload:            JSON.stringify({ ref: "main", inputs: { skip_delay: "1" } }),
       muteHttpExceptions: true,
     });
     const code = resp.getResponseCode();
