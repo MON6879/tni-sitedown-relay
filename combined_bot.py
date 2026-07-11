@@ -55,19 +55,19 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))
 
 # Group Chat IDs của 4 team
 TEAM_GROUPS = {
-    "MYT_TNI_TEAM01_Dawei":     -5180992881,
-    "MYT_TNI_TEAM02_Myeik":     -5188855349,
-    "MYT_TNI_TEAM03_Bokpyin":   -5183480727,
-    "MYT_TNI_TEAM04_Kawthoung": -5238696719,
+    "MYT_TNI_TEAM01_Dawei":     -1004215695747,
+    "MYT_TNI_TEAM02_Myeik":     -1004480845549,
+    "MYT_TNI_TEAM03_Bokpyin":   -1004369170658,
+    "MYT_TNI_TEAM04_Kawthoung": -1004293741999,
 }
 
 def get_target_group(team_str: str):
     if not team_str: return None
     ts = team_str.upper()
-    if "TEAM01" in ts or "TEAM 1" in ts or "TEAM1" in ts: return -5180992881
-    if "TEAM02" in ts or "TEAM 2" in ts or "TEAM2" in ts or "TEAM05" in ts or "TEAM 5" in ts or "TEAM5" in ts: return -5188855349
-    if "TEAM03" in ts or "TEAM 3" in ts or "TEAM3" in ts: return -5183480727
-    if "TEAM04" in ts or "TEAM 4" in ts or "TEAM4" in ts: return -5238696719
+    if "TEAM01" in ts or "TEAM 1" in ts or "TEAM1" in ts: return -1004215695747
+    if "TEAM02" in ts or "TEAM 2" in ts or "TEAM2" in ts or "TEAM05" in ts or "TEAM 5" in ts or "TEAM5" in ts: return -1004480845549
+    if "TEAM03" in ts or "TEAM 3" in ts or "TEAM3" in ts: return -1004369170658
+    if "TEAM04" in ts or "TEAM 4" in ts or "TEAM4" in ts: return -1004293741999
     return None
 
 
@@ -225,16 +225,16 @@ async def send_all_tasks():
 
     if emp_by_team and SEND_BOT_TOKEN:
         TEAM_CLEAN_NAMES = {
-            -5180992881: "Team 1 Dawei",
-            -5188855349: "Team 2 Myeik",
-            -5183480727: "Team 3 Bokpyin",
-            -5238696719: "Team 4 Kawthoung",
+            -1004215695747: "Team 1 Dawei",
+            -1004480845549: "Team 2 Myeik",
+            -1004369170658: "Team 3 Bokpyin",
+            -1004293741999: "Team 4 Kawthoung",
         }
         EMP_CHATID_TO_KEY = {
-            "-5180992881": "SCHEDULER_EMP_T1",
-            "-5188855349": "SCHEDULER_EMP_T2",
-            "-5183480727": "SCHEDULER_EMP_T3",
-            "-5238696719": "SCHEDULER_EMP_T4",
+            "-1004215695747": "SCHEDULER_EMP_T1",
+            "-1004480845549": "SCHEDULER_EMP_T2",
+            "-1004369170658": "SCHEDULER_EMP_T3",
+            "-1004293741999": "SCHEDULER_EMP_T4",
         }
 
         async with Bot(token=SEND_BOT_TOKEN) as bot:

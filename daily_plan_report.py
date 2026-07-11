@@ -61,10 +61,10 @@ DAILY_REPORT_CSV = (
 
 # ── Telegram Groups ────────────────────────────────────────────
 GROUPS = {
-    "T1": -5180992881,   # TNI TEAM 1 (Dawei)
-    "T2": -5188855349,   # TNI TEAM 2 (Myeik + Team5)
-    "T3": -5183480727,   # TNI TEAM 3 (Bokpyin)
-    "T4": -5238696719,   # TNI TEAM 4 (Kawthoung)
+    "T1": -1004215695747,   # TNI TEAM 1 (Dawei)
+    "T2": -1004480845549,   # TNI TEAM 2 (Myeik + Team5)
+    "T3": -1004369170658,   # TNI TEAM 3 (Bokpyin)
+    "T4": -1004293741999,   # TNI TEAM 4 (Kawthoung)
 }
 CONTROL_CHAT_ID = -5251698940
 

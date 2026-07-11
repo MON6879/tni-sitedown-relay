@@ -1753,7 +1753,7 @@ function handleStoreSiteDownDirect(body) {
     // ── Gọi checkAndSend() nếu cùng GAS project; nếu khác project thì GAS trigger 5p sẽ xử lý ──
     var checkResult = { sent_tin1: false, sent_tin2: false };
     try {
-      var r = checkAndSend();
+      var r = checkAndSend(true);
       if (r && typeof r === "object") {
         checkResult = r;
       }

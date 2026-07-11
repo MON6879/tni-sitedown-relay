@@ -68,10 +68,10 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ─── Group mapping ─────────────────────────────────────────
 GROUP_MAP = {
-    "T1":      -5180992881,   # Dawei
-    "T2":      -5188855349,   # Myeik + Team5
-    "T3":      -5183480727,   # Bokpyin
-    "T4":      -5238696719,   # Kawthoung
+    "T1":      -1004215695747,   # Dawei
+    "T2":      -1004480845549,   # Myeik + Team5
+    "T3":      -1004369170658,   # Bokpyin
+    "T4":      -1004293741999,   # Kawthoung
     "CONTROL": -5251698940,   # Control group
 }
 
