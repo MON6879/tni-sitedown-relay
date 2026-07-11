@@ -29,12 +29,13 @@ REFUEL_GROUP_ID = -5469544739   # 9 TNI REQUEST REFUEL — scan Letter Submit/Ap
 REFUEL_GAS_URL  = os.environ.get("REFUEL_APPS_SCRIPT_URL", "")
 
 # Nhóm nhận Note từ @Phongha79 (để theo dõi ai đọc)
+# T1-T4 đã migrate sang supergroup (Channel) — dùng Channel ID
 ALL_GROUPS = {
-    "CONTROL": -5251698940,
-    "T1":      -5180992881,
-    "T2":      -5188855349,
-    "T3":      -5183480727,
-    "T4":      -5238696719,
+    "CONTROL": -5251698940,  # Chat (chưa migrate)
+    "T1":       4215695747,  # Channel (migrate từ -5180992881)
+    "T2":       4480845549,  # Channel (migrate từ -5188855349)
+    "T3":       4369170658,  # Channel (migrate từ -5183480727)
+    "T4":       4293741999,  # Channel (migrate từ -5238696719)
 }
 TARGET_CHAT_ID = ALL_GROUPS["CONTROL"]   # fallback error messages
 
