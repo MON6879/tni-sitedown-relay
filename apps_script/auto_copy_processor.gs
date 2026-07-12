@@ -77,6 +77,41 @@ function runResetTeam3CopiedNotes() {
 }
 
 /**
+ * Hàm tự động reset Note trên tất cả các sheet nguồn có trong bảng cấu hình
+ */
+function runResetAllCopiedNotes() {
+  Logger.log("🔄 Bắt đầu reset ghi chú (Note) trên tất cả các sheet nguồn...");
+  try {
+    const configSS = getSpreadsheetCached_(CONFIG_SS_ID);
+    const sheetConfig = configSS.getSheetByName(CONFIG_TAB_NAME);
+    const lastRow = sheetConfig.getLastRow();
+    if (lastRow < 2) {
+      Logger.log("ℹ️ Bảng cấu hình trống.");
+      return;
+    }
+    const configRows = sheetConfig.getRange(2, 1, lastRow - 1, 4).getValues();
+    for (let i = 0; i < configRows.length; i++) {
+      const sourceLink = String(configRows[i][0] || "").trim();
+      const sourceSheet = String(configRows[i][1] || "").trim();
+      const sourceColCond = String(configRows[i][2] || "").trim();
+      if (sourceLink && sourceSheet && sourceColCond) {
+        try {
+          const srcSSId = extractSsId_(sourceLink);
+          const srcInfo = parseSheetAndRange_(sourceSheet);
+          const condRangeInfo = parseColAndStartRow_(sourceColCond);
+          resetCopiedNotes(srcSSId, srcInfo.sheetName, condRangeInfo.colLetter);
+        } catch (e) {
+          Logger.log("  ⚠️ Bỏ qua dòng cấu hình #" + (i+2) + ": " + e.message);
+        }
+      }
+    }
+    Logger.log("✅ Đã hoàn thành reset tất cả ghi chú nguồn.");
+  } catch (err) {
+    Logger.log("❌ Lỗi khi chạy Reset All: " + err.message);
+  }
+}
+
+/**
  * Hàm kiểm tra nhanh nội dung các ô A3, A4 để phân tích lỗi công thức
  */
 function runDebugTeam3Cells() {
