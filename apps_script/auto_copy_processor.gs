@@ -4,7 +4,7 @@
 // Chức năng: 
 //   - Đọc bảng cấu hình động tại Spreadsheet trung tâm
 //   - Tự động chạy Copy-Paste 123 & Xóa hàng theo điều kiện
-//   - Lịch chạy: 22:00 hàng ngày ( Myanmar Time )
+//   - Lịch chạy: Chạy tự động mỗi 15 phút (trong khung giờ làm việc)
 // ============================================================
 
 const CONFIG_SS_ID = "19RBlwehMC6BLoueaTEzsJHMx4puB0CTE5i5x79-uI6c";
@@ -61,10 +61,20 @@ function initConfigTab() {
 }
 
 /**
- * Hàm xử lý chính: Quét cấu hình và thực thi Copy-Paste + Xóa dòng
+ * HÀM CHẠY THỬ NGHIỆM THỦ CÔNG (Bỏ qua cổng thời gian)
+ * Anh có thể chọn và chạy hàm này từ Apps Script Editor bất kỳ lúc nào để test hệ thống copy.
  */
-function runAutoCopyProcessor() {
-  if (!isWithinCopyActiveWindows_()) {
+function runAutoCopyProcessorManual() {
+  Logger.log("🧪 Đang bắt đầu chạy thử nghiệm thủ công (Bỏ qua giới hạn khung giờ)...");
+  runAutoCopyProcessor(true);
+}
+
+/**
+ * Hàm xử lý chính: Quét cấu hình và thực thi Copy-Paste + Xóa dòng
+ * @param {boolean} bypassTimeGate - Nếu là true, bỏ qua kiểm tra khung giờ làm việc
+ */
+function runAutoCopyProcessor(bypassTimeGate) {
+  if (bypassTimeGate !== true && !isWithinCopyActiveWindows_()) {
     Logger.log("😴 Ngoài khung giờ hoạt động Copy (08:00-12:00 & 14:00-22:00 Myanmar) — Dừng tiến trình.");
     return;
   }
@@ -90,13 +100,15 @@ function runAutoCopyProcessor() {
     return;
   }
 
+  // Đọc dữ liệu từ cột A đến J (cột 1 đến 10)
   const configRows = sheetConfig.getRange(2, 1, lastRow - 1, 10).getValues();
-  Logger.log("Found " + configRows.length + " dòng cấu hình cần xử lý.");
+  Logger.log("Tìm thấy " + configRows.length + " dòng cấu hình cần xử lý.");
 
   for (let i = 0; i < configRows.length; i++) {
     const rowIdx = i + 2;
     const row = configRows[i];
     
+    // .getValues() đã tự động đọc giá trị cuối cùng được tính toán bởi công thức Excel/Sheets
     const sourceLink    = String(row[0] || "").trim();
     const sourceSheet   = String(row[1] || "").trim();
     const sourceColCond = String(row[2] || "").trim();
@@ -128,7 +140,6 @@ function runAutoCopyProcessor() {
           const tgtSS = getSpreadsheetCached_(tgtSSId);
           const tgtInfo = parseSheetAndRange_(targetSheet);
           const tgtSh = tgtSS.getSheetByName(tgtInfo.sheetName);
-
 
           if (!tgtSh) {
             Logger.log("  ❌ Lỗi: Không tìm thấy sheet đích: '" + tgtInfo.sheetName + "'");
@@ -179,8 +190,7 @@ function runAutoCopyProcessor() {
                   const condCell = srcSh.getRange(srcRowNum, condColNum);
                   const existingNote = condCell.getNote() || "";
                   if (existingNote.indexOf("✅ Auto-Copied:") !== -1) {
-                    Logger.log("  ⏭️ Dòng " + srcRowNum + " đã được đánh dấu Copied — bỏ qua.");
-                    continue;
+                    continue; // Đã copy trước đó — bỏ qua
                   }
                   
                   let rowValues;
@@ -201,7 +211,7 @@ function runAutoCopyProcessor() {
                   } catch (readErr) {
                     hasCircularError = true;
                     rowValues = null;
-                    Logger.log("  ⚠️ Lỗi đọc dữ liệu dòng " + srcRowNum + " (có thể Circular Reference): " + readErr.message);
+                    Logger.log("  ⚠️ Lỗi đọc dữ liệu dòng " + srcRowNum + " (có thể do Circular Reference): " + readErr.message);
                   }
                   
                   if (hasCircularError) {
@@ -243,9 +253,6 @@ function runAutoCopyProcessor() {
     // ========================================================
     // PHẦN 2: XÓA HÀNG Ở SHEET KHÁC (theo cấu hình cột G, H, I)
     // ========================================================
-    // Sheet xóa là sheet KHÁC với sheet nguồn (link cột G, sheet cột H)
-    // Điều kiện xóa dựa vào Cột A của sheet đó (công thức VLOOKUP trả về
-    // các giá trị như "Not same task", "Remove" v.v.)
     if (deleteLink && deleteColCond && deleteValCond) {
       try {
         const delSSId = extractSsId_(deleteLink);
@@ -282,8 +289,6 @@ function runAutoCopyProcessor() {
 
   Logger.log("🏁 Hoàn thành toàn bộ tiến trình Auto Copy & Delete.");
 
-
-  
   // Gửi báo cáo tổng hợp lỗi nếu có
   if (errorRows.length > 0) {
     const summaryMsg = "⚠️ AUTO COPY BÁO CÁO LỖI\n" +
@@ -320,7 +325,6 @@ function setupAutoCopyEvery15MinutesTrigger() {
   Logger.log("⏰ Đã thiết lập trigger chạy tự động mỗi 15 phút cho tác vụ Copy.");
 }
 
-
 /**
  * Xem báo cáo lỗi lần chạy Auto Copy cuối cùng
  * Chạy thủ công từ Apps Script Editor để xem có lỗi gì không
@@ -337,11 +341,9 @@ function getLastCopyErrors() {
   }
 }
 
-
 /**
  * Reset toàn bộ Cell Note "✅ Auto-Copied" trên sheet nguồn để cho phép copy lại
  * Hữu ích khi bạn muốn chạy lại toàn bộ từ đầu
- * Tham số: sheetId (ID của spreadsheet), sheetName (tên sheet), condColLetter (cột điều kiện VD: "A")
  */
 function resetCopiedNotes(sheetId, sheetName, condColLetter) {
   try {
@@ -364,9 +366,6 @@ function resetCopiedNotes(sheetId, sheetName, condColLetter) {
   }
 }
 
-
-
-
 // ============================================================
 // HELPERS
 // ============================================================
@@ -379,11 +378,12 @@ function extractSsId_(link) {
 
 function parseSheetAndRange_(sheetStr) {
   if (!sheetStr) return { sheetName: "", rangeStr: "" };
+  sheetStr = String(sheetStr).trim();
   const idx = sheetStr.indexOf("!");
-  if (idx === -1) return { sheetName: sheetStr, rangeStr: "" };
+  if (idx === -1) return { sheetName: sheetStr.replace(/['"]/g, "").trim(), rangeStr: "" };
   return {
-    sheetName: sheetStr.substring(0, idx).replace(/'/g, ""),
-    rangeStr: sheetStr.substring(idx + 1)
+    sheetName: sheetStr.substring(0, idx).replace(/['"]/g, "").trim(),
+    rangeStr: sheetStr.substring(idx + 1).trim()
   };
 }
 
@@ -413,9 +413,11 @@ function colLetterToNum_(letter) {
 function parseRangeCols_(rangeStr) {
   if (!rangeStr) return { start: 1, end: 27 };
   const parts = rangeStr.split(":");
-  const start = colLetterToNum_(parts[0]);
-  const end = parts.length > 1 ? colLetterToNum_(parts[1]) : start;
-  return { start: start, end: end };
+  if (parts.length < 2) return { start: 1, end: 27 };
+  return {
+    start: colLetterToNum_(parts[0]),
+    end: colLetterToNum_(parts[1])
+  };
 }
 
 function findNextEmptyRowInCol_(sheet, columnIdx) {
@@ -431,10 +433,6 @@ function findNextEmptyRowInCol_(sheet, columnIdx) {
   return 1;
 }
 
-/**
- * Hàm tự động sắp xếp sheet từ A:Z dựa theo cột chỉ định trong config
- * VD: sortConfig = "2.1 Your Data solution!D" -> Sắp xếp cột D của tab "2.1 Your Data solution"
- */
 function sortSheetByConfig_(ss, sortConfig) {
   if (!ss || !sortConfig) return;
   try {
@@ -448,15 +446,13 @@ function sortSheetByConfig_(ss, sortConfig) {
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
     const frozenRows = sheet.getFrozenRows();
-    const defaultStartRow = frozenRows > 0 ? frozenRows + 1 : 2; // Bỏ qua tiêu đề header
+    const defaultStartRow = frozenRows > 0 ? frozenRows + 1 : 2;
 
-    // Phân tách cấu hình sort thông minh để lấy cột và dòng bắt đầu
     const sortInfo = parseSortConfigRange_(info.rangeStr, defaultStartRow);
     const startRow = sortInfo.startRow;
     const colLetter = sortInfo.colLetter;
     const colIdx = colLetterToNum_(colLetter);
 
-    // Tìm dòng thực sự cuối cùng có chứa dữ liệu ở cột sort để tránh sort các dòng trống lên đầu
     let actualLastRow = startRow;
     const colValues = sheet.getRange(1, colIdx, lastRow, 1).getValues();
     for (let r = lastRow - 1; r >= 0; r--) {
@@ -467,7 +463,6 @@ function sortSheetByConfig_(ss, sortConfig) {
       }
     }
 
-    // Nếu không tìm thấy ở cột sort, quét dự phòng ở cột 1 (thường là cột ID/No luôn có dữ liệu)
     if (actualLastRow === startRow && colIdx !== 1) {
       const col1Values = sheet.getRange(1, 1, lastRow, 1).getValues();
       for (let r = lastRow - 1; r >= 0; r--) {
@@ -484,97 +479,71 @@ function sortSheetByConfig_(ss, sortConfig) {
       return;
     }
 
-    // Lấy vùng dữ liệu thực tế cần sắp xếp (loại trừ các dòng hoàn toàn trống ở dưới)
     const range = sheet.getRange(startRow, 1, actualLastRow - startRow + 1, lastCol);
     const data        = range.getValues();
-    const formulas    = range.getFormulas();   // Đọc thêm công thức để bảo toàn sau khi sort
+    const formulas    = range.getFormulas();
     const backgrounds = range.getBackgrounds();
     const fontWeights = range.getFontWeights();
 
-    // Gộp dữ liệu, công thức và định dạng để sắp xếp đi kèm với nhau
     const rows = [];
     for (let r = 0; r < data.length; r++) {
       rows.push({
         values:   data[r],
-        formulas: formulas[r],   // Lưu công thức của từng dòng
+        formulas: formulas[r],
         bg:       backgrounds[r],
         fw:       fontWeights[r]
       });
     }
 
-    // Sắp xếp mảng trong JS để đẩy ô rỗng hoặc chứa "-" xuống cuối cùng của bảng
     rows.sort(function(a, b) {
       const valA = a.values[colIdx - 1];
       const valB = b.values[colIdx - 1];
 
-      // Đánh giá xem ô có trống không (ô rỗng, null, undefined hoặc chứa dấu gạch ngang "-")
       const isAEmpty = (valA === "" || valA === null || valA === undefined || String(valA).trim() === "-");
       const isBEmpty = (valB === "" || valB === null || valB === undefined || String(valB).trim() === "-");
 
       if (isAEmpty && isBEmpty) return 0;
-      if (isAEmpty) return 1;  // Đẩy dòng A trống xuống dưới cùng
-      if (isBEmpty) return -1; // Đẩy dòng B trống xuống dưới cùng
+      if (isAEmpty) return 1;
+      if (isBEmpty) return -1;
 
-      // So sánh dữ liệu dạng ngày tháng hoặc chuỗi/số
       if (valA < valB) return -1;
       if (valA > valB) return 1;
       return 0;
     });
 
-    // Tách mảng đã sắp xếp ra để ghi đè lại sheet
     const sortedValues     = rows.map(r => r.values);
     const sortedFormulas   = rows.map(r => r.formulas);
     const sortedBackgrounds = rows.map(r => r.bg);
     const sortedFontWeights = rows.map(r => r.fw);
 
-    // Bước 1: Ghi giá trị trước (cho các ô không có công thức)
     range.setValues(sortedValues);
-    // Bước 2: Ghi lại công thức — ô nào có công thức sẽ được khôi phục,
-    //         ô không có công thức (chuỗi rỗng "") giữ nguyên giá trị vừa ghi ở Bước 1
     range.setFormulas(sortedFormulas);
     range.setBackgrounds(sortedBackgrounds);
     range.setFontWeights(sortedFontWeights);
 
-    Logger.log("  📶 Đã tự động sắp xếp (Sort A:Z) sheet '" + info.sheetName + "' theo cột " + colLetter + " (Từ dòng " + startRow + " đến dòng " + actualLastRow + " - đã đẩy ô trống & '-' xuống cuối)");
+    Logger.log("  📶 Đã tự động sắp xếp (Sort A:Z) sheet '" + info.sheetName + "' theo cột " + colLetter + " (Từ dòng " + startRow + " đến dòng " + actualLastRow + ")");
   } catch (err) {
     Logger.log("  ❌ Lỗi khi tự động sắp xếp sheet: " + err.message);
   }
 }
 
-/**
- * Phân tách thông minh chuỗi cấu hình sort (VD: "G4:G" hoặc "G4" hoặc "G")
- * Trả về ký tự cột và dòng bắt đầu sort
- */
 function parseSortConfigRange_(rangeStr, defaultStartRow) {
   if (!rangeStr) return { colLetter: "A", startRow: defaultStartRow };
-  
   let colLetter = "A";
   let startRow = defaultStartRow;
-  
-  // Lấy phần trước dấu hai chấm nếu có (VD: "G4:G" -> "G4")
   let firstPart = rangeStr.indexOf(":") !== -1 ? rangeStr.split(":")[0] : rangeStr;
   firstPart = firstPart.trim();
-  
-  // Trích xuất số dòng bắt đầu (VD: "G4" -> 4)
   const rowMatch = firstPart.match(/\d+/);
   if (rowMatch) {
     startRow = parseInt(rowMatch[0], 10);
   }
-  
-  // Trích xuất chữ cái cột (VD: "G4" -> "G")
   const colMatch = firstPart.match(/[a-zA-Z]+/);
   if (colMatch) {
     colLetter = colMatch[0];
   }
-  
   return { colLetter: colLetter, startRow: startRow };
 }
 
-/**
- * Kiểm tra xem thời gian hiện tại có nằm trong 2 khung giờ hoạt động của tác vụ Copy hay không
- * Khung 1: 08:00 - 12:00 (Myanmar Time)
- * Khung 2: 14:00 - 22:00 (Myanmar Time)
- */
 function isWithinCopyActiveWindows_() {
   const now = new Date();
   const hour = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "H"), 10);
@@ -590,4 +559,3 @@ function isWithinCopyActiveWindows_() {
   
   return false;
 }
-
