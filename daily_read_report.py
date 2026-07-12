@@ -1,8 +1,8 @@
 """
 daily_read_report.py
 ====================
-Run at 17:00 Myanmar — check who has read the Note message
-("Team leader and Staff control Site down make plan rescue...")
+Run at 20:30 Myanmar — check who has read the EOD Report message
+("📋 4. Report — Daily EOD Task & Stats")
 in T1 / T2 / T3 / T4 / CONTROL.
 
 For Team groups: only count team members from sheet (col E, rows 4-59).
@@ -68,8 +68,8 @@ S_COL_NAME = 5   # F: Tên nhân viên
 S_COL_TEAM = 12  # M: Team (Team 1/2/3/4)
 S_COL_EXIT = 13  # N: Ngày nghỉ / inactive — RỔNG = còn làm việc (active)
 
-# Keywords to identify Note message
-NOTE_KEYWORDS = ["team leader", "site down", "make plan", "rescue", "mdg", "mbb"]
+# Keywords to identify EOD Report message (sent around 17:30 Myanmar)
+NOTE_KEYWORDS = ["daily eod task", "task & stats", "eod task"]
 # ──────────────────────────────────────────────────────────────────
 
 def myanmar_now() -> str:
@@ -82,9 +82,9 @@ def days_ago_utc(n: int) -> datetime:
     return target.astimezone(timezone.utc)
 
 def is_note_msg(text: str) -> bool:
-    """Check if message matches Note keywords."""
+    """Check if message matches EOD Report keywords."""
     t = (text or "").lower()
-    return sum(1 for kw in NOTE_KEYWORDS if kw in t) >= 2
+    return any(kw in t for kw in NOTE_KEYWORDS)
 
 
 def get_team_members_from_sheet() -> dict:
