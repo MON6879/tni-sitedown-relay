@@ -434,6 +434,10 @@ function getLastCopyErrors() {
  * Hữu ích khi bạn muốn chạy lại toàn bộ từ đầu
  */
 function resetCopiedNotes(sheetId, sheetName, condColLetter) {
+  if (sheetName === undefined || sheetId === undefined) {
+    Logger.log("⚠️ Cảnh báo: Vui lòng không chọn chạy trực tiếp hàm 'resetCopiedNotes' này. Hãy bấm vào menu thả xuống ở trên đầu và chọn chạy hàm 'runResetAllCopiedNotes' (để reset tất cả các Team) hoặc 'runResetTeam3CopiedNotes' (chỉ reset Team 3) nhé ạ.");
+    return;
+  }
   try {
     const ss = SpreadsheetApp.openById(sheetId || CONFIG_SS_ID);
     const sh = ss.getSheetByName(sheetName);
