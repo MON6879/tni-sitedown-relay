@@ -271,9 +271,7 @@ function runAutoCopyProcessor(bypassTimeGate) {
 
             if (srcLastRow >= finalStartRow) {
               const numCondRows = srcLastRow - finalStartRow + 1;
-              const condDataRange = srcSh.getRange(finalStartRow, condColNum, numCondRows, 1);
-              const condData = condDataRange.getValues();
-              const condNotes = condDataRange.getNotes();
+              const condData = srcSh.getRange(finalStartRow, condColNum, numCondRows, 1).getValues();
               
               // Xác định khoảng cột cần copy
               let startCol = 1;
@@ -310,15 +308,6 @@ function runAutoCopyProcessor(bypassTimeGate) {
               for (let r = 0; r < condData.length; r++) {
                 if (String(condData[r][0]).trim() === sourceValCond) {
                   const srcRowNum = r + finalStartRow;
-                  
-                  // Kiểm tra xem dòng này đã được copy trước đó chưa (qua Cell Note) - sử dụng ghi chú đã đọc lô để tối ưu hiệu suất
-                  const existingNote = condNotes[r][0] || "";
-                  if (existingNote.indexOf("✅ Auto-Copied:") !== -1) {
-                    continue; // Đã copy trước đó — bỏ qua
-                  }
-                  
-                  const condCell = srcSh.getRange(srcRowNum, condColNum);
-                  
                   let rowValues;
                   let hasCircularError = false;
                   
@@ -356,10 +345,6 @@ function runAutoCopyProcessor(bypassTimeGate) {
                   tgtSh.getRange(tgtNextRow, targetStartCol, 1, numCols).setValues(rowValues);
                   copiedCount++;
                   Logger.log("  ✅ Đã copy dòng " + srcRowNum + " sang sheet đích dòng " + tgtNextRow);
-                  
-                  // Đánh dấu dòng đã xử lý bằng Cell Note (KHÔNG ghi đè công thức)
-                  const noteText = "✅ Auto-Copied: " + Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy HH:mm") + " Myanmar";
-                  condCell.setNote(noteText);
                 }
               }
               Logger.log("  📊 Hoàn thành copy: " + copiedCount + " dòng.");
