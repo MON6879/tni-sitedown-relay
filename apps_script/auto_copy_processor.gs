@@ -145,12 +145,15 @@ function runAutoCopyProcessor(bypassTimeGate) {
             Logger.log("  ❌ Lỗi: Không tìm thấy sheet đích: '" + tgtInfo.sheetName + "'");
           } else {
             const srcLastRow = srcSh.getLastRow();
-            if (srcLastRow >= 1) {
-              let condColNum = colLetterToNum_(sourceColCond);
-              // Đảm bảo cột điều kiện nằm trong giới hạn của sheet nguồn
-              condColNum = Math.min(condColNum, srcSh.getMaxColumns());
-              
-              const condData = srcSh.getRange(1, condColNum, srcLastRow, 1).getValues();
+            const condRangeInfo = parseColAndStartRow_(sourceColCond);
+            let condColNum = colLetterToNum_(condRangeInfo.colLetter);
+            // Đảm bảo cột điều kiện nằm trong giới hạn của sheet nguồn
+            condColNum = Math.min(condColNum, srcSh.getMaxColumns());
+            
+            const srcStartRow = condRangeInfo.startRow;
+            if (srcLastRow >= srcStartRow) {
+              const numCondRows = srcLastRow - srcStartRow + 1;
+              const condData = srcSh.getRange(srcStartRow, condColNum, numCondRows, 1).getValues();
               
               // Xác định khoảng cột cần copy
               let startCol = 1;
@@ -184,7 +187,7 @@ function runAutoCopyProcessor(bypassTimeGate) {
               let copiedCount = 0;
               for (let r = 0; r < condData.length; r++) {
                 if (String(condData[r][0]).trim() === sourceValCond) {
-                  const srcRowNum = r + 1;
+                  const srcRowNum = r + srcStartRow;
                   
                   // Kiểm tra xem dòng này đã được copy trước đó chưa (qua Cell Note)
                   const condCell = srcSh.getRange(srcRowNum, condColNum);
@@ -264,17 +267,20 @@ function runAutoCopyProcessor(bypassTimeGate) {
           Logger.log("  ❌ Lỗi: Không tìm thấy sheet xóa: '" + delInfo.sheetName + "'");
         } else {
           const delColLetter = delInfo.rangeStr || "A";
-          const delColNum = colLetterToNum_(delColLetter);
+          const delRangeInfo = parseColAndStartRow_(delColLetter);
+          const delColNum = colLetterToNum_(delRangeInfo.colLetter);
+          const delStartRow = delRangeInfo.startRow;
           const delLastRow = delSh.getLastRow();
 
-          if (delLastRow >= 1) {
-            const delData = delSh.getRange(1, delColNum, delLastRow, 1).getValues();
+          if (delLastRow >= delStartRow) {
+            const numRowsToRead = delLastRow - delStartRow + 1;
+            const delData = delSh.getRange(delStartRow, delColNum, numRowsToRead, 1).getValues();
             const numCols = delSh.getLastColumn();
             let deletedCount = 0;
             // Duyệt từ dưới lên để làm sạch ô (giữ nguyên công thức và không làm xê dịch hàng gây lỗi Validation)
-            for (let r = delLastRow - 1; r >= 0; r--) {
+            for (let r = numRowsToRead - 1; r >= 0; r--) {
               if (String(delData[r][0]).trim() === deleteValCond) {
-                const rowNum = r + 1;
+                const rowNum = r + delStartRow;
                 if (numCols > 0) {
                   const rowRange = delSh.getRange(rowNum, 1, 1, numCols);
                   const cellFormulas = rowRange.getFormulas()[0];
@@ -569,4 +575,29 @@ function isWithinCopyActiveWindows_() {
   if (hour === 22 && minute === 0) return true;
   
   return false;
+}
+
+function parseColAndStartRow_(rangeStr) {
+  if (!rangeStr) return { colLetter: "A", startRow: 1 };
+  
+  let colLetter = "A";
+  let startRow = 1;
+  
+  // Lấy phần trước dấu hai chấm nếu có (VD: "A4:A" -> "A4")
+  let firstPart = rangeStr.indexOf(":") !== -1 ? rangeStr.split(":")[0] : rangeStr;
+  firstPart = firstPart.trim();
+  
+  // Trích xuất số dòng bắt đầu (VD: "A4" -> 4)
+  const rowMatch = firstPart.match(/\d+/);
+  if (rowMatch) {
+    startRow = parseInt(rowMatch[0], 10);
+  }
+  
+  // Trích xuất chữ cái cột (VD: "A4" -> "G")
+  const colMatch = firstPart.match(/[a-zA-Z]+/);
+  if (colMatch) {
+    colLetter = colMatch[0];
+  }
+  
+  return { colLetter: colLetter, startRow: startRow };
 }
