@@ -70,6 +70,35 @@ function runAutoCopyProcessorManual() {
 }
 
 /**
+ * Hàm hỗ trợ reset nhanh trạng thái copy của Team 3 để kiểm tra copy lại
+ */
+function runResetTeam3CopiedNotes() {
+  resetCopiedNotes("1Z2E4gSGXpYbjexfZJGNDglACYB9Zn46VXuiO2GGSGqQ", "3. see to Task", "A");
+}
+
+/**
+ * Hàm kiểm tra nhanh nội dung các ô A3, A4 để phân tích lỗi công thức
+ */
+function runDebugTeam3Cells() {
+  try {
+    const ss = SpreadsheetApp.openById("1Z2E4gSGXpYbjexfZJGNDglACYB9Zn46VXuiO2GGSGqQ");
+    const sh = ss.getSheetByName("3.1 Update Assign");
+    if (!sh) {
+      Logger.log("❌ Không tìm thấy sheet '3.1 Update Assign'");
+      return;
+    }
+    Logger.log("🔍 [Debug Team 3]");
+    Logger.log("A3 Value: " + sh.getRange("A3").getValue());
+    Logger.log("A3 Formula: " + sh.getRange("A3").getFormula());
+    Logger.log("A4 Value: " + sh.getRange("A4").getValue());
+    Logger.log("A4 Formula: " + sh.getRange("A4").getFormula());
+    Logger.log("G4 Value: " + sh.getRange("G4").getValue());
+  } catch (e) {
+    Logger.log("❌ Lỗi debug: " + e.message);
+  }
+}
+
+/**
  * Hàm xử lý chính: Quét cấu hình và thực thi Copy-Paste + Xóa dòng
  * @param {boolean} bypassTimeGate - Nếu là true, bỏ qua kiểm tra khung giờ làm việc
  */
