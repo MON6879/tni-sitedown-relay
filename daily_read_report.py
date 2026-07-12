@@ -352,13 +352,13 @@ async def process_group(client, group_key: str, chat_id: int,
     d7_start = today_start - timedelta(days=7)
 
     def in_read_window(read_dt, day_start):
-        """Check if read_dt is between 17:30 and 20:30 Myanmar cutoff of that day."""
+        """Check if read_dt is between 16:00 and 20:30 Myanmar cutoff of that day."""
         if read_dt is None:
             return True  # no timestamp → count anyway
         if read_dt.tzinfo is None:
             read_dt = read_dt.replace(tzinfo=timezone.utc)
         read_mm = read_dt.astimezone(MYANMAR_TZ)
-        start_time = day_start.replace(hour=17, minute=30, second=0, microsecond=0)
+        start_time = day_start.replace(hour=16, minute=0, second=0, microsecond=0)
         end_time = day_start.replace(hour=20, minute=30, second=0, microsecond=0)
         return start_time <= read_mm <= end_time
 
@@ -510,9 +510,9 @@ async def main():
             tl = [
                 f"📋 6. Report — Daily Note Read Report — {gk}",
                 f"📅 {date_str}  |  🕐 {now_str}",
-                f"⏰ Read Window: 17:30 - 20:30 Myanmar",
+                f"⏰ Read Window: 16:00 - 20:30 Myanmar",
                 f"📅 Cycle: {cycle_str}",
-                f"📌 Shows who read the Note message during the active window (17:30 - 20:30) today.",
+                f"📌 Shows who read the Note message during the active window (16:00 - 20:30) today.",
             ]
             if note_line:
                 tl.append(f"📝 Note: {r['note_preview']}...")
@@ -541,9 +541,9 @@ async def main():
         lines = [
             f"📋 6. Report — Daily Note Read Report — Summary",
             f"📅 {date_str}  |  🕐 {now_str}",
-            f"⏰ Read Window: 17:30 - 20:30 Myanmar",
+            f"⏰ Read Window: 16:00 - 20:30 Myanmar",
             f"📅 Cycle: {cycle_str}",
-            f"📌 Shows who read the Note message during the active window (17:30 - 20:30) today.",
+            f"📌 Shows who read the Note message during the active window (16:00 - 20:30) today.",
             divider,
         ]
 

@@ -2,8 +2,7 @@ name: Unified Daily Reports  # last-updated: 2026-07-10
 
 on:
   schedule:
-    - cron: '30 10 * * *'  # 17:00 Myanmar / 10:30 UTC → daily_task + plan_eod + bod_assign
-    - cron: '0 11 * * *'   # 17:30 Myanmar / 11:00 UTC → cable_report
+    - cron: '30 9 * * *'   # 16:00 Myanmar / 09:30 UTC → daily_task + plan_eod + bod_assign + cable_report + refuel_report
     - cron: '30 22 * * *'  # 05:00 Myanmar / 22:30 UTC → refuel_report
     - cron: '30 6 * * *'   # 13:00 Myanmar / 06:30 UTC → refuel_report
     - cron: '30 0 * * *'   # 07:00 Myanmar / 00:30 UTC → plan_morning
@@ -55,7 +54,7 @@ jobs:
 
       - name: Report 2 — BOD-assigned Tasks Stats
         if: |
-          (github.event_name == 'schedule' && github.event.schedule == '30 10 * * *') ||
+          (github.event_name == 'schedule' && github.event.schedule == '30 9 * * *') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'bod_assign')
         env:
           SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
@@ -64,7 +63,7 @@ jobs:
 
       - name: Reports 1, 2, 3, 4 — Daily Backlog & Task Reminders
         if: |
-          (github.event_name == 'schedule' && github.event.schedule == '30 10 * * *') ||
+          (github.event_name == 'schedule' && github.event.schedule == '30 9 * * *') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'daily_task')
         env:
           SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
@@ -87,7 +86,7 @@ jobs:
 
       - name: Report 5A — Daily Plan EOD
         if: |
-          (github.event_name == 'schedule' && github.event.schedule == '30 10 * * *') ||
+          (github.event_name == 'schedule' && github.event.schedule == '30 9 * * *') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_eod')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
@@ -145,7 +144,7 @@ jobs:
 
       - name: Task — Cable Daily Report (Cron or Manual)
         if: |
-          (github.event_name == 'schedule' && github.event.schedule == '0 11 * * *') ||
+          (github.event_name == 'schedule' && github.event.schedule == '30 9 * * *') ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'cable_report')
         env:
           COLLECTOR_BOT_TOKEN: ${{ secrets.COLLECTOR_BOT_TOKEN }}
@@ -156,7 +155,7 @@ jobs:
 
       - name: Task — Refuel Request Report (Cron or Manual)
         if: |
-          (github.event_name == 'schedule' && (github.event.schedule == '30 10 * * *' || github.event.schedule == '30 22 * * *' || github.event.schedule == '30 6 * * *')) ||
+          (github.event_name == 'schedule' && (github.event.schedule == '30 9 * * *' || github.event.schedule == '30 22 * * *' || github.event.schedule == '30 6 * * *')) ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'refuel_report')
         env:
           REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}

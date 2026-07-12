@@ -155,6 +155,25 @@ def get_note_from_sheet() -> str:
         return ""
 
 
+def get_control_note_from_sheet() -> str:
+    """Read H1:H3 from Config tab (GID 1236389870)."""
+    try:
+        resp = requests.get(CONFIG_SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+        resp.raise_for_status()
+        df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str, on_bad_lines="skip")
+        
+        note_lines = []
+        for r_idx in range(0, min(3, len(df))):
+            if len(df.columns) > 7:
+                val = str(df.iloc[r_idx].iloc[7]).strip() if not pd.isna(df.iloc[r_idx].iloc[7]) else ""
+                if val and val.lower() not in ("nan", "none", ""):
+                    note_lines.append(val)
+        return "\n".join(note_lines)
+    except Exception as e:
+        logger.error(f"Error fetching Control Note from Config sheet: {e}")
+        return ""
+
+
 def get_current_cycle_str() -> str:
     now = datetime.now(TZ_MM)
     if now.day <= 20:
@@ -1478,6 +1497,13 @@ async def main():
     else:
         logger.info("No Note found or error fetching Note")
 
+    # ── 5b. Fetch Control Note from Config H1:H3 ──
+    control_note = get_control_note_from_sheet()
+    if control_note:
+        logger.info("Control Note fetched successfully from Config sheet")
+    else:
+        logger.info("No Control Note found or error fetching Control Note")
+
     # ── 5.5 Team→employees mapping (dùng khi gửi riêng lẻ cho TL) ──
     TEAM_BY_NUMBER = {
         1: "MYT_TNI_TEAM01_Dawei",
@@ -1505,6 +1531,9 @@ async def main():
     if asset_msg:
         mgmt_parts.append("━" * 20)
         mgmt_parts.append(asset_msg)
+    if control_note:
+        mgmt_parts.append("━" * 20)
+        mgmt_parts.append(f"📝 CONTROL NOTE:\n{control_note}")
     mgmt_report = "\n".join(mgmt_parts)
 
     # Chat ID nhóm "5 TNI TECHNICA DEP CONTROL SITE"

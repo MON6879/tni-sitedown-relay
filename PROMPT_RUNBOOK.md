@@ -11,7 +11,7 @@ Hệ thống tự động gửi báo cáo Telegram cho **4 Teams + Management** 
 |---|---|---|---|
 | **Tin 1** — Site down list per team | Khi có báo cáo mới vào Col A | `8647102342:AAGwI95-...` | T1/T2/T3/T4 + CONTROL |
 | **Tin 2** — Summary (site/cell/DG/link) | Khi AW7 thay đổi | `8647102342:AAGwI95-...` | T1/T2/T3/T4 + CONTROL |
-| **Daily 17:30** — Task remain + WO | GitHub Actions 11:00 UTC | `SEND_BOT 8897800070:...` | Nhân viên + TL + BOD |
+| **Daily 16:00** — Task remain + WO | GitHub Actions 09:30 UTC | `SEND_BOT 8897800070:...` | Nhân viên + TL + BOD |
 
 ---
 

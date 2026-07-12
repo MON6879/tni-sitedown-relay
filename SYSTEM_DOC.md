@@ -220,10 +220,10 @@ Missing: TNI0052, TNI0185, TNI0058
 
 | Time | Script | Workflow / Input | What |
 |---|---|---|---|
-| **17:00** | `daily_bod_assign.py` | `daily_reports.yml` (`bod_assign`) | Report 2: BOD-assigned task statistics (Consolidated) to CONTROL |
-| **17:10** | `backlog_send.py` | `daily_reports.yml` (`daily_task`) | Report 1, 2, 3: Daily Backlog reports to team groups |
-| **17:00** | `cron_send.py` | `daily_reports.yml` (`daily_task`) | Report 4: Daily EOD Task + Asset + Search reports to all groups |
-| **17:00** | `daily_plan_report.py --mode eod` | `daily_reports.yml` (`plan_eod`) | Report 5A: EOD Plan vs Actual + Plan Tomorrow status |
+| **16:00** | `daily_bod_assign.py` | `daily_reports.yml` (`bod_assign`) | Report 2: BOD-assigned task statistics (Consolidated) to CONTROL |
+| **16:00** | `backlog_send.py` | `daily_reports.yml` (`daily_task`) | Report 1, 2, 3: Daily Backlog reports to team groups |
+| **16:00** | `cron_send.py` | `daily_reports.yml` (`daily_task`) | Report 4: Daily EOD Task + Asset + Search reports to all groups |
+| **16:00** | `daily_plan_report.py --mode eod` | `daily_reports.yml` (`plan_eod`) | Report 5A: EOD Plan vs Actual + Plan Tomorrow status |
 | **21:00** | `daily_plan_report.py --mode update` | `daily_reports.yml` (`plan_update`) | Report 5B: Updated Plan Tomorrow status |
 | **07:00** | `daily_plan_report.py --mode morning` | `daily_reports.yml` (`plan_morning`) | Report 5C: Morning Plan forward + 3D/7D/1M stats + completion rate |
 | **20:30** | `daily_read_report.py` | `daily_reports.yml` (`read_report`) | Report 6: Note read status per-person (Cutoff at 20:25) to teams + CONTROL |
