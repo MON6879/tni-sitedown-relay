@@ -271,7 +271,9 @@ function runAutoCopyProcessor(bypassTimeGate) {
 
             if (srcLastRow >= finalStartRow) {
               const numCondRows = srcLastRow - finalStartRow + 1;
-              const condData = srcSh.getRange(finalStartRow, condColNum, numCondRows, 1).getValues();
+              const condDataRange = srcSh.getRange(finalStartRow, condColNum, numCondRows, 1);
+              const condData = condDataRange.getValues();
+              const condNotes = condDataRange.getNotes();
               
               // Xác định khoảng cột cần copy
               let startCol = 1;
@@ -309,12 +311,13 @@ function runAutoCopyProcessor(bypassTimeGate) {
                 if (String(condData[r][0]).trim() === sourceValCond) {
                   const srcRowNum = r + finalStartRow;
                   
-                  // Kiểm tra xem dòng này đã được copy trước đó chưa (qua Cell Note)
-                  const condCell = srcSh.getRange(srcRowNum, condColNum);
-                  const existingNote = condCell.getNote() || "";
+                  // Kiểm tra xem dòng này đã được copy trước đó chưa (qua Cell Note) - sử dụng ghi chú đã đọc lô để tối ưu hiệu suất
+                  const existingNote = condNotes[r][0] || "";
                   if (existingNote.indexOf("✅ Auto-Copied:") !== -1) {
                     continue; // Đã copy trước đó — bỏ qua
                   }
+                  
+                  const condCell = srcSh.getRange(srcRowNum, condColNum);
                   
                   let rowValues;
                   let hasCircularError = false;
@@ -445,12 +448,23 @@ function resetCopiedNotes(sheetId, sheetName, condColLetter) {
     const colNum = colLetterToNum_(condColLetter || "A");
     const lastRow = sh.getLastRow();
     if (lastRow < 1) return;
-    for (let r = 1; r <= lastRow; r++) {
-      const cell = sh.getRange(r, colNum);
-      const note = cell.getNote() || "";
+    
+    // Đọc tất cả note trong cột một lần duy nhất để tối ưu hiệu suất (nhanh gấp 100 lần)
+    const range = sh.getRange(1, colNum, lastRow, 1);
+    const notes = range.getNotes();
+    let hasChanges = false;
+    
+    for (let r = 0; r < lastRow; r++) {
+      const note = notes[r][0] || "";
       if (note.indexOf("✅ Auto-Copied:") !== -1) {
-        cell.clearNote();
+        notes[r][0] = "";
+        hasChanges = true;
       }
+    }
+    
+    // Chỉ ghi đè lại nếu thực sự có note cần xóa
+    if (hasChanges) {
+      range.setNotes(notes);
     }
     Logger.log("✅ Đã xóa toàn bộ Auto-Copied Note trên sheet '" + sheetName + "' cột " + condColLetter);
   } catch (e) {
