@@ -118,10 +118,11 @@ function checkBodAssign() {
 function getTeamChatId_(teamStr) {
   if (!teamStr) return null;
   const ts = teamStr.toUpperCase().replace(/\s+/g, "");
-  if (ts.indexOf("TEAM01") !== -1 || ts.indexOf("TEAM1") !== -1) return "-5180992881";
-  if (ts.indexOf("TEAM02") !== -1 || ts.indexOf("TEAM2") !== -1 || ts.indexOf("TEAM05") !== -1 || ts.indexOf("TEAM5") !== -1) return "-5188855349";
-  if (ts.indexOf("TEAM03") !== -1 || ts.indexOf("TEAM3") !== -1) return "-5183480727";
-  if (ts.indexOf("TEAM04") !== -1 || ts.indexOf("TEAM4") !== -1) return "-5238696719";
+  // Cập nhật ID theo nhóm Supergroup thực tế (có tiền tố -100...)
+  if (ts.indexOf("TEAM01") !== -1 || ts.indexOf("TEAM1") !== -1) return "-1004215695747";
+  if (ts.indexOf("TEAM02") !== -1 || ts.indexOf("TEAM2") !== -1 || ts.indexOf("TEAM05") !== -1 || ts.indexOf("TEAM5") !== -1) return "-1004480845549";
+  if (ts.indexOf("TEAM03") !== -1 || ts.indexOf("TEAM3") !== -1) return "-1004369170658";
+  if (ts.indexOf("TEAM04") !== -1 || ts.indexOf("TEAM4") !== -1) return "-1004293741999";
   return null;
 }
 
