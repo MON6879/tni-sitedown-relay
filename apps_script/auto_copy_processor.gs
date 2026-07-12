@@ -134,6 +134,27 @@ function runDebugTeam3Cells() {
 }
 
 /**
+ * Hàm kiểm tra cấu trúc và dữ liệu của Team 4
+ */
+function runDebugTeam4() {
+  try {
+    const ss = SpreadsheetApp.openById("1s53UHIDF-T9P4EuNB8XoE9yTpoNmDyrQaEe_VJP6f9o");
+    const sheets = ss.getSheets();
+    for (let i = 0; i < sheets.length; i++) {
+      const sh = sheets[i];
+      Logger.log("=== Sheet: " + sh.getName() + " ===");
+      Logger.log("Row 1: " + JSON.stringify(sh.getRange(1, 1, 1, 15).getValues()[0]));
+      Logger.log("Row 2: " + JSON.stringify(sh.getRange(2, 1, 1, 15).getValues()[0]));
+      Logger.log("Row 3: " + JSON.stringify(sh.getRange(3, 1, 1, 15).getValues()[0]));
+      Logger.log("Row 4: " + JSON.stringify(sh.getRange(4, 1, 1, 15).getValues()[0]));
+      Logger.log("Row 5: " + JSON.stringify(sh.getRange(5, 1, 1, 15).getValues()[0]));
+    }
+  } catch (e) {
+    Logger.log("❌ Lỗi debug Team 4: " + e.message);
+  }
+}
+
+/**
  * Hàm xử lý chính: Quét cấu hình và thực thi Copy-Paste + Xóa dòng
  * @param {boolean} bypassTimeGate - Nếu là true, bỏ qua kiểm tra khung giờ làm việc
  */
