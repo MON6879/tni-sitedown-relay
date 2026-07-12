@@ -652,8 +652,14 @@ function parseColAndStartRow_(rangeStr) {
   let colLetter = "A";
   let startRow = 1;
   
+  // Loại bỏ phần tên sheet phía trước dấu chấm than ! nếu có (VD: "3.1 Update Assign!A4:A" -> "A4:A")
+  let rangeOnly = rangeStr;
+  if (rangeStr.indexOf("!") !== -1) {
+    rangeOnly = rangeStr.split("!")[1].trim();
+  }
+  
   // Lấy phần trước dấu hai chấm nếu có (VD: "A4:A" -> "A4")
-  let firstPart = rangeStr.indexOf(":") !== -1 ? rangeStr.split(":")[0] : rangeStr;
+  let firstPart = rangeOnly.indexOf(":") !== -1 ? rangeOnly.split(":")[0] : rangeOnly;
   firstPart = firstPart.trim();
   
   // Trích xuất số dòng bắt đầu (VD: "A4" -> 4)
@@ -662,7 +668,7 @@ function parseColAndStartRow_(rangeStr) {
     startRow = parseInt(rowMatch[0], 10);
   }
   
-  // Trích xuất chữ cái cột (VD: "A4" -> "G")
+  // Trích xuất chữ cái cột (VD: "A4" -> "A")
   const colMatch = firstPart.match(/[a-zA-Z]+/);
   if (colMatch) {
     colLetter = colMatch[0];
