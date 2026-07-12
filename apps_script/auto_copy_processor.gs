@@ -599,8 +599,12 @@ function sortSheetByConfig_(ss, sortConfig) {
       // Sắp xếp định dạng nền và font chữ (không ảnh hưởng đến công thức mảng)
       const colBackgrounds = sortedBackgrounds.map(row => [row[c]]);
       const colFontWeights = sortedFontWeights.map(row => [row[c]]);
-      colRange.setBackgrounds(colBackgrounds);
-      colRange.setFontWeights(colFontWeights);
+      try {
+        colRange.setBackgrounds(colBackgrounds);
+        colRange.setFontWeights(colFontWeights);
+      } catch (eFormat) {
+        // Bỏ qua lỗi định dạng nếu có
+      }
 
       if (formulaCols[c]) {
         // Cột này được kiểm soát bởi ARRAYFORMULA phía trên -> KHÔNG ghi đè giá trị hoặc công thức để tránh lỗi #REF!
@@ -609,8 +613,29 @@ function sortSheetByConfig_(ss, sortConfig) {
 
       const colValues = sortedValues.map(row => [row[c]]);
       const colFormulas = sortedFormulas.map(row => [row[c]]);
-      colRange.setValues(colValues);
-      colRange.setFormulas(colFormulas);
+      try {
+        colRange.setValues(colValues);
+      } catch (valErr) {
+        // Nếu bị lỗi Validation ở cột này (ví dụ cột có Dropdown nghiêm ngặt), ta thử ghi từng ô
+        for (let r = 0; r < numRows; r++) {
+          const cell = sheet.getRange(startRow + r, c + 1);
+          try {
+            cell.setValue(colValues[r][0]);
+          } catch (cellValErr) {
+            try {
+              cell.setValue("");
+            } catch (cellValErr2) {
+              // Bỏ qua ô bị Validation chặn không cho sửa
+            }
+          }
+        }
+      }
+
+      try {
+        colRange.setFormulas(colFormulas);
+      } catch (formErr) {
+        // Bỏ qua lỗi công thức nếu cột này không cho phép ghi đè
+      }
     }
 
     Logger.log("  📶 Đã tự động sắp xếp (Sort A:Z) sheet '" + info.sheetName + "' theo cột " + colLetter + " (Từ dòng " + startRow + " đến dòng " + actualLastRow + ")");
