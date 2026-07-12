@@ -299,7 +299,15 @@ function runAutoCopyProcessor(bypassTimeGate) {
                   // Chỉ xóa nội dung các ô không chứa công thức để bảo toàn VLOOKUP/công thức Excel
                   for (let c = 0; c < cellFormulas.length; c++) {
                     if (cellFormulas[c] === "") {
-                      delSh.getRange(rowNum, c + 1).clearContent();
+                      try {
+                        delSh.getRange(rowNum, c + 1).clearContent();
+                      } catch (cellErr) {
+                        try {
+                          delSh.getRange(rowNum, c + 1).setValue("");
+                        } catch (e2) {
+                          // Bỏ qua nếu ô này có quy tắc Validation bắt buộc nhập / không cho để trống
+                        }
+                      }
                     }
                   }
                 }
