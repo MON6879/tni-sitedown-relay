@@ -137,8 +137,10 @@ function sendTelegramMessage_(token, payload) {
     const res = JSON.parse(resp.getContentText());
     if (res.ok) {
       return res.result.message_id;
+    } else {
+      Logger.log("❌ Telegram API Error: " + res.description + " | Chat ID: " + payload.chat_id);
+      return null;
     }
-    return null;
   } catch (e) {
     Logger.log("❌ Lỗi gửi Telegram: " + e.message);
     return null;
@@ -154,4 +156,35 @@ function setupBodAssignTrigger() {
   });
   ScriptApp.newTrigger("checkBodAssign").timeBased().everyMinutes(10).create();
   Logger.log("✅ Đã cài trigger checkBodAssign chạy mỗi 10 phút.");
+}
+
+function debugBodAssign() {
+  const ss = SpreadsheetApp.openById("1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8");
+  const sheet = ss.getSheetByName("BOD assign");
+  if (!sheet) {
+    Logger.log("❌ Không tìm thấy sheet 'BOD assign'");
+    return;
+  }
+  const lastRow = sheet.getLastRow();
+  Logger.log("Dòng cuối cùng phát hiện: " + lastRow);
+  if (lastRow < 2) return;
+
+  const range = sheet.getRange(2, 1, lastRow - 1, 22);
+  const values = range.getValues();
+  Logger.log("Số dòng quét được: " + values.length);
+  
+  for (let i = 0; i < values.length; i++) {
+    const rowNum = i + 2;
+    const row = values[i];
+    
+    const colR = String(row[17] || "").trim(); 
+    const colS = String(row[18] || "").trim(); 
+    const colT = String(row[19] || "").trim(); 
+    const colU = String(row[20] || "").trim(); 
+    const colV = String(row[21] || "").trim(); 
+    
+    if (colR || colT) {
+      Logger.log("Dòng " + rowNum + ": R='" + colR + "', S='" + colS + "', T='" + colT + "', U='" + colU + "', V='" + colV + "'");
+    }
+  }
 }
