@@ -145,53 +145,22 @@ function runAutoCopyProcessor(bypassTimeGate) {
           if (delLastRow >= delStartRow) {
             const numRowsToRead = delLastRow - delStartRow + 1;
             const delData = delSh.getRange(delStartRow, delColNum, numRowsToRead, 1).getValues();
-            const numCols = delSh.getLastColumn();
-            // Quét các dòng phía trên dòng delStartRow để xem cột nào chứa công thức (như ARRAYFORMULA ở dòng tiêu đề)
-            const formulaCols = {};
-            if (delStartRow > 1 && numCols > 0) {
-              try {
-                const upperFormulas = delSh.getRange(1, 1, delStartRow - 1, numCols).getFormulas();
-                for (let c = 0; c < numCols; c++) {
-                  for (let rUpper = 0; rUpper < upperFormulas.length; rUpper++) {
-                    if (upperFormulas[rUpper][c] !== "") {
-                      formulaCols[c] = true;
-                      break;
-                    }
-                  }
-                }
-              } catch (eFormula) {
-                Logger.log("  ⚠️ Cảnh báo đọc công thức hàng trên: " + eFormula.message);
-              }
-            }
-
             let deletedCount = 0;
-            // Duyệt từ dưới lên để làm sạch ô (giữ nguyên công thức và không làm xê dịch hàng gây lỗi Validation)
+            // Duyệt từ dưới lên để xóa toàn bộ hàng (giúp tránh lệch chỉ số dòng khi xóa)
+            // Lệnh deleteRow() xóa cả hàng trực tiếp nên miễn nhiễm hoàn toàn với quy tắc Validation,
+            // đồng thời bảo toàn công thức ARRAYFORMULA ở dòng tiêu đề (do chỉ xóa dòng >= delStartRow)
             for (let r = numRowsToRead - 1; r >= 0; r--) {
               if (String(delData[r][0]).trim() === deleteValCond) {
                 const rowNum = r + delStartRow;
-                if (numCols > 0) {
-                  const rowRange = delSh.getRange(rowNum, 1, 1, numCols);
-                  const cellFormulas = rowRange.getFormulas()[0];
-                  
-                  // Chỉ xóa nội dung các ô không chứa công thức và không nằm trong cột có ARRAYFORMULA phía trên
-                  for (let c = 0; c < cellFormulas.length; c++) {
-                    if (cellFormulas[c] === "" && !formulaCols[c]) {
-                      try {
-                        delSh.getRange(rowNum, c + 1).clearContent();
-                      } catch (cellErr) {
-                        try {
-                          delSh.getRange(rowNum, c + 1).setValue("");
-                        } catch (e2) {
-                          // Bỏ qua nếu ô này có quy tắc Validation bắt buộc nhập / không cho để trống
-                        }
-                      }
-                    }
-                  }
+                try {
+                  delSh.deleteRow(rowNum);
+                  deletedCount++;
+                } catch (delErr) {
+                  Logger.log("  ⚠️ Lỗi khi xóa dòng " + rowNum + ": " + delErr.message);
                 }
-                deletedCount++;
               }
             }
-            Logger.log("  🗑️ Làm sạch xong: " + deletedCount + " dòng có '" + deleteValCond + "' tại '" + delInfo.sheetName + "' cột " + delColLetter);
+            Logger.log("  🗑️ Đã xóa thành công: " + deletedCount + " dòng có '" + deleteValCond + "' tại '" + delInfo.sheetName + "' cột " + delColLetter);
           }
         }
       } catch (err) {
