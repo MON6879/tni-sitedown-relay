@@ -317,8 +317,16 @@ function runAutoCopyProcessor(bypassTimeGate) {
                     // Nếu ô nào chứa lỗi Error (VD: #REF!, #CIRC!), đánh dấu đỏ và ghi log
                     const flatVals = rowValues[0];
                     for (let v = 0; v < flatVals.length; v++) {
-                      const vStr = String(flatVals[v]);
-                      if (vStr.indexOf("#REF") !== -1 || vStr.indexOf("#CIRC") !== -1 || vStr.indexOf("Error") !== -1) {
+                      const vStr = String(flatVals[v]).trim();
+                      if (
+                        vStr.indexOf("#REF") !== -1 || 
+                        vStr.indexOf("#CIRC") !== -1 || 
+                        vStr.indexOf("#VALUE") !== -1 || 
+                        vStr.indexOf("#DIV/0") !== -1 || 
+                        vStr.indexOf("#NAME") !== -1 || 
+                        vStr.indexOf("#N/A") !== -1 || 
+                        vStr === "Error"
+                      ) {
                         hasCircularError = true;
                         break;
                       }
