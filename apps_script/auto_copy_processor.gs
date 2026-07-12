@@ -676,16 +676,26 @@ function sortSheetByConfig_(ss, sortConfig) {
         continue;
       }
 
-      const colValues = sortedValues.map(row => [row[c]]);
-      const colFormulas = sortedFormulas.map(row => [row[c]]);
+      // Trộn lẫn giá trị và công thức để ghi đè trong 1 lần setValues duy nhất,
+      // tránh việc setFormulas ghi đè các ô giá trị tĩnh thành rỗng.
+      const mixedValues = [];
+      for (let r = 0; r < numRows; r++) {
+        const formula = sortedFormulas[r][c];
+        if (formula && formula.indexOf("=") === 0) {
+          mixedValues.push([formula]);
+        } else {
+          mixedValues.push([sortedValues[r][c]]);
+        }
+      }
+
       try {
-        colRange.setValues(colValues);
+        colRange.setValues(mixedValues);
       } catch (valErr) {
         // Nếu bị lỗi Validation ở cột này (ví dụ cột có Dropdown nghiêm ngặt), ta thử ghi từng ô
         for (let r = 0; r < numRows; r++) {
           const cell = sheet.getRange(startRow + r, c + 1);
           try {
-            cell.setValue(colValues[r][0]);
+            cell.setValue(mixedValues[r][0]);
           } catch (cellValErr) {
             try {
               cell.setValue("");
@@ -694,12 +704,6 @@ function sortSheetByConfig_(ss, sortConfig) {
             }
           }
         }
-      }
-
-      try {
-        colRange.setFormulas(colFormulas);
-      } catch (formErr) {
-        // Bỏ qua lỗi công thức nếu cột này không cho phép ghi đè
       }
     }
 
