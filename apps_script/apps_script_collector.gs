@@ -1917,10 +1917,11 @@ function checkBodAssignME() {
   const rangeB = sheet.getRange(2, 2, lastRow - 1, 1).getValues(); // Cột B: PIC / Backoffice task
   const rangeC = sheet.getRange(2, 3, lastRow - 1, 1).getValues(); // Cột C: Group Assign (Content)
   const rangeD = sheet.getRange(2, 4, lastRow - 1, 1).getDisplayValues(); // Cột D: Date Assign
+  const rangeO = sheet.getRange(2, 15, lastRow - 1, 1).getValues(); // Cột O: Status (New assign)
 
   const todayStr = Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy");
   const props = PropertiesService.getScriptProperties();
-  const sentRowsKey = "BOD_ASSIGN_ME_SENT_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
+  const sentRowsKey = "BOD_ASSIGN_ALL_SENT_" + Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMdd");
   
   let sentRows = [];
   try {
@@ -1935,14 +1936,15 @@ function checkBodAssignME() {
 
   for (let i = 0; i < rangeA.length; i++) {
     const rowNum = i + 2;
-    const assignTo = String(rangeA[i][0]).trim().toLowerCase();
+    const statusVal = String(rangeO[i][0]).trim().toLowerCase();
     const dateStr = String(rangeD[i][0]).trim();
 
-    if (assignTo === "m&e" && dateStr) {
+    if (statusVal === "new assign" && dateStr) {
       const datePart = dateStr.split(" ")[0].trim();
       if (datePart === todayStr) {
         matchedTasks.push({
           row: rowNum,
+          assign: String(rangeA[i][0] || "").trim(),
           pic: String(rangeB[i][0] || "").trim(),
           content: String(rangeC[i][0] || "").trim()
         });
@@ -1956,7 +1958,7 @@ function checkBodAssignME() {
   }
 
   if (hasNewMatch) {
-    Logger.log("[checkBodAssignME] 🔔 Phát hiện giao việc mới cho M&E!");
+    Logger.log("[checkBodAssignME] 🔔 Phát hiện giao việc mới!");
     
     const token = props.getProperty("SEND_BOT_TOKEN") || "";
     const controlChatId = "-5251698940";
@@ -1969,16 +1971,16 @@ function checkBodAssignME() {
     const nowStr = Utilities.formatDate(new Date(), "Asia/Rangoon", "HH:mm");
     
     const lines = [
-      "📋 1.1. Report — BOD Assign to M&E",
+      "📋 1.1. Report — BOD Assign",
       "📅 " + todayStr + "  |  🕐 " + nowStr,
       "━━━━━━━━━━━━━━━━━━━━━━",
-      "M&E: You have new Assign from BOD or Manager:",
+      "You have new Assign from BOD or Manager:",
       "━━━━━━━━━━━━━━━━━━━━━━"
     ];
 
     const inlineKeyboard = [];
     matchedTasks.forEach(function(task) {
-      lines.push("• Row #" + task.row + " | PIC: " + task.pic + " | Content: " + task.content);
+      lines.push("• Row #" + task.row + " | Target: " + task.assign + " | PIC: " + task.pic + " | Content: " + task.content);
       inlineKeyboard.push([{
         text: "Yes, I received Row #" + task.row,
         callback_data: "ack_bod_assign_me_" + task.row
@@ -2038,11 +2040,11 @@ function checkBodAssignME() {
       Logger.log("[checkBodAssignME] ❌ Lỗi gọi Telegram: " + e.message);
     }
   } else {
-    Logger.log("[checkBodAssignME] 😴 Không có giao việc M&E mới");
+    Logger.log("[checkBodAssignME] 😴 Không có giao việc mới");
   }
 }
 
-/** Cài đặt trigger chạy checkBodAssignME mỗi 5 phút */
+/** Cài đặt trigger chạy checkBodAssignME mỗi 10 phút */
 function setupBodAssignMETrigger() {
   const triggerName = "checkBodAssignME";
   const triggers = ScriptApp.getProjectTriggers();
@@ -2051,8 +2053,8 @@ function setupBodAssignMETrigger() {
       ScriptApp.deleteTrigger(t);
     }
   });
-  ScriptApp.newTrigger(triggerName).timeBased().everyMinutes(5).create();
-  Logger.log("✅ Đã cài trigger checkBodAssignME mỗi 5 phút");
+  ScriptApp.newTrigger(triggerName).timeBased().everyMinutes(10).create();
+  Logger.log("✅ Đã cài trigger checkBodAssignME mỗi 10 phút");
 }
 
 // ════════════════════════════════════════════════════════════
