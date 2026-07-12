@@ -10,7 +10,7 @@ Hệ thống tự động gửi báo cáo Telegram cho **4 Teams + Management** 
 | Loại báo cáo | Trigger | Bot | Nơi gửi |
 |---|---|---|---|
 | **Tin 1** — Site down list per team | Khi có báo cáo mới vào Col A | `8647102342:AAGwI95-...` | T1/T2/T3/T4 + CONTROL |
-| **Tin 2** — Summary (site/cell/DG/link) | Khi AW4:AZ8 thay đổi | `8647102342:AAGwI95-...` | T1/T2/T3/T4 |
+| **Tin 2** — Summary (site/cell/DG/link) | Khi AW7 thay đổi | `8647102342:AAGwI95-...` | T1/T2/T3/T4 + CONTROL |
 | **Daily 17:30** — Task remain + WO | GitHub Actions 11:00 UTC | `SEND_BOT 8897800070:...` | Nhân viên + TL + BOD |
 
 ---
@@ -20,16 +20,18 @@ Hệ thống tự động gửi báo cáo Telegram cho **4 Teams + Management** 
 ```
 d:\6. AI\1. QLTC\
 ├── Task and WO\                    ← Repo chính: phonghdpxd-cmd/tni-bot
-│   ├── site_down_notify.gs         ← Apps Script: Tin 1 + Tin 2 (site down)
+│   ├── apps_script/
+│   │   ├── site_down_v2.gs         ← Apps Script: Tin 1 + Tin 2 (site down) - Decoupled
+│   │   └── apps_script_collector.js← Apps Script: Main data collector
 │   ├── cron_send.py                ← GitHub Actions: Daily task remain 17:30
-│   ├── system_map.md               ← Kiến trúc hệ thống
+│   ├── SYSTEM_DOC.md               ← Tài liệu hệ thống
 │   ├── PROMPT_RUNBOOK.md           ← File này
 │   ├── api/collector.py            ← Vercel: Bot thu thập order/revoke
-│   └── .github/workflows/
-│       └── daily_task.yml          ← ✅ ACTIVE: 0 11 * * * UTC = 17:30 Myanmar
-└── QLTC_GAS\                       ← Finance/Settlement system (khác biệt)
-├── auto_send_17h30.gs              ← Apps Script: Leader report 17:30
-└── telegram_report_bot.gs          ← Apps Script: Task progress report
+│   └── tni_site_down_repo/         ← Sub-repo: phonghdpxd-cmd/TNI-SITE-DOWN
+│       ├── .github/workflows/
+│       │   └── botlookup_relay.yml ← Chạy cào dữ liệu qua workflow_dispatch
+│       ├── botlookup_relay.py      ← Script Python cào botlookup (đã gỡ Note)
+│       └── site_down_v2.gs         ← Bản lưu trữ của Apps Script
 ```
 
 ---
@@ -54,15 +56,13 @@ d:\6. AI\1. QLTC\
 ### Bots
 | Bot | Token (4 số đầu) | Dùng cho |
 |---|---|---|
-| Site Down Bot | `8647102342:AAGwI95-...` | site_down_notify.gs |
+| Site Down Bot | `8647102342:AAGwI95-...` | site_down_v2.gs |
 | SEND_BOT | `8897800070:AAHc...` | cron_send.py |
-| TNIREPORTTASK_BOT | `8646913750:AAG3...` | telegram_report_bot.gs |
 | Collector Bot | `8928677923:AAE_...` | api/collector.py |
 
-### Apps Script
-| Script | ID |
-|---|---|
-| Site Down Notify | `1rvgWwrAMDbqtmqwOfqzguXB7m9snA5UZeOs9iGu64VJbejlNAkH2m6uR` |
+### Apps Script Projects
+- **TNI Main Project:** Contains `apps_script_collector.gs`, `10_DASHBOARD_REPORT.gs`, etc.
+- **TNI Site Down Bot Project:** Standalone project containing only `site_down_v2.gs` (ID: `1fglR_frjlOHBt4o3STTjGmHYaKfuiSb3zAtp7IrO__uLSIuRQGJ2Oc6X`).
 
 ---
 
@@ -122,7 +122,7 @@ TẮT WORKFLOW:
 NGUYÊN NHÂN: Web App "Who has access" ≠ "Anyone"
 → KHÔNG FIX WEBHOOK nữa, dùng POLLING thay thế:
   1. deleteWebhook() → Run
-  2. fetchTelegramUpdates() tự chạy qua checkAndSend() trigger 5 phút
+  2. fetchTelegramUpdates() tự chạy qua checkAndSend() trigger 1 phút (phút :08/:38)
 ```
 
 ### 🔧 Khi tin nhắn bị lỗi format / không hiển thị bold
@@ -134,13 +134,32 @@ FIX: Đã đổi sang HTML format trong sendTelegram():
   escHtml() escape & < > trong dữ liệu
 ```
 
-### 🔧 Khi muốn tạo bot mới
+## 🗺️ KIẾN TRÚC SITE DOWN V2 (site_down_v2.gs)
+
 ```
-1. Telegram: nhắn @BotFather → /newbot → đặt tên → lấy token
-2. Thêm bot vào group với quyền ADMIN (để nhận tất cả tin nhắn)
-3. BotFather → /mybots → Bot → Bot Settings → Group Privacy → Turn OFF
-4. Test: gửi tin vào group → getUpdates → kiểm tra chat ID
-5. Cập nhật token trong code + GitHub Secrets
+┌─────────────────────────────────────────────────────────────┐
+│  GITHUB ACTIONS: botlookup_relay.yml                        │
+│    (Được kích hoạt bởi trigger của Apps Script hoặc manual)  │
+│    1. Gửi lệnh /down_tni tới auto_nocpro_bot               │
+│    2. Nhận tin nhắn phản hồi từ Botlookup                  │
+│    3. POST tin nhắn raw về Web App của Apps Script         │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ POST (action: store_site_down)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│  APPS SCRIPT: doPost(e)                                     │
+│    1. Ghi tin nhắn raw vào Cột A của Google Sheets          │
+│    2. Chờ 10 giây để công thức Cột C và AW7 cập nhật        │
+│    3. Gọi checkAndSend(true) để gửi tin tức thì             │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│  checkAndSend()                                             │
+│    - Gửi Tin 1 (chi tiết site down từ Cột C)                │
+│    - Gửi Tin 2 (bảng tổng hợp sự cố từ AW7:AZ15)            │
+│    - Nơi nhận: Nhóm T1, T2, T3, T4 và CONTROL               │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -152,55 +171,24 @@ FIX: Đã đổi sang HTML format trong sendTelegram():
 □ 2. Tắt Privacy Mode (BotFather → /mybots → Group Privacy → Turn off)
 □ 3. Thêm bot vào group cần monitor (nên làm Admin)
 □ 4. Lấy Chat ID của group: gửi /start rồi gọi getUpdates
-□ 5. Cập nhật SD_GROUPS trong site_down_notify.gs
-□ 6. Chạy setupSdTrigger() để cài trigger 5 phút
-□ 7. KHÔNG dùng webhook (dùng polling getUpdates thay thế)
-□ 8. Test: testGetUpdatesRaw() → testTin1Only() → kiểm tra Telegram
+□ 5. Cập nhật SD_GROUPS trong site_down_v2.gs
+□ 6. Chạy setupSdTrigger() để cài trigger 1 phút (có gate 08/38)
+□ 7. KHÔNG dùng webhook (dùng polling getUpdates hoặc Web App relay)
+□ 8. Test: testFullFlow() → kiểm tra Telegram
 □ 9. Với GitHub Actions: tính cron theo UTC (Myanmar = UTC+6:30)
 □ 10. Commit + push lên branch main (không phải master)
 ```
 
 ---
 
-## 🗺️ KIẾN TRÚC SITE DOWN NOTIFY (site_down_notify.gs)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  checkAndSend() — trigger 5 phút                        │
-│                                                         │
-│  BƯỚC 1: fetchTelegramUpdates(sheet)                    │
-│    → getUpdates từ Telegram (offset = lastId+1)         │
-│    → Lọc: chat=-5251698940 + isSiteDownReport()         │
-│    → Nếu có báo cáo → writeToColumnA() → xóa TS_KEY_A1 │
-│    → flush() + sleep(3s) chờ Col C tính lại             │
-│                                                         │
-│  BƯỚC 2: checkColC(sheet)                               │
-│    → Đọc A1 → so sánh với TS_KEY_A1 stored             │
-│    → Nếu khác → readColC() → buildColCMessage()         │
-│    → sendTelegram() cho T1/T2/T3/T4 + CONTROL           │
-│    → Cập nhật TS_KEY_A1                                 │
-│                                                         │
-│  BƯỚC 3: checkAwAz(sheet)                               │
-│    → Đọc AW4 → so sánh với TS_KEY_AW4 stored           │
-│    → Nếu khác → buildAwAzTeamMessage()                  │
-│    → sendTelegram() cho T1/T2/T3/T4                     │
-│    → Cập nhật TS_KEY_AW4                                │
-└─────────────────────────────────────────────────────────┘
-```
-
 ### Hàm test quan trọng
 | Hàm | Mục đích |
 |---|---|
-| `testGetUpdatesRaw()` | Xem raw getUpdates Telegram → debug bot nhận tin |
-| `testTin1Only()` | Force gửi Tin 1 với dữ liệu hiện tại |
-| `testSendNow()` | Xóa key + gửi cả Tin 1 và Tin 2 |
-| `checkAndSend()` | Chạy đầy đủ: poll + check + send |
-| `checkWebhook()` | Xem webhook status (không dùng nữa) |
-| `deleteWebhook()` | Xóa webhook để getUpdates hoạt động |
-| `setupSdTrigger()` | Cài trigger 5 phút |
-| `testPingBot()` | Test bot có gửi được Telegram không |
-| `testDebugColC()` | Debug Col C: xem data per team |
-| `testDebugAW4()` | Debug AW4: xem timestamp stored |
+| `testFullFlow()` | Xóa cache, giả lập kích hoạt GitHub Actions cào và gửi tin ngay lập tức |
+| `setupSdTrigger()` | Cài trigger chạy mỗi 1 phút (chỉ thực sự chạy vào phút :08 và :38 Myanmar, khung giờ 03:38 - 22:08) |
+| `resetSiteDownProperties()` | Xóa cache ghi nhận A1 và AW7 cũ trên Sheets |
+| `testTin1Only()` | Ép gửi Tin 1 (danh sách chi tiết site) bằng dữ liệu hiện có trong Col C |
+| `testTin2Only()` | Ép gửi Tin 2 (bảng tổng hợp sự cố) bằng dữ liệu hiện có trong AW7:AZ15 |
 
 ---
 

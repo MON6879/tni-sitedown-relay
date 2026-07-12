@@ -90,11 +90,18 @@ Telegram Groups (per-team + consolidated to CONTROL)
 
 ### 3. `apps_script_collector.js` — Google Apps Script Data Collector
 - **Deployed as:** Web App (Google Apps Script)
-- **URL:** Set in `APPS_SCRIPT_URL` secret
+- **URL:** Set in `APPS_SCRIPT_URL` secret in main repo
 - **Returns JSON** with: employees, leaders, teamSummary, searchStats, taskSummary, asset data
 - **Per-person search fields:** `search_today`, `search_d1`, `search_d2`, `search_week`, `search_month`
 - **Per-team summary:** `today`, `d1`, `d2`, `week`, `month`
 - ⚠️ **Must deploy manually** via Google Apps Script Editor → Deploy → New version
+
+### 3a. `site_down_v2.gs` — Standalone Site Down Web App
+- **Deployed as:** Standalone Web App (Google Apps Script project: "TNI Site Down Bot")
+- **URL:** Set in `SD_APPS_SCRIPT_URL` secret in `TNI-SITE-DOWN` repo
+- **Functions:** Standard entry points `doPost` (receives raw text from Python, writes to Col A, triggers `checkAndSend(true)`) and `doGet`
+- **Trigger:** Runs `checkAndSend` trigger every 1 minute, which gates execution to exactly minutes `:08` and `:38` between `03:38` and `22:08` Myanmar Time.
+- **Key decoupling:** Has no dependencies on `apps_script_collector.gs` and runs completely independently.
 
 ### 4. `check_read_status.py` — Quick Read Check (manual)
 
@@ -225,15 +232,18 @@ Missing: TNI0052, TNI0185, TNI0058
 
 ## 🔑 GitHub Secrets Required
 
-| Secret | Used By |
-|---|---|
-| `SEND_BOT_TOKEN` | cron_send.py |
-| `REPORT_TASK_BOT_TOKEN` | cron_send.py |
-| `TECHNICAL_DEP_BOT_TOKEN` | cron_send.py |
-| `APPS_SCRIPT_URL` | cron_send.py |
-| `TELEGRAM_API_ID` | daily_read_report.py |
-| `TELEGRAM_API_HASH` | daily_read_report.py |
-| `TELEGRAM_SESSION` | daily_read_report.py |
+| Secret | Repository | Used By | Description |
+|---|---|---|---|
+| `SEND_BOT_TOKEN` | `tni-bot` (main) | `cron_send.py` | Bot token for daily reports |
+| `REPORT_TASK_BOT_TOKEN` | `tni-bot` (main) | `cron_send.py` | Bot token for task remain |
+| `TECHNICAL_DEP_BOT_TOKEN` | `tni-bot` (main) | `cron_send.py` | Bot token for technical updates |
+| `APPS_SCRIPT_URL` | `tni-bot` (main) | `cron_send.py`, search bots | Web app URL of main Apps Script project (`apps_script_collector.gs`) |
+| `DAILY_APPS_SCRIPT_URL` | `tni-bot` (main) | `cron_send.py`, search bots | Web app URL for daily summaries |
+| `REFUEL_APPS_SCRIPT_URL` | `tni-bot` (main) / `TNI-SITE-DOWN` | `refuel_plan_report.py`, `botlookup_relay.py` | Web app URL for refuel tracking |
+| `SD_APPS_SCRIPT_URL` | `TNI-SITE-DOWN` | `botlookup_relay.py` | Web app URL of standalone Site Down project (`site_down_v2.gs`) |
+| `TELEGRAM_API_ID` | `tni-bot` (main) / `TNI-SITE-DOWN` | `daily_read_report.py`, `botlookup_relay.py` | Telegram account API ID |
+| `TELEGRAM_API_HASH` | `tni-bot` (main) / `TNI-SITE-DOWN` | `daily_read_report.py`, `botlookup_relay.py` | Telegram account API hash |
+| `TELEGRAM_SESSION` | `tni-bot` (main) / `TNI-SITE-DOWN` | `daily_read_report.py`, `botlookup_relay.py` | Telethon session string |
 
 ---
 
