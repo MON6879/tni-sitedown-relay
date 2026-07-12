@@ -287,6 +287,24 @@ function runAutoCopyProcessor(bypassTimeGate) {
             const numRowsToRead = delLastRow - delStartRow + 1;
             const delData = delSh.getRange(delStartRow, delColNum, numRowsToRead, 1).getValues();
             const numCols = delSh.getLastColumn();
+            // Quét các dòng phía trên dòng delStartRow để xem cột nào chứa công thức (như ARRAYFORMULA ở dòng tiêu đề)
+            const formulaCols = {};
+            if (delStartRow > 1 && numCols > 0) {
+              try {
+                const upperFormulas = delSh.getRange(1, 1, delStartRow - 1, numCols).getFormulas();
+                for (let c = 0; c < numCols; c++) {
+                  for (let rUpper = 0; rUpper < upperFormulas.length; rUpper++) {
+                    if (upperFormulas[rUpper][c] !== "") {
+                      formulaCols[c] = true;
+                      break;
+                    }
+                  }
+                }
+              } catch (eFormula) {
+                Logger.log("  ⚠️ Cảnh báo đọc công thức hàng trên: " + eFormula.message);
+              }
+            }
+
             let deletedCount = 0;
             // Duyệt từ dưới lên để làm sạch ô (giữ nguyên công thức và không làm xê dịch hàng gây lỗi Validation)
             for (let r = numRowsToRead - 1; r >= 0; r--) {
@@ -296,9 +314,9 @@ function runAutoCopyProcessor(bypassTimeGate) {
                   const rowRange = delSh.getRange(rowNum, 1, 1, numCols);
                   const cellFormulas = rowRange.getFormulas()[0];
                   
-                  // Chỉ xóa nội dung các ô không chứa công thức để bảo toàn VLOOKUP/công thức Excel
+                  // Chỉ xóa nội dung các ô không chứa công thức và không nằm trong cột có ARRAYFORMULA phía trên
                   for (let c = 0; c < cellFormulas.length; c++) {
-                    if (cellFormulas[c] === "") {
+                    if (cellFormulas[c] === "" && !formulaCols[c]) {
                       try {
                         delSh.getRange(rowNum, c + 1).clearContent();
                       } catch (cellErr) {
