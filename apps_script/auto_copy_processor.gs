@@ -145,15 +145,24 @@ function runAutoCopyProcessor(bypassTimeGate) {
             Logger.log("  ❌ Lỗi: Không tìm thấy sheet đích: '" + tgtInfo.sheetName + "'");
           } else {
             const srcLastRow = srcSh.getLastRow();
+            
+            // Lấy dòng bắt đầu quét điều kiện của cột điều kiện và dải ô nguồn
             const condRangeInfo = parseColAndStartRow_(sourceColCond);
             let condColNum = colLetterToNum_(condRangeInfo.colLetter);
             // Đảm bảo cột điều kiện nằm trong giới hạn của sheet nguồn
             condColNum = Math.min(condColNum, srcSh.getMaxColumns());
             
-            const srcStartRow = condRangeInfo.startRow;
-            if (srcLastRow >= srcStartRow) {
-              const numCondRows = srcLastRow - srcStartRow + 1;
-              const condData = srcSh.getRange(srcStartRow, condColNum, numCondRows, 1).getValues();
+            // Xác định dòng bắt đầu thực tế (lấy max giữa dòng khai báo ở Sheet nguồn và cột điều kiện)
+            let srcStartRow = 1;
+            if (srcInfo.rangeStr) {
+              const srcRangeInfo = parseColAndStartRow_(srcInfo.rangeStr);
+              srcStartRow = srcRangeInfo.startRow;
+            }
+            const finalStartRow = Math.max(srcStartRow, condRangeInfo.startRow);
+
+            if (srcLastRow >= finalStartRow) {
+              const numCondRows = srcLastRow - finalStartRow + 1;
+              const condData = srcSh.getRange(finalStartRow, condColNum, numCondRows, 1).getValues();
               
               // Xác định khoảng cột cần copy
               let startCol = 1;
@@ -169,11 +178,13 @@ function runAutoCopyProcessor(bypassTimeGate) {
               endCol = Math.min(endCol, srcMaxCols);
               const numCols = endCol - startCol + 1;
 
-              // Xác định cột dán ở sheet đích
+              // Xác định cột dán ở sheet đích và dòng dán bắt đầu
               let targetStartCol = 1;
+              let targetStartRow = 1;
               if (tgtInfo.rangeStr) {
-                const targetCols = parseRangeCols_(tgtInfo.rangeStr);
-                targetStartCol = targetCols.start;
+                const tgtRangeInfo = parseColAndStartRow_(tgtInfo.rangeStr);
+                targetStartCol = colLetterToNum_(tgtRangeInfo.colLetter);
+                targetStartRow = tgtRangeInfo.startRow;
               }
 
               // Đảm bảo sheet đích đủ cột để dán, nếu thiếu thì tự động chèn thêm cột
@@ -187,7 +198,7 @@ function runAutoCopyProcessor(bypassTimeGate) {
               let copiedCount = 0;
               for (let r = 0; r < condData.length; r++) {
                 if (String(condData[r][0]).trim() === sourceValCond) {
-                  const srcRowNum = r + srcStartRow;
+                  const srcRowNum = r + finalStartRow;
                   
                   // Kiểm tra xem dòng này đã được copy trước đó chưa (qua Cell Note)
                   const condCell = srcSh.getRange(srcRowNum, condColNum);
@@ -227,7 +238,7 @@ function runAutoCopyProcessor(bypassTimeGate) {
                   }
                   
                   // Tìm dòng trống tiếp theo dựa theo cột dán đích
-                  const tgtNextRow = findNextEmptyRowInCol_(tgtSh, targetStartCol);
+                  const tgtNextRow = findNextEmptyRowInCol_(tgtSh, targetStartCol, targetStartRow);
                   
                   // Ghi dữ liệu dạng Paste 123 (values only — giữ nguyên công thức nguồn)
                   tgtSh.getRange(tgtNextRow, targetStartCol, 1, numCols).setValues(rowValues);
@@ -437,17 +448,19 @@ function parseRangeCols_(rangeStr) {
   };
 }
 
-function findNextEmptyRowInCol_(sheet, columnIdx) {
+function findNextEmptyRowInCol_(sheet, columnIdx, startRow) {
+  startRow = startRow || 1;
   const lastRow = sheet.getLastRow();
-  if (lastRow === 0) return 1;
-  const values = sheet.getRange(1, columnIdx, lastRow, 1).getValues();
-  for (let i = lastRow - 1; i >= 0; i--) {
+  if (lastRow < startRow) return startRow;
+  const numRowsToRead = lastRow - startRow + 1;
+  const values = sheet.getRange(startRow, columnIdx, numRowsToRead, 1).getValues();
+  for (let i = numRowsToRead - 1; i >= 0; i--) {
     const val = values[i][0];
     if (val !== "" && val !== null && val !== undefined) {
-      return i + 2;
+      return i + startRow + 1;
     }
   }
-  return 1;
+  return startRow;
 }
 
 function sortSheetByConfig_(ss, sortConfig) {
