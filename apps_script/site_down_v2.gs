@@ -185,7 +185,7 @@ function checkAndSend(isWebhookCall) {
 
   // ── Kiểm tra thời gian nếu không phải là Webhook call ──
   const props = PropertiesService.getScriptProperties();
-  if (!isWebhookCall) {
+  if (isWebhookCall !== true) {
     if (minute !== 8 && minute !== 38) return { sent_tin1: false, sent_tin2: false };
     if (hour < 3 || hour > 22) return { sent_tin1: false, sent_tin2: false };
     if (hour === 3 && minute < 38) return { sent_tin1: false, sent_tin2: false };   // 03:38 là sớm nhất
@@ -200,7 +200,7 @@ function checkAndSend(isWebhookCall) {
     props.setProperty(doneKey, "1");
   }
 
-  Logger.log("✅ checkAndSend — " + mytime + " Myanmar" + (isWebhookCall ? " (Webhook)" : ""));
+  Logger.log("✅ checkAndSend — " + mytime + " Myanmar" + (isWebhookCall === true ? " (Webhook)" : ""));
 
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) {
@@ -214,7 +214,7 @@ function checkAndSend(isWebhookCall) {
 
     // Bước 1: Dispatch botlookup_relay → gửi lệnh lấy data từ BOT LOOKUP
     //   botlookup_relay.py sẽ: gửi /down_tni → đọc kết quả → ghi Col A + Note B2:B5
-    if (!isWebhookCall) {
+    if (isWebhookCall !== true) {
       triggerBotlookupRelay();
     }
 
