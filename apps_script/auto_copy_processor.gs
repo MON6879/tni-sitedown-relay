@@ -164,6 +164,17 @@ function runAutoCopyProcessor(bypassTimeGate) {
     return;
   }
   Logger.log("🚀 Bắt đầu tiến trình Auto Copy & Delete...");
+  
+  // Tự động chạy quét gửi tin nhắn BOD assign trước khi tiến hành copy/xóa dữ liệu nguồn
+  try {
+    if (typeof checkBodAssign === "function") {
+      Logger.log("🔄 Đang chạy quét gửi tin nhắn BOD assign trước khi copy...");
+      checkBodAssign();
+    }
+  } catch (eBod) {
+    Logger.log("⚠️ Cảnh báo chạy checkBodAssign trong copy processor: " + eBod.message);
+  }
+
   const errorRows = []; // Thu thập các dòng lỗi để tổng hợp báo cáo
   let ssConfig;
   try {
