@@ -31,6 +31,10 @@ STAFF_SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
     "/export?format=csv&gid=1684930643"
 )
+CONFIG_SHEET_URL = (
+    f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
+    "/export?format=csv&gid=1236389870"
+)
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 HEADER_ROWS = 3  # rows 1-3 là header (row 3 có 'export sms')
 COL_A, COL_B, COL_C, COL_D, COL_E = 0, 1, 2, 3, 4
@@ -130,6 +134,25 @@ def build_search_summary(now_str, report_data):
         f"7Day:{grand.get('week',0)} Month:{grand.get('month',0)}"
     )
     return "\n".join(lines)
+
+
+def get_note_from_sheet() -> str:
+    """Read G1:G5 from Config tab (GID 1236389870)."""
+    try:
+        resp = requests.get(CONFIG_SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+        resp.raise_for_status()
+        df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str, on_bad_lines="skip")
+        
+        note_lines = []
+        for r_idx in range(0, min(5, len(df))):
+            if len(df.columns) > 6:
+                val = str(df.iloc[r_idx].iloc[6]).strip() if not pd.isna(df.iloc[r_idx].iloc[6]) else ""
+                if val and val.lower() not in ("nan", "none", ""):
+                    note_lines.append(val)
+        return "\n".join(note_lines)
+    except Exception as e:
+        logger.error(f"Error fetching Note from Config sheet: {e}")
+        return ""
 
 
 def get_current_cycle_str() -> str:
@@ -1448,6 +1471,13 @@ async def main():
     input_task_detail = get_input_task_detail(now)
     logger.info(f"Input task detail: {len(input_task_detail)} dept messages")
 
+    # ── 5a. Fetch Note from Config G1:G5 ──
+    note_text = get_note_from_sheet()
+    if note_text:
+        logger.info("Note fetched successfully from Config sheet")
+    else:
+        logger.info("No Note found or error fetching Note")
+
     # ── 5.5 Team→employees mapping (dùng khi gửi riêng lẻ cho TL) ──
     TEAM_BY_NUMBER = {
         1: "MYT_TNI_TEAM01_Dawei",
@@ -1644,6 +1674,10 @@ async def main():
                 team_lines_indiv.append(tl_search)
             if no_search:
                 team_lines_indiv.append(no_search)
+
+            if note_text:
+                team_lines_indiv.append("────────────────────")
+                team_lines_indiv.append(f"📝 NOTE:\n{note_text}")
 
             team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
             team_lines_indiv.append(f"👥 Total: {len(members)} members")
