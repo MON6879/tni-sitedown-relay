@@ -269,16 +269,27 @@ function runAutoCopyProcessor(bypassTimeGate) {
 
           if (delLastRow >= 1) {
             const delData = delSh.getRange(1, delColNum, delLastRow, 1).getValues();
+            const numCols = delSh.getLastColumn();
             let deletedCount = 0;
-
-            // Quét từ dưới lên để tránh lệch index dòng khi xóa
+            // Duyệt từ dưới lên để làm sạch ô (giữ nguyên công thức và không làm xê dịch hàng gây lỗi Validation)
             for (let r = delLastRow - 1; r >= 0; r--) {
               if (String(delData[r][0]).trim() === deleteValCond) {
-                delSh.deleteRow(r + 1);
+                const rowNum = r + 1;
+                if (numCols > 0) {
+                  const rowRange = delSh.getRange(rowNum, 1, 1, numCols);
+                  const cellFormulas = rowRange.getFormulas()[0];
+                  
+                  // Chỉ xóa nội dung các ô không chứa công thức để bảo toàn VLOOKUP/công thức Excel
+                  for (let c = 0; c < cellFormulas.length; c++) {
+                    if (cellFormulas[c] === "") {
+                      delSh.getRange(rowNum, c + 1).clearContent();
+                    }
+                  }
+                }
                 deletedCount++;
               }
             }
-            Logger.log("  🗑️ Xóa xong: " + deletedCount + " dòng có '" + deleteValCond + "' tại '" + delInfo.sheetName + "' cột " + delColLetter);
+            Logger.log("  🗑️ Làm sạch xong: " + deletedCount + " dòng có '" + deleteValCond + "' tại '" + delInfo.sheetName + "' cột " + delColLetter);
           }
         }
       } catch (err) {
