@@ -276,19 +276,42 @@ function runAutoCopyProcessor(bypassTimeGate) {
           } else {
             const srcLastRow = srcSh.getLastRow();
             
-            // Lấy dòng bắt đầu quét điều kiện của cột điều kiện và dải ô nguồn
+            // 1. Xác định cột dán ở sheet đích và dòng dán bắt đầu
+            let targetStartCol = 1;
+            let targetStartRow = 1;
+            let targetHasRow = false;
+            if (tgtInfo.rangeStr) {
+              const tgtRangeInfo = parseColAndStartRow_(tgtInfo.rangeStr);
+              targetStartCol = colLetterToNum_(tgtRangeInfo.colLetter);
+              targetStartRow = tgtRangeInfo.startRow;
+              targetHasRow = tgtRangeInfo.hasRow;
+            }
+
+            // 2. Lấy dòng bắt đầu quét điều kiện của cột điều kiện và dải ô nguồn
             const condRangeInfo = parseColAndStartRow_(sourceColCond);
             let condColNum = colLetterToNum_(condRangeInfo.colLetter);
             // Đảm bảo cột điều kiện nằm trong giới hạn của sheet nguồn
             condColNum = Math.min(condColNum, srcSh.getMaxColumns());
             
-            // Xác định dòng bắt đầu thực tế (lấy max giữa dòng khai báo ở Sheet nguồn và cột điều kiện)
             let srcStartRow = 1;
+            let srcHasRow = false;
             if (srcInfo.rangeStr) {
               const srcRangeInfo = parseColAndStartRow_(srcInfo.rangeStr);
               srcStartRow = srcRangeInfo.startRow;
+              srcHasRow = srcRangeInfo.hasRow;
             }
-            const finalStartRow = Math.max(srcStartRow, condRangeInfo.startRow);
+
+            // Đồng bộ dòng bắt đầu quét nếu cấu hình nguồn là cột dạng A:A (không có số dòng)
+            // nhưng cấu hình đích có dạng C4:H (bắt đầu từ dòng 4) để tránh copy nhầm tiêu đề.
+            let condStartRow = condRangeInfo.startRow;
+            if (!condRangeInfo.hasRow && targetHasRow) {
+              condStartRow = targetStartRow;
+            }
+            if (!srcHasRow && targetHasRow) {
+              srcStartRow = targetStartRow;
+            }
+
+            const finalStartRow = Math.max(srcStartRow, condStartRow);
 
             if (srcLastRow >= finalStartRow) {
               const numCondRows = srcLastRow - finalStartRow + 1;
@@ -307,17 +330,6 @@ function runAutoCopyProcessor(bypassTimeGate) {
               startCol = Math.min(startCol, srcMaxCols);
               endCol = Math.min(endCol, srcMaxCols);
               const numCols = endCol - startCol + 1;
-
-              // Xác định cột dán ở sheet đích và dòng dán bắt đầu
-              let targetStartCol = 1;
-              let targetStartRow = 1;
-              if (tgtInfo.rangeStr) {
-                const tgtRangeInfo = parseColAndStartRow_(tgtInfo.rangeStr);
-                targetStartCol = colLetterToNum_(tgtRangeInfo.colLetter);
-                targetStartRow = tgtRangeInfo.startRow;
-              }
-
-              // Đảm bảo sheet đích đủ cột để dán, nếu thiếu thì tự động chèn thêm cột
               const tgtMaxCols = tgtSh.getMaxColumns();
               const neededTgtCols = targetStartCol + numCols - 1;
               if (neededTgtCols > tgtMaxCols) {
@@ -747,10 +759,11 @@ function isWithinCopyActiveWindows_() {
 }
 
 function parseColAndStartRow_(rangeStr) {
-  if (!rangeStr) return { colLetter: "A", startRow: 1 };
+  if (!rangeStr) return { colLetter: "A", startRow: 1, hasRow: false };
   
   let colLetter = "A";
   let startRow = 1;
+  let hasRow = false;
   
   // Loại bỏ phần tên sheet phía trước dấu chấm than ! nếu có (VD: "3.1 Update Assign!A4:A" -> "A4:A")
   let rangeOnly = rangeStr;
@@ -766,6 +779,7 @@ function parseColAndStartRow_(rangeStr) {
   const rowMatch = firstPart.match(/\d+/);
   if (rowMatch) {
     startRow = parseInt(rowMatch[0], 10);
+    hasRow = true;
   }
   
   // Trích xuất chữ cái cột (VD: "A4" -> "A")
@@ -774,5 +788,5 @@ function parseColAndStartRow_(rangeStr) {
     colLetter = colMatch[0];
   }
   
-  return { colLetter: colLetter, startRow: startRow };
+  return { colLetter: colLetter, startRow: startRow, hasRow: hasRow };
 }
