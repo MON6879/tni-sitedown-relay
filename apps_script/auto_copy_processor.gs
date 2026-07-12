@@ -124,7 +124,83 @@ function runAutoCopyProcessor(bypassTimeGate) {
     Logger.log("Dòng cấu hình #" + rowIdx + ":");
 
     // ========================================================
-    // PHẦN 1: COPY - PASTE 123 (Nếu có đủ cấu hình)
+    // PHẦN 1: XÓA HÀNG Ở SHEET KHÁC (theo cấu hình cột G, H, I)
+    // ========================================================
+    if (deleteLink && deleteColCond && deleteValCond) {
+      try {
+        const delSSId = extractSsId_(deleteLink);
+        const delSS = getSpreadsheetCached_(delSSId);
+        const delInfo = parseSheetAndRange_(deleteColCond);
+        const delSh = delSS.getSheetByName(delInfo.sheetName);
+
+        if (!delSh) {
+          Logger.log("  ❌ Lỗi: Không tìm thấy sheet xóa: '" + delInfo.sheetName + "'");
+        } else {
+          const delColLetter = delInfo.rangeStr || "A";
+          const delRangeInfo = parseColAndStartRow_(delColLetter);
+          const delColNum = colLetterToNum_(delRangeInfo.colLetter);
+          const delStartRow = delRangeInfo.startRow;
+          const delLastRow = delSh.getLastRow();
+
+          if (delLastRow >= delStartRow) {
+            const numRowsToRead = delLastRow - delStartRow + 1;
+            const delData = delSh.getRange(delStartRow, delColNum, numRowsToRead, 1).getValues();
+            const numCols = delSh.getLastColumn();
+            // Quét các dòng phía trên dòng delStartRow để xem cột nào chứa công thức (như ARRAYFORMULA ở dòng tiêu đề)
+            const formulaCols = {};
+            if (delStartRow > 1 && numCols > 0) {
+              try {
+                const upperFormulas = delSh.getRange(1, 1, delStartRow - 1, numCols).getFormulas();
+                for (let c = 0; c < numCols; c++) {
+                  for (let rUpper = 0; rUpper < upperFormulas.length; rUpper++) {
+                    if (upperFormulas[rUpper][c] !== "") {
+                      formulaCols[c] = true;
+                      break;
+                    }
+                  }
+                }
+              } catch (eFormula) {
+                Logger.log("  ⚠️ Cảnh báo đọc công thức hàng trên: " + eFormula.message);
+              }
+            }
+
+            let deletedCount = 0;
+            // Duyệt từ dưới lên để làm sạch ô (giữ nguyên công thức và không làm xê dịch hàng gây lỗi Validation)
+            for (let r = numRowsToRead - 1; r >= 0; r--) {
+              if (String(delData[r][0]).trim() === deleteValCond) {
+                const rowNum = r + delStartRow;
+                if (numCols > 0) {
+                  const rowRange = delSh.getRange(rowNum, 1, 1, numCols);
+                  const cellFormulas = rowRange.getFormulas()[0];
+                  
+                  // Chỉ xóa nội dung các ô không chứa công thức và không nằm trong cột có ARRAYFORMULA phía trên
+                  for (let c = 0; c < cellFormulas.length; c++) {
+                    if (cellFormulas[c] === "" && !formulaCols[c]) {
+                      try {
+                        delSh.getRange(rowNum, c + 1).clearContent();
+                      } catch (cellErr) {
+                        try {
+                          delSh.getRange(rowNum, c + 1).setValue("");
+                        } catch (e2) {
+                          // Bỏ qua nếu ô này có quy tắc Validation bắt buộc nhập / không cho để trống
+                        }
+                      }
+                    }
+                  }
+                }
+                deletedCount++;
+              }
+            }
+            Logger.log("  🗑️ Làm sạch xong: " + deletedCount + " dòng có '" + deleteValCond + "' tại '" + delInfo.sheetName + "' cột " + delColLetter);
+          }
+        }
+      } catch (err) {
+        Logger.log("  ❌ Lỗi xử lý Xóa dòng #" + rowIdx + ": " + err.message);
+      }
+    }
+
+    // ========================================================
+    // PHẦN 2: COPY - PASTE 123 (Nếu có đủ cấu hình)
     // ========================================================
     if (sourceLink && sourceSheet && sourceColCond && sourceValCond && targetSheet) {
       try {
@@ -264,81 +340,6 @@ function runAutoCopyProcessor(bypassTimeGate) {
       }
     }
 
-    // ========================================================
-    // PHẦN 2: XÓA HÀNG Ở SHEET KHÁC (theo cấu hình cột G, H, I)
-    // ========================================================
-    if (deleteLink && deleteColCond && deleteValCond) {
-      try {
-        const delSSId = extractSsId_(deleteLink);
-        const delSS = getSpreadsheetCached_(delSSId);
-        const delInfo = parseSheetAndRange_(deleteColCond);
-        const delSh = delSS.getSheetByName(delInfo.sheetName);
-
-        if (!delSh) {
-          Logger.log("  ❌ Lỗi: Không tìm thấy sheet xóa: '" + delInfo.sheetName + "'");
-        } else {
-          const delColLetter = delInfo.rangeStr || "A";
-          const delRangeInfo = parseColAndStartRow_(delColLetter);
-          const delColNum = colLetterToNum_(delRangeInfo.colLetter);
-          const delStartRow = delRangeInfo.startRow;
-          const delLastRow = delSh.getLastRow();
-
-          if (delLastRow >= delStartRow) {
-            const numRowsToRead = delLastRow - delStartRow + 1;
-            const delData = delSh.getRange(delStartRow, delColNum, numRowsToRead, 1).getValues();
-            const numCols = delSh.getLastColumn();
-            // Quét các dòng phía trên dòng delStartRow để xem cột nào chứa công thức (như ARRAYFORMULA ở dòng tiêu đề)
-            const formulaCols = {};
-            if (delStartRow > 1 && numCols > 0) {
-              try {
-                const upperFormulas = delSh.getRange(1, 1, delStartRow - 1, numCols).getFormulas();
-                for (let c = 0; c < numCols; c++) {
-                  for (let rUpper = 0; rUpper < upperFormulas.length; rUpper++) {
-                    if (upperFormulas[rUpper][c] !== "") {
-                      formulaCols[c] = true;
-                      break;
-                    }
-                  }
-                }
-              } catch (eFormula) {
-                Logger.log("  ⚠️ Cảnh báo đọc công thức hàng trên: " + eFormula.message);
-              }
-            }
-
-            let deletedCount = 0;
-            // Duyệt từ dưới lên để làm sạch ô (giữ nguyên công thức và không làm xê dịch hàng gây lỗi Validation)
-            for (let r = numRowsToRead - 1; r >= 0; r--) {
-              if (String(delData[r][0]).trim() === deleteValCond) {
-                const rowNum = r + delStartRow;
-                if (numCols > 0) {
-                  const rowRange = delSh.getRange(rowNum, 1, 1, numCols);
-                  const cellFormulas = rowRange.getFormulas()[0];
-                  
-                  // Chỉ xóa nội dung các ô không chứa công thức và không nằm trong cột có ARRAYFORMULA phía trên
-                  for (let c = 0; c < cellFormulas.length; c++) {
-                    if (cellFormulas[c] === "" && !formulaCols[c]) {
-                      try {
-                        delSh.getRange(rowNum, c + 1).clearContent();
-                      } catch (cellErr) {
-                        try {
-                          delSh.getRange(rowNum, c + 1).setValue("");
-                        } catch (e2) {
-                          // Bỏ qua nếu ô này có quy tắc Validation bắt buộc nhập / không cho để trống
-                        }
-                      }
-                    }
-                  }
-                }
-                deletedCount++;
-              }
-            }
-            Logger.log("  🗑️ Làm sạch xong: " + deletedCount + " dòng có '" + deleteValCond + "' tại '" + delInfo.sheetName + "' cột " + delColLetter);
-          }
-        }
-      } catch (err) {
-        Logger.log("  ❌ Lỗi xử lý Xóa dòng #" + rowIdx + ": " + err.message);
-      }
-    }
   } // end for configRows
 
   Logger.log("🏁 Hoàn thành toàn bộ tiến trình Auto Copy & Delete.");
@@ -572,10 +573,45 @@ function sortSheetByConfig_(ss, sortConfig) {
     const sortedBackgrounds = rows.map(r => r.bg);
     const sortedFontWeights = rows.map(r => r.fw);
 
-    range.setValues(sortedValues);
-    range.setFormulas(sortedFormulas);
-    range.setBackgrounds(sortedBackgrounds);
-    range.setFontWeights(sortedFontWeights);
+    // Quét các dòng phía trên dòng startRow để xem cột nào chứa công thức mảng (ARRAYFORMULA ở dòng tiêu đề)
+    const formulaCols = {};
+    if (startRow > 1 && lastCol > 0) {
+      try {
+        const upperFormulas = sheet.getRange(1, 1, startRow - 1, lastCol).getFormulas();
+        for (let c = 0; c < lastCol; c++) {
+          for (let rUpper = 0; rUpper < upperFormulas.length; rUpper++) {
+            if (upperFormulas[rUpper][c] !== "") {
+              formulaCols[c] = true;
+              break;
+            }
+          }
+        }
+      } catch (eFormula) {
+        Logger.log("  ⚠️ Cảnh báo đọc công thức hàng trên khi sort: " + eFormula.message);
+      }
+    }
+
+    // Ghi đè dữ liệu sau khi sort theo từng cột (bảo vệ cột có ARRAYFORMULA)
+    const numRows = sortedValues.length;
+    for (let c = 0; c < lastCol; c++) {
+      const colRange = sheet.getRange(startRow, c + 1, numRows, 1);
+      
+      // Sắp xếp định dạng nền và font chữ (không ảnh hưởng đến công thức mảng)
+      const colBackgrounds = sortedBackgrounds.map(row => [row[c]]);
+      const colFontWeights = sortedFontWeights.map(row => [row[c]]);
+      colRange.setBackgrounds(colBackgrounds);
+      colRange.setFontWeights(colFontWeights);
+
+      if (formulaCols[c]) {
+        // Cột này được kiểm soát bởi ARRAYFORMULA phía trên -> KHÔNG ghi đè giá trị hoặc công thức để tránh lỗi #REF!
+        continue;
+      }
+
+      const colValues = sortedValues.map(row => [row[c]]);
+      const colFormulas = sortedFormulas.map(row => [row[c]]);
+      colRange.setValues(colValues);
+      colRange.setFormulas(colFormulas);
+    }
 
     Logger.log("  📶 Đã tự động sắp xếp (Sort A:Z) sheet '" + info.sheetName + "' theo cột " + colLetter + " (Từ dòng " + startRow + " đến dòng " + actualLastRow + ")");
   } catch (err) {
