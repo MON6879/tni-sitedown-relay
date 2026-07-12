@@ -359,8 +359,8 @@ function runAutoCopyProcessor(bypassTimeGate) {
                   }
                   
                   if (hasCircularError) {
-                    // Bôi đỏ toàn bộ dòng lỗi trong sheet nguồn
-                    srcSh.getRange(srcRowNum, 1, 1, srcSh.getLastColumn()).setBackground("#FF5252");
+                    // Bôi đỏ cột A và B dòng lỗi trong sheet nguồn
+                    srcSh.getRange(srcRowNum, 1, 1, 2).setBackground("#FF5252");
                     const errMsg = "⚠️ Lỗi vòng lặp/công thức tại sheet '" + srcInfo.sheetName + "' dòng " + srcRowNum + " (Cấu hình dòng #" + rowIdx + ")";
                     errorRows.push(errMsg);
                     Logger.log("  ❌ " + errMsg);
