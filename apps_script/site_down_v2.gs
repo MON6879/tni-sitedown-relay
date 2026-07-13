@@ -378,7 +378,12 @@ function checkColC(sheet) {
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
-      const linesControl = colCRaw.split("\n").filter(l => !/^\s*Team\s*\d+/i.test(l));
+      const linesControl = colCRaw.split("\n").filter(l => {
+        const trimmed = l.trim();
+        if (/^\s*Team\s*\d+/i.test(trimmed)) return false;
+        if (/^\s*\.{3,}\s*$/.test(trimmed)) return false; // Lọc bỏ dòng chỉ có dấu chấm ...
+        return true;
+      });
       const colored = colorizeTeams(linesControl.join("\n"));
       sendOrEditTelegramPre(controlId, colored, "TIN1_CONTROL", "[Tin1][CONTROL]");
     } catch (controlErr) {
