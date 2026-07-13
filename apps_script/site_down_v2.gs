@@ -378,7 +378,7 @@ function checkColC(sheet) {
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
-      const linesControl = colCRaw.split("\n").filter(l => !/^Team\s*\d+\s*:/i.test(l.trim()));
+      const linesControl = colCRaw.split("\n").filter(l => !/^\s*Team\s*\d+/i.test(l));
       const colored = colorizeTeams(linesControl.join("\n"));
       sendOrEditTelegramPre(controlId, colored, "TIN1_CONTROL", "[Tin1][CONTROL]");
     } catch (controlErr) {
@@ -397,7 +397,7 @@ function checkColC(sheet) {
       const teamNum = team.replace("T", "");
       // Regex khớp cả T1, T1 S1, T1 Su1, T1 S*
       const sitePat    = new RegExp("\\|\\s*T" + teamNum + "(?:\\s+S\\w*)?\\s*\\|", "i");
-      const summaryPat = new RegExp("^Team\\s*" + teamNum + "\\s*:", "i");
+      const summaryPat = new RegExp("^\\s*Team\\s*" + teamNum, "i");
 
       const headerLines = lines.filter(l => {
         if (!l.trim()) return false;
@@ -431,7 +431,7 @@ function readColCRaw(sheet) {
   return data
     .map(c => {
       let line = (c || "").toString().trim();
-      if (/^Team\s+\d+\s*:/i.test(line)) {
+      if (/^\s*Team\s*\d+/i.test(line)) {
         line = line.replace(/\s+Don'?t\s+Forget.*$/i, "").trim();
       }
       return line;
