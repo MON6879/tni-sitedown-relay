@@ -31,26 +31,21 @@ function relayDailyReports() {
     });
   }
 
-  // 2. 16:55–17:25 Myanmar → dispatch plan_eod và daily_bod_assign (17:00)
-  const isPlanEodTime = (myanmarHour === 16 && myanmarMin >= 55) || (myanmarHour === 17 && myanmarMin <= 25);
-  if (isPlanEodTime) {
+  // 2. 15:55–16:25 Myanmar → gửi Task Remain & dispatch plan_eod, bod_assign, daily_task (16:00)
+  const isEodReportTime = (myanmarHour === 15 && myanmarMin >= 55) || (myanmarHour === 16 && myanmarMin <= 25);
+  if (isEodReportTime) {
     runOnceToday("DAILY_PLAN_EOD_DATE_", function() {
       return triggerDailyWorkflow("plan_eod");
     });
     runOnceToday("DAILY_BOD_ASSIGN_DATE_", function() {
       return triggerDailyWorkflow("bod_assign");
     });
-  }
-
-  // 3. 17:25–17:55 Myanmar → gửi Task Remain & dispatch daily_task (17:30)
-  const isTaskTime = (myanmarHour === 17 && myanmarMin >= 25 && myanmarMin <= 55);
-  if (isTaskTime) {
+    runOnceToday("DAILY_TASK_DATE_", function() {
+      return triggerDailyWorkflow("daily_task");
+    });
     runOnceToday("TASK_REMAIN_DATE_", function() {
       sendSchedulerTaskRemain();
       return true;
-    });
-    runOnceToday("DAILY_TASK_DATE_", function() {
-      return triggerDailyWorkflow("daily_task");
     });
   }
 
