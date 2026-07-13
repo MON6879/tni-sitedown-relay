@@ -269,3 +269,12 @@ function saveSchedulerMsgIds_(key, ids) {
     PropertiesService.getScriptProperties().setProperty("MSGIDS_" + key, JSON.stringify(ids));
   } catch(e) {}
 }
+
+// ── Các hàm chạy thủ công để test / gửi nhanh báo cáo ───────────
+function runManual_plan_morning()   { triggerDailyWorkflow("plan_morning"); }
+function runManual_plan_eod()       { triggerDailyWorkflow("plan_eod"); }
+function runManual_plan_update()    { triggerDailyWorkflow("plan_update"); }
+function runManual_bod_assign()     { triggerDailyWorkflow("bod_assign"); }
+function runManual_read_report()    { triggerDailyWorkflow("read_report"); }
+function runManual_daily_task()     { triggerDailyWorkflow("daily_task"); }
+function runManual_sendTaskRemain() { sendSchedulerTaskRemain(); }
