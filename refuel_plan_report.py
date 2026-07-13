@@ -154,13 +154,18 @@ class RefuelData:
             for r in range(2, ws.max_row + 1):
                 tg_id = ws.cell(row=r, column=1).value   # Cột A: Telegram ID
 
-                # Thử lấy tên từ cột B→F (cột 2→6), lấy cái đầu tiên có chữ
+                # Lấy tên từ cột F (cột 6), tránh lấy số điện thoại ở cột B (cột 2)
                 name = None
-                for col in range(2, 7):
-                    val = ws.cell(row=r, column=col).value
-                    if val and str(val).strip() and str(val).strip().lower() not in ("none", "0"):
-                        name = str(val).strip()
-                        break
+                val_f = ws.cell(row=r, column=6).value
+                if val_f and str(val_f).strip() and str(val_f).strip().lower() not in ("none", "0"):
+                    name = str(val_f).strip()
+                else:
+                    # Fallback sang các cột khác trừ cột B (2)
+                    for col in (3, 4, 5):
+                        val = ws.cell(row=r, column=col).value
+                        if val and str(val).strip() and str(val).strip().lower() not in ("none", "0"):
+                            name = str(val).strip()
+                            break
 
                 if not name and not tg_id:
                     continue  # Dòng trống hoàn toàn → bỏ qua
@@ -474,8 +479,26 @@ def report_4(data: RefuelData):
         if diff <= timedelta(days=30):
             freq[sid]["d30"] += 1
 
+    # Phải lấy thông tin request ngày hôm nay để đưa vào tiêu đề
+    today_str = now.strftime("%d/%m/%Y")
+    today_reqs = {}
+    for r in data.records:
+        if r["date"] == today_str and r["cat"] == "REQUEST" and r["site"]:
+            today_reqs[r["site"]] = today_reqs.get(r["site"], 0) + r["qty"]
+    
+    req_parts = []
+    for site in sorted(today_reqs.keys()):
+        qty = today_reqs[site]
+        req_parts.append(f"{site} : {qty}L")
+    
+    if req_parts:
+        req_summary = " + ".join(req_parts)
+        title = f"👤 <b>[Report 4] Team request {today_str}: {req_summary}</b>"
+    else:
+        title = f"👤 <b>[Report 4] Team request {today_str}</b>"
+
     lines = [
-        f"👤 <b>[Report 4] REFUEL REQUESTS BY PERSON</b>",
+        title,
         f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
         fmt_row_freq("Name", "3Days", "7Days", "1Month"),
         "<code>" + "─────────────┼───────┼───────┼────────" + "</code>"

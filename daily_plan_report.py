@@ -1280,7 +1280,7 @@ async def run_eod_or_update(mode: str):
             lines = [
                 f"📋 5. Report — Daily Plan & Results — {team_name}",
                 f"📅 {date_str}  |  🕐 {now.strftime('%H:%M')}",
-                f"📌 Comparison of today's plan vs actual completed stations.",
+                f"📌 Comparison of plan for {date_str} vs actual completed stations.",
                 divider,
                 f"📊 Plan Stats: 3Day: {stats['d2']}/{stats['d1']}/{stats['d0']} "
                 f"| 7Day: {stats['d7']} | Month: {stats['month']}",
@@ -1410,7 +1410,7 @@ async def run_eod_or_update(mode: str):
         ctrl_lines = [
             f"📋 5. Report — Daily Plan & Results — Summary",
             f"📅 {date_str}  |  🕐 {now.strftime('%H:%M')}",
-            f"📌 Comparison of today's plan vs actual completed stations.",
+            f"📌 Comparison of plan for {date_str} vs actual completed stations.",
             divider,
         ]
 
@@ -1471,7 +1471,7 @@ async def run_eod_or_update(mode: str):
         # Today's plan contents
         if team_today_contents:
             ctrl_lines.append("")
-            ctrl_lines.append("📝 Today's Plans:")
+            ctrl_lines.append(f"📝 Plans for {date_str}:")
             for team_name, content in team_today_contents:
                 ctrl_lines.append(sub_divider)
                 ctrl_lines.append(f"🏷️ {team_name}:")
@@ -1573,7 +1573,7 @@ async def run_morning():
             ]
 
             # Plan today status
-            lines.append(f"📝 Today's Plan ({date_str}):")
+            lines.append(f"📝 Plan for {date_str}:")
             if pt["found"]:
                 lines.append(f"✅ Team Leader: Submitted ✓ (sent at {pt['sent_time']})")
                 lines.append("")
@@ -1659,7 +1659,7 @@ async def run_morning():
         has_any_plan = any(plan_today_status.get(gk, {}).get("found", False) for gk in ("T1", "T2", "T3", "T4"))
         if has_any_plan:
             ctrl_lines.append("")
-            ctrl_lines.append("📝 Today's Plans:")
+            ctrl_lines.append(f"📝 Plans for {date_str}:")
             for group_key in ("T1", "T2", "T3", "T4"):
                 pt = plan_today_status.get(group_key, {"found": False})
                 if pt["found"]:
