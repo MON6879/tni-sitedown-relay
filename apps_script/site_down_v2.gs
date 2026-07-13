@@ -374,11 +374,12 @@ function checkColC(sheet) {
   const colCRaw = readColCRaw(sheet);
   if (!colCRaw) { Logger.log("[Tin1] Col C trống — bỏ qua"); return false; }
 
-  // ① CONTROL: toàn bộ Col C (có tô màu team)
+  // ① CONTROL: toàn bộ Col C (có tô màu team, bỏ dòng tổng hợp Team X: cho đỡ dài)
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
-      const colored = colorizeTeams(colCRaw);
+      const linesControl = colCRaw.split("\n").filter(l => !/^Team\s*\d+\s*:/i.test(l.trim()));
+      const colored = colorizeTeams(linesControl.join("\n"));
       sendOrEditTelegramPre(controlId, colored, "TIN1_CONTROL", "[Tin1][CONTROL]");
     } catch (controlErr) {
       Logger.log("[Tin1][CONTROL] ❌ Lỗi gửi: " + controlErr.message);
