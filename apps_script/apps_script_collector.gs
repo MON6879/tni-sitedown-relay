@@ -2299,13 +2299,11 @@ function checkBodAssign() {
       const row = values[i];
       
       const colR = String(row[17] || "").trim(); // Cột R (index 17)
-      const colS = String(row[18] || "").trim(); // Cột S (index 18)
       const colT = String(row[19] || "").trim(); // Cột T (index 19)
       const colU = String(row[20] || "").trim(); // Cột U (index 20)
-      const colV = String(row[21] || "").trim(); // Cột V (index 21)
 
       // 1. Quét gửi Control
-      if (colR && !colS) {
+      if (colR) {
         const msgText = "BOD assing New task for : " + colR;
         const payload = {
           chat_id: controlChatId,
@@ -2317,14 +2315,11 @@ function checkBodAssign() {
           }
         };
         
-        const success = sendTelegramMessage_(token, payload);
-        if (success) {
-          sheet.getRange(rowNum, 19).setValue("Sent"); // Ghi "Sent" vào cột S
-        }
+        sendTelegramMessage_(token, payload);
       }
 
       // 2. Quét gửi Team
-      if (colT && !colV) {
+      if (colT) {
         const chatId = getTeamChatId_(colU);
         if (chatId) {
           const msgText = "New assing task: " + colT;
@@ -2338,10 +2333,7 @@ function checkBodAssign() {
             }
           };
           
-          const success = sendTelegramMessage_(token, payload);
-          if (success) {
-            sheet.getRange(rowNum, 22).setValue("Sent"); // Ghi "Sent" vào cột V
-          }
+          sendTelegramMessage_(token, payload);
         } else {
           Logger.log("⚠️ Không tìm thấy chat ID cho team: " + colU);
         }

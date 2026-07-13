@@ -429,7 +429,13 @@ function readColCRaw(sheet) {
   if (lastRow < 1) return "";
   const data = sheet.getRange(1, 3, lastRow, 1).getValues().flat();
   return data
-    .map(c => (c || "").toString().trim())
+    .map(c => {
+      let line = (c || "").toString().trim();
+      if (/^Team\s+\d+\s*:/i.test(line)) {
+        line = line.replace(/\s+Don'?t\s+Forget.*$/i, "").trim();
+      }
+      return line;
+    })
     .filter(l => l.length > 0)
     .join("\n");
 }

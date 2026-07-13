@@ -26,13 +26,11 @@ function checkBodAssign() {
       const row = values[i];
       
       const colR = String(row[17] || "").trim(); // Cột R (index 17)
-      const colS = String(row[18] || "").trim(); // Cột S (index 18)
       const colT = String(row[19] || "").trim(); // Cột T (index 19)
       const colU = String(row[20] || "").trim(); // Cột U (index 20)
-      const colV = String(row[21] || "").trim(); // Cột V (index 21)
 
       // 1. Quét gửi Control
-      if (colR && !colS) {
+      if (colR) {
         const msgText = "BOD assing New task for : " + colR;
         
         // Tự động tìm và xóa tin cũ cùng nội dung trên Control
@@ -63,13 +61,12 @@ function checkBodAssign() {
         
         const newMsgId = sendTelegramMessage_(token, payload);
         if (newMsgId) {
-          sheet.getRange(rowNum, 19).setValue("Sent"); // Ghi "Sent" vào cột S (cột 19)
           props.setProperty(oldMsgKey, String(newMsgId));
         }
       }
 
       // 2. Quét gửi Team
-      if (colT && !colV) {
+      if (colT) {
         const chatId = getTeamChatId_(colU);
         if (chatId) {
           const msgText = "New assing task: " + colT;
@@ -102,7 +99,6 @@ function checkBodAssign() {
           
           const newMsgId = sendTelegramMessage_(token, payload);
           if (newMsgId) {
-            sheet.getRange(rowNum, 22).setValue("Sent"); // Ghi "Sent" vào cột V (cột 22)
             props.setProperty(oldMsgKey, String(newMsgId));
           }
         } else {

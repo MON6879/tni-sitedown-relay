@@ -828,7 +828,13 @@ function readColCRaw(sheet) {
   if (lastRow < 1) return "";
   const data = sheet.getRange(1, 3, lastRow, 1).getValues().flat();
   const lines = data
-    .map(cell => (cell || "").toString().trim())
+    .map(cell => {
+      let line = (cell || "").toString().trim();
+      if (/^Team\s+\d+\s*:/i.test(line)) {
+        line = line.replace(/\s+Don'?t\s+Forget.*$/i, "").trim();
+      }
+      return line;
+    })
     .filter(line => line.length > 0);
   return lines.join("\n");
 }
