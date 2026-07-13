@@ -22,6 +22,8 @@ import pandas as pd
 import requests
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+from dotenv import load_dotenv
+load_dotenv()
 from delete_old_helper import delete_old_messages_telethon, save_msgids
 from telethon.tl.functions.messages import (
     GetHistoryRequest,

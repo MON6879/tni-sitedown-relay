@@ -36,6 +36,8 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.messages import GetHistoryRequest
 from telegram import Bot
+from dotenv import load_dotenv
+load_dotenv()
 from delete_old_helper import delete_old_messages_bot, save_msgids
 
 # ── Logging ─────────────────────────────────────────────────────
