@@ -25,7 +25,7 @@ CONTROL_CHAT_ID = -5251698940
 SHEET_URL = (
     "https://docs.google.com/spreadsheets/d/"
     "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
-    "/gviz/tq?tqx=out:csv&sheet=BOD+assign"
+    "/gviz/tq?tqx=out:csv&sheet=BOD+assign&headers=1"
 )
 
 # Timezone Myanmar
