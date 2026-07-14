@@ -24,7 +24,7 @@
 |---|---|---|
 | `cross_check_wo.gs` | **Tự động gửi báo cáo Cross Check lúc 17:00** | Lấy dữ liệu 5 cột của sheet `Cross Check WO` gửi cho 5 nhóm Telegram tương ứng (xóa tin cũ). |
 | `daily_report_scheduler.gs` | **Cập nhật lịch gửi EOD 16:00 Myanmar** | Được khai báo vào `.claspignore` để đẩy clasp thành công lên Apps Script trực tiếp. |
-| `auto_fetch_ict.py` | **Tích hợp tịnh tiến cột & tự ghi giờ Myanmar vào W1** | Copy `Y:AU` sang `AW:BS`, copy `A:W` sang `Y:AU`, ghi dữ liệu mới vào `A:V` và cập nhật timestamp `W1` tự động. |
+| `auto_fetch_ict.py` | **Tích hợp tịnh tiến cột, ghi giờ W1 & tổng hợp chênh lệch > 4** | Dịch chuyển cột lịch sử, ghi giờ Myanmar vào W1 và lọc các dòng chênh lệch > 4 sang tab Summary. |
 
 ### 03/07/2026
 | File | Thay đổi | Lý do |
