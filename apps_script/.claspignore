@@ -6,4 +6,9 @@
 !appsscript.json
 !daily_report_collector.gs
 !auto_copy_processor.gs
+!cross_check_wo.gs
+!daily_report_scheduler.gs
+!input_ict_tinh_tien.gs
+
+
 

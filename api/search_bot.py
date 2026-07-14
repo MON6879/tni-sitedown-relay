@@ -49,6 +49,36 @@ _daily_fields: list[str] = []
 _daily_fields_ts: float  = 0.0
 DAILY_FIELDS_TTL = 600   # 10 phút
 
+_allowed_info_ids: set[str] | None = None
+_allowed_info_ids_ts: float = 0.0
+ALLOWED_IDS_TTL = 300 # 5 minutes cache
+
+def get_allowed_info_search_ids() -> set[str]:
+    global _allowed_info_ids, _allowed_info_ids_ts
+    import time
+    if _allowed_info_ids is not None and time.time() - _allowed_info_ids_ts < ALLOWED_IDS_TTL:
+        return _allowed_info_ids
+    try:
+        df = fetch_csv("1236389870")
+        allowed_ids = set()
+        for idx in range(1, len(df)):
+            row = df.iloc[idx]
+            if len(row) > 4:
+                val = str(row.iloc[4]).strip()
+                if val and val != "-" and val.lower() != "nan" and val.lower() != "none":
+                    if val.endswith(".0"):
+                        val = val[:-2]
+                    allowed_ids.add(val)
+        _allowed_info_ids = allowed_ids
+        _allowed_info_ids_ts = time.time()
+        logger.info(f"Loaded allowed Info search IDs: {allowed_ids}")
+        return allowed_ids
+    except Exception as e:
+        logger.error(f"Error fetching allowed info search IDs: {e}")
+        if _allowed_info_ids is not None:
+            return _allowed_info_ids
+        return set()
+
 DAILY_FIELDS_DEFAULT = [
     "Daily report",
     "Transportation Used", "Full Name", "Detail WO", "Detail task",
@@ -171,8 +201,7 @@ def get_wos(tni: str) -> list:
     return wos
 
 def lookup_tni(tni: str) -> str:
-    """Tra cứu TNIxxxx từ cột G (nội dung gộp sẵn) trong sheet Tên Sum WO.
-    Cột A (index 0) = Site ID, cột G (index 6) = nội dung gộp."""
+    """Tra cứu TNIxxxx từ cột H (nội dung gộp sẵn) trong sheet Tên Sum WO."""
     def e(s): return html.escape(str(s))
     tni_upper = tni.upper()
 
@@ -185,17 +214,17 @@ def lookup_tni(tni: str) -> str:
     if df is None or df.empty:
         return "❌ No data available."
 
-    # Tìm row có cột A = TNI code
+    # Tìm row có cột B (index 1) = TNI code
     for _, row in df.iterrows():
-        col_a = safe(row, 0).strip().upper()
-        if col_a != tni_upper:
+        col_b = safe(row, 1).strip().upper()
+        if col_b != tni_upper:
             continue
-        col_g = safe(row, 6)  # Cột G = nội dung gộp sẵn
-        if not col_g:
+        col_h = safe(row, 7)  # Cột H (index 7) = nội dung gộp sẵn
+        if not col_h:
             continue
 
-        # Hiển thị nguyên nội dung cột G
-        clean = col_g.strip().lstrip("~ ").strip()
+        # Hiển thị nguyên nội dung cột H
+        clean = col_h.strip().lstrip("~ ").strip()
         return f"🔍 <b>{e(tni_upper)}</b>\n━━━━━━━━━━━━━━━━━━━━\n{e(clean)}\n━━━━━━━━━━━━━━━━━━━━"
 
     return f"❌ No data found for <b>{e(tni_upper)}</b>"
@@ -320,15 +349,15 @@ def lookup_team(team_code: str) -> list[str]:
     if df is None or df.empty:
         return ["❌ No data available."]
 
-    # Gom nội dung cột I từ các row có cột H = team code
+    # Gom nội dung cột J từ các row có cột I = team code
     raw_entries = []
     for _, row in df.iterrows():
-        col_h = safe(row, 7).strip().upper()  # Cột H = filter tag
-        if col_h != team_code_upper:
+        col_i = safe(row, 8).strip().upper()  # Cột I = filter tag
+        if col_i != team_code_upper:
             continue
-        col_i = safe(row, 8)  # Cột I = nội dung gộp sẵn
-        if col_i:
-            raw_entries.append(col_i)
+        col_j = safe(row, 9)  # Cột J = nội dung gộp sẵn
+        if col_j:
+            raw_entries.append(col_j)
 
     if not raw_entries:
         return [f"❌ No sites found for <b>{html.escape(team_code_upper)}</b>"]
@@ -661,7 +690,6 @@ def handle(update: dict) -> None:
             tg_send(chat_id,
                 "👋 <b>TNI Search Bot</b>\n\n"
                 "• Gõ mã <code>TNI...</code> để tra cứu Task/WO\n"
-                "• <code>Info: TNI...</code> tra cứu Site/Cable/DIA\n"
                 "• <code>T1</code> <code>T2</code> <code>T3</code> <code>T4</code> — xem Task/WO theo Team\n"
                 "• <code>T1notclose</code> — WO chưa Close của Team\n"
                 "• <code>T1waitcd</code> — WO chờ CD của Team\n"
@@ -710,7 +738,6 @@ def handle(update: dict) -> None:
             tg_send(chat_id,
                 "📖 <b>Hướng dẫn</b>\n\n"
                 "• Gõ mã TNI (vd: <code>TNI0009</code>) → tra cứu Site/Task/WO\n"
-                "• <code>Info: TNI0009</code> → tra cứu Site/Cable/Gpon/DIA\n"
                 "• <code>T1</code> <code>T2</code> <code>T3</code> <code>T4</code> → xem Task/WO theo Team\n"
                 "• <code>T1notclose</code> → WO chưa Close (T1-T4)\n"
                 "• <code>T1waitcd</code> → WO chờ CD (T1-T4)\n"
@@ -849,6 +876,18 @@ def handle(update: dict) -> None:
     if info_match:
         tni = info_match.group(1).upper()
         logger.info(f"Info lookup: {tni} | chat={chat_id}")
+        
+        # Access control: Only Telegram IDs in Column E of Config sheet (GID 1236389870)
+        allowed_ids = get_allowed_info_search_ids()
+        user_id_str = str(user_id).strip()
+        if user_id_str not in allowed_ids:
+            # Simulate searching then return "Not found"
+            tg_send(chat_id, f"⏳ Đang tìm thông tin <b>{html.escape(tni)}</b>...")
+            import time
+            time.sleep(1)
+            tg_send(chat_id, f"❌ Không tìm thấy <b>{html.escape(tni)}</b> trong danh sách Site Info.")
+            return
+
         tg_send(chat_id, f"⏳ Đang tìm thông tin <b>{html.escape(tni)}</b>...")
         try:
             info = get_info(tni)

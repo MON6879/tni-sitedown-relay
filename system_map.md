@@ -19,6 +19,13 @@
 
 ## 📅 CHANGELOG
 
+### 14/07/2026
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `cross_check_wo.gs` | **Tự động gửi báo cáo Cross Check lúc 17:00** | Lấy dữ liệu 5 cột của sheet `Cross Check WO` gửi cho 5 nhóm Telegram tương ứng (xóa tin cũ). |
+| `daily_report_scheduler.gs` | **Cập nhật lịch gửi EOD 16:00 Myanmar** | Được khai báo vào `.claspignore` để đẩy clasp thành công lên Apps Script trực tiếp. |
+| `auto_fetch_ict.py` | **Tích hợp tịnh tiến cột & tự ghi giờ Myanmar vào W1** | Copy `Y:AU` sang `AW:BS`, copy `A:W` sang `Y:AU`, ghi dữ liệu mới vào `A:V` và cập nhật timestamp `W1` tự động. |
+
 ### 03/07/2026
 | File | Thay đổi | Lý do |
 |---|---|---|
@@ -140,6 +147,8 @@ Trong `apps_script_collector.js`:
 | [telegram_bot.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/telegram_bot.py) | ~~GitHub Actions~~ | ⚠️ ĐÃ THAY THẾ bởi `api/search_bot.py` (Vercel webhook) |
 | [apps_script_collector.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_collector.js) | **Apps Script** | Backend xử lý dữ liệu Sheet |
 | [auto_copy_processor.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/auto_copy_processor.js) | **Apps Script** | Tự động xử lý Copy-Paste & Xóa dòng theo file Config lúc 22:00 |
+| [cross_check_wo.gs](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script/cross_check_wo.gs) | **Apps Script** | Tự động gửi báo cáo Cross Check WO hàng ngày lúc 17:00 |
+| [auto_fetch_ict.py](file:///d:/6.%20AI/1.%20QLTC/ICT%20Fetch/auto_fetch_ict.py) | **Local PC** | Script Python cào dữ liệu ICT, tự động tịnh tiến lịch sử cột và ghi giờ Myanmar vào W1 |
 
 ---
 
