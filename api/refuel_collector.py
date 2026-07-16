@@ -97,6 +97,92 @@ def process_update(update: dict):
         logger.info(f"Skip chat_id={chat_id}")
         return
 
+    # Xử lý các lệnh lấy template
+    if text.startswith("/"):
+        cmd = text.split()[0].split("@")[0].lower()
+        
+        if cmd == "/refuel":
+            today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
+            reply_text = (
+                "📝 <b>Template: Báo cáo đã đổ dầu (Refueled)</b>\n"
+                "<i>(Chạm vào vùng code bên dưới để copy nhanh)</i>\n\n"
+                f"<pre><code>DG Type\n"
+                f"Date: {today_str}\n"
+                f"DG ID: TNIXXXX\n"
+                f"Team: Team X\n"
+                f"Running Hour: \n"
+                f"KWH Hour: \n\n"
+                f"Before:\n"
+                f"CSU Reading (L): \n"
+                f"Level %: \n"
+                f"Liter/cm - ()\n\n"
+                f"After:\n"
+                f"CSU Reading (L): \n"
+                f"Level %: \n"
+                f"Liter/cm - ()\n\n"
+                f"Actual Filled Qty (L): \n"
+                f"Partner price = </code></pre>"
+            )
+            tg_reply(chat_id, reply_text)
+            return
+            
+        elif cmd == "/plan":
+            tomorrow_str = (datetime.now(TZ_MM) + timedelta(days=1)).strftime("%d/%m/%Y")
+            reply_text = (
+                "📝 <b>Template: Kế hoạch đổ dầu (Plan)</b>\n"
+                "<i>(Chạm vào vùng code bên dưới để copy nhanh)</i>\n\n"
+                f"<pre><code>Plan refuel\n"
+                f"Date: {tomorrow_str}\n"
+                f"Team X\n"
+                f"TNIXXXX 440L\n"
+                f"TNIXXXX 220L</code></pre>"
+            )
+            tg_reply(chat_id, reply_text)
+            return
+            
+        elif cmd == "/request":
+            tomorrow_str = (datetime.now(TZ_MM) + timedelta(days=1)).strftime("%d/%m/%Y")
+            reply_text = (
+                "📝 <b>Template: Yêu cầu cấp dầu (Request)</b>\n"
+                "<i>(Chạm vào vùng code bên dưới để copy nhanh)</i>\n\n"
+                f"<pre><code>Request refuel\n"
+                f"Date: {tomorrow_str}\n"
+                f"Team X\n"
+                f"TNIXXXX: 440 L\n"
+                f"TNIXXXX: 220 L</code></pre>"
+            )
+            tg_reply(chat_id, reply_text)
+            return
+            
+        elif cmd == "/letter":
+            today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
+            reply_text = (
+                "📝 <b>Template: Công văn Trình/Duyệt (Letter)</b>\n"
+                "<i>(Chạm vào từng dòng code bên dưới để copy nhanh)</i>\n\n"
+                "• Trình công văn:\n"
+                f"<pre><code>Letter Submit: {today_str}</code></pre>\n"
+                "• Duyệt công văn:\n"
+                f"<pre><code>Approved Letter: {today_str}</code></pre>"
+            )
+            tg_reply(chat_id, reply_text)
+            return
+            
+        elif cmd in ("/start", "/help"):
+            reply_text = (
+                "👋 <b>Chào mừng bạn đến với TNI Refuel Bot!</b>\n\n"
+                "Danh sách lệnh lấy mẫu thông tin (Template):\n"
+                "• /refuel - Template Báo cáo đã đổ dầu (Refueled)\n"
+                "• /plan - Template Kế hoạch đổ dầu (Plan)\n"
+                "• /request - Template Yêu cầu cấp dầu (Request)\n"
+                "• /letter - Template Công văn Trình/Duyệt\n\n"
+                "<i>Hãy gõ lệnh và chạm vào tin nhắn bot phản hồi để copy nhanh mẫu điền nhé!</i>"
+            )
+            tg_reply(chat_id, reply_text)
+            return
+
+        logger.info(f"Unknown command {cmd} — skip")
+        return
+
     category = classify(text)
     if not category:
         logger.info("No keyword match — skip")
