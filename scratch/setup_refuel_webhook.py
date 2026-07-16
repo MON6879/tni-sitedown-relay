@@ -24,7 +24,7 @@ def main():
     print(f"🔗 Setting webhook → {WEBHOOK_URL}")
     r = requests.post(f"{base}/setWebhook", json={
         "url": WEBHOOK_URL,
-        "allowed_updates": ["message"],
+        "allowed_updates": ["message", "inline_query"],
         "drop_pending_updates": True,
     }, timeout=15)
     resp = r.json()
