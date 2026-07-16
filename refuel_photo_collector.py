@@ -147,45 +147,18 @@ def _detect_authenticity(exif: dict) -> str:
     return "ORIGINAL"
 
 
-# ── QI4 code extraction ───────────────────────────────────────────────────────
+# ── Site code extraction ───────────────────────────────────────────────────────
 
-def _extract_qi4_from_caption(caption: str) -> str:
+def _extract_site_code(caption: str) -> str:
     """
-    Lấy 3 ký tự cuối của chuỗi khớp pattern TNIXXXX_NQI4 trong caption.
-    VD: 'TNI0233_1QI4' → 'QI4'
-    Nếu không tìm thấy → trả về ''
-    """
-    m = re.search(r'TNI\d{4}_\d+([A-Z0-9]{3})$', caption.strip(), re.IGNORECASE)
-    if m:
-        return m.group(1).upper()
-    # Fallback: tìm 3 ký tự cuối bất kỳ pattern _XYZ
-    m2 = re.search(r'_([A-Z0-9]{3})(?:\s|$)', caption.strip(), re.IGNORECASE)
-    if m2:
-        return m2.group(1).upper()
-    return ""
-
-
-def _match_qi4(caption: str, dg_id_from_sheet: str, qi4_code: str) -> str:
-    """
-    So sánh caption ảnh với DG ID từ sheet.
-    Trả về: 'MATCH' / 'NEAR' / 'NO'
+    Trích xuất mã trạm dạng TNIxxxx hoặc TNIxxxx_01 từ caption.
     """
     if not caption:
-        return "NO"
-    caption_u = caption.upper().strip()
-    qi4_u = qi4_code.upper() if qi4_code else "QI4"
-    dg_u  = dg_id_from_sheet.upper().strip() if dg_id_from_sheet else ""
-
-    # MATCH: caption chứa đúng pattern TNIXXXX_NQI4 và DG ID khớp
-    pattern_exact = rf'{re.escape(dg_u)}_\d+{re.escape(qi4_u)}'
-    if dg_u and re.search(pattern_exact, caption_u):
-        return "MATCH"
-
-    # NEAR: không đúng DG ID nhưng có QI4 ở cuối
-    if qi4_u and qi4_u in caption_u:
-        return "NEAR"
-
-    return "NO"
+        return ""
+    m = re.search(r'(TNI\d{3,5}(?:_\d+)?)', caption.strip(), re.IGNORECASE)
+    if m:
+        return m.group(1).upper()
+    return ""
 
 
 # ── Telegram API helpers ──────────────────────────────────────────────────────
@@ -334,8 +307,8 @@ def handle_document(message: dict):
             "(do NOT send as compressed photo).",
             reply_to=msg_id)
 
-    # ── Lấy QI4 code của ngày từ caption ────────────────────────────────────
-    qi4_code = _extract_qi4_from_caption(caption)
+    # ── Lấy mã trạm (TNIxxxx) từ caption ────────────────────────────────────
+    site_code = _extract_site_code(caption)
 
     # ── Build payload gửi GAS ────────────────────────────────────────────────
     date_str = now.strftime("%d/%m/%Y")
@@ -349,7 +322,7 @@ def handle_document(message: dict):
         "time":        time_str,
         "file_id":     file_id,
         "caption":     caption,
-        "qi4_code":    qi4_code,       # 3 ký tự cuối → ghi cột T
+        "site_code":   site_code,      # TNIxxxx hoặc TNIxxxx_01
         "lat_photo":   lat_photo,      # GPS lat → cột W
         "lng_photo":   lng_photo,      # GPS lng → cột V
         "auth":        auth,           # ORIGINAL/EDITED/SUSPECT → cột AA
@@ -364,7 +337,6 @@ def handle_document(message: dict):
         log.info(f"✅ Photo {count}/{MAX_PHOTOS_PER_DAY} saved. DG: {result.get('dg_id','?')}")
 
         # Build confirmation message
-        match_result = result.get("match", "—")
         dg_id        = result.get("dg_id", "—")
         row_num      = result.get("row", "—")
 
@@ -372,8 +344,7 @@ def handle_document(message: dict):
             f"✅ <b>Photo #{count}/{MAX_PHOTOS_PER_DAY} received!</b>",
             f"👤 Sender: {sender_nm}",
             f"📋 DG ID: <code>{dg_id}</code>",
-            f"🔑 QI4 Code: <code>{qi4_code or '—'}</code>",
-            f"🎯 Match: <b>{match_result}</b>",
+            f"🔍 Site Code (Caption): <code>{site_code or '—'}</code>",
         ]
         if lat_photo and lng_photo:
             lines.append(f"📍 GPS: {lat_photo:.6f}, {lng_photo:.6f}")

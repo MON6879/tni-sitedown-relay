@@ -215,7 +215,7 @@ function collectMessage(body) {
     const teamMatch = text.match(/Team\s*(\d+)/i);
     const teamVal   = teamMatch ? "Team " + parseInt(teamMatch[1], 10) : "";
 
-    const entries = parseSitesAndQty(text);
+    const entries = parseSitesAndQty(text, true);
     if (entries.length === 0) return jsonResp({ status: "skip", message: "No sites parsed in Plan" });
 
     // Ghi từng dòng lên đầu (mỗi site 1 dòng, site đầu tiên sẽ ở row 2 sau khi xong)
@@ -253,7 +253,7 @@ function collectMessage(body) {
     const teamMatch = text.match(/Team\s*(\d+)/i);
     const teamVal   = teamMatch ? "Team " + parseInt(teamMatch[1], 10) : "";
 
-    const entries = parseSitesAndQty(text);
+    const entries = parseSitesAndQty(text, false);
     if (entries.length === 0) return jsonResp({ status: "skip", message: "No sites parsed in Request" });
 
     const firstDefId = "#" + String(sheet.getLastRow() + entries.length - 1).padStart(5, "0");
@@ -363,19 +363,33 @@ function parseRefueledText(text) {
            filled: filled, price: price };
 }
 
-function parseSitesAndQty(text) {
+function parseSitesAndQty(text, isPlan) {
   const results = [];
-  const pat1 = /TNI(\d{4})(?:\([^)]*\))?[\s:,]+(\d+)\s*[Ll]/gi;
+  // pat1: matches TNIxxxx or TNIxxxx_01 followed by separator (space, colon, comma, plus) and quantity (optional L)
+  // Utilizes \b after optional [Ll] to avoid matching dates (e.g., 14/7/2026) as quantities
+  const pat1 = /TNI(\d{4}(?:_\d+)?)(?:\([^)]*\))?[\s:,+]+(\d+)\s*[Ll]?\b(?!\s*\/)/gi;
   let m;
+  const matchedSites = {};
+
   while ((m = pat1.exec(text)) !== null) {
-    results.push({ site: "TNI" + m[1], qty: parseInt(m[2], 10) });
+    const siteCode = "TNI" + m[1];
+    const qty = parseInt(m[2], 10);
+    results.push({ site: siteCode, qty: qty });
+    matchedSites[siteCode.toUpperCase()] = true;
   }
-  if (results.length === 0) {
-    const pat2 = /TNI(\d{4})(?:\([^)]*\))?\s+(\d+)/gi;
+
+  if (isPlan) {
+    // pat2: matches any remaining TNIxxxx or TNIxxxx_01 (defaults to 440)
+    const pat2 = /TNI(\d{4}(?:_\d+)?)/gi;
     while ((m = pat2.exec(text)) !== null) {
-      results.push({ site: "TNI" + m[1], qty: parseInt(m[2], 10) });
+      const siteCode = "TNI" + m[1];
+      if (!matchedSites[siteCode.toUpperCase()]) {
+        results.push({ site: siteCode, qty: 440 });
+        matchedSites[siteCode.toUpperCase()] = true;
+      }
     }
   }
+
   // Dedup theo site
   const seen = {};
   results.forEach(function(r) {
@@ -451,7 +465,7 @@ function collectPhoto(body) {
   const senderId   = String(body.sender_id   || "").trim();
   const senderName = String(body.sender_name || "").trim();
   const dateStr    = String(body.date        || "").trim();   // dd/MM/yyyy
-  const qi4Code    = String(body.qi4_code    || "").trim().toUpperCase();
+  const siteCode   = String(body.site_code   || "").trim().toUpperCase(); // TNIxxxx hoặc TNIxxxx_01
   const fileId     = String(body.file_id     || "").trim();
   const caption    = String(body.caption     || "").trim();
   const latPhoto   = (body.lat_photo !== undefined && body.lat_photo !== null)
@@ -473,23 +487,41 @@ function collectPhoto(body) {
   let targetRow = -1;
   let dgId      = "";
 
-  // Ưu tiên: tìm row khớp sender_id + ngày hôm nay
-  for (let i = 0; i < numRows; i++) {
-    const rowDate   = String(dateCol[i][0]   || "").trim();
-    const rowSender = String(senderCol[i][0] || "").trim();
-    if (rowSender === senderId && rowDate === dateStr) {
-      targetRow = i + 2;
-      dgId      = String(dgIdCol[i][0] || "").trim().toUpperCase();
-      break;
+  // 1. Ưu tiên: Tìm theo siteCode và ngày hôm nay
+  if (siteCode) {
+    const cleanSiteCode = siteCode.replace(/_01$/, "").replace(/_1$/, "");
+    for (let i = 0; i < numRows; i++) {
+      const rowDate = String(dateCol[i][0] || "").trim();
+      const rowDg   = String(dgIdCol[i][0] || "").trim().toUpperCase();
+      const cleanRowDg = rowDg.replace(/_01$/, "").replace(/_1$/, "");
+      
+      if (rowDate === dateStr && cleanRowDg === cleanSiteCode) {
+        targetRow = i + 2;
+        dgId      = rowDg;
+        break;
+      }
     }
   }
 
-  // Fallback: tìm row đầu tiên có ngày hôm nay mà cột T chưa điền
+  // 2. Thử tìm theo sender_id + ngày hôm nay (nếu không khớp siteCode)
+  if (targetRow === -1) {
+    for (let i = 0; i < numRows; i++) {
+      const rowDate   = String(dateCol[i][0]   || "").trim();
+      const rowSender = String(senderCol[i][0] || "").trim();
+      if (rowSender === senderId && rowDate === dateStr) {
+        targetRow = i + 2;
+        dgId      = String(dgIdCol[i][0] || "").trim().toUpperCase();
+        break;
+      }
+    }
+  }
+
+  // 3. Fallback: tìm row đầu tiên có ngày hôm nay mà cột Lng (Photo) chưa điền
   if (targetRow === -1) {
     for (let i = 0; i < numRows; i++) {
       const rowDate = String(dateCol[i][0] || "").trim();
-      const rowT    = sheet.getRange(i + 2, COL_T).getValue();
-      if (rowDate === dateStr && !rowT) {
+      const rowV    = sheet.getRange(i + 2, COL_V).getValue();
+      if (rowDate === dateStr && !rowV) {
         targetRow = i + 2;
         dgId      = String(dgIdCol[i][0] || "").trim().toUpperCase();
         break;
@@ -502,23 +534,18 @@ function collectPhoto(body) {
     const now     = new Date();
     const defId   = nextDefId(sheet);
     const newRow  = [
-      defId, dateStr, "", "", "", "", "", "", "", "",  // A–J
+      defId, dateStr, siteCode, "", "", "", "", "", "", "",  // A–J (Cột C ghi siteCode)
       "", "", "", "", "", "", now, senderName, senderId // K–S
     ];
     insertAtTop(sheet, newRow);
     targetRow = 2;
+    dgId      = siteCode;
     Logger.log("[collectPhoto] New row inserted: DEF=" + defId);
   }
 
-  // ── QI4 matching ──
-  const matchResult = matchQi4(caption, dgId, qi4Code);
-
-  // ── Ghi các cột T, U, V, W, AA ──
-  sheet.getRange(targetRow, COL_T).setValue(qi4Code);
-  sheet.getRange(targetRow, COL_U).setValue(matchResult);
+  // ── Ghi các cột V, W, AA (Bỏ qua cột T, U) ──
   sheet.getRange(targetRow, COL_V).setValue(lngPhoto !== null ? lngPhoto : "");
   sheet.getRange(targetRow, COL_W).setValue(latPhoto !== null ? latPhoto : "");
-  // COL_X, COL_Y: user điền thủ công → không ghi
   sheet.getRange(targetRow, COL_AA).setValue(auth);
 
   // Lưu file_id vào note của cell AA để tra cứu sau
@@ -530,43 +557,16 @@ function collectPhoto(body) {
   }
 
   Logger.log("[collectPhoto] row=" + targetRow + " DG=" + dgId +
-             " T=" + qi4Code + " U=" + matchResult +
              " V=" + lngPhoto + " W=" + latPhoto + " AA=" + auth);
 
   return jsonResp({
     status: "ok",
     row:    targetRow,
     dg_id:  dgId,
-    qi4:    qi4Code,
-    match:  matchResult,
     auth:   auth,
     lat:    latPhoto,
     lng:    lngPhoto
   });
-}
-
-
-/**
- * matchQi4: so sánh caption ảnh với DG ID từ sheet và mã QI4.
- * Returns: 'MATCH' | 'NEAR' | 'NO'
- */
-function matchQi4(caption, dgId, qi4Code) {
-  if (!caption) return "NO";
-  const capU = caption.toUpperCase().trim();
-  const qi4U = (qi4Code || "QI4").toUpperCase();
-  const dgU  = (dgId || "").toUpperCase().trim();
-
-  // MATCH: caption chứa đúng pattern TNIXXXX_NQI4 với DG ID khớp
-  if (dgU) {
-    const esc = dgU.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const qi4Esc = qi4U.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (new RegExp(esc + "_\\d+" + qi4Esc).test(capU)) return "MATCH";
-  }
-
-  // NEAR: không đúng DG ID nhưng có chuỗi QI4 trong caption
-  if (qi4U && capU.includes(qi4U)) return "NEAR";
-
-  return "NO";
 }
 
 
