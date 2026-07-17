@@ -360,9 +360,55 @@ function testLookup() {
 const DAILY_PLAN_TAB = "Team leader assign Plan";
 
 /**
+ * Normalize a date value (JS Date object, "Wed Jul 15 2026...", or "15/07/2026") → "DD/MM/YYYY".
+ * Used for robust deduplication regardless of how the date was stored.
+ */
+function parseDateToDDMMYYYY_(rawDate) {
+  if (!rawDate) return "";
+  const s = rawDate.toString().trim();
+
+  // Already DD/MM/YYYY or D/M/YYYY
+  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) {
+    return dmy[1].padStart(2, "0") + "/" + dmy[2].padStart(2, "0") + "/" + dmy[3];
+  }
+
+  // JS Date toString: "Wed Jul 15 2026 00:00:00 GMT+0630 (Myanmar Time)"
+  const months = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6,
+                   jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+  const parts = s.split(/[\s,]+/);
+  for (let i = 0; i < parts.length - 2; i++) {
+    const mon = parts[i].toLowerCase().substring(0, 3);
+    if (months[mon]) {
+      const day  = parseInt(parts[i + 1], 10);
+      const year = parseInt(parts[i + 2], 10);
+      if (!isNaN(day) && !isNaN(year) && year > 2000) {
+        return String(day).padStart(2, "0") + "/" +
+               String(months[mon]).padStart(2, "0") + "/" + year;
+      }
+    }
+  }
+
+  // Try parsing as JS Date object directly
+  try {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      // Convert to Myanmar timezone (UTC+6:30)
+      const utcMs = d.getTime() + (6 * 60 + 30) * 60 * 1000;
+      const mm = new Date(utcMs);
+      return String(mm.getUTCDate()).padStart(2, "0") + "/" +
+             String(mm.getUTCMonth() + 1).padStart(2, "0") + "/" +
+             mm.getUTCFullYear();
+    }
+  } catch (e) {}
+
+  return s; // fallback: return as-is
+}
+
+/**
  * Store a daily plan entry with comparison data.
  * Payload: { action: "store_daily_plan", date, team, content, daily_report, comparison }
- * Auto-generates REF. Dedup by date+team.
+ * Auto-generates REF. Dedup by date+team (date normalized to DD/MM/YYYY).
  */
 function handleStoreDailyPlan(body) {
   try {
@@ -376,33 +422,45 @@ function handleStoreDailyPlan(body) {
       sheet.getRange(1, 1, 1, 6).setFontWeight("bold");
     }
 
-    const date       = (body.date       || "").toString().trim();
+    const rawDate    = (body.date       || "").toString().trim();
     const team       = (body.team       || "").toString().trim();
     const content    = (body.content    || "").toString().trim();
     const report     = (body.daily_report || "").toString().trim();
     const comparison = (body.comparison || "").toString().trim();
 
-    if (!date || !team) {
+    if (!rawDate || !team) {
       return jsonOut({ status: "error", message: "Missing date or team" });
     }
 
-    // Dedup: same date + team?
+    // Normalize incoming date to DD/MM/YYYY for consistent storage
+    const date = parseDateToDDMMYYYY_(rawDate);
+
+    // Normalize team string to "Team N" canonical form
+    const teamNorm = team.replace(/team\s*0?/i, "Team ").trim();
+
+    // Dedup: same date + team? (compare normalized forms on both sides)
     const lastRow = sheet.getLastRow();
     if (lastRow >= 2) {
       const existing = sheet.getRange(2, 2, lastRow - 1, 2).getValues();
       for (let i = 0; i < existing.length; i++) {
-        const exDate = existing[i][0].toString().trim();
-        const exTeam = existing[i][1].toString().trim();
-        if (exDate === date && exTeam.toLowerCase() === team.toLowerCase()) {
-          // Update existing row E and F if new data
+        const exDateRaw = existing[i][0].toString().trim();
+        const exTeamRaw = existing[i][1].toString().trim();
+        const exDate = parseDateToDDMMYYYY_(exDateRaw);
+        const exTeam = exTeamRaw.replace(/team\s*0?/i, "Team ").trim();
+        if (exDate === date && exTeam.toLowerCase() === teamNorm.toLowerCase()) {
+          // Update existing row E and F with latest data
           if (report)     sheet.getRange(i + 2, 5).setValue(report);
           if (comparison) sheet.getRange(i + 2, 6).setValue(comparison);
+          // Also update plan content (col D) in case it changed
+          if (content)    sheet.getRange(i + 2, 4).setValue(content);
+          // Normalize the stored date to DD/MM/YYYY format
+          sheet.getRange(i + 2, 2).setValue(date);
           return jsonOut({ status: "ok", message: "Updated existing", ref: sheet.getRange(i + 2, 1).getValue(), duplicate: true });
         }
       }
     }
 
-    // Tính REF bằng cách quét max existing (giống Daily report)
+    // Tính REF bằng cách quét max existing
     let maxRef = 0;
     if (lastRow >= 2) {
       const refValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
@@ -416,8 +474,9 @@ function handleStoreDailyPlan(body) {
     }
     const ref = "DP-" + String(maxRef + 1).padStart(3, "0");
 
-    // Chèn dòng mới tại dòng 2 (newest first, giống Daily report and Bussiness)
+    // Chèn dòng mới tại dòng 2 (newest first)
     sheet.insertRowBefore(2);
+    // Store normalized DD/MM/YYYY date for consistent future dedup
     sheet.getRange(2, 1, 1, 6).setValues([[ref, date, team, content, report, comparison]]);
 
     return jsonOut({ status: "ok", ref: ref });
@@ -444,7 +503,8 @@ function handleGetDailyPlans() {
 
     for (let i = 0; i < data.length; i++) {
       const ref        = data[i][0].toString().trim();
-      const date       = data[i][1].toString().trim();
+      // Normalize date to DD/MM/YYYY so Python parse_plan_date() works reliably
+      const date       = parseDateToDDMMYYYY_(data[i][1].toString().trim());
       const team       = data[i][2].toString().trim();
       const content    = data[i][3].toString().trim();
       const report     = data[i][4].toString().trim();

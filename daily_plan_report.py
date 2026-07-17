@@ -303,9 +303,18 @@ def get_report_data() -> dict:
 
 def get_team_leaders() -> dict:
     """
-    Reads GID 133591305 and returns a dict mapping team key ("T1", "T2", "T3", "T4") -> leader's telegram ID (str).
+    Reads GID 133591305 and returns a dict mapping team key ("T1", "T2", "T3", "T4") -> list of leader's telegram IDs (str).
     """
+    fallback = {
+        "T1": "6859790680",
+        "T2": "6555381983",
+        "T3": "6710667362",
+        "T4": "6867087612"
+    }
     leaders = {}
+    for k, v in fallback.items():
+        leaders[k] = [v]
+        
     try:
         resp = requests.get(TEAM_SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
         resp.raise_for_status()
@@ -326,20 +335,11 @@ def get_team_leaders() -> dict:
                 elif "TEAM04" in tk or "TEAM4" in tk: tk = "T4"
                 else: tk = ""
                 
-                if tk:
-                    leaders[tk] = tg_id
+                if tk and tg_id and tg_id != "-" and tg_id.lower() != "nan":
+                    if tg_id not in leaders[tk]:
+                        leaders[tk].append(tg_id)
     except Exception as e:
         logger.error(f"Error loading team leaders from sheet: {e}")
-        
-    # Fallback to hardcoded IDs if sheet read fails or leader ID missing
-    fallback = {
-        "T1": "6859790680",
-        "T2": "6555381983",
-        "T3": "6710667362",
-        "T4": "6867087612"
-    }
-    for k, v in fallback.items():
-        leaders.setdefault(k, v)
         
     return leaders
 
@@ -856,8 +856,12 @@ async def scan_group_for_plans(client, chat_id: int, since_utc: datetime, leader
             # Filter by sender if leader_id is provided
             if leader_id:
                 sender_id_str = str(msg.sender_id) if msg.sender_id else ""
-                if sender_id_str != str(leader_id).strip():
-                    continue
+                if isinstance(leader_id, list):
+                    if sender_id_str not in [str(x).strip() for x in leader_id]:
+                        continue
+                else:
+                    if sender_id_str != str(leader_id).strip():
+                        continue
             if msg.message and is_daily_plan_msg(msg.message):
                 parsed = parse_daily_plan(msg.message)
                 if parsed:
@@ -1004,8 +1008,12 @@ async def scan_plan_tomorrow(client, group_key: str, chat_id: int,
                 break
             # Filter by leader
             sender_id_str = str(msg.sender_id) if msg.sender_id else ""
-            if sender_id_str != str(leader_id).strip():
-                continue
+            if isinstance(leader_id, list):
+                if sender_id_str not in [str(x).strip() for x in leader_id]:
+                    continue
+            else:
+                if sender_id_str != str(leader_id).strip():
+                    continue
             if msg.message and is_daily_plan_msg(msg.message):
                 parsed = parse_daily_plan(msg.message)
                 if parsed:
@@ -1246,6 +1254,52 @@ async def run_eod_or_update(mode: str):
     all_plans = get_daily_plans()
     logger.info(f"  📊 Total plans in sheet: {len(all_plans)}")
 
+    # ── Step 4a: Fallback — nếu Telegram scan không tìm thấy plan của team nào,
+    #            lấy từ sheet (all_plans) để đảm bảo team_comparisons luôn có data ──
+    for group_key in ("T1", "T2", "T3", "T4"):
+        if group_key in team_comparisons:
+            continue  # Đã có từ Telegram scan
+        # Tìm plan hôm nay trong sheet
+        sheet_plans_today = find_plans_for_date(all_plans, date_str, team_filter=group_key)
+        if not sheet_plans_today:
+            logger.info(f"  ⚠️ {group_key}: No plan found in sheet for {date_str} either")
+            continue
+        # Dùng plan mới nhất từ sheet
+        sp = sheet_plans_today[0]
+        comp_text = sp.get("comparison", "")
+        if comp_text:
+            # Parse comparison text để lấy plan_count/done_count/remain_count
+            plan_m  = re.search(r'Plan:\s*(\d+)', comp_text)
+            done_m  = re.search(r'Done:\s*(\d+)', comp_text)
+            remain_m = re.search(r'Remaining:\s*(\d+)', comp_text)
+            plan_cnt   = int(plan_m.group(1))   if plan_m   else 0
+            done_cnt   = int(done_m.group(1))   if done_m   else 0
+            remain_cnt = int(remain_m.group(1)) if remain_m else max(0, plan_cnt - done_cnt)
+            pct = round(done_cnt / plan_cnt * 100) if plan_cnt > 0 else 0
+            team_comparisons[group_key] = {
+                "plan_count":    plan_cnt,
+                "done_count":    done_cnt,
+                "remain_count":  remain_cnt,
+                "pct":           pct,
+                "comparison_text": comp_text,
+                "from_sheet":    True,  # đánh dấu nguồn
+            }
+            # Inject plan vào all_today_plans để stats["today_plans"] có dữ liệu
+            all_today_plans.setdefault(group_key, [])
+            if not all_today_plans[group_key]:
+                all_today_plans[group_key].append(sp)
+            logger.info(f"  📋 {group_key}: Loaded plan from sheet (REF: {sp.get('ref', '?')}, comp_text present)")
+        else:
+            # Không có comparison text, nhưng vẫn inject plan content
+            reports = team_reports.get(group_key, [])
+            comp = build_comparison(sp.get("content", ""), reports)
+            team_comparisons[group_key] = comp
+            all_today_plans.setdefault(group_key, [])
+            if not all_today_plans[group_key]:
+                all_today_plans[group_key].append(sp)
+            logger.info(f"  📋 {group_key}: Loaded plan from sheet (REF: {sp.get('ref', '?')}), rebuilt comparison")
+
+
     # ── Step 4b: Get employee stats từ Apps Script ──
     logger.info("📊 Fetching employee stats (rank/close/WO remain)...")
     unified_employees = get_unified_employees()
@@ -1278,7 +1332,7 @@ async def run_eod_or_update(mode: str):
             emps      = team_emp_map.get(group_key, [])  # danh sách nhân viên
 
             lines = [
-                f"📋 5. Report — Daily Plan & Results — {team_name}",
+                f"📋 5. Report — Daily Plan & Results ({date_str}) — {team_name}",
                 f"📅 {date_str}  |  🕐 {now.strftime('%H:%M')}",
                 f"📌 Comparison of plan for {date_str} vs actual completed stations.",
                 divider,
@@ -1308,7 +1362,7 @@ async def run_eod_or_update(mode: str):
 
             if emps:
                 lines.append(divider)
-                lines.append("📋 FT Plan & Actual Summary:")
+                lines.append(f"📋 FT Plan & Actual Summary ({date_str}):")
                 for emp in sorted(emps, key=lambda e: e.get("name", "")):
                     sys_name = emp.get("sys_name", emp.get("username", ""))
                     if sys_name and "team leader" in str(sys_name).lower():
@@ -1408,7 +1462,7 @@ async def run_eod_or_update(mode: str):
 
         # ── 5b. Send consolidated report to CONTROL ──
         ctrl_lines = [
-            f"📋 5. Report — Daily Plan & Results — Summary",
+            f"📋 5. Report — Daily Plan & Results ({date_str}) — Summary",
             f"📅 {date_str}  |  🕐 {now.strftime('%H:%M')}",
             f"📌 Comparison of plan for {date_str} vs actual completed stations.",
             divider,
@@ -1548,6 +1602,24 @@ async def run_morning():
     all_plans = get_daily_plans()
     logger.info(f"  📊 Total plans in sheet: {len(all_plans)}")
 
+    # ── Fallback: nếu Telegram scan không tìm thấy plan hôm nay,
+    #              thử lấy từ sheet (all_plans) ──
+    for group_key in list(GROUPS.keys()):
+        pt = plan_today_status.get(group_key, {"found": False})
+        if pt["found"]:
+            continue
+        sheet_plans_today = find_plans_for_date(all_plans, date_str, team_filter=group_key)
+        if sheet_plans_today:
+            sp = sheet_plans_today[0]
+            plan_today_status[group_key] = {
+                "found": True,
+                "sent_time": sp.get("msg_date", ""),  # có thể trống nếu chỉ có từ sheet
+                "content": sp.get("content", ""),
+                "plan": sp,
+                "from_sheet": True,
+            }
+            logger.info(f"  📋 {group_key}: Plan found in sheet (REF: {sp.get('ref', '?')}) — using as fallback")
+
     # Build 3-day completion rate
     logger.info("📊 Calculating 3-day completion rate...")
     completion_rate = calc_3day_completion_rate(all_plans, {})
@@ -1564,10 +1636,15 @@ async def run_morning():
             team_name = GROUP_NAMES.get(group_key, group_key)
             stats = build_plan_stats(all_plans, team_filter=group_key)
             pt = plan_today_status.get(group_key, {"found": False})
+            # Adjust stats if today's plan is found but not yet stored in sheet
+            if pt["found"] and stats["d0"] == 0:
+                stats["d0"] = 1
+                stats["d7"] += 1
+                stats["month"] += 1
             cr = completion_rate.get(group_key, {"days": [], "total_plan": 0, "total_done": 0, "pct": 0})
 
             lines = [
-                f"📋 5.1 Report — Plan — {team_name}",
+                f"📋 5.1 Report — Plan ({date_str}) — {team_name}",
                 f"📅 {date_str}  |  🕐 {now.strftime('%H:%M')}",
                 divider,
             ]
@@ -1575,7 +1652,11 @@ async def run_morning():
             # Plan today status
             lines.append(f"📝 Plan for {date_str}:")
             if pt["found"]:
-                lines.append(f"✅ Team Leader: Submitted ✓ (sent at {pt['sent_time']})")
+                sent_at = pt.get("sent_time", "")
+                if sent_at:
+                    lines.append(f"✅ Team Leader: Submitted ✓ (sent at {sent_at})")
+                else:
+                    lines.append(f"✅ Team Leader: Submitted ✓ (recorded in sheet)")
                 lines.append("")
                 lines.append("📋 Plan Content:")
                 lines.append(colorize_bullets(pt["content"]))
@@ -1620,7 +1701,7 @@ async def run_morning():
 
         # ── CONTROL consolidated morning report ──
         ctrl_lines = [
-            f"📋 5.1 Report — Plan — Summary",
+            f"📋 5.1 Report — Plan ({date_str}) — Summary",
             f"📅 {date_str}  |  🕐 {now.strftime('%H:%M')}",
             divider,
         ]
@@ -1629,6 +1710,11 @@ async def run_morning():
             team_name = GROUP_NAMES.get(group_key, group_key)
             pt = plan_today_status.get(group_key, {"found": False})
             stats = build_plan_stats(all_plans, team_filter=group_key)
+            # Adjust stats if today's plan is found but not yet stored in sheet
+            if pt["found"] and stats["d0"] == 0:
+                stats["d0"] = 1
+                stats["d7"] += 1
+                stats["month"] += 1
             cr = completion_rate.get(group_key, {"days": [], "total_plan": 0, "total_done": 0, "pct": 0})
 
             ctrl_lines.append(f"🏷️ {team_name}:")
