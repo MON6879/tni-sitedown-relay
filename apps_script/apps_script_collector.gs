@@ -118,7 +118,6 @@ function doGet(e) {
       var storeKey = ts1 ? (ts1 + "|" + a1.substring(0, 60)) : a1.substring(0, 200);
       return json({ status: "ok", props: props, a1: a1, ts1: ts1, storeKey: storeKey });
     }
-
     // ── Note B2:B5 từ SD Sheet (cho botlookup_relay.py gửi từ @Phongha79) ──
     if (action === "get_note_b2b5")       return getNoteB2B5();
     if (action === "get_note_msgids")     return handleGetNoteMsgIds();
@@ -1875,9 +1874,24 @@ function handleSaveMsgIds(body) {
   if (!key) return json({ status: "error", message: "Missing key" });
 
   var props = PropertiesService.getScriptProperties();
-  props.setProperty("SD_MSGID_" + key, JSON.stringify(msgids));
-  Logger.log("[MsgIds] 💾 Saved " + key + " = " + JSON.stringify(msgids));
-  return json({ status: "ok", key: key, count: msgids.length });
+  var propKey = "SD_MSGID_" + key;
+  var existing = [];
+  try {
+    var raw = props.getProperty(propKey) || "";
+    if (raw) {
+      existing = JSON.parse(raw);
+      if (!Array.isArray(existing)) existing = [];
+    }
+  } catch(e) {}
+
+  // Ghép các ID mới vào danh sách cũ
+  var combined = existing.concat(msgids);
+
+  // Chỉ giữ lại tối đa 20 ID gần nhất
+  var toSave = combined.slice(-20);
+  props.setProperty(propKey, JSON.stringify(toSave));
+  Logger.log("[MsgIds] 💾 Saved " + key + " = " + JSON.stringify(toSave));
+  return json({ status: "ok", key: key, count: toSave.length });
 }
 
 /** Đọc generic message_ids — gọi từ Python scripts qua doGet */
@@ -2271,115 +2285,5 @@ function handleSetMsgId(body) {
   }
 }
 
-// ============================================================
-// 12-MINUTE SCANNER FOR BOD ASSIGN CHECKS
-// ============================================================
-
-function checkBodAssign() {
-  try {
-    const ss = SpreadsheetApp.openById("1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8");
-    const sheet = ss.getSheetByName("BOD assign");
-    if (!sheet) {
-      Logger.log("❌ Không tìm thấy sheet 'BOD assign'");
-      return;
-    }
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return;
-
-    const props = PropertiesService.getScriptProperties();
-    const token = props.getProperty("SEND_BOT_TOKEN") || "8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A";
-    const controlChatId = "-5251698940";
-
-    // Đọc từ dòng 2 đến lastRow, các cột từ A đến V (22 cột)
-    const range = sheet.getRange(2, 1, lastRow - 1, 22);
-    const values = range.getValues();
-
-    for (let i = 0; i < values.length; i++) {
-      const rowNum = i + 2;
-      const row = values[i];
-      
-      const colR = String(row[17] || "").trim(); // Cột R (index 17)
-      const colT = String(row[19] || "").trim(); // Cột T (index 19)
-      const colU = String(row[20] || "").trim(); // Cột U (index 20)
-
-      // 1. Quét gửi Control
-      if (colR) {
-        const msgText = "BOD assing New task for : " + colR;
-        const payload = {
-          chat_id: controlChatId,
-          text: msgText,
-          reply_markup: {
-            inline_keyboard: [[
-              { text: "✔️ Receive Task", callback_data: "ack_bod_task_" + rowNum }
-            ]]
-          }
-        };
-        
-        sendTelegramMessage_(token, payload);
-      }
-
-      // 2. Quét gửi Team
-      if (colT) {
-        const chatId = getTeamChatId_(colU);
-        if (chatId) {
-          const msgText = "New assing task: " + colT;
-          const payload = {
-            chat_id: chatId,
-            text: msgText,
-            reply_markup: {
-              inline_keyboard: [[
-                { text: "✔️ Receive Task", callback_data: "ack_bod_task_" + rowNum }
-              ]]
-            }
-          };
-          
-          sendTelegramMessage_(token, payload);
-        } else {
-          Logger.log("⚠️ Không tìm thấy chat ID cho team: " + colU);
-        }
-      }
-    }
-  } catch (e) {
-    Logger.log("❌ Lỗi checkBodAssign: " + e.message);
-  }
-}
-
-function getTeamChatId_(teamStr) {
-  if (!teamStr) return null;
-  const ts = teamStr.toUpperCase().replace(/\s+/g, "");
-  if (ts.indexOf("TEAM01") !== -1 || ts.indexOf("TEAM1") !== -1) return "-5180992881";
-  if (ts.indexOf("TEAM02") !== -1 || ts.indexOf("TEAM2") !== -1 || ts.indexOf("TEAM05") !== -1 || ts.indexOf("TEAM5") !== -1) return "-5188855349";
-  if (ts.indexOf("TEAM03") !== -1 || ts.indexOf("TEAM3") !== -1) return "-5183480727";
-  if (ts.indexOf("TEAM04") !== -1 || ts.indexOf("TEAM4") !== -1) return "-5238696719";
-  return null;
-}
-
-function sendTelegramMessage_(token, payload) {
-  try {
-    const url = "https://api.telegram.org/bot" + token + "/sendMessage";
-    const resp = UrlFetchApp.fetch(url, {
-      method: "post",
-      contentType: "application/json",
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-    const res = JSON.parse(resp.getContentText());
-    return res.ok === true;
-  } catch (e) {
-    Logger.log("❌ Lỗi gửi Telegram: " + e.message);
-    return false;
-  }
-}
-
-function setupBodAssignTrigger() {
-  const triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(function(t) {
-    if (t.getHandlerFunction() === "checkBodAssign") {
-      ScriptApp.deleteTrigger(t);
-    }
-  });
-  ScriptApp.newTrigger("checkBodAssign").timeBased().everyMinutes(10).create();
-  Logger.log("✅ Đã cài trigger checkBodAssign chạy mỗi 10 phút.");
-}
 
 

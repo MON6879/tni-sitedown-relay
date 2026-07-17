@@ -57,7 +57,9 @@ def save_msgids(gas_url: str, key: str, msgids: list[int]):
 # ── Bot API delete ──────────────────────────────────────────────
 
 def delete_telegram_msg(bot_token: str, chat_id, message_id: int) -> bool:
-    """Xóa 1 tin nhắn qua Telegram Bot API."""
+    """Xóa 1 tin nhắn qua Telegram Bot API.
+    Trả về True nếu xóa thành công hoặc tin nhắn đã bị xóa trước đó.
+    """
     url = f"https://api.telegram.org/bot{bot_token}/deleteMessage"
     try:
         resp = requests.post(url, json={
@@ -69,7 +71,12 @@ def delete_telegram_msg(bot_token: str, chat_id, message_id: int) -> bool:
             print(f"[delete_old] 🗑️ msg_id={message_id} → {chat_id}")
             return True
         else:
-            print(f"[delete_old] ⚠️ msg_id={message_id}: {data.get('description', '')}")
+            desc = data.get('description', '')
+            # Nếu tin nhắn đã bị xóa trước đó, coi như thành công để gỡ khỏi bộ nhớ
+            if "message to delete not found" in desc.lower():
+                print(f"[delete_old] 🗑️ msg_id={message_id} đã được xóa trước đó (không tìm thấy)")
+                return True
+            print(f"[delete_old] ⚠️ msg_id={message_id}: {desc}")
             return False
     except Exception as ex:
         print(f"[delete_old] ❌ delete msg_id={message_id}: {ex}")
@@ -82,9 +89,15 @@ def delete_old_messages_bot(bot_token: str, chat_id, gas_url: str, key: str) -> 
     if not old_ids:
         return 0
     count = 0
+    remaining_ids = []
     for mid in old_ids:
         if delete_telegram_msg(bot_token, chat_id, mid):
             count += 1
+        else:
+            remaining_ids.append(mid)
+    
+    # Cập nhật lại các ID chưa xóa được lên GAS
+    save_msgids(gas_url, key, remaining_ids)
     print(f"[delete_old] 📊 {key}: xóa {count}/{len(old_ids)}")
     return count
 
@@ -97,12 +110,23 @@ async def delete_old_messages_telethon(client, chat_id, gas_url: str, key: str) 
     if not old_ids:
         return 0
     count = 0
+    remaining_ids = []
     for mid in old_ids:
         try:
             await client.delete_messages(chat_id, [mid])
             count += 1
             print(f"[delete_old] 🗑️ msg_id={mid} → {chat_id}")
         except Exception as ex:
-            print(f"[delete_old] ⚠️ msg_id={mid}: {ex}")
+            err_str = str(ex).lower()
+            # Nếu tin nhắn không tồn tại hoặc đã bị xóa trước đó, coi như thành công
+            if "not found" in err_str or "invalid" in err_str:
+                count += 1
+                print(f"[delete_old] 🗑️ msg_id={mid} đã được xóa trước đó (không tìm thấy)")
+            else:
+                remaining_ids.append(mid)
+                print(f"[delete_old] ⚠️ msg_id={mid}: {ex}")
+    
+    # Cập nhật lại các ID chưa xóa được lên GAS
+    save_msgids(gas_url, key, remaining_ids)
     print(f"[delete_old] 📊 {key}: xóa {count}/{len(old_ids)}")
     return count
