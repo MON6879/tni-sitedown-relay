@@ -662,8 +662,23 @@ function sendTelegramPreCollectIds_(chatId, plainContent, tag) {
 
 // ── Message ID persistence ───────────────────────────────────
 function saveMsgIds_(msgKey, messageIds) {
-  PropertiesService.getScriptProperties()
-    .setProperty("SD_MSGID_" + msgKey, JSON.stringify(messageIds));
+  const props = PropertiesService.getScriptProperties();
+  const key = "SD_MSGID_" + msgKey;
+  let existing = [];
+  try {
+    const val = props.getProperty(key) || "";
+    if (val) {
+      existing = JSON.parse(val);
+      if (!Array.isArray(existing)) existing = [];
+    }
+  } catch(e) {}
+  
+  // Ghép các ID mới vào danh sách cũ
+  const combined = existing.concat(messageIds);
+  
+  // Chỉ giữ lại tối đa 10 ID gần nhất để tránh phình bộ nhớ
+  const toSave = combined.slice(-10);
+  props.setProperty(key, JSON.stringify(toSave));
 }
 
 function getSavedMsgIds_(msgKey) {
@@ -700,17 +715,28 @@ function deleteTelegramMsgBot_(chatId, messageId) {
     const res = JSON.parse(resp.getContentText());
     Logger.log("[delete] " + (res.ok ? "🗑️" : "⚠️") + " msg=" + messageId + " → " + chatId
       + (!res.ok ? " | " + res.description : ""));
-    return res.ok === true;
+    // Trả về true nếu xóa thành công HOẶC tin nhắn đã bị xóa trước đó rồi (không tìm thấy)
+    return res.ok === true || (res.description && res.description.indexOf("message to delete not found") >= 0);
   } catch(e) { Logger.log("[delete] ❌ " + e.message); return false; }
 }
 
 function deleteOldMessages_(chatId, msgKey) {
   const oldIds = getSavedMsgIds_(msgKey);
+  const remainingIds = [];
   for (let i = 0; i < oldIds.length; i++) {
-    deleteTelegramMsgBot_(chatId, oldIds[i]);
-    if (i < oldIds.length - 1) Utilities.sleep(200);
+    const success = deleteTelegramMsgBot_(chatId, oldIds[i]);
+    if (!success) {
+      remainingIds.push(oldIds[i]);
+    }
+    if (i < oldIds.length - 1) Utilities.sleep(100);
   }
-  if (oldIds.length > 0) clearMsgIds_(msgKey);
+  
+  const key = "SD_MSGID_" + msgKey;
+  if (remainingIds.length > 0) {
+    PropertiesService.getScriptProperties().setProperty(key, JSON.stringify(remainingIds));
+  } else {
+    PropertiesService.getScriptProperties().deleteProperty(key);
+  }
 }
 
 
