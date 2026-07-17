@@ -312,7 +312,7 @@ async def main():
                 f"📌 Shows detailed site assignments and tasks grouped by department (Admin, Asset, etc.) from today/recent plans.",
                 "━━━━━━━━━━━━━━━━━━━━"
             ]
-            if len(lines2) > 4: # Có dữ liệu (bao gồm header và annotation)
+            if team_msg2[t_num]: # Có dữ liệu
                 # Sắp xếp danh sách chi tiết (theo Category) trước khi gửi
                 lines2.extend(sorted(team_msg2[t_num]))
                 msg2_text = "\n".join(lines2)
