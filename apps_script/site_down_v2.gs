@@ -374,17 +374,11 @@ function checkColC(sheet) {
   const colCRaw = readColCRaw(sheet);
   if (!colCRaw) { Logger.log("[Tin1] Col C trống — bỏ qua"); return false; }
 
-  // ① CONTROL: toàn bộ Col C (có tô màu team, bỏ dòng tổng hợp Team X: cho đỡ dài)
+  // ① CONTROL: toàn bộ Col C (có tô màu team)
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
-      const linesControl = colCRaw.split("\n").filter(l => {
-        const trimmed = l.trim();
-        if (/^\s*Team\s*\d+/i.test(trimmed)) return false;
-        if (/^\s*\.{3,}\s*$/.test(trimmed)) return false; // Lọc bỏ dòng chỉ có dấu chấm ...
-        return true;
-      });
-      const colored = colorizeTeams(linesControl.join("\n"));
+      const colored = colorizeTeams(colCRaw);
       sendOrEditTelegramPre(controlId, colored, "TIN1_CONTROL", "[Tin1][CONTROL]");
     } catch (controlErr) {
       Logger.log("[Tin1][CONTROL] ❌ Lỗi gửi: " + controlErr.message);
@@ -434,13 +428,7 @@ function readColCRaw(sheet) {
   if (lastRow < 1) return "";
   const data = sheet.getRange(1, 3, lastRow, 1).getValues().flat();
   return data
-    .map(c => {
-      let line = (c || "").toString().trim();
-      if (/^\s*Team\s*\d+/i.test(line)) {
-        line = line.replace(/\s+Don'?t\s+Forget.*$/i, "").trim();
-      }
-      return line;
-    })
+    .map(c => (c || "").toString().trim())
     .filter(l => l.length > 0)
     .join("\n");
 }
