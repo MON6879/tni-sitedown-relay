@@ -17,18 +17,18 @@ on:
         required: true
         type: choice
         options:
-          - bod_assign
-          - daily_task
-          - plan_report
-          - plan_eod
-          - plan_update
-          - plan_morning
-          - read_report
-          - check_read_status
-          - botlookup_relay
-          - cable_report
-          - refuel_plan_report
-          - refuel_report
+          - 'Report 2 (BOD) - BOD Assign'
+          - 'Reports 1, 2, 3, 4 - Daily Task & Backlog'
+          - 'Report 5 - Daily Plan & Results'
+          - 'Report 5A - Plan EOD'
+          - 'Report 5B - Plan Update'
+          - 'Report 5C - Plan Morning'
+          - 'Report 6 - Daily Note Read Report'
+          - 'Task - Check Read Status'
+          - 'Task - Bot Lookup Relay'
+          - 'Task - Cable Daily Report'
+          - 'Task - Refuel Plan Report'
+          - 'Task - Refuel Request Report'
       skip_delay:
         description: 'Skip random delay (1=yes, 0=no) - for botlookup_relay'
         required: false
@@ -49,13 +49,13 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: |
+          run: |
           pip install python-telegram-bot requests pandas python-dotenv telethon openpyxl
 
       - name: Report 2 — BOD-assigned Tasks Stats
         if: |
           (github.event_name == 'schedule' && github.event.schedule == '30 9 * * *') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'bod_assign')
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 2 (BOD) - BOD Assign')
         env:
           SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
@@ -64,7 +64,7 @@ jobs:
       - name: Reports 1, 2, 3, 4 — Daily Backlog & Task Reminders
         if: |
           (github.event_name == 'schedule' && github.event.schedule == '30 9 * * *') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'daily_task')
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Reports 1, 2, 3, 4 - Daily Task & Backlog')
         env:
           SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
           REPORT_TASK_BOT_TOKEN: ${{ secrets.REPORT_TASK_BOT_TOKEN }}
@@ -75,7 +75,7 @@ jobs:
           python cron_send.py
 
       - name: Report 5 — Daily Plan & Results
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_report'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 5 - Daily Plan & Results'
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -87,7 +87,7 @@ jobs:
       - name: Report 5A — Daily Plan EOD
         if: |
           (github.event_name == 'schedule' && github.event.schedule == '30 9 * * *') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_eod')
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 5A - Plan EOD')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -99,7 +99,7 @@ jobs:
       - name: Report 5B — Daily Plan Update
         if: |
           (github.event_name == 'schedule' && github.event.schedule == '30 14 * * *') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_update')
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 5B - Plan Update')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -111,7 +111,7 @@ jobs:
       - name: Report 5C — Morning Plan
         if: |
           (github.event_name == 'schedule' && github.event.schedule == '30 0 * * *') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'plan_morning')
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 5C - Plan Morning')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -123,7 +123,7 @@ jobs:
       - name: Report 6 — Daily Note Read Report
         if: |
           (github.event_name == 'schedule' && github.event.schedule == '0 14 * * *') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'read_report')
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 6 - Daily Note Read Report')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -133,7 +133,7 @@ jobs:
         run: python daily_read_report.py
 
       - name: Task — Check Read Status
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'check_read_status'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Task - Check Read Status'
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -145,7 +145,7 @@ jobs:
       - name: Task — Cable Daily Report (Cron or Manual)
         if: |
           (github.event_name == 'schedule' && github.event.schedule == '30 9 * * *') ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'cable_report')
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Task - Cable Daily Report')
         env:
           COLLECTOR_BOT_TOKEN: ${{ secrets.COLLECTOR_BOT_TOKEN }}
           CABLE_APPS_SCRIPT_URL: ${{ secrets.CABLE_APPS_SCRIPT_URL }}
@@ -156,7 +156,7 @@ jobs:
       - name: Task — Refuel Request Report (Cron or Manual)
         if: |
           (github.event_name == 'schedule' && (github.event.schedule == '30 9 * * *' || github.event.schedule == '30 22 * * *' || github.event.schedule == '30 6 * * *')) ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'refuel_report')
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Task - Refuel Request Report')
         env:
           REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
@@ -180,7 +180,7 @@ jobs:
 
       - name: Task — Refuel Plan Report (Manual Dispatch)
         if: |
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'refuel_plan_report')
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Task - Refuel Plan Report')
         env:
           REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}
           REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}

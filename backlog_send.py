@@ -312,9 +312,9 @@ async def main():
                 f"📌 Shows detailed site assignments and tasks grouped by department (Admin, Asset, etc.) from today/recent plans.",
                 "━━━━━━━━━━━━━━━━━━━━"
             ]
-            lines2.extend(team_msg2[t_num])
-
             if len(lines2) > 4: # Có dữ liệu (bao gồm header và annotation)
+                # Sắp xếp danh sách chi tiết (theo Category) trước khi gửi
+                lines2.extend(sorted(team_msg2[t_num]))
                 msg2_text = "\n".join(lines2)
                 ok, m_ids = await send_msg(bot, chat_id, msg2_text, f"{t_name} Backlog Msg 2")
                 sent_msg_ids.extend(m_ids)
