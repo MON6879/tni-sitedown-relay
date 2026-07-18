@@ -188,6 +188,57 @@ function getSiteDownData() {
 
 
 // ============================================================
+// MSG IDS — L\u01b0u / \u0110\u1ecdc message_ids c\u1ee7a c\u00e1c b\u00e1o c\u00e1o (cron_send, bod_assign, v.v.)
+// D\u00f9ng b\u1edfi delete_old_helper.py \u0111\u1ec3 x\u00f3a tin c\u0169 tr\u01b0\u1edbc khi g\u1eedi m\u1edbi.
+// PropertiesService key: MSGIDS_{key}
+// ============================================================
+
+/** POST {action:"save_msgids", key:"CRON_TEAM_T1", msgids:[123,456]} */
+function handleSaveMsgIds(body) {
+  try {
+    const key    = (body.key    || "").toString().trim();
+    const msgids = body.msgids  || [];
+    if (!key) return json({ status: "error", message: "key required" });
+    const propKey = "MSGIDS_" + key;
+    const props   = PropertiesService.getScriptProperties();
+    if (!msgids || msgids.length === 0) {
+      props.deleteProperty(propKey);
+      Logger.log("[MsgIds] DELETE " + propKey);
+    } else {
+      props.setProperty(propKey, JSON.stringify(msgids.map(Number)));
+      Logger.log("[MsgIds] SAVE " + propKey + " = " + JSON.stringify(msgids));
+    }
+    return json({ status: "ok", key: key, count: msgids.length });
+  } catch(e) {
+    return json({ status: "error", message: e.message });
+  }
+}
+
+/** GET ?action=get_msgids&key=CRON_TEAM_T1 */
+function handleGetMsgIds(params) {
+  try {
+    const key     = (params.key || "").toString().trim();
+    if (!key) return json({ status: "error", message: "key required", msgids: [] });
+    const propKey = "MSGIDS_" + key;
+    const raw     = PropertiesService.getScriptProperties().getProperty(propKey) || "[]";
+    let msgids    = [];
+    try { msgids = JSON.parse(raw); } catch(e2) { msgids = []; }
+    if (!Array.isArray(msgids)) msgids = [];
+    Logger.log("[MsgIds] GET " + propKey + " = " + JSON.stringify(msgids));
+    return json({ status: "ok", key: key, msgids: msgids });
+  } catch(e) {
+    return json({ status: "error", message: e.message, msgids: [] });
+  }
+}
+
+/** GET ?action=get_msg_id&key=... (alias, backward compat) */
+function handleGetMsgId(params) { return handleGetMsgIds(params); }
+
+/** POST {action:"set_msg_id", key:..., msgids:[...]} (alias) */
+function handleSetMsgId(body) { return handleSaveMsgIds(body); }
+
+
+// ============================================================
 // ACTION: ADD — write new row to data sheet
 // Payload: { action, date, chat_id, msg }
 // Sheet columns: A=Date Sent  B=Telegram ID  C=Content  D=Asset action done
