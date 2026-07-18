@@ -19,7 +19,34 @@
 
 ## 📅 CHANGELOG
 
+### 18/07/2026
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `refuel_plan_report.py` | **Report 1 redesign**: format Sender → Team → Sites; thêm field `team` từ col C; infer team từ lịch sử | Hiển thị đúng tên người gửi và team (Team 2/3) |
+| `refuel_plan_report.py` | **Report 2 redesign**: Letter Progress (ngày nộp + ngày duyệt) + Plan freq 3D/7D/1M per person | Thay thế Plan vs Refueled cũ |
+| `refuel_plan_report.py` | Thêm `load_dotenv()` + `from dotenv import load_dotenv` | Env vars không được load khi chạy local |
+| `tg_utils.py` | Fix Telethon `from_user=bot_id` → filter `msg.sender_id` thủ công | `PeerUser entity not found` khi Telethon chưa cache bot |
+| `tg_utils.py` | Fix bold markdown stripping: strip `**` khỏi `first_line` trước `startswith()` | Telethon render `<b>text</b>` thành `**text**` → title prefix không match |
+| `delete_old_helper.py` | Cùng fix bold markdown stripping | Đồng bộ với tg_utils.py |
+| `.env` | Thêm `REFUEL_BOT_TOKEN=8811503647` | `load_dotenv()` load `SEND_BOT_TOKEN` (bot sai) thay vì bot refuel |
+| `apps_script/apps_script_refuel_plan.gs` | Fix `parseSitesAndQty`: thêm `=` vào separator regex `[\s:,+=]+` | `TNI0385=220L` bị parse thành 440L (default) |
+| `apps_script/apps_script_refuel_plan.gs` | Fix team regex: `Team\s*` → `Team[\s\-]*` | `Team-3`, `Team -2` không match → col C = None |
+
+**Refuel Plan System — File Map:**
+| File | Vai trò |
+|---|---|
+| `refuel_plan_report.py` | Python reports (1-5) gửi Telegram group `-5469544739` |
+| `tg_utils.py` | Bot API send + Telethon delete-by-title cho refuel group |
+| `apps_script/apps_script_refuel_plan.gs` | GAS collector: nhận tin Telegram → ghi vào sheet Plan/Request/Refueled |
+| `.github/workflows/` | GitHub Actions tự động chạy reports |
+
+**Refuel Spreadsheet:** `1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM`
+Tabs: `Plan refuel` | `Team request` | `Refueled` | `Lettel Progress` | `Template`
+
+---
+
 ### 14/07/2026
+
 | File | Thay đổi | Lý do |
 |---|---|---|
 | `cross_check_wo.gs` | **Tự động gửi báo cáo Cross Check lúc 17:00** | Lấy dữ liệu 5 cột của sheet `Cross Check WO` gửi cho 5 nhóm Telegram tương ứng (xóa tin cũ). |
