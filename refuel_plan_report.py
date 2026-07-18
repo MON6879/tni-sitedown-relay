@@ -330,11 +330,11 @@ def report_1(data: RefuelData):
     if not plan_today:
         tg_send(
             f"📋 <b>[Report 1] Plan - Request - Refueled</b>\n"
-            f"📅 {today_str} | ⏰ {now.strftime('%H:%M')} Myanmar\n"
+            f"📅 {today_str} | \u23f0 {now.strftime('%H:%M')} Myanmar\n"
             f"📭 No Plan submitted for today.",
             "report1"
         )
-        print("✅ Report 1 sent (no plan today).")
+        print("\u2705 Report 1 sent (no plan today).")
         return
 
     # ── Build lookup: site → qty cho Refueled & Request ──
@@ -346,42 +346,37 @@ def report_1(data: RefuelData):
     for r in request_today:
         request_by_site[r["site"]] = request_by_site.get(r["site"], 0) + r["qty"]
 
-    # ── Infer team name cho sender từ TẤT CẢ lịch sử Plan (không chỉ hôm nay) ──
-    # Ưu tiên: record có team != '' gần nhất
-    sender_team: dict[str, str] = {}  # sender_id → team name
-    all_plan_with_team = sorted(
+    # ── Infer team từ lịch sử toàn bộ PLAN records ──
+    sender_team_map: dict[str, str] = {}
+    for r in sorted(
         [r for r in data.records if r["cat"] == "PLAN" and r.get("team")],
-        key=lambda x: x["ts"],
-        reverse=True  # mới nhất trước
-    )
-    for r in all_plan_with_team:
+        key=lambda x: x["ts"], reverse=True
+    ):
         sid = r["sender_id"]
-        if sid not in sender_team:
-            sender_team[sid] = r["team"]
+        if sid not in sender_team_map:
+            sender_team_map[sid] = r["team"]
 
-
-    # ── Group Plan theo Team → Sender (giữ thứ tự thời gian) ──
-    # team_key: (team_name or 'Unnamed', sender_label)
-    team_sender_order: list[tuple] = []   # [(team, sender_label)]
-    team_sender_sites: dict[tuple, list] = {}  # (team,sender) → [{site, plan}]
-    sender_label_map: dict[str, str] = {}  # sender_id → label
+    # ── Group: Sender → Team → Sites ──
+    sender_order: list[str] = []
+    sender_data: dict = {}
 
     for r in sorted(plan_today, key=lambda x: x["ts"]):
         sid  = r["sender_id"]
         name = r["sender"] or sid or "Unknown"
-        team = sender_team.get(sid, r.get("team", "")) or "No Team"
+        team = r.get("team") or sender_team_map.get(sid, "") or "No Team"
 
-        if sid not in sender_label_map:
-            sender_label_map[sid] = name
-        label = sender_label_map[sid]
-        key = (team, label)
+        if sid not in sender_data:
+            sender_order.append(sid)
+            sender_data[sid] = {"name": name, "team_order": [], "team_sites": {}}
 
-        if key not in team_sender_sites:
-            team_sender_order.append(key)
-            team_sender_sites[key] = []
-        team_sender_sites[key].append({"site": r["site"], "plan": r["qty"]})
+        sd = sender_data[sid]
+        if team not in sd["team_sites"]:
+            sd["team_order"].append(team)
+            sd["team_sites"][team] = []
+        sd["team_sites"][team].append({"site": r["site"], "plan": r["qty"]})
 
     # ── Build message ──
+
     lines = [
         f"📋 <b>[Report 1] Plan - Request - Refueled</b>",
         f"📅 {today_str} | ⏰ {now.strftime('%H:%M')} Myanmar",
@@ -390,34 +385,32 @@ def report_1(data: RefuelData):
     ]
 
     total_plan = total_filled = total_req = 0
-    current_team = None
 
-    for (team, sender) in team_sender_order:
-        # Team header — chỉ in khi team đổi
-        if team != current_team:
-            current_team = team
-            lines.append(f"\n🏷 <b>{team}</b>")
-        lines.append(f"  👤 <b>{sender}</b>")
+    for sid in sender_order:
+        sd = sender_data[sid]
+        lines.append(f"\n👤 <b>{sd['name']}</b>")
 
-        for item in team_sender_sites[(team, sender)]:
-            site   = item["site"]
-            plan_q = item["plan"]
-            fill_q = refueled_by_site.get(site, 0)
-            req_q  = request_by_site.get(site, 0)
+        for team in sd["team_order"]:
+            lines.append(f"  🏷 <b>{team}</b>")
+            for item in sd["team_sites"][team]:
+                site   = item["site"]
+                plan_q = item["plan"]
+                fill_q = refueled_by_site.get(site, 0)
+                req_q  = request_by_site.get(site, 0)
 
-            if fill_q == 0 and plan_q > 0:
-                icon = "❌"
-            elif fill_q >= plan_q or abs(fill_q - plan_q) <= 50:
-                icon = "✅"
-            else:
-                icon = "⚠️"
+                if fill_q == 0 and plan_q > 0:
+                    icon = "❌"
+                elif fill_q >= plan_q or abs(fill_q - plan_q) <= 50:
+                    icon = "✅"
+                else:
+                    icon = "⚠️"
 
-            lines.append(
-                f"  {icon} <code>{site:<12} | {plan_q:>4}L | {fill_q:>7}L | {req_q:>4}L</code>"
-            )
-            total_plan  += plan_q
-            total_filled += fill_q
-            total_req   += req_q
+                lines.append(
+                    f"    {icon} <code>{site:<12} | {plan_q:>4}L | {fill_q:>7}L | {req_q:>4}L</code>"
+                )
+                total_plan  += plan_q
+                total_filled += fill_q
+                total_req   += req_q
 
     lines += [
         "\n<code>" + "─────────────┴───────┴──────────┴───────" + "</code>",

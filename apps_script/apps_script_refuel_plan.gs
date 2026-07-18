@@ -212,7 +212,8 @@ function collectMessage(body) {
 
     const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
     const dateVal   = dateMatch ? dateMatch[1] : today;
-    const teamMatch = text.match(/Team\s*(\d+)/i);
+    // Fix: handle "Team-3", "Team -2", "Team 2" (dash or space before number)
+    const teamMatch = text.match(/Team[\s\-]*(\d+)/i);
     const teamVal   = teamMatch ? "Team " + parseInt(teamMatch[1], 10) : "";
 
     const entries = parseSitesAndQty(text, true);
@@ -250,7 +251,7 @@ function collectMessage(body) {
 
     const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
     const dateVal   = dateMatch ? dateMatch[1] : today;
-    const teamMatch = text.match(/Team\s*(\d+)/i);
+    const teamMatch = text.match(/Team[\s\-]*(\d+)/i);
     const teamVal   = teamMatch ? "Team " + parseInt(teamMatch[1], 10) : "";
 
     const entries = parseSitesAndQty(text, false);
@@ -365,9 +366,9 @@ function parseRefueledText(text) {
 
 function parseSitesAndQty(text, isPlan) {
   const results = [];
-  // pat1: matches TNIxxxx or TNIxxxx_01 followed by separator (space, colon, comma, plus) and quantity (optional L)
-  // Utilizes \b after optional [Ll] to avoid matching dates (e.g., 14/7/2026) as quantities
-  const pat1 = /TNI(\d{4}(?:_\d+)?)(?:\([^)]*\))?[\s:,+]+(\d+)\s*[Ll]?\b(?!\s*\/)/gi;
+  // pat1: matches TNIxxxx followed by separator (space, colon, comma, plus, equals) and quantity
+  // Thêm = vào separator để parse đúng TNI0385=220L
+  const pat1 = /TNI(\d{4}(?:_\d+)?)(?:\([^)]*\))?[\s:,+=]+(\d+)\s*[Ll]?\b(?!\s*\/)/gi;
   let m;
   const matchedSites = {};
 
