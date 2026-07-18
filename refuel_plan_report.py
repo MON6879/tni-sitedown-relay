@@ -294,53 +294,89 @@ class RefuelData:
 # ── Reports implementation ──────────────────────────────────────────────────
 
 def report_1(data: RefuelData):
-    print("📊 Generating Report 1 — Plan Frequency by Person...")
+    print("📋 Generating Report 1 — Plan - Request - Refueled...")
     now = datetime.now(TZ_MM)
     today_str = now.strftime("%d/%m/%Y")
 
-    # Chỉ tính những người trong target_members (col H) — bỏ qua test/unknown
-    allowed_ids = {m["id"] for m in data.target_members}
-    id_to_name  = {m["id"]: m["name"] for m in data.target_members}
+    # ── Lọc tất cả records có date == hôm nay ──
+    plan_today     = [r for r in data.records if r["cat"] == "PLAN"     and r["date"] == today_str]
+    refueled_today = [r for r in data.records if r["cat"] == "REFUELED" and r["date"] == today_str]
+    request_today  = [r for r in data.records if r["cat"] == "REQUEST"  and r["date"] == today_str]
 
-    # Khởi tạo freq cho TẤT CẢ target_members (kể cả người chưa submit)
-    freq = {m["name"]: {"d3": 0, "d7": 0, "d30": 0} for m in data.target_members}
+    if not plan_today:
+        tg_send(
+            f"📋 <b>[Report 1] Plan - Request - Refueled</b>\n"
+            f"📅 {today_str} | ⏰ {now.strftime('%H:%M')} Myanmar\n"
+            f"📭 No Plan submitted for today.",
+            "report1"
+        )
+        print("✅ Report 1 sent (no plan today).")
+        return
 
-    for r in data.records:
-        if r["cat"] != "PLAN":
-            continue
-        sid = r["sender_id"]
-        if sid not in allowed_ids:
-            continue   # bỏ qua test / người ngoài danh sách
-        diff = now - r["ts"]
-        name = id_to_name[sid]
-        if diff <= timedelta(days=3):  freq[name]["d3"] += 1
-        if diff <= timedelta(days=7):  freq[name]["d7"] += 1
-        if diff <= timedelta(days=30): freq[name]["d30"] += 1
+    # ── Build lookup: site → qty cho Refueled & Request ──
+    refueled_by_site: dict[str, int] = {}
+    for r in refueled_today:
+        refueled_by_site[r["site"]] = refueled_by_site.get(r["site"], 0) + r["qty"]
 
-    # Header: ngày hôm nay + Letter Approved
-    letter_line = ""
-    if data.letter_approved:
-        letter_line = f"\n✅ Letter Approved: <b>{data.letter_approved}</b>"
+    request_by_site: dict[str, int] = {}
+    for r in request_today:
+        request_by_site[r["site"]] = request_by_site.get(r["site"], 0) + r["qty"]
 
-    # Tổng số plan hôm nay (tất cả người)
-    total_today = sum(f["d3"] for f in freq.values())
+    # ── Group Plan theo sender (giữ thứ tự theo thời gian gửi đầu tiên) ──
+    sender_order: list[str] = []
+    sender_sites: dict[str, list[dict]] = {}   # sender → [{site, plan_qty}]
+    for r in sorted(plan_today, key=lambda x: x["ts"]):
+        sender = r["sender"] or r["sender_id"] or "Unknown"
+        if sender not in sender_sites:
+            sender_order.append(sender)
+            sender_sites[sender] = []
+        sender_sites[sender].append({"site": r["site"], "plan": r["qty"]})
 
+    # ── Build message ──
     lines = [
-        f"📊 <b>[Report 1] PLAN SUBMISSION FREQUENCY</b>",
-        f"📅 Sum Plan Today {today_str}: <b>{total_today:03d}</b>{letter_line}",
-        f"<code>{'No':<3} {'Name':<13} | {'3D':>4} | {'7D':>4} | {'1M':>5}</code>",
-        "<code>" + "────┬──────────────┼──────┼──────┼───────" + "</code>"
+        f"📋 <b>[Report 1] Plan - Request - Refueled</b>",
+        f"📅 {today_str} | ⏰ {now.strftime('%H:%M')} Myanmar",
+        f"<code>{'Site ID':<12} | {'Plan':>6} | {'Refueled':>8} | {'Request':>7}</code>",
+        "<code>" + "─────────────┼────────┼──────────┼────────" + "</code>",
     ]
-    for i, name in enumerate(sorted(freq.keys()), 1):
-        f = freq[name]
-        short = name[:13]
-        lines.append(f"<code>{i:<3} {short:<13} | {f['d3']:>03d}  | {f['d7']:>03d}  | {f['d30']:>04d} </code>")
 
-    lines.append("<code>" + "────┴──────────────┴──────┴──────┴───────" + "</code>")
-    lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
+    total_plan = total_filled = total_req = 0
+
+    for sender in sender_order:
+        lines.append(f"\n👤 <b>{sender}</b>")
+        for item in sender_sites[sender]:
+            site    = item["site"]
+            plan_q  = item["plan"]
+            fill_q  = refueled_by_site.get(site, 0)
+            req_q   = request_by_site.get(site, 0)
+
+            # Icon: ✅ đã đổ đủ, ⚠️ đổ gần đủ (<= 50L chênh), ❌ chưa đổ
+            if fill_q == 0 and plan_q > 0:
+                icon = "❌"
+            elif fill_q >= plan_q or abs(fill_q - plan_q) <= 50:
+                icon = "✅"
+            else:
+                icon = "⚠️"
+
+            lines.append(
+                f"  {icon} <code>{site:<12} | {plan_q:>5}L | {fill_q:>7}L | {req_q:>6}L</code>"
+            )
+            total_plan  += plan_q
+            total_filled += fill_q
+            total_req   += req_q
+
+    lines += [
+        "\n<code>" + "─────────────┴────────┴──────────┴────────" + "</code>",
+        f"<code>{'Total':<12} | {total_plan:>5}L | {total_filled:>7}L | {total_req:>6}L</code>",
+        "\n🤖 <i>Auto report — Refuel Plan System</i>"
+    ]
+
     tg_send("\n".join(lines), "report1")
     print("✅ Report 1 sent.")
 
+
+
+    # Chỉ tính những người trong target_members (col H) — bỏ qua test/unknown
 
 def report_2(data: RefuelData):
     print("⛽ Generating Report 2 — Plan vs Refueled...")
