@@ -32,14 +32,16 @@ BASE_URL       = (
     f"{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid="
 )
 
-GID_SITE = "1095689918"  # 'Site down now'   – col B=TNI, cols R,T,U,V,Y,AA = alarm durations
-GID_TASK = "1755404595"  # 'Input task'      – col T=TNI, col J=""=pending, D:E:K+H
-GID_WO   = "1429089905"  # 'Input WO'(matrix)– col E=TNI, A+B:C+F
-GID_SITE_CLEAR = "610944071"  # Tab: Search Site  Clear
+GID_SITE       = "1095689918"   # 'Site down now'   – col B=TNI, cols R,T,U,V,Y,AA = alarm durations
+GID_TASK       = "1755404595"   # 'Input task'      – col T=TNI, col J=""=pending, D:E:K+H
+GID_WO         = "1429089905"   # 'Input WO'(matrix)– col E=TNI, A+B:C+F
+GID_SITE_CLEAR = "610944071"    # Tab: Search Site Clear
+GID_STAFF      = "1684930643"   # 'Staff' – col A=Telegram ID, row 1=headers (mysite/mycable/...)
 
-df_site: pd.DataFrame = None
-df_task: pd.DataFrame = None
-df_wo:   pd.DataFrame = None
+df_site:  pd.DataFrame = None
+df_task:  pd.DataFrame = None
+df_wo:    pd.DataFrame = None
+df_staff: pd.DataFrame = None
 
 # ===================== DAILY REPORT CONFIG =====================
 DAILY_APPS_SCRIPT_URL = os.getenv("DAILY_APPS_SCRIPT_URL", "")
@@ -83,14 +85,15 @@ def fetch_csv(gid: str, has_header: bool = True) -> pd.DataFrame:
 
 
 def load_all_sheets():
-    global df_site, df_task, df_wo
-    logger.info("Dang tai 3 sheet tu Google Sheet...")
+    global df_site, df_task, df_wo, df_staff
+    logger.info("Dang tai 4 sheet tu Google Sheet...")
     # gviz/tq với header=None: row 0 = labels, row 1+ = data
-    df_site = fetch_csv(GID_SITE, has_header=False)
-    df_task = fetch_csv(GID_TASK, has_header=False)
-    df_wo   = fetch_csv(GID_WO,   has_header=False)
+    df_site  = fetch_csv(GID_SITE,  has_header=False)
+    df_task  = fetch_csv(GID_TASK,  has_header=False)
+    df_wo    = fetch_csv(GID_WO,    has_header=False)
+    df_staff = fetch_csv(GID_STAFF, has_header=False)  # Staff: col A=TelegramID, row 1=headers
     logger.info(
-        f"OK – Site:{len(df_site)} Task:{len(df_task)} WO:{len(df_wo)}"
+        f"OK – Site:{len(df_site)} Task:{len(df_task)} WO:{len(df_wo)} Staff:{len(df_staff)}"
     )
 
 
@@ -208,6 +211,74 @@ def get_wos(tni: str) -> list:
     except Exception as e:
         logger.error(f"get_wos: {e}")
     return wos
+
+
+# ===================== STAFF SHEET LOOKUP =====================
+def get_staff_data(sender_id: str, field_name: str | None = None) -> str:
+    """
+    Tra cứu dữ liệu cá nhân từ Staff sheet (gid=1684930643).
+    - Col A (index 0): Telegram ID người dùng
+    - Row 1 (index 0): headers — ví dụ: mysite, mycable, myolt, mysn, mydia ...
+
+    field_name=None  → trả về tất cả cột có header bắt đầu bằng 'my'
+    field_name=str   → trả về giá trị cột đó cho người dùng
+    """
+    def e(s): return html.escape(str(s))
+
+    # Lấy data mới nhất (fetch trực tiếp không dùng cache global, luôn fresh)
+    try:
+        df = fetch_csv(GID_STAFF, has_header=False)
+    except Exception as ex:
+        logger.error(f"get_staff_data fetch: {ex}")
+        return f"❌ Error loading Staff data: {e(str(ex)[:80])}"
+
+    if df is None or df.empty:
+        return "❌ Staff sheet empty."
+
+    # Row 0 = header, Row 1+ = data
+    headers = df.iloc[0]
+    data    = df.iloc[1:]
+
+    # Tìm row có col A = sender_id
+    matched = data[data.iloc[:, 0].astype(str).str.strip() == str(sender_id).strip()]
+    if matched.empty:
+        return f"❌ No data found for your Telegram ID in Staff sheet.\nYour ID: <code>{e(sender_id)}</code>"
+
+    row = matched.iloc[0]
+
+    def clean_val(v: str) -> str:
+        """Bỏ các giá trị rỗng / lỗi công thức."""
+        return "" if v.lower() in ("nan", "none", "", "#n/a", "#na", "#ref!", "#value!") else v
+
+    if field_name is None:
+        # Trả về TẤT CẢ cột có header chứa 'my' (Q1:U1 và các cột tương tự)
+        results = []
+        for col_idx in range(len(headers)):
+            h = str(headers.iloc[col_idx]).strip()
+            if h.lower().startswith("my") and h.lower() not in ("nan", "none", ""):
+                val = clean_val(safe(row, col_idx))
+                results.append(f"• <b>{e(h)}:</b> {e(val) if val else '—'}")
+        if not results:
+            return "ℹ️ No 'my*' columns found in Staff sheet."
+        return (
+            "👤 <b>My Stats</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+            + "\n".join(results)
+            + "\n━━━━━━━━━━━━━━━━━━━━"
+        )
+    else:
+        # Tìm cột có header khớp field_name (case-insensitive)
+        target_col = None
+        for col_idx in range(len(headers)):
+            h = str(headers.iloc[col_idx]).strip().lower()
+            if h == field_name.lower():
+                target_col = col_idx
+                break
+        if target_col is None:
+            return f"❌ Column '<b>{e(field_name)}</b>' not found in Staff sheet headers."
+        val = clean_val(safe(row, target_col))
+        if not val:
+            return f"ℹ️ <b>{e(field_name)}:</b> (empty)"
+        return f"📊 <b>{e(field_name)}:</b>\n{e(val)}"
 
 
 # ===================== MAIN LOOKUP =====================
@@ -522,6 +593,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── 1. Daily report: tin nhắn có chữ "daily" → lưu sheet
     if is_daily_report(text):
         await submit_daily_report(update, context)
+        return
+
+    # ── 1.3 Staff lookup: "mysite", "mycable", "mydia"... hoặc range "Q1:U1"
+    #    → Tra cứu dữ liệu cá nhân theo Telegram ID người gửi
+    text_lower = text.lower().strip()
+    is_my_field = (
+        text_lower.startswith("my")
+        and len(text_lower) > 2
+        and " " not in text_lower
+        and not text_lower.startswith("myo")    # tránh khớp MyOther keywords
+    )
+    is_range_query = bool(re.match(r'^[A-Z]\d+:[A-Z]\d+$', text, re.IGNORECASE))
+    if is_my_field or is_range_query:
+        sender_id = str(update.effective_user.id)
+        # Range → trả về tất cả cột my*; field cụ thể → trả về đúng cột
+        field = None if is_range_query else text_lower
+        reply = get_staff_data(sender_id, field)
+        chunks = split_messages(reply)
+        await update.message.reply_text(chunks[0], parse_mode="HTML")
+        for chunk in chunks[1:]:
+            await update.message.reply_text(chunk, parse_mode="HTML")
         return
 
     # ── 1.5 CLEAR Site Search
