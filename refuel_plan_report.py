@@ -132,7 +132,8 @@ class RefuelData:
         self.target_members = []   # list of dict: {id, name} — từ Template col G & H
         self.lettel_persons = []   # list of dict: {id, name} — từ Template col J & K
         self.records = []          # list of dict: {ts, date, cat, sender, sender_id, site, qty}
-        self.letter_approved = "" # ngày Letter Approved mới nhất từ "Lettel Progress" col C
+        self.letter_approved = ""  # ngày Government Approved mới nhất (col C)
+        self.letter_submitted = "" # ngày Letter Submitted mới nhất (col B)
 
         if not os.path.exists(XLSX_FILE_PATH):
             if not download_spreadsheet():
@@ -210,18 +211,25 @@ class RefuelData:
                 self.lettel_persons.append({"id": tg_id_str, "name": name_str})
 
     def _parse_lettel_progress(self, wb):
-        """Đọc Lettel Progress col C (Date Letter Approved) — lấy giá trị mới nhất không rỗng."""
+        """Đọc Lettel Progress col B (Date Letter Submit) và col C (Date Leter Approved) — lấy giá trị mới nhất."""
         if "Lettel Progress" not in wb.sheetnames:
             return
         ws = wb["Lettel Progress"]
-        latest = ""
+        latest_submitted = ""
+        latest_approved  = ""
         for r in range(2, ws.max_row + 1):
-            val = ws.cell(row=r, column=3).value  # C: Date Letter Approved
-            if val:
-                val_str = str(val).strip()
-                if val_str and val_str != "None":
-                    latest = val_str  # giữ cái cuối cùng có giá trị
-        self.letter_approved = latest
+            val_b = ws.cell(row=r, column=2).value  # B: Date Letter Submit
+            val_c = ws.cell(row=r, column=3).value  # C: Date Letter Approved
+            if val_b:
+                s = parse_date_str(val_b)
+                if s and s != "None":
+                    latest_submitted = s
+            if val_c:
+                s = parse_date_str(val_c)
+                if s and s != "None":
+                    latest_approved = s
+        self.letter_submitted = latest_submitted
+        self.letter_approved  = latest_approved
 
     def _parse_records(self, wb):
         # 1. Parse Plan refuel sheet
@@ -379,57 +387,69 @@ def report_1(data: RefuelData):
     # Chỉ tính những người trong target_members (col H) — bỏ qua test/unknown
 
 def report_2(data: RefuelData):
-    print("⛽ Generating Report 2 — Plan vs Refueled...")
+    print("📊 Generating Report 2 — Progress Sent Plan...")
     now = datetime.now(TZ_MM)
     today_str = now.strftime("%d/%m/%Y")
 
-    plan = {}
-    refueled = {}
+    # ── Letter Progress ──
+    submit_line   = f"📤 The letter was submitted to the Government for approval on: <b>{data.letter_submitted or 'N/A'}</b>"
+    approved_line = f"✅ The government approved the oil transport letter on: <b>{data.letter_approved or 'N/A'}</b>"
+
+    # ── Tần suất gửi Plan per person từ target_members (col G/H Template) ──
+    allowed_ids = {m["id"] for m in data.target_members}
+    id_to_name  = {m["id"]: m["name"] for m in data.target_members}
+
+    # Khởi tạo freq cho TẤT CẢ target_members (kể cả người chưa submit)
+    freq: dict[str, dict] = {m["name"]: {"d3": 0, "d7": 0, "d30": 0} for m in data.target_members}
 
     for r in data.records:
-        if r["date"] != today_str or not r["site"]:
+        if r["cat"] != "PLAN":
             continue
-        if r["cat"] == "PLAN":
-            plan[r["site"]] = plan.get(r["site"], 0) + r["qty"]
-        elif r["cat"] == "REFUELED":
-            refueled[r["site"]] = refueled.get(r["site"], 0) + r["qty"]
+        sid = r["sender_id"]
+        if sid not in allowed_ids:
+            continue
+        diff_time = now - r["ts"]
+        name = id_to_name[sid]
+        if diff_time <= timedelta(days=3):  freq[name]["d3"]  += 1
+        if diff_time <= timedelta(days=7):  freq[name]["d7"]  += 1
+        if diff_time <= timedelta(days=30): freq[name]["d30"] += 1
 
-    all_sites = sorted(set(list(plan.keys()) + list(refueled.keys())))
-    if not all_sites:
-        tg_send(f"⛽ <b>[Report 2] Plan vs Refueled</b>\n📅 {today_str}\n📭 No refuel records today.", "report2")
-        return
+    total_today = sum(
+        1 for r in data.records
+        if r["cat"] == "PLAN" and r["date"] == today_str and r["sender_id"] in allowed_ids
+    )
 
+    # ── Build message ──
     lines = [
-        f"⛽ <b>[Report 2] PLAN vs REFUELED — {today_str}</b>",
-        f"⏰ {now.strftime('%H:%M')} Myanmar",
-        fmt_row_compare("Site ID", "Plan", "Filled", "Diff"),
-        "<code>" + "─────────────┼───────┼────────┼────────" + "</code>"
+        f"📊 <b>[Report 2] Progress Sent Plan</b>",
+        f"📅 {today_str} | ⏰ {now.strftime('%H:%M')} Myanmar",
+        "",
+        "📝 <b>Letter Progress:</b>",
+        f"  {submit_line}",
+        f"  {approved_line}",
+        "",
+        f"📋 <b>Plan Sent Today: {total_today}</b>",
+        f"<code>{'Name':<15} | {'3D':>3} | {'7D':>3} | {'1M':>4}</code>",
+        "<code>" + "────────────────┼─────┼─────┼──────" + "</code>",
     ]
 
-    ok_count = warn_count = miss_count = 0
-
-    for i, site in enumerate(all_sites, 1):
-        p = plan.get(site, 0)
-        f = refueled.get(site, 0)
-        diff = f - p
-        diff_str = f"+{diff}L" if diff > 0 else f"{diff}L"
-
-        if f == 0 and p > 0:
-            icon = "❌"; miss_count += 1
-        elif diff == 0:
-            icon = "✅"; ok_count += 1
-        elif abs(diff) <= 50:
-            icon = "⚠️"; warn_count += 1
+    for name in sorted(freq.keys()):
+        f = freq[name]
+        short = name[:15]
+        # Icon: ✅ có gửi 3D, 🟡 có gửi 7D, ❌ không gửi
+        if f["d3"] > 0:
+            icon = "✅"
+        elif f["d7"] > 0:
+            icon = "🟡"
         else:
-            icon = "❌"; miss_count += 1
-
-        lines.append(f"{i}. {icon} {fmt_row_compare(site, f'{p}L', f'{f}L', diff_str)}")
+            icon = "❌"
+        lines.append(f"{icon} <code>{short:<15} | {f['d3']:>3} | {f['d7']:>3} | {f['d30']:>4}</code>")
 
     lines += [
-        "<code>" + "─────────────┴───────┴────────┴────────" + "</code>",
-        f"✅ Match: <b>{ok_count}</b>  ⚠️ Near: <b>{warn_count}</b>  ❌ Miss: <b>{miss_count}</b>",
+        "<code>" + "────────────────┴─────┴─────┴──────" + "</code>",
         "\n🤖 <i>Auto report — Refuel Plan System</i>"
     ]
+
     tg_send("\n".join(lines), "report2")
     print("✅ Report 2 sent.")
 
