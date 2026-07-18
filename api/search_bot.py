@@ -26,13 +26,14 @@ BASE_URL              = (
     f"https://docs.google.com/spreadsheets/d/"
     f"{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid="
 )
-GID_SITE = "1095689918"
-GID_TASK = "1755404595"
-GID_WO   = "1429089905"
-GID_INFO = "171059303"   # Tab: Name Site / Site / Cable / Gpon / DIA
-GID_TEAM_SUM = "893574714"  # Tab: Tên Sum WO (Team Leader search)
-GID_TL_WAITCD = "1110926116"  # Tab: Team leader Wait CD + Not Close
-GID_SITE_CLEAR = "610944071"  # Tab: Search Site  Clear
+GID_SITE       = "1095689918"
+GID_TASK       = "1755404595"
+GID_WO         = "1429089905"
+GID_INFO       = "171059303"   # Tab: Name Site / Site / Cable / Gpon / DIA
+GID_TEAM_SUM   = "893574714"   # Tab: Tên Sum WO (Team Leader search)
+GID_TL_WAITCD  = "1110926116"  # Tab: Team leader Wait CD + Not Close
+GID_SITE_CLEAR = "610944071"   # Tab: Search Site Clear
+GID_STAFF      = "1684930643"  # Tab: Staff — col A=Telegram ID, row 1=headers (mysite/mycable/...)
 
 TZ_MM    = timezone(timedelta(hours=6, minutes=30))   # Myanmar UTC+6:30
 MAX_LEN  = 4096
@@ -290,6 +291,73 @@ def lookup_clear_site(tni: str) -> str:
 
     lines.append("━━━━━━━━━━━━━━━━━━━━")
     return "\n".join(lines)
+
+# ── Staff personal lookup ──────────────────────────────────────────────
+def get_staff_data(sender_id: int | str, field_name: str | None = None) -> str:
+    """
+    Tra cứu dữ liệu cá nhân từ Staff sheet (gid=1684930643).
+    - Col A (index 0) : Telegram ID người dùng
+    - Row 1 (index 0) : headers — mysite, mycable, myolt, mysn, mydia ...
+    field_name=None → trả tất cả cột bắt đầu bằng 'my'
+    field_name=str  → trả cột đó
+    """
+    def e(s): return html.escape(str(s))
+    try:
+        df = fetch_csv(GID_STAFF)   # row 0 = headers, row 1+ = data
+    except Exception as ex:
+        logger.error(f"get_staff_data fetch: {ex}")
+        return f"❌ Error loading Staff data: {e(str(ex)[:80])}"
+    if df is None or df.empty:
+        return "❌ Staff sheet empty."
+
+    headers = df.iloc[0]
+    data    = df.iloc[1:]
+
+    # Tìm row có col A = sender_id (so sánh string, bỏ ".0" nếu có)
+    sid = str(sender_id).strip()
+    col_a = data.iloc[:, 0].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+    matched = data[col_a == sid]
+    if matched.empty:
+        return (
+            f"❌ No data found for your Telegram ID in Staff sheet.\n"
+            f"Your ID: <code>{e(sid)}</code>"
+        )
+    row = matched.iloc[0]
+
+    def clean(v: str) -> str:
+        return "" if v.strip().lower() in ("nan","none","","#n/a","#na","#ref!","#value!") else v.strip()
+
+    if field_name is None:
+        # Trả tất cả cột 'my*'
+        parts = []
+        for i in range(len(headers)):
+            h = clean(str(headers.iloc[i]))
+            if h.lower().startswith("my"):
+                v = clean(safe(row, i))
+                parts.append(f"• <b>{e(h)}:</b> {e(v) if v else '—'}")
+        if not parts:
+            return "ℹ️ No 'my*' columns found in Staff sheet."
+        return "\n".join([
+            "👤 <b>My Stats</b>",
+            "━" * 20,
+            *parts,
+            "━" * 20,
+        ])
+    else:
+        # Tìm cột khớp field_name
+        target = None
+        fn_low = field_name.lower()
+        for i in range(len(headers)):
+            if clean(str(headers.iloc[i])).lower() == fn_low:
+                target = i
+                break
+        if target is None:
+            return f"❌ Column '<b>{e(field_name)}</b>' not found in Staff sheet."
+        v = clean(safe(row, target))
+        if not v:
+            return f"ℹ️ <b>{e(field_name)}:</b> (empty)"
+        return f"📊 <b>{e(field_name)}:</b>\n{e(v)}"
+
 
 def split_messages(text: str) -> list:
     chunks, current = [], ""
@@ -693,6 +761,8 @@ def handle(update: dict) -> None:
                 "• <code>T1</code> <code>T2</code> <code>T3</code> <code>T4</code> — xem Task/WO theo Team\n"
                 "• <code>T1notclose</code> — WO chưa Close của Team\n"
                 "• <code>T1waitcd</code> — WO chờ CD của Team\n"
+                "• <code>mysite</code> <code>mycable</code> <code>mydia</code>... — thống kê cá nhân\n"
+                "• <code>Q1:U1</code> — xem toàn bộ chỉ số my*\n"
                 "• Gửi báo cáo có chữ <b>Daily</b> để lưu\n"
                 "• /daily — xem mẫu báo cáo")
 
@@ -750,6 +820,16 @@ def handle(update: dict) -> None:
     # ── DAILY REPORT ────────────────────────────────────────────────────────
     if is_daily(text):
         submit_daily(chat_id, user_id, first_name, text)
+        return
+
+    # ── STAFF PERSONAL LOOKUP: "mysite" / "mycable" / ... hoặc range "Q1:U1" ──
+    text_low = text.lower().strip()
+    is_my_field    = (text_low.startswith("my") and len(text_low) > 2 and " " not in text_low)
+    is_range_query = bool(re.match(r'^[A-Z]\d+:[A-Z]\d+$', text, re.IGNORECASE))
+    if is_my_field or is_range_query:
+        field = None if is_range_query else text_low
+        reply = get_staff_data(user_id, field)
+        tg_send(chat_id, reply)
         return
 
     # ── TEAM LEADER SEARCH (T1/T2/T3/T4) ──────────────────────────────────
