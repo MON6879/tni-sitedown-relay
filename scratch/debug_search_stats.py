@@ -1,17 +1,16 @@
-"""Test v221 deployment."""
+"""Test v222: doGet get_msgids + doPost get_report_data."""
 import requests
 
-url = "https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec"
-resp = requests.post(url, json={"action": "get_report_data"}, timeout=120)
-data = resp.json()
+base = "https://script.google.com/macros/s/AKfycbwHyzulEMVGjslfjN_m38HzpFZHRfk2qwbQmdwb6MMqBM8xNm20JJxxzW_4zTNzp3n24Q/exec"
 
-print(f"HTTP {resp.status_code}")
-print(f"status: {data.get('status')}")
-print(f"searchStats keys: {len(data.get('searchStats', {}))}")
-print(f"searchStatsByName keys: {list(data.get('searchStatsByName', {}).keys())}")
-ts = data.get("teamSummary", [])
-for t in ts:
-    nm = t.get("team","?")[-15:]
-    print(f"  {nm}: d2={t.get('d2')} d1={t.get('d1')} d0={t.get('today')}")
-if not ts:
-    print(f"Raw (500): {resp.text[:500]}")
+# Test 1: GET get_msgids (đây là thứ delete_old_helper dùng)
+r1 = requests.get(base, params={"action": "get_msgids", "key": "CRON_TEAM_T2"}, timeout=30)
+print(f"GET get_msgids: HTTP {r1.status_code} → {r1.text[:200]}")
+
+# Test 2: POST get_report_data (search stats)
+r2 = requests.post(base, json={"action": "get_report_data"}, timeout=120)
+d2 = r2.json()
+print(f"\nPOST get_report_data: status={d2.get('status')} searchByName={len(d2.get('searchStatsByName',{}))} keys")
+for ts in d2.get("teamSummary", []):
+    t = ts.get("team","?")[-15:]
+    print(f"  {t}: d2={ts.get('d2')} d1={ts.get('d1')} d0={ts.get('today')}")

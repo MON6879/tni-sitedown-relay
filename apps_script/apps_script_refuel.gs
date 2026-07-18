@@ -16,7 +16,7 @@ function authorizeUrlFetch() {
   Logger.log("✅ Đã cấp quyền thành công!");
 }
 
-function doGet(e) {
+function doGetRefuel_(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || "";
     

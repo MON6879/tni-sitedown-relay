@@ -12,7 +12,7 @@ const PLAN_CHAT_ID     = "-5469544739";
 
 // ── Web App Entry Points ───────────────────────────────────────────────────
 
-function doGet(e) {
+function doGetRefuelPlan_(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || "";
     if (action === "get_refuel_data") return getRefuelData();

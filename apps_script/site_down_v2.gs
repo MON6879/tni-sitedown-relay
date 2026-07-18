@@ -150,7 +150,7 @@ function doPostSiteDown_(e) {
   }
 }
 
-function doGet(e) {
+function doGetSiteDown_(e) {
   try {
     const action = (e.parameter && e.parameter.action) || "";
 
