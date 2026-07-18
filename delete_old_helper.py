@@ -171,7 +171,10 @@ async def delete_by_title_telethon(
     deleted = 0
 
     try:
-        async for msg in client.iter_messages(cid, limit=search_limit, from_user=bot_id):
+        async for msg in client.iter_messages(cid, limit=search_limit):
+            # Lọc theo sender_id (không cần Telethon cache entity của bot)
+            if msg.sender_id != bot_id:
+                continue
             if not msg.text:
                 continue
             first_line = msg.text.split("\n")[0].strip()

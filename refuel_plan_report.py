@@ -20,7 +20,10 @@ Cách chạy:
 import os, sys, argparse, requests
 import openpyxl
 from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
 from tg_utils import tg_send_fresh
+
+load_dotenv()  # Load .env local (GitHub Actions đã có env vars sẵn)
 
 # Cấu hình bot và chat ID mặc định của group 9 TNI REQUEST REFUEL
 REFUEL_BOT_TOKEN    = os.getenv("REFUEL_BOT_TOKEN", "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME")
@@ -41,14 +44,25 @@ REFUEL_GAS_URL = (
 ).strip()
 
 
+# Map report_key → title prefix dòng đầu tiên (dùng cho Telethon delete-by-title)
+REPORT_TITLE_PREFIX = {
+    "report1": "📋 [Report 1]",
+    "report2": "📊 [Report 2]",
+    "report3": "🔄 [Report 3]",
+    "report4": "👤 [Report 4]",
+    "report5": "📋 [Report 5]",
+}
+
 def tg_send(text: str, report_key: str = "") -> bool:
-    """Xóa tin cũ rồi gửi tin mới lên Telegram group."""
-    state_key = f"{report_key}_{REFUEL_CHAT_ID}" if report_key else None
-    msg_id = tg_send_fresh(REFUEL_CHAT_ID, text, state_key=state_key)
+    """Xóa TẤT CẢ tin cũ cùng tiêu đề rồi gửi tin mới lên Telegram group."""
+    state_key    = f"{report_key}_{REFUEL_CHAT_ID}" if report_key else None
+    title_prefix = REPORT_TITLE_PREFIX.get(report_key, "")
+    msg_id = tg_send_fresh(REFUEL_CHAT_ID, text, state_key=state_key, title_prefix=title_prefix)
     if not msg_id:
-        print(f"❌ Telegram send failed", file=sys.stderr)
+        print("❌ Telegram send failed", file=sys.stderr)
         return False
     return True
+
 
 
 def download_spreadsheet() -> bool:
