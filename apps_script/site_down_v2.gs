@@ -737,7 +737,9 @@ function editTelegramMsg_(chatId, messageId, text, parseMode, tag) {
     const res = JSON.parse(resp.getContentText());
     Logger.log((tag||"")+" [edit] "+(res.ok?"✏️":"⚠️")+" msg="+messageId+" → "+chatId
       +(!res.ok?" | "+res.description:""));
-    return res.ok === true;
+    // "message is not modified" = nội dung y chang → coi như edit thành công, không cần gửi lại
+    return res.ok === true
+        || (!!res.description && res.description.indexOf("message is not modified") >= 0);
   } catch(e) {
     Logger.log((tag||"")+" [edit] ❌ "+e.message);
     return false;
@@ -837,21 +839,13 @@ function deleteTelegramMsgBot_(chatId, messageId) {
 
 function deleteOldMessages_(chatId, msgKey) {
   const oldIds = getSavedMsgIds_(msgKey);
-  const remainingIds = [];
+  // Thử xóa tất cả — kết quả không quan trọng, luôn xóa key sau
   for (let i = 0; i < oldIds.length; i++) {
-    const success = deleteTelegramMsgBot_(chatId, oldIds[i]);
-    if (!success) {
-      remainingIds.push(oldIds[i]);
-    }
+    deleteTelegramMsgBot_(chatId, oldIds[i]);
     if (i < oldIds.length - 1) Utilities.sleep(100);
   }
-  
-  const key = "SD_MSGID_" + msgKey;
-  if (remainingIds.length > 0) {
-    PropertiesService.getScriptProperties().setProperty(key, JSON.stringify(remainingIds));
-  } else {
-    PropertiesService.getScriptProperties().deleteProperty(key);
-  }
+  // Luôn xóa key để không tích dồn IDs lỗi
+  PropertiesService.getScriptProperties().deleteProperty("SD_MSGID_" + msgKey);
 }
 
 
