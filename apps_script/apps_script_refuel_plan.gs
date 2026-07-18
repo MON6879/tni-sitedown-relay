@@ -22,7 +22,7 @@ function doGet(e) {
   }
 }
 
-function doPost(e) {
+function doPostRefuelPlan_(e) {
   let body;
   try {
     body = (e.postData && e.postData.contents)

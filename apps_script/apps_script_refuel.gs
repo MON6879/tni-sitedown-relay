@@ -36,7 +36,7 @@ function doGet(e) {
   }
 }
 
-function doPost(e) {
+function doPostRefuel_(e) {
   try {
     let body;
     if (e.postData && e.postData.contents) {

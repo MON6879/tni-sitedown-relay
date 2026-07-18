@@ -63,7 +63,7 @@ const TEAM_COLORS = { T1: "🔵", T2: "🟡", T3: "🟢", T4: "🔴" };
 //   save_note_msgids → lưu message IDs của Note vào Properties
 //   get_note_msgids  → đọc message IDs đã lưu
 // ============================================================
-function doPost(e) {
+function doPostSiteDown_(e) {
   try {
     const data   = JSON.parse(e.postData.contents);
     const action = data.action || "";

@@ -44,7 +44,7 @@ function doPost(e) {
     const sheet = getDataSheet(ss);
 
     // Route Telegram webhook format (site down bot) → doPostSiteDown
-    if (body.message || body.channel_post) return doPostSiteDown(e);
+    if (body.message || body.channel_post) return doPostSiteDown_(e);
 
     if (body.action === "add")              return handleAdd(sheet, body);
     if (body.action === "done")             return handleDone(sheet, ss, body);

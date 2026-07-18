@@ -1,0 +1,297 @@
+Row 1: Col A Val='' Formula='' | Col N Val='' | Col O Val=''
+Row 2: Col A Val='' Formula='' | Col N Val='' | Col O Val=''
+Row 3: Col A Val='Have new data : 0' Formula='="Have new data : "&countif(A4:A300,"Have new database")' | Col N Val='Auto Count point ' | Col O Val=''
+Row 4: Col A Val='DOB' Formula='=IF(LEN(F4)=0,"-",IFERROR(Xlookup(F4,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 5: Col A Val='DOB' Formula='=IF(LEN(F5)=0,"-",IFERROR(Xlookup(F5,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 6: Col A Val='DOB' Formula='=IF(LEN(F6)=0,"-",IFERROR(Xlookup(F6,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 7: Col A Val='DOB' Formula='=IF(LEN(F7)=0,"-",IFERROR(Xlookup(F7,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 8: Col A Val='DOB' Formula='=IF(LEN(F8)=0,"-",IFERROR(Xlookup(F8,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 9: Col A Val='DOB' Formula='=IF(LEN(F9)=0,"-",IFERROR(Xlookup(F9,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 10: Col A Val='DOB' Formula='=IF(LEN(F10)=0,"-",IFERROR(Xlookup(F10,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 11: Col A Val='DOB' Formula='=IF(LEN(F11)=0,"-",IFERROR(Xlookup(F11,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 12: Col A Val='DOB' Formula='=IF(LEN(F12)=0,"-",IFERROR(Xlookup(F12,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 13: Col A Val='DOB' Formula='=IF(LEN(F13)=0,"-",IFERROR(Xlookup(F13,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 14: Col A Val='DOB' Formula='=IF(LEN(F14)=0,"-",IFERROR(Xlookup(F14,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 15: Col A Val='DOB' Formula='=IF(LEN(F15)=0,"-",IFERROR(Xlookup(F15,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 16: Col A Val='DOB' Formula='=IF(LEN(F16)=0,"-",IFERROR(Xlookup(F16,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 17: Col A Val='DOB' Formula='=IF(LEN(F17)=0,"-",IFERROR(Xlookup(F17,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 18: Col A Val='DOB' Formula='=IF(LEN(F18)=0,"-",IFERROR(Xlookup(F18,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 19: Col A Val='DOB' Formula='=IF(LEN(F19)=0,"-",IFERROR(Xlookup(F19,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 20: Col A Val='DOB' Formula='=IF(LEN(F20)=0,"-",IFERROR(Xlookup(F20,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 21: Col A Val='DOB' Formula='=IF(LEN(F21)=0,"-",IFERROR(Xlookup(F21,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 22: Col A Val='DOB' Formula='=IF(LEN(F22)=0,"-",IFERROR(Xlookup(F22,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 23: Col A Val='DOB' Formula='=IF(LEN(F23)=0,"-",IFERROR(Xlookup(F23,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 24: Col A Val='DOB' Formula='=IF(LEN(F24)=0,"-",IFERROR(Xlookup(F24,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='0' | Col O Val=''
+Row 25: Col A Val='-' Formula='=IF(LEN(F25)=0,"-",IFERROR(Xlookup(F25,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 26: Col A Val='-' Formula='=IF(LEN(F26)=0,"-",IFERROR(Xlookup(F26,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 27: Col A Val='-' Formula='=IF(LEN(F27)=0,"-",IFERROR(Xlookup(F27,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 28: Col A Val='-' Formula='=IF(LEN(F28)=0,"-",IFERROR(Xlookup(F28,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 29: Col A Val='-' Formula='=IF(LEN(F29)=0,"-",IFERROR(Xlookup(F29,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 30: Col A Val='-' Formula='=IF(LEN(F30)=0,"-",IFERROR(Xlookup(F30,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 31: Col A Val='-' Formula='=IF(LEN(F31)=0,"-",IFERROR(Xlookup(F31,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 32: Col A Val='-' Formula='=IF(LEN(F32)=0,"-",IFERROR(Xlookup(F32,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 33: Col A Val='-' Formula='=IF(LEN(F33)=0,"-",IFERROR(Xlookup(F33,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 34: Col A Val='-' Formula='=IF(LEN(F34)=0,"-",IFERROR(Xlookup(F34,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 35: Col A Val='-' Formula='=IF(LEN(F35)=0,"-",IFERROR(Xlookup(F35,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 36: Col A Val='-' Formula='=IF(LEN(F36)=0,"-",IFERROR(Xlookup(F36,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 37: Col A Val='-' Formula='=IF(LEN(F37)=0,"-",IFERROR(Xlookup(F37,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 38: Col A Val='-' Formula='=IF(LEN(F38)=0,"-",IFERROR(Xlookup(F38,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 39: Col A Val='-' Formula='=IF(LEN(F39)=0,"-",IFERROR(Xlookup(F39,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 40: Col A Val='-' Formula='=IF(LEN(F40)=0,"-",IFERROR(Xlookup(F40,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 41: Col A Val='-' Formula='=IF(LEN(F41)=0,"-",IFERROR(Xlookup(F41,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 42: Col A Val='-' Formula='=IF(LEN(F42)=0,"-",IFERROR(Xlookup(F42,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 43: Col A Val='-' Formula='=IF(LEN(F43)=0,"-",IFERROR(Xlookup(F43,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 44: Col A Val='-' Formula='=IF(LEN(F44)=0,"-",IFERROR(Xlookup(F44,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 45: Col A Val='-' Formula='=IF(LEN(F45)=0,"-",IFERROR(Xlookup(F45,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 46: Col A Val='-' Formula='=IF(LEN(F46)=0,"-",IFERROR(Xlookup(F46,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 47: Col A Val='-' Formula='=IF(LEN(F47)=0,"-",IFERROR(Xlookup(F47,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 48: Col A Val='-' Formula='=IF(LEN(F48)=0,"-",IFERROR(Xlookup(F48,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 49: Col A Val='-' Formula='=IF(LEN(F49)=0,"-",IFERROR(Xlookup(F49,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 50: Col A Val='-' Formula='=IF(LEN(F50)=0,"-",IFERROR(Xlookup(F50,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 51: Col A Val='-' Formula='=IF(LEN(F51)=0,"-",IFERROR(Xlookup(F51,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 52: Col A Val='-' Formula='=IF(LEN(F52)=0,"-",IFERROR(Xlookup(F52,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 53: Col A Val='-' Formula='=IF(LEN(F53)=0,"-",IFERROR(Xlookup(F53,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 54: Col A Val='-' Formula='=IF(LEN(F54)=0,"-",IFERROR(Xlookup(F54,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 55: Col A Val='-' Formula='=IF(LEN(F55)=0,"-",IFERROR(Xlookup(F55,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 56: Col A Val='-' Formula='=IF(LEN(F56)=0,"-",IFERROR(Xlookup(F56,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 57: Col A Val='-' Formula='=IF(LEN(F57)=0,"-",IFERROR(Xlookup(F57,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 58: Col A Val='-' Formula='=IF(LEN(F58)=0,"-",IFERROR(Xlookup(F58,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 59: Col A Val='-' Formula='=IF(LEN(F59)=0,"-",IFERROR(Xlookup(F59,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 60: Col A Val='-' Formula='=IF(LEN(F60)=0,"-",IFERROR(Xlookup(F60,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 61: Col A Val='-' Formula='=IF(LEN(F61)=0,"-",IFERROR(Xlookup(F61,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 62: Col A Val='-' Formula='=IF(LEN(F62)=0,"-",IFERROR(Xlookup(F62,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 63: Col A Val='-' Formula='=IF(LEN(F63)=0,"-",IFERROR(Xlookup(F63,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 64: Col A Val='-' Formula='=IF(LEN(F64)=0,"-",IFERROR(Xlookup(F64,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 65: Col A Val='-' Formula='=IF(LEN(F65)=0,"-",IFERROR(Xlookup(F65,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 66: Col A Val='-' Formula='=IF(LEN(F66)=0,"-",IFERROR(Xlookup(F66,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 67: Col A Val='-' Formula='=IF(LEN(F67)=0,"-",IFERROR(Xlookup(F67,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 68: Col A Val='-' Formula='=IF(LEN(F68)=0,"-",IFERROR(Xlookup(F68,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 69: Col A Val='-' Formula='=IF(LEN(F69)=0,"-",IFERROR(Xlookup(F69,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 70: Col A Val='-' Formula='=IF(LEN(F70)=0,"-",IFERROR(Xlookup(F70,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 71: Col A Val='-' Formula='=IF(LEN(F71)=0,"-",IFERROR(Xlookup(F71,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 72: Col A Val='-' Formula='=IF(LEN(F72)=0,"-",IFERROR(Xlookup(F72,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 73: Col A Val='-' Formula='=IF(LEN(F73)=0,"-",IFERROR(Xlookup(F73,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 74: Col A Val='-' Formula='=IF(LEN(F74)=0,"-",IFERROR(Xlookup(F74,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 75: Col A Val='-' Formula='=IF(LEN(F75)=0,"-",IFERROR(Xlookup(F75,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 76: Col A Val='-' Formula='=IF(LEN(F76)=0,"-",IFERROR(Xlookup(F76,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 77: Col A Val='-' Formula='=IF(LEN(F77)=0,"-",IFERROR(Xlookup(F77,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 78: Col A Val='-' Formula='=IF(LEN(F78)=0,"-",IFERROR(Xlookup(F78,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 79: Col A Val='-' Formula='=IF(LEN(F79)=0,"-",IFERROR(Xlookup(F79,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 80: Col A Val='-' Formula='=IF(LEN(F80)=0,"-",IFERROR(Xlookup(F80,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 81: Col A Val='-' Formula='=IF(LEN(F81)=0,"-",IFERROR(Xlookup(F81,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 82: Col A Val='-' Formula='=IF(LEN(F82)=0,"-",IFERROR(Xlookup(F82,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 83: Col A Val='-' Formula='=IF(LEN(F83)=0,"-",IFERROR(Xlookup(F83,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 84: Col A Val='-' Formula='=IF(LEN(F84)=0,"-",IFERROR(Xlookup(F84,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 85: Col A Val='-' Formula='=IF(LEN(F85)=0,"-",IFERROR(Xlookup(F85,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 86: Col A Val='-' Formula='=IF(LEN(F86)=0,"-",IFERROR(Xlookup(F86,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 87: Col A Val='-' Formula='=IF(LEN(F87)=0,"-",IFERROR(Xlookup(F87,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 88: Col A Val='-' Formula='=IF(LEN(F88)=0,"-",IFERROR(Xlookup(F88,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 89: Col A Val='-' Formula='=IF(LEN(F89)=0,"-",IFERROR(Xlookup(F89,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 90: Col A Val='-' Formula='=IF(LEN(F90)=0,"-",IFERROR(Xlookup(F90,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 91: Col A Val='-' Formula='=IF(LEN(F91)=0,"-",IFERROR(Xlookup(F91,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 92: Col A Val='-' Formula='=IF(LEN(F92)=0,"-",IFERROR(Xlookup(F92,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 93: Col A Val='-' Formula='=IF(LEN(F93)=0,"-",IFERROR(Xlookup(F93,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 94: Col A Val='-' Formula='=IF(LEN(F94)=0,"-",IFERROR(Xlookup(F94,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 95: Col A Val='-' Formula='=IF(LEN(F95)=0,"-",IFERROR(Xlookup(F95,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 96: Col A Val='-' Formula='=IF(LEN(F96)=0,"-",IFERROR(Xlookup(F96,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 97: Col A Val='-' Formula='=IF(LEN(F97)=0,"-",IFERROR(Xlookup(F97,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 98: Col A Val='-' Formula='=IF(LEN(F98)=0,"-",IFERROR(Xlookup(F98,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 99: Col A Val='-' Formula='=IF(LEN(F99)=0,"-",IFERROR(Xlookup(F99,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 100: Col A Val='-' Formula='=IF(LEN(F100)=0,"-",IFERROR(Xlookup(F100,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 101: Col A Val='-' Formula='=IF(LEN(F101)=0,"-",IFERROR(Xlookup(F101,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 102: Col A Val='-' Formula='=IF(LEN(F102)=0,"-",IFERROR(Xlookup(F102,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 103: Col A Val='-' Formula='=IF(LEN(F103)=0,"-",IFERROR(Xlookup(F103,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 104: Col A Val='-' Formula='=IF(LEN(F104)=0,"-",IFERROR(Xlookup(F104,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 105: Col A Val='-' Formula='=IF(LEN(F105)=0,"-",IFERROR(Xlookup(F105,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 106: Col A Val='-' Formula='=IF(LEN(F106)=0,"-",IFERROR(Xlookup(F106,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 107: Col A Val='-' Formula='=IF(LEN(F107)=0,"-",IFERROR(Xlookup(F107,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 108: Col A Val='-' Formula='=IF(LEN(F108)=0,"-",IFERROR(Xlookup(F108,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 109: Col A Val='-' Formula='=IF(LEN(F109)=0,"-",IFERROR(Xlookup(F109,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 110: Col A Val='-' Formula='=IF(LEN(F110)=0,"-",IFERROR(Xlookup(F110,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 111: Col A Val='-' Formula='=IF(LEN(F111)=0,"-",IFERROR(Xlookup(F111,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 112: Col A Val='-' Formula='=IF(LEN(F112)=0,"-",IFERROR(Xlookup(F112,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 113: Col A Val='-' Formula='=IF(LEN(F113)=0,"-",IFERROR(Xlookup(F113,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 114: Col A Val='-' Formula='=IF(LEN(F114)=0,"-",IFERROR(Xlookup(F114,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 115: Col A Val='-' Formula='=IF(LEN(F115)=0,"-",IFERROR(Xlookup(F115,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 116: Col A Val='-' Formula='=IF(LEN(F116)=0,"-",IFERROR(Xlookup(F116,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 117: Col A Val='-' Formula='=IF(LEN(F117)=0,"-",IFERROR(Xlookup(F117,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 118: Col A Val='-' Formula='=IF(LEN(F118)=0,"-",IFERROR(Xlookup(F118,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 119: Col A Val='-' Formula='=IF(LEN(F119)=0,"-",IFERROR(Xlookup(F119,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 120: Col A Val='-' Formula='=IF(LEN(F120)=0,"-",IFERROR(Xlookup(F120,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 121: Col A Val='-' Formula='=IF(LEN(F121)=0,"-",IFERROR(Xlookup(F121,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 122: Col A Val='-' Formula='=IF(LEN(F122)=0,"-",IFERROR(Xlookup(F122,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 123: Col A Val='-' Formula='=IF(LEN(F123)=0,"-",IFERROR(Xlookup(F123,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 124: Col A Val='-' Formula='=IF(LEN(F124)=0,"-",IFERROR(Xlookup(F124,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 125: Col A Val='-' Formula='=IF(LEN(F125)=0,"-",IFERROR(Xlookup(F125,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 126: Col A Val='-' Formula='=IF(LEN(F126)=0,"-",IFERROR(Xlookup(F126,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 127: Col A Val='-' Formula='=IF(LEN(F127)=0,"-",IFERROR(Xlookup(F127,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 128: Col A Val='-' Formula='=IF(LEN(F128)=0,"-",IFERROR(Xlookup(F128,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 129: Col A Val='-' Formula='=IF(LEN(F129)=0,"-",IFERROR(Xlookup(F129,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 130: Col A Val='-' Formula='=IF(LEN(F130)=0,"-",IFERROR(Xlookup(F130,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 131: Col A Val='-' Formula='=IF(LEN(F131)=0,"-",IFERROR(Xlookup(F131,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 132: Col A Val='-' Formula='=IF(LEN(F132)=0,"-",IFERROR(Xlookup(F132,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 133: Col A Val='-' Formula='=IF(LEN(F133)=0,"-",IFERROR(Xlookup(F133,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 134: Col A Val='-' Formula='=IF(LEN(F134)=0,"-",IFERROR(Xlookup(F134,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 135: Col A Val='-' Formula='=IF(LEN(F135)=0,"-",IFERROR(Xlookup(F135,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 136: Col A Val='-' Formula='=IF(LEN(F136)=0,"-",IFERROR(Xlookup(F136,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 137: Col A Val='-' Formula='=IF(LEN(F137)=0,"-",IFERROR(Xlookup(F137,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 138: Col A Val='-' Formula='=IF(LEN(F138)=0,"-",IFERROR(Xlookup(F138,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 139: Col A Val='-' Formula='=IF(LEN(F139)=0,"-",IFERROR(Xlookup(F139,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 140: Col A Val='-' Formula='=IF(LEN(F140)=0,"-",IFERROR(Xlookup(F140,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 141: Col A Val='-' Formula='=IF(LEN(F141)=0,"-",IFERROR(Xlookup(F141,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 142: Col A Val='-' Formula='=IF(LEN(F142)=0,"-",IFERROR(Xlookup(F142,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 143: Col A Val='-' Formula='=IF(LEN(F143)=0,"-",IFERROR(Xlookup(F143,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 144: Col A Val='-' Formula='=IF(LEN(F144)=0,"-",IFERROR(Xlookup(F144,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 145: Col A Val='-' Formula='=IF(LEN(F145)=0,"-",IFERROR(Xlookup(F145,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 146: Col A Val='-' Formula='=IF(LEN(F146)=0,"-",IFERROR(Xlookup(F146,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 147: Col A Val='-' Formula='=IF(LEN(F147)=0,"-",IFERROR(Xlookup(F147,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 148: Col A Val='-' Formula='=IF(LEN(F148)=0,"-",IFERROR(Xlookup(F148,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 149: Col A Val='-' Formula='=IF(LEN(F149)=0,"-",IFERROR(Xlookup(F149,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
+Row 150: Col A Val='-' Formula='=IF(LEN(F150)=0,"-",IFERROR(Xlookup(F150,'2.My control'!F:F,'2.My control'!C:C),"Have new database"))
+' | Col N Val='' | Col O Val=''
