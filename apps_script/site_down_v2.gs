@@ -385,42 +385,60 @@ function checkColC(sheet) {
   const colCRaw = readColCRaw(sheet);
   if (!colCRaw) { Logger.log("[Tin1] Col C trống — bỏ qua"); return false; }
 
-  // ① CONTROL: toàn bộ Col C (có tô màu team)
+  const lines = colCRaw.split("\n");
+  const teams = ["T1", "T2", "T3", "T4"];
+
+  // ── Tách header chung (không phải site line, không phải team summary) ──
+  const globalHeaderLines = lines.filter(l => {
+    if (!l.trim()) return false;
+    if (/^\d+:/.test(l)) return false;          // site lines
+    if (/^Team\s*\d+\s*:/i.test(l)) return false; // team summaries
+    if (/^\s*\.\.\.\s*$/.test(l)) return false;  // separator
+    return true;
+  });
+
+  // ── Tách site lines và team summary lines theo từng team ──
+  const teamData = {};
+  for (const team of teams) {
+    const teamNum    = team.replace("T", "");
+    const sitePat    = new RegExp("\\|\\s*T" + teamNum + "(?:\\s+S\\w*)?\\s*\\|", "i");
+    const summaryPat = new RegExp("^\\s*Team\\s*" + teamNum, "i");
+    teamData[team] = {
+      summary:    lines.filter(l => summaryPat.test(l)),
+      sites:      lines.filter(l => sitePat.test(l)),
+    };
+  }
+
+  // ① CONTROL: header chung + từng team (summary + sites) — đầy đủ tất cả teams
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
-      const colored = colorizeTeams(colCRaw);
-      sendOrEditTelegramPre(controlId, colored, "TIN1_CONTROL", "[Tin1][CONTROL]");
+      const controlParts = [...globalHeaderLines];
+      for (const team of teams) {
+        const { summary, sites } = teamData[team];
+        controlParts.push("...");
+        if (summary.length > 0) controlParts.push(...summary);
+        if (sites.length > 0) {
+          controlParts.push(...sites);
+        } else {
+          controlParts.push("  (No site down)");
+        }
+      }
+      sendOrEditTelegramPre(controlId, colorizeTeams(controlParts.join("\n")), "TIN1_CONTROL", "[Tin1][CONTROL]");
     } catch (controlErr) {
       Logger.log("[Tin1][CONTROL] ❌ Lỗi gửi: " + controlErr.message);
     }
   }
 
-  // ② Mỗi Team: header chung + site của team đó
-  const lines = colCRaw.split("\n");
-  const teams = ["T1", "T2", "T3", "T4"];
+  // ② Mỗi Team: header chung + summary team đó + site của team đó
   for (const team of teams) {
     try {
       const chatId = SD_GROUPS[team];
       if (!chatId) continue;
-
-      const teamNum = team.replace("T", "");
-      // Regex khớp cả T1, T1 S1, T1 Su1, T1 S*
-      const sitePat    = new RegExp("\\|\\s*T" + teamNum + "(?:\\s+S\\w*)?\\s*\\|", "i");
-      const summaryPat = new RegExp("^\\s*Team\\s*" + teamNum, "i");
-
-      const headerLines = lines.filter(l => {
-        if (!l.trim()) return false;
-        if (/^\d+:/.test(l)) return false;
-        if (/^Team\s*\d+\s*:/i.test(l)) return summaryPat.test(l);
-        return true;
-      });
-      const siteLines = lines.filter(l => sitePat.test(l));
-
-      const content = siteLines.length > 0
-        ? [...headerLines, "...", ...siteLines].join("\n")
-        : [...headerLines, "No site down"].join("\n");
-
+      const { summary, sites } = teamData[team];
+      const content = sites.length > 0
+        ? [...globalHeaderLines, "...", ...summary, "...", ...sites].join("\n")
+        : [...globalHeaderLines, "...", ...summary, "No site down"].join("\n");
       sendOrEditTelegramPre(chatId, colorizeTeams(content), "TIN1_" + team, "[Tin1][" + team + "]");
     } catch (teamErr) {
       Logger.log("[Tin1][" + team + "] ❌ Lỗi gửi: " + teamErr.message);
