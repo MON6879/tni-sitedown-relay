@@ -75,6 +75,13 @@ function doPost(e) {
       const sheet = getSheetByGid(ss, SD_SHEET_GID);
       if (!sheet) return _json({ ok: false, msg: "Sheet not found" });
 
+      // ── Kiểm tra nội dung có thay đổi so với lần trước không ──
+      // Nếu cùng bot data (relay chạy 2 lần cùng dữ liệu), không reset dedup
+      const props    = PropertiesService.getScriptProperties();
+      const newHash  = text.substring(0, 200);  // fingerprint: 200 ký tự đầu
+      const lastHash = props.getProperty("SD_LAST_TEXT_HASH") || "";
+      const sameData = (newHash === lastHash);
+
       // Xóa Col A cũ
       const lastRow = Math.max(sheet.getLastRow(), 1);
       sheet.getRange(1, 1, lastRow, 1).clearContent();
@@ -85,10 +92,13 @@ function doPost(e) {
         const values = lines.map(l => [l]);
         sheet.getRange(1, 1, values.length, 1).setValues(values);
       }
-      Logger.log("[doPost] store_site_down — " + lines.length + " dòng ghi vào Col A");
+      Logger.log("[doPost] store_site_down — " + lines.length + " dòng ghi vào Col A" + (sameData ? " (DATA GIỐNG CŨ — giữ dedup key)" : " (data mới)"));
+      props.setProperty("SD_LAST_TEXT_HASH", newHash);
 
-      // Reset dedup key Tin 1 để checkAndSend() gửi ngay khi trigger tiếp theo
-      PropertiesService.getScriptProperties().deleteProperty(TS_KEY_A1);
+      // Chỉ reset dedup key Tin 1 khi data MỚI — tránh gửi 2 lần khi relay chạy 2 lần
+      if (!sameData) {
+        props.deleteProperty(TS_KEY_A1);
+      }
 
       SpreadsheetApp.flush();
       Utilities.sleep(10000); // Chờ công thức Cột C và AW7:AZ15 cập nhật hoàn toàn
@@ -248,15 +258,15 @@ function triggerBotlookupRelay() {
   const repo  = "TNI-SITE-DOWN";
   if (!pat) { Logger.log("[Relay] ⚠️ GITHUB_PAT chưa set — bỏ qua dispatch"); return; }
 
-  // ── Chống dispatch 2 lần trong vòng 25 phút ──────────────────
-  const now25     = new Date();
-  const slot25    = Math.floor(now25.getTime() / (25 * 60 * 1000)); // epoch chia 25p
-  const dedup25Key = "SD_RELAY_DISPATCHED_" + slot25;
-  if (props.getProperty(dedup25Key)) {
-    Logger.log("[Relay] ⏭️ Đã dispatch trong 25 phút vừa rồi — bỏ qua.");
+  // ── Chống dispatch 2 lần trong vòng 35 phút (> 30p trigger interval) ──
+  const nowMs       = new Date().getTime();
+  const lastMs      = parseInt(props.getProperty("SD_RELAY_LAST_DISPATCH_TS") || "0", 10);
+  const elapsedMin  = (nowMs - lastMs) / 60000;
+  if (lastMs > 0 && elapsedMin < 35) {
+    Logger.log("[Relay] ⏭️ Đã dispatch " + elapsedMin.toFixed(1) + " phút trước — chờ đủ 35 phút.");
     return;
   }
-  props.setProperty(dedup25Key, "1");
+  props.setProperty("SD_RELAY_LAST_DISPATCH_TS", nowMs.toString());
 
   try {
     const url  = "https://api.github.com/repos/" + owner + "/" + repo + "/actions/workflows/botlookup_relay.yml/dispatches";
