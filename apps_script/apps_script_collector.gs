@@ -907,9 +907,10 @@ function setupConfigHeaders(ss) {
 // HELPER: buildSearchStatsMap
 // ============================================================
 function buildSearchStatsMap(ss) {
-  const map = {};
+  const idMap  = {};   // key = userId (col E)
+  const nameMap = {};  // key = userName.toLowerCase() (col D) — fallback khi UID không match
   const logSheet = ss.getSheetByName(SEARCH_LOG_TAB);
-  if (!logSheet || logSheet.getLastRow() < 2) return map;
+  if (!logSheet || logSheet.getLastRow() < 2) return { idMap, nameMap };
   const tz = 'Asia/Rangoon';
   const now = new Date();
   const today = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
@@ -921,27 +922,45 @@ function buildSearchStatsMap(ss) {
   const data = logSheet.getRange(2, 1, last - 1, 6).getValues(); // Doc 6 cot A-F
   for (const row of data) {
     const dateVal = dateToStr(row[1]); // Cot B (Date) -> index 1
-    // Cot E (UserID) -> index 4: dung UserID lam key de match chinh xac
-    const userId = (row[4] || '').toString().trim();
-    if (!userId) continue;
+    // Cot E (UserID) -> index 4
+    const userId   = (row[4] || '').toString().trim();
+    // Cot D (UserName) -> index 3 — fallback key
+    const userName = (row[3] || '').toString().trim().toLowerCase();
+    if (!userId && !userName) continue;
     // Bo qua lenh CLEAR TNIxxxx — khong tinh vao search stats
     const tniCode = (row[5] || '').toString().trim();
     if (/^clear\b/i.test(tniCode)) continue;
-    if (!map[userId]) map[userId] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
-    const u = map[userId];
+    // Tinh ngay
     const parts = dateVal.split('/');
     if (parts.length !== 3) continue;
     const rowDate = new Date(+parts[2], +parts[1]-1, +parts[0]);
     const diffMs = now - rowDate;
-    if (dateVal === today) u.today++;
-    if (dateVal === d1) u.d1++;
-    if (dateVal === d2) u.d2++;
-    if (diffMs <= msWeek) u.week++;
-    if (diffMs <= msMonth) u.month++;
+    // Accumulate idMap
+    if (userId) {
+      if (!idMap[userId]) idMap[userId] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+      const u = idMap[userId];
+      if (dateVal === today) u.today++;
+      if (dateVal === d1)    u.d1++;
+      if (dateVal === d2)    u.d2++;
+      if (diffMs <= msWeek)  u.week++;
+      if (diffMs <= msMonth) u.month++;
+    }
+    // Accumulate nameMap (dung shortName — chu sau dau cach dau tien de match linh hoat)
+    if (userName) {
+      const shortName = userName.split(/\s+/)[0]; // lay tu dau tien: "maung maung" -> "maung"
+      if (!nameMap[shortName]) nameMap[shortName] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+      const n = nameMap[shortName];
+      if (dateVal === today) n.today++;
+      if (dateVal === d1)    n.d1++;
+      if (dateVal === d2)    n.d2++;
+      if (diffMs <= msWeek)  n.week++;
+      if (diffMs <= msMonth) n.month++;
+    }
   }
 
-  return map;
+  return { idMap, nameMap };
 }
+
 
 
 
@@ -1017,7 +1036,7 @@ function fetchReportSheet() {
 // ACTION: REFRESH_GENERAL
 // ============================================================
 function handleRefreshGeneral(ss) {
-  const statsMap = buildSearchStatsMap(ss);
+  const { idMap, nameMap } = buildSearchStatsMap(ss);
   const data = fetchReportSheet();
   const employees = data.employees;
   let gen = ss.getSheetByName(GENERAL_TAB);
@@ -1026,7 +1045,9 @@ function handleRefreshGeneral(ss) {
   gen.appendRow(['Team', 'Nhan vien', 'Hom nay', 'Hom qua', 'Hom kia', 'Tuan', 'Thang']);
   gen.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
   for (const emp of employees) {
-    const s = statsMap[(emp.chat_id || '').toString().trim()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const empId = (emp.chat_id || '').toString().trim();
+    const shortN = (emp.name || '').toLowerCase().split(/\s+/)[0];
+    const s = idMap[empId] || nameMap[shortN] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     gen.appendRow([emp.team, emp.name, s.today, s.d1, s.d2, s.week, s.month]);
   }
   gen.setColumnWidth(1, 200);
@@ -1040,7 +1061,13 @@ function handleRefreshGeneral(ss) {
 // Trả về đầy đủ: search stats + WO stats + assign task + dep breakdown
 // ============================================================
 function handleGetReportData(ss) {
-  const statsMap = buildSearchStatsMap(ss);
+  const { idMap, nameMap } = buildSearchStatsMap(ss);
+  // Helper: lookup stats theo uid (primary) hoặc short name (fallback)
+  function lookupStats(chatId, fullName) {
+    const uid = (chatId || '').toString().trim();
+    const shortN = (fullName || '').toLowerCase().split(/\s+/)[0];
+    return idMap[uid] || nameMap[shortN] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+  }
   const cfgIdMap = {};
   const cfg = ss.getSheetByName(CFG_TAB);
   if (cfg && cfg.getLastRow() >= 2) {
@@ -1181,9 +1208,8 @@ function handleGetReportData(ss) {
   // ── Search team stats ──
   const teamStats = {};
   for (const emp of employees) {
-    // Fallback: nếu chat_id trống, tra bằng tên từ Config tab
-    const empLookupId = (emp.chat_id || cfgIdMap[(emp.name || '').toLowerCase()] || '').toString().trim();
-    const s = statsMap[empLookupId] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const empId = (emp.chat_id || cfgIdMap[(emp.name || '').toLowerCase()] || '').toString().trim();
+    const s = lookupStats(empId, emp.name);
     if (!teamStats[emp.team]) teamStats[emp.team] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     const t = teamStats[emp.team];
     t.today += s.today; t.d1 += s.d1; t.d2 += s.d2; t.week += s.week; t.month += s.month;
@@ -1227,9 +1253,8 @@ function handleGetReportData(ss) {
   // ── Build employee result ──
   // Tính rank toàn bộ NV rồi sắp xếp để gán rank số thứ tự
   const empWithWo = employees.map(emp => {
-    // Fallback: nếu chat_id trống, tra bằng tên từ Config tab
-    const empLookupId = (emp.chat_id || cfgIdMap[(emp.name || '').toLowerCase()] || '').toString().trim();
-    const s = statsMap[empLookupId] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const empId = (emp.chat_id || cfgIdMap[(emp.name || '').toLowerCase()] || '').toString().trim();
+    const s = lookupStats(empId, emp.name);
     const chatId = emp.chat_id || cfgIdMap[emp.name.toLowerCase()] || '';
     const wo = parseWoFromContent(emp.content);
     const close_pct = calcClosePct(wo.wo_total, wo.wo_month_close);
@@ -1257,8 +1282,8 @@ function handleGetReportData(ss) {
   const ldWithScore = leaders.map(ld => {
     const wo = parseWoFromContent(ld.content);
     // Fallback: nếu chat_id trống, tra bằng tên từ Config tab
-    const ldLookupId = (ld.chat_id || cfgIdMap[(ld.name || '').toLowerCase()] || '').toString().trim();
-    const s = statsMap[ldLookupId] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    const ldId = (ld.chat_id || cfgIdMap[(ld.name || '').toLowerCase()] || '').toString().trim();
+    const s = lookupStats(ldId, ld.name);
     // Đọc thêm từ TL content: "3-Day Result: 11/0/0/0" → member_count / eod_today / eod_d1 / eod_d2
     const eodM = ld.content.match(/3-Day\s*Result\s*:\s*(\d+)\/(\d+)\/(\d+)\/(\d+)/i);
     const member_count   = eodM ? parseInt(eodM[1]) || 0 : 0;
@@ -1324,7 +1349,8 @@ function handleGetReportData(ss) {
     teamSummary: teamSummary,
     grandTotal: grandTotal,
     assignByDep: assignByDep,
-    searchStats: statsMap
+    searchStats: idMap,
+    searchStatsByName: nameMap
   });
 }
 

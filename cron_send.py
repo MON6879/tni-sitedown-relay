@@ -373,6 +373,7 @@ def build_tl_search_section(team_key: str, report_data: dict, no_id_members: dic
         return ""
 
     raw_search_stats = report_data.get("searchStats", {})
+    raw_by_name = report_data.get("searchStatsByName", {})
 
     # Sort A-Z theo tên
     leaders_sorted = sorted(leaders, key=lambda x: x.get("name", ""))
@@ -382,6 +383,9 @@ def build_tl_search_section(team_key: str, report_data: dict, no_id_members: dic
         name = tl.get("name", "?")
         uid = tl.get("uid", "")
         s = raw_search_stats.get(uid, {}) if uid else {}
+        if not s and name:
+            short = name.strip().split()[0].lower()
+            s = raw_by_name.get(short, {})
         d0 = s.get("today", 0)
         d1 = s.get("d1", 0)
         d2 = s.get("d2", 0)
@@ -436,10 +440,18 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
     if staff_has_id:
         not_searched_count = 0
         search_lines = []
+        raw_by_name = report_data.get("searchStatsByName", {})  # fallback: key = short name lowercase
         def _get_name(item):
             return item["name"] if isinstance(item, dict) else item
         def _get_uid(item):
             return item.get("uid", "") if isinstance(item, dict) else ""
+        def _lookup_search(uid: str, full_name: str) -> dict:
+            """Lookup search stats: primary = UID, fallback = short name from searchStatsByName."""
+            s = raw_search_stats.get(uid, {}) if uid else {}
+            if not s and full_name:
+                short = full_name.strip().split()[0].lower()
+                s = raw_by_name.get(short, {})
+            return s
         seen_names = set()
         for item in sorted(staff_has_id, key=lambda x: _get_name(x)):
             name = _get_name(item)
@@ -450,8 +462,8 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
             # Bỏ qua người Not in Group hoặc No ID — hiển thị riêng ở Part 2/3
             if name in exclude_names:
                 continue
-            # Match trực tiếp bằng UserID từ GAS searchStats
-            s = raw_search_stats.get(uid, {}) if uid else {}
+            # Match trực tiếp bằng UserID từ GAS searchStats, fallback theo tên
+            s = _lookup_search(uid, name)
             d0 = s.get("today", 0)
             d1 = s.get("d1", 0)
             d2 = s.get("d2", 0)
