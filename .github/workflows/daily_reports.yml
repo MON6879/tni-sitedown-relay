@@ -35,8 +35,8 @@ on:
         default: '1'
 
 concurrency:
-  group: telethon-session
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'workflow_dispatch' && 'telethon-manual' || 'telethon-session' }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
 
 jobs:
   run-report:
