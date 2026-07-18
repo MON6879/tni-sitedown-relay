@@ -9,8 +9,10 @@ Dùng 3 bot theo dải row trong sheet Task remain (gid=133591305):
 import asyncio, io, logging, os, re, requests, pandas as pd
 from datetime import datetime, timezone, timedelta
 from telegram import Bot
+from telethon import TelegramClient
+from telethon.sessions import StringSession
 from dotenv import load_dotenv
-from delete_old_helper import delete_old_messages_bot, save_msgids
+from delete_old_helper import delete_old_messages_bot, save_msgids, delete_by_title_telethon
 
 load_dotenv()
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -20,6 +22,9 @@ SEND_BOT_TOKEN          = os.getenv("SEND_BOT_TOKEN", "")
 REPORT_TASK_BOT_TOKEN   = os.getenv("REPORT_TASK_BOT_TOKEN", "")
 TECHNICAL_DEP_BOT_TOKEN = os.getenv("TECHNICAL_DEP_BOT_TOKEN", "")
 APPS_SCRIPT_URL         = os.getenv("APPS_SCRIPT_URL", "")
+TELEGRAM_API_ID         = int(os.getenv("TELEGRAM_API_ID", "0"))
+TELEGRAM_API_HASH       = os.getenv("TELEGRAM_API_HASH", "")
+TELEGRAM_SESSION        = os.getenv("TELEGRAM_SESSION", "")
 
 SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
 # Dùng export CSV trực tiếp thay vì gviz/tq để giữ đúng số hàng (bao gồm hàng trống)
@@ -1820,18 +1825,49 @@ async def main():
         str(TELEGRAM_GROUPS["T4"]): "CRON_TEAM_T4_FULL",
     }
 
-    # ── Delete old messages trước khi gửi mới ──
-    if APPS_SCRIPT_URL and SEND_BOT_TOKEN:
+    # ── Delete old messages theo tiêu đề (Telethon) + fallback GAS msg_id ──
+    # Telethon scan lịch sử chat → xóa TẤT CẢ tin cũ cùng tiêu đề
+    # Fallback: GAS msg_id (xóa tin liền trước nếu Telethon không khả dụng)
+    if SEND_BOT_TOKEN and TELEGRAM_SESSION and TELEGRAM_API_ID:
+        # Tiêu đề từng loại tin → map (chat_id, title_prefix)
+        delete_tasks = []
+        for del_cid in CHATID_TO_KEY.keys():
+            delete_tasks.append((del_cid, "📋 4. Report — Daily EOD Task & Stats"))
+            delete_tasks.append((del_cid, "📓 4b. Full Report"))
+        delete_tasks += [
+            (str(CONTROL_CHAT_ID), "📋 1. Report — Technical Dept Task Progress"),
+            (str(CONTROL_CHAT_ID), "📋 8. Report — Technical Dep Assign to Team"),
+            (str(CONTROL_CHAT_ID), "📋 4. Report — TL Comparison"),
+            (str(CONTROL_CHAT_ID), "📋 1. BOD"),   # BOD report nếu có
+        ]
+        try:
+            async with TelegramClient(
+                StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH
+            ) as tg_client:
+                logger.info("🗑️ Delete old messages by title (Telethon)...")
+                for del_cid, title_pfx in delete_tasks:
+                    await delete_by_title_telethon(tg_client, SEND_BOT_TOKEN, del_cid, title_pfx)
+        except Exception as tg_err:
+            logger.warning(f"Telethon delete lỗi, fallback GAS: {tg_err}")
+            # Fallback: GAS msg_id delete
+            if APPS_SCRIPT_URL:
+                for del_cid, del_key in CHATID_TO_KEY.items():
+                    delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
+                for del_cid, del_key in CHATID_TO_KEY_FULL.items():
+                    delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
+                delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_CONTROL")
+                delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_DETAIL")
+                delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_EOD_CONTROL")
+    elif APPS_SCRIPT_URL and SEND_BOT_TOKEN:
+        # Fallback nếu không có Telethon session
         for del_cid, del_key in CHATID_TO_KEY.items():
             delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
         for del_cid, del_key in CHATID_TO_KEY_FULL.items():
             delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
-        # TECH_GROUP → CONTROL
         delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_CONTROL")
-        # TECHDEP_DETAIL → CONTROL
         delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_DETAIL")
-        # CONSOLIDATED_EOD → CONTROL
         delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_EOD_CONTROL")
+
 
     # ── Gửi tất cả messages ──
     collected_msgids = {}  # key → list[int], gom msg_ids theo GAS key
