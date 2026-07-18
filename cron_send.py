@@ -391,7 +391,12 @@ def build_tl_search_section(team_key: str, report_data: dict, no_id_members: dic
         d2 = s.get("d2", 0)
         w  = s.get("week", 0)
         m  = s.get("month", 0)
-        icon = "✅" if d0 > 0 else "❌"
+        if d0 > 0:
+            icon = "✅"   # search hôm nay
+        elif d1 > 0 or d2 > 0:
+            icon = "🟡"   # có search gần đây nhưng không phải hôm nay
+        else:
+            icon = "❌"   # 3 ngày không search
         lines.append(f"  {icon} {name}: 3Day: {d2} /{d1} /{d0}  7Day: /{w}  Month: /{m}")
 
     return "\n".join(lines)
@@ -469,7 +474,12 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
             d2 = s.get("d2", 0)
             w  = s.get("week", 0)
             m  = s.get("month", 0)
-            icon = "✅" if d0 > 0 else "❌"
+            if d0 > 0:
+                icon = "✅"   # xanh: search hôm nay
+            elif d1 > 0 or d2 > 0:
+                icon = "🟡"   # vàng: có search gần đây nhưng không phải hôm nay
+            else:
+                icon = "❌"   # đỏ: 3 ngày không search
             if d0 == 0:
                 not_searched_count += 1
             search_lines.append(f"  {icon} {name}: 3Day: {d2} /{d1} /{d0}  7Day: /{w}  Month: /{m}")
@@ -1802,10 +1812,19 @@ async def main():
         str(TELEGRAM_GROUPS["T3"]): "CRON_TEAM_T3",
         str(TELEGRAM_GROUPS["T4"]): "CRON_TEAM_T4",
     }
+    # Key riêng cho Full Report (tin thứ 2 mỗi team)
+    CHATID_TO_KEY_FULL = {
+        str(TELEGRAM_GROUPS["T1"]): "CRON_TEAM_T1_FULL",
+        str(TELEGRAM_GROUPS["T2"]): "CRON_TEAM_T2_FULL",
+        str(TELEGRAM_GROUPS["T3"]): "CRON_TEAM_T3_FULL",
+        str(TELEGRAM_GROUPS["T4"]): "CRON_TEAM_T4_FULL",
+    }
 
     # ── Delete old messages trước khi gửi mới ──
     if APPS_SCRIPT_URL and SEND_BOT_TOKEN:
         for del_cid, del_key in CHATID_TO_KEY.items():
+            delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
+        for del_cid, del_key in CHATID_TO_KEY_FULL.items():
             delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
         # TECH_GROUP → CONTROL
         delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_CONTROL")
@@ -1831,6 +1850,8 @@ async def main():
                         gas_key = "CRON_TECHDEP_DETAIL"
                     elif label == "CONSOLIDATED_EOD":
                         gas_key = "CRON_EOD_CONTROL"
+                    elif label == "TEAM_GROUP_FULL":
+                        gas_key = CHATID_TO_KEY_FULL.get(str(cid), "")
                     else:
                         gas_key = CHATID_TO_KEY.get(str(cid), "")
                     if gas_key and msg_ids:
