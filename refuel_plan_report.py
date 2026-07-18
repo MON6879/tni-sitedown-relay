@@ -346,12 +346,19 @@ def report_1(data: RefuelData):
     for r in request_today:
         request_by_site[r["site"]] = request_by_site.get(r["site"], 0) + r["qty"]
 
-    # ── Infer team name cho sender (lấy từ record có team != '') ──
+    # ── Infer team name cho sender từ TẤT CẢ lịch sử Plan (không chỉ hôm nay) ──
+    # Ưu tiên: record có team != '' gần nhất
     sender_team: dict[str, str] = {}  # sender_id → team name
-    for r in sorted(plan_today, key=lambda x: bool(x.get("team")), reverse=True):
+    all_plan_with_team = sorted(
+        [r for r in data.records if r["cat"] == "PLAN" and r.get("team")],
+        key=lambda x: x["ts"],
+        reverse=True  # mới nhất trước
+    )
+    for r in all_plan_with_team:
         sid = r["sender_id"]
-        if r.get("team") and sid not in sender_team:
+        if sid not in sender_team:
             sender_team[sid] = r["team"]
+
 
     # ── Group Plan theo Team → Sender (giữ thứ tự thời gian) ──
     # team_key: (team_name or 'Unnamed', sender_label)
