@@ -640,15 +640,108 @@ function buildAwAzControlMessage(ts, awaz) {
 // ============================================================
 
 function sendOrEditTelegram(chatId, text, msgKey, tag) {
-  deleteOldMessages_(chatId, msgKey);
+  const oldIds = getSavedMsgIds_(msgKey);
+  const props  = PropertiesService.getScriptProperties();
+  const idKey  = "SD_MSGID_" + msgKey;
+  const chunks = splitMessage(text, 4000);
+
+  if (oldIds.length > 0) {
+    const edited = editTelegramMsg_(chatId, oldIds[0], chunks[0], "HTML", tag);
+    if (edited) {
+      for (let i = 1; i < oldIds.length; i++) deleteTelegramMsgBot_(chatId, oldIds[i]);
+      const newIds = [oldIds[0]];
+      for (let i = 1; i < chunks.length; i++) {
+        Utilities.sleep(300);
+        try {
+          const r = UrlFetchApp.fetch(
+            "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/sendMessage", {
+              method: "post", contentType: "application/json",
+              payload: JSON.stringify({ chat_id: chatId, text: chunks[i], parse_mode: "HTML" }),
+              muteHttpExceptions: true,
+          });
+          const res = JSON.parse(r.getContentText());
+          if (res.ok && res.result) newIds.push(res.result.message_id);
+        } catch(e) {}
+      }
+      props.setProperty(idKey, JSON.stringify(newIds));
+      return;
+    }
+    deleteOldMessages_(chatId, msgKey);
+  }
   const newIds = sendTelegramCollectIds_(chatId, text, tag);
-  if (newIds.length > 0) saveMsgIds_(msgKey, newIds);
+  props.setProperty(idKey, JSON.stringify(newIds));
 }
 
 function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
-  deleteOldMessages_(chatId, msgKey);
+  const oldIds  = getSavedMsgIds_(msgKey);
+  const props   = PropertiesService.getScriptProperties();
+  const idKey   = "SD_MSGID_" + msgKey;
+  const escaped = escHtml(plainContent);
+  const chunks  = splitMessage(escaped, 3800);
+
+  // ① Thử edit tin cũ (không cần quyền admin)
+  if (oldIds.length > 0) {
+    const edited = editTelegramMsg_(chatId, oldIds[0],
+      "<pre>" + chunks[0] + "</pre>", "HTML", tag);
+    if (edited) {
+      // Edit thành công → xóa các chunk cũ dư
+      for (let i = 1; i < oldIds.length; i++) deleteTelegramMsgBot_(chatId, oldIds[i]);
+      // Gửi chunk mới nếu nội dung dài hơn (hiếm)
+      const newIds = [oldIds[0]];
+      for (let i = 1; i < chunks.length; i++) {
+        Utilities.sleep(300);
+        try {
+          const r = UrlFetchApp.fetch(
+            "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/sendMessage", {
+              method: "post", contentType: "application/json",
+              payload: JSON.stringify({
+                chat_id: chatId,
+                text: "<pre>" + chunks[i] + "</pre>",
+                parse_mode: "HTML"
+              }),
+              muteHttpExceptions: true,
+          });
+          const res = JSON.parse(r.getContentText());
+          if (res.ok && res.result) newIds.push(res.result.message_id);
+        } catch(e) {}
+      }
+      props.setProperty(idKey, JSON.stringify(newIds));  // REPLACE
+      Logger.log((tag||"")+" ✏️ Edited in-place msgId="+oldIds[0]);
+      return;
+    }
+    // Edit thất bại (tin quá cũ hoặc bị xóa) → xóa và gửi mới
+    deleteOldMessages_(chatId, msgKey);
+  }
+
+  // ② Gửi mới (không có tin cũ hoặc edit thất bại)
   const newIds = sendTelegramPreCollectIds_(chatId, plainContent, tag);
-  if (newIds.length > 0) saveMsgIds_(msgKey, newIds);
+  props.setProperty(idKey, JSON.stringify(newIds));  // REPLACE
+}
+
+// ── Edit tin nhắn Telegram (không cần admin, chỉ cần bot là tác giả) ──────────────
+function editTelegramMsg_(chatId, messageId, text, parseMode, tag) {
+  try {
+    const resp = UrlFetchApp.fetch(
+      "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/editMessageText", {
+        method:             "post",
+        contentType:        "application/json",
+        payload:            JSON.stringify({
+          chat_id:    chatId,
+          message_id: messageId,
+          text:       text,
+          parse_mode: parseMode || "HTML",
+        }),
+        muteHttpExceptions: true,
+      }
+    );
+    const res = JSON.parse(resp.getContentText());
+    Logger.log((tag||"")+" [edit] "+(res.ok?"✏️":"⚠️")+" msg="+messageId+" → "+chatId
+      +(!res.ok?" | "+res.description:""));
+    return res.ok === true;
+  } catch(e) {
+    Logger.log((tag||"")+" [edit] ❌ "+e.message);
+    return false;
+  }
 }
 
 function sendTelegramCollectIds_(chatId, text, tag) {
@@ -697,25 +790,10 @@ function sendTelegramPreCollectIds_(chatId, plainContent, tag) {
   return ids;
 }
 
-// ── Message ID persistence ───────────────────────────────────
+// Gửi ảnh: chỉ lưu ID mới, THAY THẾ hoàn toàn củ (không dồn thêm)
 function saveMsgIds_(msgKey, messageIds) {
-  const props = PropertiesService.getScriptProperties();
-  const key = "SD_MSGID_" + msgKey;
-  let existing = [];
-  try {
-    const val = props.getProperty(key) || "";
-    if (val) {
-      existing = JSON.parse(val);
-      if (!Array.isArray(existing)) existing = [];
-    }
-  } catch(e) {}
-  
-  // Ghép các ID mới vào danh sách cũ
-  const combined = existing.concat(messageIds);
-  
-  // Chỉ giữ lại tối đa 10 ID gần nhất để tránh phình bộ nhớ
-  const toSave = combined.slice(-10);
-  props.setProperty(key, JSON.stringify(toSave));
+  PropertiesService.getScriptProperties()
+    .setProperty("SD_MSGID_" + msgKey, JSON.stringify(messageIds));
 }
 
 function getSavedMsgIds_(msgKey) {
