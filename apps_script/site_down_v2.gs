@@ -222,11 +222,9 @@ function checkAndSend(isWebhookCall) {
     const sheet = getSheetByGid(ss, SD_SHEET_GID);
     if (!sheet) { Logger.log("❌ Không tìm thấy sheet GID=" + SD_SHEET_GID); return { sent_tin1: false, sent_tin2: false }; }
 
-    // Bước 1: Dispatch botlookup_relay → gửi lệnh lấy data từ BOT LOOKUP
-    //   botlookup_relay.py sẽ: gửi /down_tni → đọc kết quả → ghi Col A + Note B2:B5
-    if (isWebhookCall !== true) {
-      triggerBotlookupRelay();
-    }
+    // Bước 1: Relay được GitHub Actions cron tự kích hoạt mỗi giờ lúc :08 Myanmar
+    //   (không cần GAS dispatch nữa — tránh gửi 2 lần)
+    // triggerBotlookupRelay();  // ← ĐÃ TẮT: GitHub Actions cron thay thế
 
     // Bước 2: Kiểm tra và gửi (data được botlookup_relay ghi từ lần trước)
     const sentTin1 = checkColC(sheet);   // Tin 1: A1 thay đổi → gửi Col C vào T1/T2/T3/T4 + CONTROL
