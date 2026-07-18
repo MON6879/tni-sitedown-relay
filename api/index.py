@@ -18,6 +18,36 @@ GID_SITE_CLEAR = "610944071"  # Tab: Search Site  Clear
 MAX_LEN = 4096
 TZ_MM   = timezone(timedelta(hours=6, minutes=30))
 
+_allowed_info_ids = None
+_allowed_info_ids_ts = 0.0
+ALLOWED_IDS_TTL = 300
+
+def get_allowed_info_search_ids():
+    global _allowed_info_ids, _allowed_info_ids_ts
+    import time
+    if _allowed_info_ids is not None and time.time() - _allowed_info_ids_ts < ALLOWED_IDS_TTL:
+        return _allowed_info_ids
+    try:
+        df = fetch("1236389870")
+        allowed_ids = set()
+        for idx in range(1, len(df)):
+            row = df.iloc[idx]
+            if len(row) > 4:
+                val = str(row.iloc[4]).strip()
+                if val and val != "-" and val.lower() != "nan" and val.lower() != "none":
+                    if val.endswith(".0"):
+                        val = val[:-2]
+                    allowed_ids.add(val)
+        _allowed_info_ids = allowed_ids
+        _allowed_info_ids_ts = time.time()
+        logger.info(f"Loaded allowed Info search IDs: {allowed_ids}")
+        return allowed_ids
+    except Exception as e:
+        logger.error(f"Error fetching allowed info search IDs: {e}")
+        if _allowed_info_ids is not None:
+            return _allowed_info_ids
+        return set()
+
 
 # ── Telegram helper: gửi tin nhắn ────────────────────────────────────────
 def tg_send(chat_id, text, parse_mode="HTML"):
@@ -381,6 +411,18 @@ def handle(data):
     if info_match:
         tni = info_match.group(1).upper()
         logger.info(f"Info lookup: {tni} | chat={chat_id}")
+        
+        # Access control: Only Telegram IDs in Column E of Config sheet (GID 1236389870)
+        allowed_ids = get_allowed_info_search_ids()
+        user_id_str = str(user_id).strip()
+        if user_id_str not in allowed_ids:
+            # Simulate searching then return "Not found"
+            tg_send(chat_id, f"⏳ Đang tìm thông tin <b>{html.escape(tni)}</b>...")
+            import time
+            time.sleep(1)
+            tg_send(chat_id, f"❌ Không tìm thấy <b>{html.escape(tni)}</b> trong danh sách Site Info.")
+            return
+
         tg_send(chat_id, f"⏳ Đang tìm thông tin <b>{html.escape(tni)}</b>...")
         try:
             info = get_info(tni)

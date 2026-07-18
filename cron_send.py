@@ -319,42 +319,39 @@ def get_no_id_members(bot_token: str = "") -> dict:
 
 
 def build_team_search_section(team_key: str, report_data: dict, now_str: str = "", no_id_members: dict | None = None) -> str:
-    """Build search stats section for a specific team — tính Total từ searchStats + Staff UIDs."""
+    """Build search stats section for a specific team — tính Total từ teamSummary GAS (chính xác)."""
     if not team_key:
         return ""
 
-    raw_search_stats = report_data.get("searchStats", {})
     cycle_str = get_current_cycle_str()
 
-    # Lấy UIDs của NV trong team từ Staff Sheet
-    team_uids = []
-    if no_id_members:
-        team_info = no_id_members.get(team_key, {})
-        for item in team_info.get("has_id", []):
-            uid = item.get("uid", "") if isinstance(item, dict) else ""
-            if uid:
-                team_uids.append(uid)
-
-    # Tính tổng search cho team từ searchStats
+    # Ưu tiên dùng teamSummary từ GAS — đã tính sẵn, đồng nhất với dữ liệu GAS
     d0_total = d1_total = d2_total = w_total = m_total = 0
-    for uid in team_uids:
-        s = raw_search_stats.get(uid, {})
-        d0_total += s.get("today", 0)
-        d1_total += s.get("d1", 0)
-        d2_total += s.get("d2", 0)
-        w_total  += s.get("week", 0)
-        m_total  += s.get("month", 0)
+    found_summary = False
+    for ts in report_data.get("teamSummary", []):
+        if ts.get("team", "") == team_key:
+            d2_total = ts.get('d2', 0)
+            d1_total = ts.get('d1', 0)
+            d0_total = ts.get('today', 0)
+            w_total  = ts.get('week', 0)
+            m_total  = ts.get('month', 0)
+            found_summary = True
+            break
 
-    # Fallback: nếu không có Staff data thì dùng teamSummary cũ
-    if not team_uids:
-        for ts in report_data.get("teamSummary", []):
-            if ts.get("team", "") == team_key:
-                d2_total = ts.get('d2', 0)
-                d1_total = ts.get('d1', 0)
-                d0_total = ts.get('today', 0)
-                w_total  = ts.get('week', 0)
-                m_total  = ts.get('month', 0)
-                break
+    # Fallback: nếu không có teamSummary thì tính từ searchStats + Staff UIDs
+    if not found_summary:
+        raw_search_stats = report_data.get("searchStats", {})
+        if no_id_members:
+            team_info = no_id_members.get(team_key, {})
+            for item in team_info.get("has_id", []):
+                uid = item.get("uid", "") if isinstance(item, dict) else ""
+                if uid:
+                    s = raw_search_stats.get(uid, {})
+                    d0_total += s.get("today", 0)
+                    d1_total += s.get("d1", 0)
+                    d2_total += s.get("d2", 0)
+                    w_total  += s.get("week", 0)
+                    m_total  += s.get("month", 0)
 
     return (
         f"🔍 Search TNIxxxx click here @SEARCHTNITASKWOBOT "
