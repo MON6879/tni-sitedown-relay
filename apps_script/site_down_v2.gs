@@ -242,10 +242,21 @@ function checkAndSend(isWebhookCall) {
 // Kết quả sẽ có sau ~2–3 phút → trigger tiếp theo sẽ gửi Tin 1
 // ============================================================
 function triggerBotlookupRelay() {
-  const pat   = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT") || "";
+  const props = PropertiesService.getScriptProperties();
+  const pat   = props.getProperty("GITHUB_PAT") || "";
   const owner = "phonghdpxd-cmd";
   const repo  = "TNI-SITE-DOWN";
   if (!pat) { Logger.log("[Relay] ⚠️ GITHUB_PAT chưa set — bỏ qua dispatch"); return; }
+
+  // ── Chống dispatch 2 lần trong vòng 25 phút ──────────────────
+  const now25     = new Date();
+  const slot25    = Math.floor(now25.getTime() / (25 * 60 * 1000)); // epoch chia 25p
+  const dedup25Key = "SD_RELAY_DISPATCHED_" + slot25;
+  if (props.getProperty(dedup25Key)) {
+    Logger.log("[Relay] ⏭️ Đã dispatch trong 25 phút vừa rồi — bỏ qua.");
+    return;
+  }
+  props.setProperty(dedup25Key, "1");
 
   try {
     const url  = "https://api.github.com/repos/" + owner + "/" + repo + "/actions/workflows/botlookup_relay.yml/dispatches";
