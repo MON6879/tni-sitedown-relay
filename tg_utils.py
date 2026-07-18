@@ -113,7 +113,9 @@ def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300)
                 if not msg.text:
                     continue
                 first_line = msg.text.split("\n")[0].strip()
-                if not first_line.startswith(title_prefix):
+                # Telethon render <b>text</b> thành **text** — cần strip trước khi so sánh
+                first_line_clean = first_line.replace("**", "").replace("__", "").strip()
+                if not first_line_clean.startswith(title_prefix):
                     continue
                 try:
                     resp = requests.post(

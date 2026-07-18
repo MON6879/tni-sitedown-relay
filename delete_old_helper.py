@@ -178,7 +178,9 @@ async def delete_by_title_telethon(
             if not msg.text:
                 continue
             first_line = msg.text.split("\n")[0].strip()
-            if not first_line.startswith(title_prefix):
+            # Telethon render <b>text</b> thành **text** — strip trước khi so sánh
+            first_line_clean = first_line.replace("**", "").replace("__", "").strip()
+            if not first_line_clean.startswith(title_prefix):
                 continue
             # Xóa qua Bot API
             try:
