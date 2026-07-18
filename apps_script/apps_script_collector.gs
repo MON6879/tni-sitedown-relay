@@ -1181,7 +1181,9 @@ function handleGetReportData(ss) {
   // ── Search team stats ──
   const teamStats = {};
   for (const emp of employees) {
-    const s = statsMap[(emp.chat_id || '').toString().trim()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    // Fallback: nếu chat_id trống, tra bằng tên từ Config tab
+    const empLookupId = (emp.chat_id || cfgIdMap[(emp.name || '').toLowerCase()] || '').toString().trim();
+    const s = statsMap[empLookupId] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     if (!teamStats[emp.team]) teamStats[emp.team] = { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     const t = teamStats[emp.team];
     t.today += s.today; t.d1 += s.d1; t.d2 += s.d2; t.week += s.week; t.month += s.month;
@@ -1225,7 +1227,9 @@ function handleGetReportData(ss) {
   // ── Build employee result ──
   // Tính rank toàn bộ NV rồi sắp xếp để gán rank số thứ tự
   const empWithWo = employees.map(emp => {
-    const s = statsMap[(emp.chat_id || '').toString().trim()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    // Fallback: nếu chat_id trống, tra bằng tên từ Config tab
+    const empLookupId = (emp.chat_id || cfgIdMap[(emp.name || '').toLowerCase()] || '').toString().trim();
+    const s = statsMap[empLookupId] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     const chatId = emp.chat_id || cfgIdMap[emp.name.toLowerCase()] || '';
     const wo = parseWoFromContent(emp.content);
     const close_pct = calcClosePct(wo.wo_total, wo.wo_month_close);
@@ -1252,7 +1256,9 @@ function handleGetReportData(ss) {
   // Sắp xếp leader theo % close để gán rank
   const ldWithScore = leaders.map(ld => {
     const wo = parseWoFromContent(ld.content);
-    const s = statsMap[(ld.chat_id || '').toString().trim()] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
+    // Fallback: nếu chat_id trống, tra bằng tên từ Config tab
+    const ldLookupId = (ld.chat_id || cfgIdMap[(ld.name || '').toLowerCase()] || '').toString().trim();
+    const s = statsMap[ldLookupId] || { today: 0, d1: 0, d2: 0, week: 0, month: 0 };
     // Đọc thêm từ TL content: "3-Day Result: 11/0/0/0" → member_count / eod_today / eod_d1 / eod_d2
     const eodM = ld.content.match(/3-Day\s*Result\s*:\s*(\d+)\/(\d+)\/(\d+)\/(\d+)/i);
     const member_count   = eodM ? parseInt(eodM[1]) || 0 : 0;
