@@ -18,6 +18,16 @@ const GH_WF_FILE = 'daily_reports.yml';
 const GH_BRANCH  = 'main';
 const GH_REPORT  = 'Reports 1, 2, 3, 4 - Daily Task & Backlog';
 
+
+
+// ── Ham ho tro: luu GITHUB_TOKEN vao Script Properties (goi qua API) ──
+function setGitHubTokenProp_(token) {
+  if (!token) return 'error: empty token';
+  PropertiesService.getScriptProperties().setProperty('GITHUB_TOKEN', token);
+  return 'ok';
+}
+
+
 // ── Ham chinh: goi GitHub API de trigger workflow_dispatch ──
 function triggerDailyReport_() {
   const token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
