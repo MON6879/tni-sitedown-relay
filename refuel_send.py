@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from tg_utils import get_msg_id, set_msg_id, tg_delete
+from tg_utils import get_msg_id, set_msg_id, tg_delete, tg_delete_by_title
 
 # Cấu hình bot và chat ID mặc định của group 9 TNI REQUEST REFUEL
 REFUEL_BOT_TOKEN = os.getenv("REFUEL_BOT_TOKEN", "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME")
@@ -156,6 +156,7 @@ def format_and_send_report(rows: list[str]) -> list[int]:
     STATE_KEY = f"refuel_daily_{REFUEL_CHAT_ID}"
 
     # Xóa tin cũ trước khi gửi mới
+    tg_delete_by_title(REFUEL_CHAT_ID, "⛽ TNI REQUEST REFUEL")
     old_id = get_msg_id(STATE_KEY)
     if old_id:
         tg_delete(REFUEL_CHAT_ID, old_id)
