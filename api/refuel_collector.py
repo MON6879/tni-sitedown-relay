@@ -24,6 +24,11 @@ REFUEL_PLAN_GAS_URL = (
     os.environ.get("REFUEL_PLAN_GAS_URL") or       # Vercel env var name (fallback)
     ""
 ).strip()
+
+# Tự động chuyển đổi nếu URL chứa deployment cũ đã bị Google lưu trữ (archive)
+if not REFUEL_PLAN_GAS_URL or "AKfycbzZmFw" in REFUEL_PLAN_GAS_URL:
+    REFUEL_PLAN_GAS_URL = "https://script.google.com/macros/s/AKfycbwHyzulEMVGjslfjN_m38HzpFZHRfk2qwbQmdwb6MMqBM8xNm20JJxxzW_4zTNzp3n24Q/exec"
+
 PLAN_GROUP_ID       = "5469544739"   # ID group 9 TNI REQUEST REFUEL (dạng số dương, không có dấu -)
 
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
