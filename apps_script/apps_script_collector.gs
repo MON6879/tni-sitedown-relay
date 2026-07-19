@@ -89,6 +89,10 @@ function doPost(e) {
         body.action === "inv_add_photo" ||
         body.action === "process_photo")     return doPostMdg_(e);
 
+    // ── Refuel Plan Collector ──────────────────────────────────────────────
+    if (body.action === "collect_message" ||
+        body.action === "collect_photo")     return doPostRefuelPlan_(e);
+
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
     return json({ status: "error", message: err.message, stack: err.stack });
