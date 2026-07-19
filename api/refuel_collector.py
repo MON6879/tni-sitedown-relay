@@ -32,6 +32,8 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))
 def classify(text: str) -> str | None:
     """Phân loại tin nhắn theo keyword."""
     t = text.lower()
+    if "name of ft staff member" in t and "supervise" in t:
+        return "FT_MONITOR"
     if "dg type" in t:
         return "REFUELED"
     # Letter Submit: "letter" + "submit"/"submitted"
@@ -325,6 +327,7 @@ def process_update(update: dict):
                 "PLAN":    "Plan refuel",
                 "REQUEST": "Team request",
                 "REFUELED":"Refueled",
+                "FT_MONITOR": "FT follow monitor",
             }.get(category, category)
             reply_text = (
                 f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"

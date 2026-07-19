@@ -163,6 +163,51 @@ function collectMessage(body) {
   const today   = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
   const timeStr = Utilities.formatDate(now, "Asia/Rangoon", "HH:mm");
 
+  // ==================== 0. FT FOLLOW MONITOR ====================
+  if (textLower.includes("name of ft staff member") && textLower.includes("supervise")) {
+    let sheet = ss.getSheetByName("FT follow monitor");
+    if (!sheet) {
+      sheet = ss.insertSheet("FT follow monitor");
+      sheet.appendRow(["DEF", "Date", "FT Name", "Site ID", "Refuel Qty", "Timestamp", "Sender Name", "Sender ID"]);
+      sheet.getRange("A1:H1").setFontWeight("bold").setBackground("#D9E1F2");
+    }
+
+    const match = text.match(/according to the plan:\s*([^-]+)-\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    let ftName = "";
+    let dateVal = today;
+    if (match) {
+      ftName = match[1].trim();
+      dateVal = match[2].trim();
+    } else {
+      const nameMatch = text.match(/plan:\s*([^-]+)/i);
+      if (nameMatch) ftName = nameMatch[1].trim();
+      const dMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+      if (dMatch) dateVal = dMatch[1].trim();
+    }
+
+    const entries = parseSitesAndQty(text, false);
+    if (entries.length === 0) return jsonResp({ status: "skip", message: "No sites parsed in FT Monitor" });
+
+    const firstDefId = "#" + String(sheet.getLastRow() + entries.length - 1).padStart(5, "0");
+    entries.reverse().forEach(function(en) {
+      const defId = nextDefId(sheet);
+      const row = [
+        defId,    // A: DEF
+        dateVal,  // B: Date
+        ftName,   // C: FT Name
+        en.site,  // D: Site ID
+        en.qty,   // E: Refuel Qty
+        now,      // F: Timestamp
+        sender,   // G: Sender Name
+        senderId  // H: Sender ID
+      ];
+      insertAtTop(sheet, row);
+    });
+
+    Logger.log("[Collect] FT_MONITOR → FT follow monitor sheet, " + entries.length + " sites, first DEF=" + firstDefId);
+    return jsonResp({ status: "ok", category: "FT_MONITOR", sites: entries.length, def: firstDefId, time: today + " " + timeStr });
+  }
+
   // ==================== 1. REFUELED (DG Type) ====================
   if (textLower.includes("dg type")) {
     const sheet = ss.getSheetByName("Refueled");

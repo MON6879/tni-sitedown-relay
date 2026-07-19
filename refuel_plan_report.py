@@ -148,17 +148,19 @@ class RefuelData:
         self.records = []          # list of dict: {ts, date, cat, sender, sender_id, site, qty}
         self.letter_approved = ""  # ngày Government Approved mới nhất (col C)
         self.letter_submitted = "" # ngày Letter Submitted mới nhất (col B)
-
+        self.ft_monitors = []      # list of dict: {date, ft_name, site_id, qty} — từ sheet "FT follow monitor"
+ 
         if not os.path.exists(XLSX_FILE_PATH):
             if not download_spreadsheet():
                 return
-
+ 
         try:
             wb = openpyxl.load_workbook(XLSX_FILE_PATH, data_only=True)
             self._parse_members(wb)
             self._parse_targets(wb)
             self._parse_lettel(wb)
             self._parse_lettel_progress(wb)
+            self._parse_ft_monitors(wb)
             self._parse_records(wb)
         except Exception as e:
             print(f"❌ Error loading Excel data: {e}", file=sys.stderr)
@@ -244,7 +246,33 @@ class RefuelData:
                     latest_approved = s
         self.letter_submitted = latest_submitted
         self.letter_approved  = latest_approved
-
+ 
+    def _parse_ft_monitors(self, wb):
+        """Đọc tab 'FT follow monitor' và lấy danh sách những người đi theo giám sát."""
+        self.ft_monitors = []
+        if "FT follow monitor" not in wb.sheetnames:
+            return
+        ws = wb["FT follow monitor"]
+        for r in range(2, ws.max_row + 1):
+            date_val = ws.cell(row=r, column=2).value  # B: Date
+            ft_name  = ws.cell(row=r, column=3).value  # C: FT Name
+            site_id  = ws.cell(row=r, column=4).value  # D: Site ID
+            qty      = ws.cell(row=r, column=5).value  # E: Refuel Qty
+            
+            if ft_name:
+                date_str = ""
+                if isinstance(date_val, datetime):
+                    date_str = date_val.strftime("%d/%m/%Y")
+                elif date_val:
+                    date_str = str(date_val).strip()
+                
+                self.ft_monitors.append({
+                    "date": date_str,
+                    "ft_name": str(ft_name).strip(),
+                    "site_id": str(site_id).strip() if site_id else "",
+                    "qty": str(qty).strip() if qty else ""
+                })
+ 
     def _parse_records(self, wb):
         # 1. Parse Plan refuel sheet
         if "Plan refuel" in wb.sheetnames:
@@ -422,12 +450,6 @@ def report_1(data: RefuelData):
     print("✅ Report 1 sent.")
 
 
-
-    # ── Lọc tất cả records có date == hôm nay ──
-    plan_today     = [r for r in data.records if r["cat"] == "PLAN"     and r["date"] == today_str]
-    refueled_today = [r for r in data.records if r["cat"] == "REFUELED" and r["date"] == today_str]
-    request_today  = [r for r in data.records if r["cat"] == "REQUEST"  and r["date"] == today_str]
-
 def report_2(data: RefuelData):
     print("📊 Generating Report 2 — Progress Sent Plan...")
     now = datetime.now(TZ_MM)
@@ -436,6 +458,28 @@ def report_2(data: RefuelData):
     # ── Letter Progress ──
     submit_line   = f"📤 The letter was submitted to the Government for approval on: <b>{data.letter_submitted or 'N/A'}</b>"
     approved_line = f"✅ The government approved the oil transport letter on: <b>{data.letter_approved or 'N/A'}</b>"
+
+    # ── FT follow monitor ──
+    ft_today = []
+    for ft in data.ft_monitors:
+        ft_date = ft["date"]
+        try:
+            parts = ft_date.split("/")
+            if len(parts) == 3:
+                ft_date = f"{int(parts[0]):02d}/{int(parts[1]):02d}/{int(parts[2])}"
+        except Exception:
+            pass
+        today_norm = ""
+        try:
+            parts_today = today_str.split("/")
+            if len(parts_today) == 3:
+                today_norm = f"{int(parts_today[0]):02d}/{int(parts_today[1]):02d}/{int(parts_today[2])}"
+        except Exception:
+            today_norm = today_str
+        if ft_date == today_norm:
+            ft_today.append(ft["ft_name"])
+    ft_names_today = sorted(list(set(ft_today)))
+    ft_str = ", ".join(ft_names_today) if ft_names_today else "None"
 
     # ── Tần suất gửi Plan per person từ target_members (col G/H Template) ──
     allowed_ids = {m["id"] for m in data.target_members}
@@ -469,6 +513,7 @@ def report_2(data: RefuelData):
         "📝 <b>Letter Progress:</b>",
         f"  {submit_line}",
         f"  {approved_line}",
+        f"  👥 FT follow monitor: <b>{ft_str}</b>",
         "",
         f"📋 <b>Plan Sent Today: {total_today}</b>",
         f"<code>{'Name':<15} | {'3D':>3} | {'7D':>3} | {'1M':>4}</code>",
