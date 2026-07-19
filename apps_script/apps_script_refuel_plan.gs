@@ -172,18 +172,11 @@ function collectMessage(body) {
       sheet.getRange("A1:H1").setFontWeight("bold").setBackground("#D9E1F2");
     }
 
-    const match = text.match(/according to the plan:\s*([^-]+)-\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
-    let ftName = "";
-    let dateVal = today;
-    if (match) {
-      ftName = match[1].trim();
-      dateVal = match[2].trim();
-    } else {
-      const nameMatch = text.match(/plan:\s*([^-]+)/i);
-      if (nameMatch) ftName = nameMatch[1].trim();
-      const dMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
-      if (dMatch) dateVal = dMatch[1].trim();
-    }
+    const colonIdx = text.indexOf(":");
+    const ftName = colonIdx > -1 ? text.substring(colonIdx + 1).trim() : "";
+
+    const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    const dateVal = dateMatch ? dateMatch[1].trim() : today;
 
     const entries = parseSitesAndQty(text, false);
     if (entries.length === 0) return jsonResp({ status: "skip", message: "No sites parsed in FT Monitor" });
