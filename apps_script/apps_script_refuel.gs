@@ -62,7 +62,7 @@ function doPostRefuel_(e) {
  * Đọc cột R (cột thứ 18), từ dòng thứ 2 đến cuối cùng của tab "Refuel"
  */
 function getRefuelData() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById("1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM");
   const sheet = ss.getSheetByName("Refueled");  // fix: renamed from 'Refuel' to 'Refueled'
   if (!sheet) {
     return json({ status: "error", message: "Sheet 'Refueled' not found" });
@@ -138,7 +138,7 @@ function sendRefuelReport() {
   deleteOldMessagesRefuel();
   
   // 2. Đọc dữ liệu cột R
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById("1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM");
   const sheet = ss.getSheetByName("Refueled");  // fix: renamed from 'Refuel' to 'Refueled'
   if (!sheet) {
     Logger.log("❌ Không tìm thấy tab 'Refueled'");

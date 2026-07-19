@@ -10,6 +10,11 @@ const PLAN_GROUP_ID    = "5469544739";   // ID group 9 TNI REQUEST REFUEL (đún
 const PLAN_BOT_TOKEN   = "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME";
 const PLAN_CHAT_ID     = "-5469544739";
 
+const REFUEL_SS_ID     = "1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM";
+function getRefuelSpreadsheet_() {
+  return SpreadsheetApp.openById(REFUEL_SS_ID);
+}
+
 // ── Web App Entry Points ───────────────────────────────────────────────────
 
 function doGetRefuelPlan_(e) {
@@ -46,7 +51,7 @@ function doPostRefuelPlan_(e) {
 // ── BotState: lưu/đọc message_id trong tab BotState ───────────────────────
 
 function getBotStateSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getRefuelSpreadsheet_();
   let sh = ss.getSheetByName("BotState");
   if (!sh) {
     sh = ss.insertSheet("BotState");
@@ -108,7 +113,7 @@ function insertAtTop(sheet, rowData) {
  */
 function updateLettelProgress(senderId, dateStr, category) {
   try {
-    const ss        = SpreadsheetApp.getActiveSpreadsheet();
+    const ss        = getRefuelSpreadsheet_();
     const tmplSheet = ss.getSheetByName("Template");
     const lpSheet   = ss.getSheetByName("Lettel Progress");
     if (!tmplSheet || !lpSheet) return "";
@@ -158,7 +163,7 @@ function collectMessage(body) {
   if (!text) return jsonResp({ status: "skip", message: "Empty message" });
 
   const textLower = text.toLowerCase();
-  const ss  = SpreadsheetApp.getActiveSpreadsheet();
+  const ss  = getRefuelSpreadsheet_();
   const now = new Date();
   const today   = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
   const timeStr = Utilities.formatDate(now, "Asia/Rangoon", "HH:mm");
@@ -497,7 +502,7 @@ const COL_AA = 27;
  * rồi ghi các cột T, U, V, W, AA.
  */
 function collectPhoto(body) {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const ss    = getRefuelSpreadsheet_();
   const sheet = ss.getSheetByName("Refueled");
   if (!sheet) return jsonResp({ status: "error", message: "Sheet 'Refueled' not found" });
 
@@ -668,7 +673,7 @@ function onEditRefuelPhoto(e) {
  * Chạy 1 lần từ Apps Script Editor để khởi tạo.
  */
 function setupRefuelPhotoHeaders() {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
+  const ss    = getRefuelSpreadsheet_();
   const sheet = ss.getSheetByName("Refueled");
   if (!sheet) { Logger.log("❌ Sheet 'Refueled' not found"); return; }
 
@@ -713,7 +718,7 @@ function setupOnEditTrigger() {
     }
   }
   ScriptApp.newTrigger("onEditRefuelPhoto")
-    .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
+    .forSpreadsheet(getRefuelSpreadsheet_())
     .onEdit()
     .create();
   Logger.log("✅ onEditRefuelPhoto trigger installed.");
