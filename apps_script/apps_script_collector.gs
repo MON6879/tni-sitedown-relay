@@ -2298,9 +2298,9 @@ function doGetRefuelData_(e) {
   try {
     const ssId = "1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM";
     const ss = SpreadsheetApp.openById(ssId);
-    const sheet = ss.getSheetByName("Refuel");
+    const sheet = ss.getSheetByName("Refueled");  // fix: renamed from 'Refuel' to 'Refueled'
     if (!sheet) {
-      return json({ status: "error", message: "Sheet Refuel not found" });
+      return json({ status: "error", message: "Sheet Refueled not found" });
     }
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
