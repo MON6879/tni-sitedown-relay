@@ -2298,15 +2298,15 @@ function doGetRefuelData_(e) {
   try {
     const ssId = "1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM";
     const ss = SpreadsheetApp.openById(ssId);
-    const sheet = ss.getSheetByName("Refueled");  // fix: renamed from 'Refuel' to 'Refueled'
+    const sheet = ss.getSheetByName("Need Refuel");
     if (!sheet) {
-      return json({ status: "error", message: "Sheet Refueled not found" });
+      return json({ status: "error", message: "Sheet Need Refuel not found" });
     }
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
       return json({ status: "ok", data: [] });
     }
-    const values = sheet.getRange(2, 7, lastRow - 1, 1).getValues();
+    const values = sheet.getRange(2, 18, lastRow - 1, 1).getValues();
     const data = [];
     for (let i = 0; i < values.length; i++) {
       const valTrim = String(values[i][0] || "").trim();
