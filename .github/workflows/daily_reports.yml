@@ -171,6 +171,9 @@ jobs:
         env:
           REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}
           REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
         run: python refuel_plan_report.py --report 1 2 3
 
       - name: Task — Refuel Plan Report 4, 5 (22:00 Myanmar)
@@ -179,6 +182,9 @@ jobs:
         env:
           REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}
           REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
         run: python refuel_plan_report.py --report 4 5
 
       - name: Task — Refuel Plan Report (Manual Dispatch)
@@ -187,4 +193,7 @@ jobs:
         env:
           REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}
           REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
         run: python refuel_plan_report.py
