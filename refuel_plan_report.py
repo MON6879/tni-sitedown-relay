@@ -674,7 +674,7 @@ def main():
     download_spreadsheet()
     data = RefuelData()
 
-    reports_to_run = args.report if args.report else [1, 2, 3, 4, 5]
+    reports_to_run = args.report if args.report else [1, 2, 3, 4]
 
     if 1 in reports_to_run:
         report_1(data)
