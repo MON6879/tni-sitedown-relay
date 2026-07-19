@@ -30,8 +30,8 @@ def _bot_token():
 
 def _gas_url():
     return (
-        os.environ.get("REFUEL_APPS_SCRIPT_URL") or
         os.environ.get("APPS_SCRIPT_URL") or
+        os.environ.get("REFUEL_APPS_SCRIPT_URL") or
         ""
     ).strip()
 

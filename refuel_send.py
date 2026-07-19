@@ -13,7 +13,7 @@ from tg_utils import get_msg_id, set_msg_id, tg_delete
 REFUEL_BOT_TOKEN = os.getenv("REFUEL_BOT_TOKEN", "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME")
 REFUEL_CHAT_ID   = os.getenv("REFUEL_CHAT_ID", "-5469544739")
 # URL Apps Script của bảng tính Refuel riêng, nếu không có sẽ tự động dùng chung APPS_SCRIPT_URL
-REFUEL_APPS_SCRIPT_URL = os.getenv("REFUEL_APPS_SCRIPT_URL", os.getenv("APPS_SCRIPT_URL", ""))
+REFUEL_APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL", os.getenv("REFUEL_APPS_SCRIPT_URL", ""))
 
 TZ_MM = timezone(timedelta(hours=6, minutes=30))  # Múi giờ Myanmar UTC+6:30
 

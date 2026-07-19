@@ -39,8 +39,8 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))  # Myanmar UTC+6:30
 
 # GAS URL để lưu message_id (BotState)
 REFUEL_GAS_URL = (
-    os.getenv("REFUEL_APPS_SCRIPT_URL") or
-    os.getenv("APPS_SCRIPT_URL") or ""
+    os.getenv("APPS_SCRIPT_URL") or
+    os.getenv("REFUEL_APPS_SCRIPT_URL") or ""
 ).strip()
 
 
