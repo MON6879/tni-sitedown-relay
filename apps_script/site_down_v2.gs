@@ -382,12 +382,21 @@ function checkColC(sheet) {
   const ts1     = parseA1Timestamp(sheet);
   const storeKey = ts1 ? (ts1 + "|" + raw.substring(0, 60)) : raw.substring(0, 200);
 
+  const cache = CacheService.getScriptCache();
+  const cacheKey1 = "SD_CACHE_KEY_A1_" + storeKey.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 100);
+  if (cache.get(cacheKey1)) {
+    Logger.log("[Tin1] A1 trùng cache (" + storeKey.substring(0, 40) + ") — bỏ qua");
+    return false;
+  }
+
   const props   = PropertiesService.getScriptProperties();
   const lastKey = props.getProperty(TS_KEY_A1) || "";
   if (storeKey === lastKey) {
     Logger.log("[Tin1] A1 không đổi (" + storeKey.substring(0, 40) + ") — bỏ qua");
     return false;
   }
+  
+  cache.put(cacheKey1, "1", 300);
   Logger.log("[Tin1] 🆕 A1 thay đổi → gửi Col C...");
 
   const colCRaw = readColCRaw(sheet);
@@ -488,10 +497,21 @@ function checkAwAz(sheet) {
   const ts = parseAW7Timestamp(sheet);
   if (!ts) { Logger.log("[Tin2] Không có timestamp trong AW7"); return false; }
 
+  const cache = CacheService.getScriptCache();
+  const cacheKey2 = "SD_CACHE_KEY_AW7_" + ts.replace(/[^a-zA-Z0-9]/g, "_");
+  if (cache.get(cacheKey2)) {
+    Logger.log("[Tin2] AW7 trùng cache (" + ts + ") — bỏ qua");
+    return false;
+  }
+
   const props  = PropertiesService.getScriptProperties();
   const lastTs = props.getProperty(TS_KEY_AW7) || "";
-  if (ts === lastTs) { Logger.log("[Tin2] AW7 không đổi (" + ts + ") — bỏ qua"); return false; }
+  if (ts === lastTs) {
+    Logger.log("[Tin2] AW7 không đổi (" + ts + ") — bỏ qua");
+    return false;
+  }
 
+  cache.put(cacheKey2, "1", 300);
   Logger.log("[Tin2] 🆕 " + ts + " → gửi summary...");
 
   const awaz  = readAwAz(sheet);
