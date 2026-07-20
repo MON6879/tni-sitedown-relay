@@ -37,7 +37,7 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))
 def classify(text: str) -> str | None:
     """Phân loại tin nhắn theo keyword."""
     t = text.lower()
-    if "name of ft staff member" in t and "supervise" in t:
+    if ("name of ft staff member" in t and "supervise" in t) or "follow monitor" in t or "follow moniter" in t:
         return "FT_MONITOR"
     if "dg type" in t:
         return "REFUELED"

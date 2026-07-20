@@ -169,7 +169,9 @@ function collectMessage(body) {
   const timeStr = Utilities.formatDate(now, "Asia/Rangoon", "HH:mm");
 
   // ==================== 0. FT FOLLOW MONITOR ====================
-  if (textLower.includes("name of ft staff member") && textLower.includes("supervise")) {
+  if ((textLower.includes("name of ft staff member") && textLower.includes("supervise")) || 
+      textLower.includes("follow monitor") || 
+      textLower.includes("follow moniter")) {
     let sheet = ss.getSheetByName("FT follow monitor");
     if (!sheet) {
       sheet = ss.insertSheet("FT follow monitor");
@@ -178,7 +180,20 @@ function collectMessage(body) {
     }
 
     const colonIdx = text.indexOf(":");
-    const ftName = colonIdx > -1 ? text.substring(colonIdx + 1).trim() : "";
+    let ftRaw = colonIdx > -1 ? text.substring(colonIdx + 1).trim() : text.trim();
+    
+    // Trích xuất tên sạch (loại bỏ phần ngày và mã trạm ở đuôi)
+    let cleanName = ftRaw;
+    const dateM = cleanName.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    if (dateM) {
+      cleanName = cleanName.substring(0, dateM.index).trim();
+    }
+    const tniM = cleanName.match(/TNI\d{4}/i);
+    if (tniM) {
+      cleanName = cleanName.substring(0, tniM.index).trim();
+    }
+    cleanName = cleanName.replace(/[\s\-,:]+$/, "").trim();
+    const ftName = cleanName;
 
     const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
     const dateVal = dateMatch ? dateMatch[1].trim() : today;
@@ -409,9 +424,9 @@ function parseRefueledText(text) {
 
 function parseSitesAndQty(text, isPlan) {
   const results = [];
-  // pat1: matches TNIxxxx followed by separator (space, colon, comma, plus, equals) and quantity
-  // Thêm = vào separator để parse đúng TNI0385=220L
-  const pat1 = /TNI(\d{4}(?:_\d+)?)(?:\([^)]*\))?[\s:,+=]+(\d+)\s*[Ll]?\b(?!\s*\/)/gi;
+  // pat1: matches TNIxxxx followed by separator (space, colon, comma, plus, equals, hyphen) and quantity
+  // Thêm = và - vào separator để parse đúng TNI0385=220L, TNI0213 - 660L
+  const pat1 = /TNI(\d{4}(?:_\d+)?)(?:\([^)]*\))?[\s:,+=\-]+(\d+)\s*[Ll]?\b(?!\s*\/)/gi;
   let m;
   const matchedSites = {};
 
