@@ -236,11 +236,7 @@ def process_update(update: dict):
             reply_text = (
                 "📝 <b>Template: Refuel Plan</b>\n"
                 "<i>(Tap the code block below to copy)</i>\n\n"
-                f"<pre><code>Plan refuel\n"
-                f"Date: {tomorrow_str}\n"
-                f"Team X\n"
-                f"TNIXXXX 440L\n"
-                f"TNIXXXX 220L</code></pre>"
+                f"<pre><code>Team X Plan refuel {tomorrow_str} : TNIXXXX 440L + TNIXXXX 220L</code></pre>"
             )
             tg_reply(chat_id, reply_text)
             return
@@ -250,11 +246,7 @@ def process_update(update: dict):
             reply_text = (
                 "📝 <b>Template: Refuel Request</b>\n"
                 "<i>(Tap the code block below to copy)</i>\n\n"
-                f"<pre><code>Request refuel\n"
-                f"Date: {tomorrow_str}\n"
-                f"Team X\n"
-                f"TNIXXXX: 440 L\n"
-                f"TNIXXXX: 220 L</code></pre>"
+                f"<pre><code>Team X request {tomorrow_str}: TNIXXXX: 440L + TNIXXXX: 220L</code></pre>"
             )
             tg_reply(chat_id, reply_text)
             return
