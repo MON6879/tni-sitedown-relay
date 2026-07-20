@@ -19,6 +19,12 @@
 
 ## 📅 CHANGELOG
 
+### 21/07/2026
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `apps_script_attendance/TNI attendance.js` | Thêm CacheService dedup theo `update_id` | Chặn Telegram gửi tin trùng lặp (retry loop) do timeout |
+| `apps_script_attendance/TNI attendance.js` | Sửa check trùng theo Telegram ID thay vì Tên bị lệch cột | Tránh lưu trùng lặp điểm danh nhiều lần trong ngày |
+
 ### 18/07/2026
 | File | Thay đổi | Lý do |
 |---|---|---|

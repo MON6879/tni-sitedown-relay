@@ -28,6 +28,15 @@ function doGet(e) {
     const h2 = s2 ? s2.getRange(1, 1, 1, s2.getLastColumn()).getValues()[0] : [];
     return ContentService.createTextOutput(JSON.stringify({ list_attendance: h1, staff_attendance: h2 }));
   }
+  if (action === "get_logs") {
+    const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+    const logSheet = ss.getSheetByName("Logs");
+    if (!logSheet) return ContentService.createTextOutput(JSON.stringify([]));
+    const lastRow = logSheet.getLastRow();
+    if (lastRow < 2) return ContentService.createTextOutput(JSON.stringify([]));
+    const logs = logSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    return ContentService.createTextOutput(JSON.stringify(logs));
+  }
   return ContentService.createTextOutput("Unknown action: " + action);
 }
 
@@ -44,6 +53,18 @@ function doPost(e) {
     }
 
     const update = JSON.parse(e.postData.contents);
+
+    // ── DEDUPLICATE TELEGRAM WEBHOOK RETRIES ──
+    if (update.update_id) {
+      const cache = CacheService.getScriptCache();
+      const cacheKey = "attendance_upd_" + update.update_id;
+      if (cache.get(cacheKey)) {
+        logToSheet_("Duplicate update_id: " + update.update_id + ", ignoring.");
+        return ContentService.createTextOutput("OK");
+      }
+      cache.put(cacheKey, "1", 600); // Cache for 10 minutes
+    }
+
     logToSheet_("Update received: " + JSON.stringify(update));
     Logger.log("Update received: " + JSON.stringify(update));
 
@@ -215,8 +236,8 @@ function doPost(e) {
       const finalTgId = match.telegramId;
       const finalDep = match.department;
 
-      // Kiểm tra trùng lặp trong ngày hôm nay
-      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, finalShortName)) {
+      // Kiểm tra trùng lặp trong ngày hôm nay theo Telegram ID
+      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, finalTgId)) {
         replyMsg += `- ${finalShortName} (Already logged today)\n`;
         continue;
       }
@@ -308,14 +329,15 @@ function getStaffColumns_(sheet) {
   return { nameCol: nameCol, fullNameCol: fullNameCol, idCol: idCol, photoCol: photoCol, depCol: depCol };
 }
 
-/** Kiểm tra xem nhân viên đã điểm danh trong ngày hôm nay chưa */
-function isAlreadyLoggedToday_(sheet, dateStr, fullName) {
+/** Kiểm tra xem nhân viên đã điểm danh trong ngày hôm nay chưa theo Telegram ID */
+function isAlreadyLoggedToday_(sheet, dateStr, telegramId) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return false;
-  const values = sheet.getRange(2, 2, lastRow - 1, 4).getValues(); // Cột B (Date) đến cột E (Full name)
+  // Đọc từ cột B (Date) đến cột D (Telegram ID) -> 3 cột
+  const values = sheet.getRange(2, 2, lastRow - 1, 3).getValues(); 
   for (let i = 0; i < values.length; i++) {
     const rowDate = values[i][0];
-    const rowName = String(values[i][3] || "").trim();
+    const rowTgId = String(values[i][2] || "").trim(); // Cột D (Telegram ID) là index 2 trong mảng [B, C, D]
     
     let formattedRowDate = "";
     if (rowDate instanceof Date) {
@@ -324,7 +346,7 @@ function isAlreadyLoggedToday_(sheet, dateStr, fullName) {
       formattedRowDate = String(rowDate || "").trim();
     }
     
-    if (formattedRowDate.split(" ")[0] === dateStr && rowName.toLowerCase() === fullName.toLowerCase()) {
+    if (formattedRowDate.split(" ")[0] === dateStr && rowTgId === telegramId) {
       return true;
     }
   }

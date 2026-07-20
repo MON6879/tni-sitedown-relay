@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"><base target="_top">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; font-family:'Segoe UI',sans-serif; }
+  body { background:#F5F5F5; padding:16px; font-size:14px; }
+  h2 { color:#00695C; margin-bottom:16px; font-size:16px;
+       border-bottom:2px solid #00695C; padding-bottom:8px; }
+  .form-group { margin-bottom:12px; }
+  label { display:block; font-weight:600; color:#333; margin-bottom:4px; }
+  input, select, textarea {
+    width:100%; padding:8px 10px; border:1px solid #BDBDBD;
+    border-radius:6px; font-size:14px; color:#212121; transition:border 0.2s;
+  }
+  input:focus, select:focus { outline:none; border-color:#00695C;
+    box-shadow:0 0 0 2px rgba(0,105,92,0.15); }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .required { color:#D32F2F; }
+  .section-label {
+    background:#E0F2F1; padding:6px 10px; border-radius:4px;
+    font-weight:700; color:#00695C; margin:14px 0 8px;
+  }
+  .limit-box {
+    background:#fff; border:2px solid #00695C; border-radius:8px;
+    padding:12px; margin:12px 0; display:none;
+  }
+  .limit-box h3 { color:#00695C; font-size:14px; margin-bottom:8px; }
+  .limit-row { display:flex; justify-content:space-between; padding:4px 0;
+               border-bottom:1px solid #E0F2F1; }
+  .limit-val { font-weight:700; }
+  .limit-remain { font-size:16px; font-weight:800; }
+  .ok { color:#2E7D32; } .warn { color:#FF6F00; } .bad { color:#C62828; }
+  .warning-box {
+    background:#FFF3E0; border:1px solid #FF6F00; border-radius:6px;
+    padding:10px; margin:8px 0; display:none; color:#E65100; font-weight:600;
+  }
+  .btn-row { display:flex; gap:10px; margin-top:16px; justify-content:flex-end; }
+  button { padding:9px 24px; border:none; border-radius:6px;
+           font-size:14px; font-weight:600; cursor:pointer; transition:0.2s; }
+  .btn-primary { background:#00695C; color:#fff; }
+  .btn-primary:hover { background:#004D40; }
+  .btn-cancel { background:#E0E0E0; color:#333; }
+  .msg { padding:10px; border-radius:6px; margin-bottom:12px;
+         font-weight:600; display:none; }
+  .msg.error { background:#FFEBEE; color:#C62828; display:block; }
+  .msg.success { background:#E8F5E9; color:#2E7D32; display:block; }
+</style>
+</head>
+<body>
+<h2>💸 Lập Lệnh Tạm Ứng</h2>
+<div id="msg" class="msg"></div>
+
+<div class="section-label">Thông tin lệnh ứng</div>
+<div class="row2">
+  <div class="form-group">
+    <label>Team <span class="required">*</span></label>
+    <select id="team" required onchange="loadLimit()">
+      <option value="">-- Chọn Team --</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Tháng ứng</label>
+    <input type="text" id="thang" readonly style="background:#F5F5F5">
+  </div>
+</div>
+
+<div class="form-group">
+  <label>Lý do / Mục đích tạm ứng <span class="required">*</span></label>
+  <textarea id="lyDo" rows="3" placeholder="Nêu rõ mục đích tạm ứng..." required></textarea>
+</div>
+
+<div class="section-label">Hạn mức & Số tiền</div>
+
+<div id="limitBox" class="limit-box">
+  <h3>📊 Hạn mức Team đã chọn</h3>
+  <div class="limit-row"><span>Tháng tham chiếu:</span><span class="limit-val" id="lRefMonth">—</span></div>
+  <div class="limit-row"><span>Hạn mức tối đa:</span><span class="limit-val" id="lMax">—</span></div>
+  <div class="limit-row"><span>Đã tạm ứng kỳ này:</span><span class="limit-val" id="lAdvanced">—</span></div>
+  <div class="limit-row"><span>Đã clear TCT duyệt:</span><span class="limit-val" id="lCleared">—</span></div>
+  <div class="limit-row"><span>Còn tồn ứng:</span><span class="limit-val" id="lOutstanding">—</span></div>
+  <div class="limit-row" style="border-bottom:none">
+    <span>⭐ CÒN ĐƯỢC ỨNG THÊM:</span>
+    <span class="limit-remain" id="lRemain">—</span>
+  </div>
+</div>
+
+<div id="warnBox" class="warning-box">
+  ⚠️ Số tiền đề xuất VƯỢT HẠN MỨC — Cần BOD xem xét đặc biệt!
+</div>
+
+<div class="row2">
+  <div class="form-group">
+    <label>Số tiền đề xuất (đ) <span class="required">*</span></label>
+    <input type="number" id="soTienDeXuat" placeholder="0" min="0" required
+           oninput="checkLimit()">
+  </div>
+  <div class="form-group">
+    <label>Hạn mức còn lại</label>
+    <input type="text" id="hanMucDisplay" readonly style="background:#F5F5F5; font-weight:700">
+  </div>
+</div>
+
+<div class="form-group">
+  <label>Ghi chú của TPTC</label>
+  <textarea id="ghiChuTptc" rows="2" placeholder="Nhận xét, điều kiện..."></textarea>
+</div>
+
+<div class="btn-row">
+  <button class="btn-cancel" onclick="google.script.host.close()">Hủy</button>
+  <button class="btn-primary" onclick="submitForm()">📤 Tạo Lệnh & Gửi BOD</button>
+</div>
+
+<script>
+let limitData = null;
+
+// Set tháng hiện tại
+const now = new Date();
+document.getElementById('thang').value =
+  String(now.getMonth()+1).padStart(2,'0') + '/' + now.getFullYear();
+
+// Load teams
+google.script.run.withSuccessHandler(function(data) {
+  const sel = document.getElementById('team');
+  data.teams.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t; sel.appendChild(opt);
+  });
+}).getFormDropdownData();
+
+function loadLimit() {
+  const team = document.getElementById('team').value;
+  if (!team) return;
+  document.getElementById('limitBox').style.display = 'none';
+
+  google.script.run.withSuccessHandler(function(info) {
+    limitData = info;
+    if (!info) return;
+    document.getElementById('limitBox').style.display = 'block';
+    document.getElementById('lRefMonth').textContent   = info.refMonth       || 'Chưa có';
+    document.getElementById('lMax').textContent        = fmt(info.clearAmount)    + ' đ';
+    document.getElementById('lAdvanced').textContent   = fmt(info.totalAdvanced)  + ' đ';
+    document.getElementById('lCleared').textContent    = fmt(info.totalCleared)   + ' đ';
+    document.getElementById('lOutstanding').textContent= fmt(info.outstanding)    + ' đ';
+
+    const remain = info.canAdvanceMore || 0;
+    const el = document.getElementById('lRemain');
+    el.textContent = fmt(remain) + ' đ';
+    el.className = 'limit-remain ' + (remain <= 0 ? 'bad' : remain < info.clearAmount*0.2 ? 'warn' : 'ok');
+    document.getElementById('hanMucDisplay').value = fmt(remain) + ' đ';
+    checkLimit();
+  }).getAdvanceLimitForTeam(team);
+}
+
+function checkLimit() {
+  const val = Number(document.getElementById('soTienDeXuat').value) || 0;
+  const remain = limitData ? (limitData.canAdvanceMore || 0) : 0;
+  document.getElementById('warnBox').style.display =
+    (val > remain && remain > 0) ? 'block' : 'none';
+}
+
+function fmt(n) {
+  return Number(n||0).toLocaleString('vi-VN');
+}
+
+function submitForm() {
+  const data = {
+    team         : document.getElementById('team').value,
+    lyDo         : document.getElementById('lyDo').value.trim(),
+    soTienDeXuat : document.getElementById('soTienDeXuat').value,
+    ghiChuTptc   : document.getElementById('ghiChuTptc').value.trim(),
+  };
+
+  if (!data.team || !data.lyDo || !data.soTienDeXuat) {
+    showMsg('error','⚠️ Vui lòng điền đầy đủ thông tin bắt buộc (*)'); return;
+  }
+  if (Number(data.soTienDeXuat) <= 0) {
+    showMsg('error','⚠️ Số tiền phải lớn hơn 0'); return;
+  }
+
+  document.querySelector('.btn-primary').disabled = true;
+  document.querySelector('.btn-primary').textContent = '⏳ Đang tạo lệnh...';
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        showMsg('success',
+          `✅ Đã tạo lệnh ${result.stt}!\n` +
+          (result.vuotHanMuc ? '⚠️ Lưu ý: Vượt hạn mức — BOD cần xem xét.' : ''));
+        setTimeout(() => google.script.host.close(), 2000);
+      } else {
+        showMsg('error','❌ Lỗi: ' + result.error);
+        document.querySelector('.btn-primary').disabled = false;
+        document.querySelector('.btn-primary').textContent = '📤 Tạo Lệnh & Gửi BOD';
+      }
+    })
+    .saveAdvanceRequest(data);
+}
+
+function showMsg(type, text) {
+  const el = document.getElementById('msg');
+  el.className = 'msg ' + type; el.textContent = text;
+}
+</script>
+</body>
+</html>

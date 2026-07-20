@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<base target="_top">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+  body { background: #F5F5F5; padding: 16px; font-size: 14px; }
+  h2 { color: #1565C0; margin-bottom: 16px; font-size: 16px;
+       border-bottom: 2px solid #1565C0; padding-bottom: 8px; }
+  .form-group { margin-bottom: 12px; }
+  label { display: block; font-weight: 600; color: #333; margin-bottom: 4px; }
+  input, select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid #BDBDBD;
+    border-radius: 6px; font-size: 14px; color: #212121;
+    transition: border 0.2s;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none; border-color: #1565C0;
+    box-shadow: 0 0 0 2px rgba(21,101,192,0.15);
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .required { color: #D32F2F; }
+  .btn-row { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
+  button {
+    padding: 9px 24px; border: none; border-radius: 6px;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s;
+  }
+  .btn-primary { background: #1565C0; color: #fff; }
+  .btn-primary:hover { background: #0D47A1; }
+  .btn-cancel { background: #E0E0E0; color: #333; }
+  .btn-cancel:hover { background: #BDBDBD; }
+  .msg { padding: 10px; border-radius: 6px; margin-bottom: 12px;
+         font-weight: 600; display: none; }
+  .msg.error { background: #FFEBEE; color: #C62828; display: block; }
+  .msg.success { background: #E8F5E9; color: #2E7D32; display: block; }
+  .section-label {
+    background: #E3F2FD; padding: 6px 10px; border-radius: 4px;
+    font-weight: 700; color: #1565C0; margin: 14px 0 8px;
+  }
+</style>
+</head>
+<body>
+<h2>📄 Nhập Chứng Từ Quyết Toán</h2>
+<div id="msg" class="msg"></div>
+
+<div class="section-label">Thông tin chứng từ</div>
+<div class="row2">
+  <div class="form-group">
+    <label>Ngày chứng từ <span class="required">*</span></label>
+    <input type="date" id="ngayCt" required>
+  </div>
+  <div class="form-group">
+    <label>Team <span class="required">*</span></label>
+    <select id="team" required>
+      <option value="">-- Chọn Team --</option>
+    </select>
+  </div>
+</div>
+
+<div class="row2">
+  <div class="form-group">
+    <label>Loại chi phí <span class="required">*</span></label>
+    <select id="loaiChiPhi" required>
+      <option value="">-- Chọn loại --</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Loại phí (Type of Fee)</label>
+    <select id="loaiFee">
+      <option value="">-- Chọn --</option>
+    </select>
+  </div>
+</div>
+
+<div class="form-group">
+  <label>Mô tả chi tiết <span class="required">*</span></label>
+  <textarea id="moTa" rows="3" placeholder="Mô tả nội dung chi phí..." required></textarea>
+</div>
+
+<div class="section-label">Số tiền & Kế toán</div>
+<div class="row2">
+  <div class="form-group">
+    <label>Số tiền đề xuất (đ) <span class="required">*</span></label>
+    <input type="number" id="soTienDeXuat" placeholder="0" min="0" required>
+  </div>
+  <div class="form-group">
+    <label>Tài khoản kế toán</label>
+    <select id="taiKhoan">
+      <option value="">-- Chọn TK --</option>
+      <option>1111</option><option>11211</option><option>11212</option>
+      <option>3383</option><option>6222</option><option>6272</option><option>6277</option>
+    </select>
+  </div>
+</div>
+
+<div class="form-group">
+  <label>Ghi chú</label>
+  <textarea id="ghiChu" rows="2" placeholder="Ghi chú thêm nếu có..."></textarea>
+</div>
+
+<div class="btn-row">
+  <button class="btn-cancel" onclick="google.script.host.close()">Hủy</button>
+  <button class="btn-primary" onclick="submitForm()">💾 Lưu Chứng Từ</button>
+</div>
+
+<script>
+// Điền ngày hôm nay mặc định
+document.getElementById('ngayCt').valueAsDate = new Date();
+
+// Load dropdown data từ Apps Script
+google.script.run.withSuccessHandler(function(data) {
+  const teamSel = document.getElementById('team');
+  data.teams.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    teamSel.appendChild(opt);
+  });
+
+  const catSel = document.getElementById('loaiChiPhi');
+  data.categories.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    catSel.appendChild(opt);
+  });
+
+  const feeSel = document.getElementById('loaiFee');
+  data.feeTypes.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f; opt.textContent = f;
+    feeSel.appendChild(opt);
+  });
+}).getFormDropdownData();
+
+function submitForm() {
+  const data = {
+    ngayCt      : document.getElementById('ngayCt').value,
+    team        : document.getElementById('team').value,
+    loaiChiPhi  : document.getElementById('loaiChiPhi').value,
+    loaiFee     : document.getElementById('loaiFee').value,
+    moTa        : document.getElementById('moTa').value.trim(),
+    soTienDeXuat: document.getElementById('soTienDeXuat').value,
+    taiKhoan    : document.getElementById('taiKhoan').value,
+    ghiChu      : document.getElementById('ghiChu').value.trim(),
+  };
+
+  if (!data.ngayCt || !data.team || !data.loaiChiPhi || !data.moTa || !data.soTienDeXuat) {
+    showMsg('error', '⚠️ Vui lòng điền đầy đủ các trường bắt buộc (*)');
+    return;
+  }
+  if (Number(data.soTienDeXuat) <= 0) {
+    showMsg('error', '⚠️ Số tiền phải lớn hơn 0');
+    return;
+  }
+
+  document.querySelector('.btn-primary').disabled = true;
+  document.querySelector('.btn-primary').textContent = '⏳ Đang lưu...';
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        showMsg('success', `✅ Đã lưu chứng từ #${result.stt} thành công!`);
+        setTimeout(() => google.script.host.close(), 1500);
+      } else {
+        showMsg('error', '❌ Lỗi: ' + result.error);
+        document.querySelector('.btn-primary').disabled = false;
+        document.querySelector('.btn-primary').textContent = '💾 Lưu Chứng Từ';
+      }
+    })
+    .saveSettlement(data);
+}
+
+function showMsg(type, text) {
+  const el = document.getElementById('msg');
+  el.className = 'msg ' + type;
+  el.textContent = text;
+}
+</script>
+</body>
+</html>
