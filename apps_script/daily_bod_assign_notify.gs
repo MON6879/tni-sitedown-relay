@@ -67,10 +67,42 @@ function checkBodAssign() {
 
       // 2. Quét gửi Team
       if (colT) {
+        const msgText = "New assing task: " + colT;
+        
+        // --- Gửi cho Control ---
+        const oldControlMsgKey = "BOD_MSG_ID_CONTROL_TEAM_" + colU.toUpperCase().replace(/\s+/g, "") + "_" + colT.toUpperCase().replace(/\s+/g, "");
+        const oldControlMsgId = props.getProperty(oldControlMsgKey);
+        if (oldControlMsgId) {
+          try {
+            UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/deleteMessage", {
+              method: "post",
+              contentType: "application/json",
+              payload: JSON.stringify({ chat_id: controlChatId, message_id: parseInt(oldControlMsgId, 10) }),
+              muteHttpExceptions: true
+            });
+          } catch (eDel) {
+            Logger.log("⚠️ Lỗi xóa tin cũ Team-on-Control: " + eDel.message);
+          }
+        }
+
+        const controlPayload = {
+          chat_id: controlChatId,
+          text: msgText + (colU ? " (" + colU + ")" : ""),
+          reply_markup: {
+            inline_keyboard: [[
+              { text: "✔️ Receive Task", callback_data: "ack_bod_task_" + rowNum }
+            ]]
+          }
+        };
+
+        const newControlMsgId = sendTelegramMessage_(token, controlPayload);
+        if (newControlMsgId) {
+          props.setProperty(oldControlMsgKey, String(newControlMsgId));
+        }
+
+        // --- Gửi cho Team ---
         const chatId = getTeamChatId_(colU);
         if (chatId) {
-          const msgText = "New assing task: " + colT;
-          
           // Tự động tìm và xóa tin cũ cùng nội dung trên Team
           const oldMsgKey = "BOD_MSG_ID_TEAM_" + colU.toUpperCase().replace(/\s+/g, "") + "_" + colT.toUpperCase().replace(/\s+/g, "");
           const oldMsgId = props.getProperty(oldMsgKey);
