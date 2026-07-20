@@ -823,21 +823,47 @@ async def handle(data: dict):
             cmd = text.split()[0].split("@")[0].lower()
             
             if cmd in ("/start", "/help"):
+                if chat_id == MDG_CHAT_ID:
+                    await bot.send_message(
+                        chat_id,
+                        "👋 <b>TNI MDG Run & Inventory Bot</b>\n\n"
+                        "Available template command:\n"
+                        "• /inventory - Inventory report template\n\n"
+                        "<i>Tap the command to receive the template, then copy and fill out.</i>",
+                        parse_mode="HTML"
+                    )
+                else:
+                    await bot.send_message(
+                        chat_id,
+                        "👋 <b>TNI Asset & Cable Bot</b>\n\n"
+                        "Available template commands:\n"
+                        "• /order - Order template\n"
+                        "• /revoke - Revoke template\n"
+                        "• /move - Move template\n"
+                        "• /export - Export template\n"
+                        "• /done - Done template\n"
+                        "• /find - Search tasks, WOs, or site details\n\n"
+                        "<i>Tap any command to receive the template, then copy and fill out.</i>",
+                        parse_mode="HTML"
+                    )
+                return
+            elif cmd == "/inventory":
                 await bot.send_message(
                     chat_id,
-                    "👋 <b>TNI Asset & Cable Bot</b>\n\n"
-                    "Available template commands:\n"
-                    "• /order - Order template\n"
-                    "• /revoke - Revoke template\n"
-                    "• /move - Move template\n"
-                    "• /export - Export template\n"
-                    "• /done - Done template\n"
-                    "• /find - Search tasks, WOs, or site details\n\n"
-                    "<i>Tap any command to receive the template, then copy and fill out.</i>",
+                    "📝 <b>Template: Inventory Fuel</b>\n"
+                    "<i>(Tap the code block below to copy)</i>\n\n"
+                    "<pre><code>Inventory fuel:\n"
+                    "DG ID: TNIXXXX\n"
+                    "Fuel cm: \n"
+                    "Fuel %: \n"
+                    "Fuel level: \n"
+                    "Kwh: \n"
+                    "Rh: \n"
+                    "Note: </code></pre>",
                     parse_mode="HTML"
                 )
                 return
-            elif cmd == "/order":
+            elif cmd == "/order" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
                     "📝 <b>Template: Order</b>\n"
@@ -846,7 +872,7 @@ async def handle(data: dict):
                     parse_mode="HTML"
                 )
                 return
-            elif cmd == "/revoke":
+            elif cmd == "/revoke" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
                     "📝 <b>Template: Revoke</b>\n"
@@ -855,7 +881,7 @@ async def handle(data: dict):
                     parse_mode="HTML"
                 )
                 return
-            elif cmd == "/move":
+            elif cmd == "/move" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
                     "📝 <b>Template: Move</b>\n"
@@ -864,7 +890,7 @@ async def handle(data: dict):
                     parse_mode="HTML"
                 )
                 return
-            elif cmd == "/export":
+            elif cmd == "/export" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
                     "📝 <b>Template: Export</b>\n"
@@ -873,7 +899,7 @@ async def handle(data: dict):
                     parse_mode="HTML"
                 )
                 return
-            elif cmd == "/done":
+            elif cmd == "/done" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
                     "📝 <b>Template: Done</b>\n"
@@ -882,7 +908,7 @@ async def handle(data: dict):
                     parse_mode="HTML"
                 )
                 return
-            elif cmd == "/find":
+            elif cmd == "/find" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
                     "🔍 <b>How to Search:</b>\n\n"
