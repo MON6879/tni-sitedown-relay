@@ -271,6 +271,16 @@ def process_update(update: dict):
             )
             tg_reply(chat_id, reply_text)
             return
+
+        elif cmd == "/monitor":
+            today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
+            reply_text = (
+                "📝 <b>Template: FT Giám sát (FT follow monitor)</b>\n"
+                "<i>(Chạm vào vùng code bên dưới để copy nhanh)</i>\n\n"
+                f"<pre><code>Name of FT staff member accompanying to supervise the quality of premium oil and ensure the correct quantity is poured according to the plan: Paung Aung Soe - {today_str} TNI0213 + 660L, TNI0129 + 660L</code></pre>"
+            )
+            tg_reply(chat_id, reply_text)
+            return
             
         elif cmd in ("/start", "/help"):
             reply_text = (
@@ -279,7 +289,8 @@ def process_update(update: dict):
                 "• /refuel - Template Báo cáo đã đổ dầu (Refueled)\n"
                 "• /plan - Template Kế hoạch đổ dầu (Plan)\n"
                 "• /request - Template Yêu cầu cấp dầu (Request)\n"
-                "• /letter - Template Công văn Trình/Duyệt\n\n"
+                "• /letter - Template Công văn Trình/Duyệt\n"
+                "• /monitor - Template FT Giám sát (FT follow monitor)\n\n"
                 "<i>Hãy gõ lệnh và chạm vào tin nhắn bot phản hồi để copy nhanh mẫu điền nhé!</i>"
             )
             tg_reply(chat_id, reply_text)
