@@ -1,5 +1,5 @@
 // Bot Token: 8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw
-// Spreadsheet ID: 18zQB4i0Fu4qFKkKkUZUd6SKWlEBdWDiwgpgNSaL9v54
+// Spreadsheet ID: 18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54
 // Drive Folder ID: 1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb
 
 function doGet(e) {
@@ -21,7 +21,7 @@ function doGet(e) {
     return ContentService.createTextOutput("Webhook set to: " + props.getProperty("WEBAPP_URL"));
   }
   if (action === "get_headers") {
-    const ss = SpreadsheetApp.openById("18zQB4i0Fu4qFKkKkUZUd6SKWlEBdWDiwgpgNSaL9v54");
+    const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
     const s1 = ss.getSheetByName("List Attendance");
     const s2 = ss.getSheetByName("Staff attendance");
     const h1 = s1 ? s1.getRange(1, 1, 1, s1.getLastColumn()).getValues()[0] : [];
@@ -34,7 +34,7 @@ function doGet(e) {
 function doPost(e) {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
-  const ssId = props.getProperty("ATTENDANCE_SS_ID") || "18zQB4i0Fu4qFKkKkUZUd6SKWlEBdWDiwgpgNSaL9v54";
+  const ssId = props.getProperty("ATTENDANCE_SS_ID") || "18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54";
   const folderId = props.getProperty("DRIVE_FOLDER_ID") || "1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb";
   const geminiApiKey = props.getProperty("GEMINI_API_KEY") || "";
 
@@ -257,11 +257,11 @@ function saveToDrive_(blob, folderId, fileName) {
 /** Định vị động các cột trong sheet Staff attendance */
 function getStaffColumns_(sheet) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  let nameCol = 1; // Mặc định cột A
-  let fullNameCol = null;
-  let idCol = 4;   // Mặc định cột D
-  let photoCol = 15; // Mặc định cột O
-  let depCol = null;
+  let nameCol = 5;      // Column E (Name / Short name)
+  let fullNameCol = 6;  // Column F (Full name)
+  let idCol = 1;        // Column A (Telegram ID)
+  let photoCol = 15;    // Column O (photo)
+  let depCol = 11;      // Column K (Dep)
 
   for (let j = 0; j < headers.length; j++) {
     const header = String(headers[j]).trim().toLowerCase();
@@ -269,7 +269,7 @@ function getStaffColumns_(sheet) {
       nameCol = j + 1;
     } else if (header.indexOf("full name") !== -1 || header.indexOf("fullname") !== -1 || header.indexOf("họ tên") !== -1) {
       fullNameCol = j + 1;
-    } else if (header.indexOf("telegram") !== -1 || header === "id") {
+    } else if (header.indexOf("telegram id") !== -1 || header === "telegram id ") {
       idCol = j + 1;
     } else if (header.indexOf("photo") !== -1 || header.indexOf("ảnh") !== -1) {
       photoCol = j + 1;
@@ -348,12 +348,12 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
 
   promptText += "\nTask:\n";
   promptText += "1. Identify which of the reference staff members are clearly present in the target attendance photo (Image 1).\n";
-  promptText += "2. Look at the target attendance photo (Image 1) and find any text watermark containing \"Name: [Value]\" or any site name/code written on the photo (e.g. \"TNI0295\"). Extract that value.\n\n";
+  promptText += "2. Look at the target attendance photo (Image 1) and find any text watermark, label, or handwritten code starting with 'TNI' followed by numbers or letters (e.g., 'TNI0295', 'TNI0312'). Extract this code completely (exclude labels like 'Name:' or 'TNI: ' prefix if separate, return the code itself like 'TNI0295').\n\n";
   promptText += "Return the result as a strict JSON object containing:\n";
   promptText += "- \"matches\": Array of objects, each containing:\n";
   promptText += "  - \"name\": String, name of matched staff member.\n";
   promptText += "  - \"telegramId\": String, telegram ID of matched staff member.\n";
-  promptText += "- \"imageName\": String, the extracted name/code from the photo (e.g., \"TNI0295\"). If not found, return empty string \"\".\n\n";
+  promptText += "- \"imageName\": String, the extracted code starting with 'TNI' from the photo (e.g., \"TNI0295\"). If not found, return empty string \"\".\n\n";
   promptText += "Do not write any markdown code block formatting (like ```json), only return the raw JSON.\n";
   promptText += "Example Output:\n";
   promptText += '{"matches": [{"name": "Ye Lwin", "telegramId": "123456"}], "imageName": "TNI0295"}';
@@ -456,7 +456,7 @@ function setupAttendanceWebhook() {
 function initAttendanceScriptProperties() {
   const props = PropertiesService.getScriptProperties();
   props.setProperty("SEND_BOT_TOKEN", "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw");
-  props.setProperty("ATTENDANCE_SS_ID", "18zQB4i0Fu4qFKkKkUZUd6SKWlEBdWDiwgpgNSaL9v54");
+  props.setProperty("ATTENDANCE_SS_ID", "18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
   props.setProperty("DRIVE_FOLDER_ID", "1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb");
   Logger.log("✅ Khởi tạo Script Properties thành công.");
 }
