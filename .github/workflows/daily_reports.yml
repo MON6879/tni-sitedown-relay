@@ -4,14 +4,12 @@ on:
   schedule:
     - cron: '0 11 * * *'   # 17:30 Myanmar / 11:00 UTC → daily_task + plan_eod + bod_assign + cable_report + refuel_report
     - cron: '30 22 * * *'  # 05:00 Myanmar / 22:30 UTC → refuel_report
-    - cron: '30 6 * * *'   # 13:00 Myanmar / 06:30 UTC → refuel_report / refuel_plan_report (2)
+    - cron: '30 6 * * *'   # 13:00 Myanmar / 06:30 UTC → refuel_report
     - cron: '30 0 * * *'   # 07:00 Myanmar / 00:30 UTC → plan_morning
     - cron: '30 14 * * *'  # 21:00 Myanmar / 14:30 UTC → plan_update
     - cron: '0 14 * * *'   # 20:30 Myanmar / 14:00 UTC → read_report
     - cron: '30 11 * * *'  # 18:00 Myanmar / 11:30 UTC → refuel_plan_report (1)
     - cron: '30 15 * * *'  # 22:00 Myanmar / 15:30 UTC → refuel_plan_report (4)
-    - cron: '30 2 * * *'   # 09:00 Myanmar / 02:30 UTC → refuel_plan_report (2)
-    - cron: '30 13 * * *'  # 20:00 Myanmar / 13:30 UTC → refuel_plan_report (2)
   workflow_dispatch:
     inputs:
       report_type:
@@ -181,11 +179,6 @@ jobs:
 
       - name: Task — Refuel Plan Report 2 (09:00, 13:00, 20:00 Myanmar)
         if: |
-          (github.event_name == 'schedule' && (
-            github.event.schedule == '30 2 * * *' ||
-            github.event.schedule == '30 6 * * *' ||
-            github.event.schedule == '30 13 * * *'
-          )) ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 2 - Progress Sent Plan')
         env:
           REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}

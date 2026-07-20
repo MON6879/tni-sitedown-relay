@@ -226,6 +226,9 @@ Missing: TNI0052, TNI0185, TNI0058
 | **16:00** | `daily_plan_report.py --mode eod` | `daily_reports.yml` (`plan_eod`) | Report 5A: EOD Plan vs Actual + Plan Tomorrow status |
 | **21:00** | `daily_plan_report.py --mode update` | `daily_reports.yml` (`plan_update`) | Report 5B: Updated Plan Tomorrow status |
 | **07:00** | `daily_plan_report.py --mode morning` | `daily_reports.yml` (`plan_morning`) | Report 5C: Morning Plan forward + 3D/7D/1M stats + completion rate |
+| **09:00** | `refuel_plan_report.py --report 2` | `daily_reports.yml` (`Report 2 - Progress Sent Plan`) | Refuel Plan Report 2: Progress Sent Plan (9:00 Myanmar) |
+| **13:00** | `refuel_plan_report.py --report 2` | `daily_reports.yml` (`Report 2 - Progress Sent Plan`) | Refuel Plan Report 2: Progress Sent Plan (13:00 Myanmar) |
+| **20:00** | `refuel_plan_report.py --report 2` | `daily_reports.yml` (`Report 2 - Progress Sent Plan`) | Refuel Plan Report 2: Progress Sent Plan (20:00 Myanmar) |
 | **20:30** | `daily_read_report.py` | `daily_reports.yml` (`read_report`) | Report 6: Note read status per-person (Cutoff at 20:25) to teams + CONTROL |
 
 ---

@@ -64,6 +64,30 @@ function relayDailyReports() {
       return triggerDailyWorkflow("plan_update");
     });
   }
+
+  // 6. 08:55–09:25 Myanmar → dispatch Refuel Plan Report 2 (09:00)
+  const isRefuelPlan9 = (myanmarHour === 8 && myanmarMin >= 55) || (myanmarHour === 9 && myanmarMin <= 25);
+  if (isRefuelPlan9) {
+    runOnceToday("REFUEL_PLAN_R2_9_DATE_", function() {
+      return triggerDailyWorkflow("Report 2 - Progress Sent Plan");
+    });
+  }
+
+  // 7. 12:55–13:25 Myanmar → dispatch Refuel Plan Report 2 (13:00)
+  const isRefuelPlan13 = (myanmarHour === 12 && myanmarMin >= 55) || (myanmarHour === 13 && myanmarMin <= 25);
+  if (isRefuelPlan13) {
+    runOnceToday("REFUEL_PLAN_R2_13_DATE_", function() {
+      return triggerDailyWorkflow("Report 2 - Progress Sent Plan");
+    });
+  }
+
+  // 8. 19:55–20:25 Myanmar → dispatch Refuel Plan Report 2 (20:00)
+  const isRefuelPlan20 = (myanmarHour === 19 && myanmarMin >= 55) || (myanmarHour === 20 && myanmarMin <= 25);
+  if (isRefuelPlan20) {
+    runOnceToday("REFUEL_PLAN_R2_20_DATE_", function() {
+      return triggerDailyWorkflow("Report 2 - Progress Sent Plan");
+    });
+  }
 }
 
 function runOnceToday(prefixKey, callback) {
@@ -278,3 +302,4 @@ function runManual_bod_assign()     { triggerDailyWorkflow("bod_assign"); }
 function runManual_read_report()    { triggerDailyWorkflow("read_report"); }
 function runManual_daily_task()     { triggerDailyWorkflow("daily_task"); }
 function runManual_sendTaskRemain() { sendSchedulerTaskRemain(); }
+function runManual_refuel_plan_r2() { triggerDailyWorkflow("Report 2 - Progress Sent Plan"); }
