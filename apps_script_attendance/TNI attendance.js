@@ -20,15 +20,6 @@ function doGet(e) {
     setupAttendanceWebhook();
     return ContentService.createTextOutput("Webhook set to: " + props.getProperty("WEBAPP_URL"));
   }
-  if (action === "set_gemini_key") {
-    const props = PropertiesService.getScriptProperties();
-    const key = e.parameter.key;
-    if (key) {
-      props.setProperty("GEMINI_API_KEY", key);
-      return ContentService.createTextOutput("GEMINI_API_KEY set successfully.");
-    }
-    return ContentService.createTextOutput("Missing key parameter.");
-  }
   return ContentService.createTextOutput("Unknown action: " + action);
 }
 
@@ -37,7 +28,7 @@ function doPost(e) {
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
   const ssId = props.getProperty("ATTENDANCE_SS_ID") || "18zQB4i0Fu4qFKkKkUZUd6SKWlEBdWDiwgpgNSaL9v54";
   const folderId = props.getProperty("DRIVE_FOLDER_ID") || "1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb";
-  const geminiApiKey = props.getProperty("GEMINI_API_KEY") || "AQ.Ab8RN6LbvIHiD3nguvqI9wmk31i-gKjpQdzAJVx2m8NyAHViZg";
+  const geminiApiKey = props.getProperty("GEMINI_API_KEY") || "";
 
   try {
     if (!e || !e.postData || !e.postData.contents) {
@@ -418,6 +409,5 @@ function initAttendanceScriptProperties() {
   props.setProperty("SEND_BOT_TOKEN", "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw");
   props.setProperty("ATTENDANCE_SS_ID", "18zQB4i0Fu4qFKkKkUZUd6SKWlEBdWDiwgpgNSaL9v54");
   props.setProperty("DRIVE_FOLDER_ID", "1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb");
-  props.setProperty("GEMINI_API_KEY", "AQ.Ab8RN6LbvIHiD3nguvqI9wmk31i-gKjpQdzAJVx2m8NyAHViZg");
   Logger.log("✅ Khởi tạo Script Properties thành công.");
 }
