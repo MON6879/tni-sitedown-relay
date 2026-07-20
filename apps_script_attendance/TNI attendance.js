@@ -44,6 +44,7 @@ function doPost(e) {
     }
 
     const update = JSON.parse(e.postData.contents);
+    logToSheet_("Update received: " + JSON.stringify(update));
     Logger.log("Update received: " + JSON.stringify(update));
 
     const msg = update.message;
@@ -65,10 +66,10 @@ function doPost(e) {
     // Lấy ảnh kích thước lớn nhất
     const fileId = photoArray[photoArray.length - 1].file_id;
 
-    // 2. Tải ảnh từ Telegram
+    logToSheet_("Photo fileId: " + fileId + ", downloading from Telegram...");
     const imageBlob = getTelegramFile_(token, fileId);
 
-    // 3. Lưu ảnh vào Google Drive
+    logToSheet_("Photo downloaded. Saving to Google Drive folder " + folderId + "...");
     const now = new Date();
     const dateStr = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
     const timeStr = Utilities.formatDate(now, "Asia/Rangoon", "HH:mm");
@@ -76,23 +77,26 @@ function doPost(e) {
     
     const fileName = "attendance_" + fileDateSuffix + "_" + senderId + ".jpg";
     const driveFileUrl = saveToDrive_(imageBlob, folderId, fileName);
+    logToSheet_("Photo saved to Drive. URL: " + driveFileUrl);
 
-    // 4. Đọc danh sách nhân viên từ sheet "Staff attendance"
+    logToSheet_("Reading Staff attendance sheet database...");
     const ss = SpreadsheetApp.openById(ssId);
     const staffSheet = ss.getSheetByName("Staff attendance");
     if (!staffSheet) {
+      logToSheet_("❌ Error: Sheet 'Staff attendance' not found");
       sendTelegramMessage_(token, chatId, "❌ Lỗi: Không tìm thấy sheet 'Staff attendance'");
       return ContentService.createTextOutput("Staff attendance sheet not found");
     }
 
     const staffLastRow = staffSheet.getLastRow();
     if (staffLastRow < 2) {
+      logToSheet_("❌ Error: Staff attendance sheet is empty");
       sendTelegramMessage_(token, chatId, "❌ Lỗi: Danh sách nhân viên trống");
       return ContentService.createTextOutput("Staff attendance sheet empty");
     }
 
-    // Định vị động các cột của Staff attendance
     const cols = getStaffColumns_(staffSheet);
+    logToSheet_("Column mapping: " + JSON.stringify(cols));
     const staffRange = staffSheet.getRange(2, 1, staffLastRow - 1, staffSheet.getLastColumn());
     const staffValues = staffRange.getValues();
 
@@ -116,16 +120,21 @@ function doPost(e) {
         });
       }
     }
+    logToSheet_("Read " + staffList.length + " staff members from database.");
 
     // 5. Tiến hành đối chiếu nhận diện bằng Gemini AI
     let geminiMatches = [];
     let extractedImageName = "";
     if (geminiApiKey) {
+      logToSheet_("Calling Gemini API for face matching and OCR...");
       const geminiResult = identifyFaces_(imageBlob, staffList, geminiApiKey);
       if (geminiResult) {
         geminiMatches = geminiResult.matches || [];
         extractedImageName = geminiResult.imageName || "";
       }
+      logToSheet_("Gemini result: matches=" + JSON.stringify(geminiMatches) + ", extractedImageName=" + extractedImageName);
+    } else {
+      logToSheet_("⚠️ No Gemini API Key configured. Skipping AI face recognition.");
     }
 
     // Nếu không tìm thấy tên ảnh từ Gemini, sử dụng caption làm dự phòng
@@ -236,6 +245,7 @@ function doPost(e) {
 
     return ContentService.createTextOutput("OK");
   } catch (err) {
+    logToSheet_("❌ Exception in doPost: " + err.message + "\nStack: " + err.stack);
     Logger.log("Error processing update: " + err.message);
     return ContentService.createTextOutput("Error: " + err.message);
   }
@@ -477,4 +487,19 @@ function initAttendanceScriptProperties() {
   props.setProperty("ATTENDANCE_SS_ID", "18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
   props.setProperty("DRIVE_FOLDER_ID", "1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb");
   Logger.log("✅ Khởi tạo Script Properties thành công.");
+}
+
+/** Ghi log trực tiếp lên sheet Logs để debug */
+function logToSheet_(message) {
+  try {
+    const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+    let logSheet = ss.getSheetByName("Logs");
+    if (!logSheet) {
+      logSheet = ss.insertSheet("Logs");
+      logSheet.appendRow(["Timestamp", "Message"]);
+    }
+    logSheet.appendRow([new Date(), message]);
+  } catch (e) {
+    // Bỏ qua lỗi ghi log
+  }
 }
