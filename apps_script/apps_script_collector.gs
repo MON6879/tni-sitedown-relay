@@ -164,6 +164,10 @@ function doGet(e) {
       const result = fixAllMismatchedConfigs();
       return json({ status: "ok", message: result });
     }
+    if (action === "run_auto_copy") {
+      runAutoCopyProcessor(true);
+      return json({ status: "ok", message: "Auto copy processor executed successfully" });
+    }
 
     // ── Cable / MDG GET endpoints ─────────────────────────────────────────
     if (action === "cable_get_stats" || action === "cable_check_row") return doGetCable_(e);
