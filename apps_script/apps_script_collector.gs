@@ -127,6 +127,11 @@ function doGet(e) {
     if (action === "get_note_msgids")     return handleGetNoteMsgIds();
     if (action === "get_msgids")          return handleGetMsgIds(e.parameter || {});
     if (action === "get_refuel_data")     return doGetRefuelData_(e);
+    if (action === "setup_bod_triggers") {
+      setupBodAssignTrigger();
+      setupBodAssignMETrigger();
+      return json({ status: "ok", message: "BOD triggers setup successfully to 1 minute" });
+    }
 
     // ── Cable / MDG GET endpoints ─────────────────────────────────────────
     if (action === "cable_get_stats" || action === "cable_check_row") return doGetCable_(e);
@@ -2154,8 +2159,8 @@ function setupBodAssignMETrigger() {
       ScriptApp.deleteTrigger(t);
     }
   });
-  ScriptApp.newTrigger(triggerName).timeBased().everyMinutes(10).create();
-  Logger.log("✅ Đã cài trigger checkBodAssignME mỗi 10 phút");
+  ScriptApp.newTrigger(triggerName).timeBased().everyMinutes(1).create();
+  Logger.log("✅ Đã cài trigger checkBodAssignME mỗi 1 phút");
 }
 
 // ════════════════════════════════════════════════════════════

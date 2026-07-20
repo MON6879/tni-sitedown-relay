@@ -151,8 +151,8 @@ function setupBodAssignTrigger() {
       ScriptApp.deleteTrigger(t);
     }
   });
-  ScriptApp.newTrigger("checkBodAssign").timeBased().everyMinutes(10).create();
-  Logger.log("✅ Đã cài trigger checkBodAssign chạy mỗi 10 phút.");
+  ScriptApp.newTrigger("checkBodAssign").timeBased().everyMinutes(1).create();
+  Logger.log("✅ Đã cài trigger checkBodAssign chạy mỗi 1 phút.");
 }
 
 function debugBodAssign() {
