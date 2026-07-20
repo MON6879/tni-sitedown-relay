@@ -20,6 +20,14 @@ function doGet(e) {
     setupAttendanceWebhook();
     return ContentService.createTextOutput("Webhook set to: " + props.getProperty("WEBAPP_URL"));
   }
+  if (action === "get_headers") {
+    const ss = SpreadsheetApp.openById("18zQB4i0Fu4qFKkKkUZUd6SKWlEBdWDiwgpgNSaL9v54");
+    const s1 = ss.getSheetByName("List Attendance");
+    const s2 = ss.getSheetByName("Staff attendance");
+    const h1 = s1 ? s1.getRange(1, 1, 1, s1.getLastColumn()).getValues()[0] : [];
+    const h2 = s2 ? s2.getRange(1, 1, 1, s2.getLastColumn()).getValues()[0] : [];
+    return ContentService.createTextOutput(JSON.stringify({ list_attendance: h1, staff_attendance: h2 }));
+  }
   return ContentService.createTextOutput("Unknown action: " + action);
 }
 
@@ -91,14 +99,16 @@ function doPost(e) {
     const staffList = [];
     for (let i = 0; i < staffValues.length; i++) {
       const row = staffValues[i];
-      const fullName = String(row[cols.nameCol - 1] || "").trim();
+      const shortName = String(row[cols.nameCol - 1] || "").trim();
+      const fullName = cols.fullNameCol ? String(row[cols.fullNameCol - 1] || "").trim() : shortName;
       const tgId = String(row[cols.idCol - 1] || "").trim();
       const photoUrl = String(row[cols.photoCol - 1] || "").trim();
       const depName = cols.depCol ? String(row[cols.depCol - 1] || "").trim() : "";
 
-      if (fullName) {
+      if (shortName) {
         staffList.push({
-          name: fullName,
+          name: shortName,
+          fullName: fullName,
           telegramId: tgId,
           photoUrl: photoUrl,
           department: depName,
@@ -120,6 +130,7 @@ function doPost(e) {
       if (fallbackStaff) {
         matches.push({
           name: fallbackStaff.name,
+          fullName: fallbackStaff.fullName,
           telegramId: fallbackStaff.telegramId,
           department: fallbackStaff.department
         });
@@ -127,6 +138,7 @@ function doPost(e) {
         // Nếu không tìm thấy Telegram ID, lưu tạm bằng tên Telegram của người gửi
         matches.push({
           name: senderName,
+          fullName: senderName,
           telegramId: senderId,
           department: ""
         });
@@ -148,33 +160,29 @@ function doPost(e) {
       
       // Tìm thông tin phòng ban đầy đủ nếu chưa có từ Gemini
       const dbStaff = staffList.find(s => s.name.toLowerCase() === match.name.toLowerCase() || (s.telegramId && s.telegramId === match.telegramId));
-      const finalName = dbStaff ? dbStaff.name : match.name;
+      const finalShortName = dbStaff ? dbStaff.name : match.name;
+      const finalFullName = dbStaff ? dbStaff.fullName : (match.fullName || match.name);
       const finalTgId = dbStaff ? dbStaff.telegramId : match.telegramId;
       const finalDep = dbStaff ? dbStaff.department : (match.department || "");
 
       // Kiểm tra trùng lặp trong ngày hôm nay
-      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, finalName)) {
-        replyMsg += `- ${finalName} (Already logged today)\n`;
+      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, finalShortName)) {
+        replyMsg += `- ${finalShortName} (Already logged today)\n`;
         continue;
       }
 
-      // Thêm dòng mới vào List Attendance
-      // Cột A: DEF (Lấy tên phòng ban/bộ phận)
-      // Cột B: Date (Ngày)
-      // Cột C: Time report (Giờ)
-      // Cột D: ID Telegram
-      // Cột E: Full name
-      // Cột F: photo (Link ảnh)
+      // Thêm dòng mới vào List Attendance (7 cột)
       attendanceSheet.appendRow([
         finalDep,
         dateStr,
         timeStr,
         finalTgId,
-        finalName,
+        finalShortName,
+        finalFullName,
         driveFileUrl
       ]);
       
-      replyMsg += `- ${finalName} (${finalDep})\n`;
+      replyMsg += `- ${finalShortName} (${finalDep})\n`;
       successCount++;
     }
 
@@ -226,14 +234,17 @@ function saveToDrive_(blob, folderId, fileName) {
 function getStaffColumns_(sheet) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   let nameCol = 1; // Mặc định cột A
+  let fullNameCol = null;
   let idCol = 4;   // Mặc định cột D
   let photoCol = 15; // Mặc định cột O
   let depCol = null;
 
   for (let j = 0; j < headers.length; j++) {
     const header = String(headers[j]).trim().toLowerCase();
-    if (header.indexOf("name") !== -1 || header.indexOf("tên") !== -1) {
+    if (header === "name" || header === "tên") {
       nameCol = j + 1;
+    } else if (header.indexOf("full name") !== -1 || header.indexOf("fullname") !== -1 || header.indexOf("họ tên") !== -1) {
+      fullNameCol = j + 1;
     } else if (header.indexOf("telegram") !== -1 || header === "id") {
       idCol = j + 1;
     } else if (header.indexOf("photo") !== -1 || header.indexOf("ảnh") !== -1) {
@@ -242,7 +253,7 @@ function getStaffColumns_(sheet) {
       depCol = j + 1;
     }
   }
-  return { nameCol: nameCol, idCol: idCol, photoCol: photoCol, depCol: depCol };
+  return { nameCol: nameCol, fullNameCol: fullNameCol, idCol: idCol, photoCol: photoCol, depCol: depCol };
 }
 
 /** Kiểm tra xem nhân viên đã điểm danh trong ngày hôm nay chưa */
