@@ -753,21 +753,33 @@ def handle(update: dict) -> None:
     # ── COMMANDS ────────────────────────────────────────────────────────────
     if text.startswith("/"):
         cmd = text.split()[0].lower().split("@")[0]
+        clean_cmd = cmd[1:]
 
-        if cmd in ("/start", "/help"):
-            tg_send(chat_id,
-                "👋 <b>TNI Search Bot</b>\n\n"
-                "• Send site code (e.g. <code>TNI0001</code>) to lookup Task/WO\n"
-                "• Send <code>T1</code>, <code>T2</code>, <code>T3</code>, or <code>T4</code> to view Task/WO by Team\n"
-                "• Send <code>T1notclose</code> to view unclosed WOs for the team\n"
-                "• Send <code>T1waitcd</code> to view WOs waiting for CD for the team\n"
-                "• Send <code>mysite</code>, <code>mycable</code>, <code>mymw</code>... to view personal stats\n"
-                "• Send <code>mydata</code> to view all personal stats (mysite to mymw)\n"
-                "• Send report containing <b>Daily</b> to save it\n"
-                "• Type /daily to see the report template")
+        if clean_cmd in ("mysite", "mycable", "myolt", "mysn", "mydia", "mymw", "mydata"):
+            reply = get_staff_data(user_id, clean_cmd)
+            tg_send(chat_id, reply)
+            return
 
-        elif cmd == "/daily":
-            send_daily_template(chat_id)
+        if clean_cmd.startswith("info") or clean_cmd.startswith("clear") or clean_cmd.endswith("notclose") or clean_cmd.endswith("waitcd"):
+            # Strip slash and fall through to main search parsers
+            text = text[1:]
+        else:
+            if cmd in ("/start", "/help"):
+                tg_send(chat_id,
+                    "👋 <b>TNI Search Bot</b>\n\n"
+                    "• Send site code (e.g. <code>TNI0001</code>) to lookup Task/WO\n"
+                    "• Send <code>T1</code>, <code>T2</code>, <code>T3</code>, or <code>T4</code> to view Task/WO by Team\n"
+                    "• Send <code>T1notclose</code> to view unclosed WOs for the team\n"
+                    "• Send <code>T1waitcd</code> to view WOs waiting for CD for the team\n"
+                    "• Send <code>mysite</code>, <code>mycable</code>, <code>mymw</code>... to view personal stats\n"
+                    "• Send <code>mydata</code> to view all personal stats (mysite to mymw)\n"
+                    "• Send report containing <b>Daily</b> to save it\n"
+                    "• Type /daily to see the report template")
+                return
+
+            elif cmd == "/daily":
+                send_daily_template(chat_id)
+                return
 
         elif cmd in ("/id", "/myid"):
             chat_title = msg["chat"].get("title") or first_name or "Private"
