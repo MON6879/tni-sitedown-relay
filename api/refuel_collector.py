@@ -209,8 +209,8 @@ def process_update(update: dict):
         if cmd == "/refuel":
             today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: Báo cáo đã đổ dầu (Refueled)</b>\n"
-                "<i>(Chạm vào vùng code bên dưới để copy nhanh)</i>\n\n"
+                "📝 <b>Template: Refueled Report</b>\n"
+                "<i>(Tap the code block below to copy)</i>\n\n"
                 f"<pre><code>DG Type\n"
                 f"Date: {today_str}\n"
                 f"DG ID: TNIXXXX\n"
@@ -234,8 +234,8 @@ def process_update(update: dict):
         elif cmd == "/plan":
             tomorrow_str = (datetime.now(TZ_MM) + timedelta(days=1)).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: Kế hoạch đổ dầu (Plan)</b>\n"
-                "<i>(Chạm vào vùng code bên dưới để copy nhanh)</i>\n\n"
+                "📝 <b>Template: Refuel Plan</b>\n"
+                "<i>(Tap the code block below to copy)</i>\n\n"
                 f"<pre><code>Plan refuel\n"
                 f"Date: {tomorrow_str}\n"
                 f"Team X\n"
@@ -248,8 +248,8 @@ def process_update(update: dict):
         elif cmd == "/request":
             tomorrow_str = (datetime.now(TZ_MM) + timedelta(days=1)).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: Yêu cầu cấp dầu (Request)</b>\n"
-                "<i>(Chạm vào vùng code bên dưới để copy nhanh)</i>\n\n"
+                "📝 <b>Template: Refuel Request</b>\n"
+                "<i>(Tap the code block below to copy)</i>\n\n"
                 f"<pre><code>Request refuel\n"
                 f"Date: {tomorrow_str}\n"
                 f"Team X\n"
@@ -262,11 +262,11 @@ def process_update(update: dict):
         elif cmd == "/letter":
             today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: Công văn Trình/Duyệt (Letter)</b>\n"
-                "<i>(Chạm vào từng dòng code bên dưới để copy nhanh)</i>\n\n"
-                "• Trình công văn:\n"
+                "📝 <b>Template: Transport Letter</b>\n"
+                "<i>(Tap the code lines below to copy)</i>\n\n"
+                "• Submit Letter:\n"
                 f"<pre><code>Letter Submit: {today_str}</code></pre>\n"
-                "• Duyệt công văn:\n"
+                "• Approved Letter:\n"
                 f"<pre><code>Approved Letter: {today_str}</code></pre>"
             )
             tg_reply(chat_id, reply_text)
@@ -275,8 +275,8 @@ def process_update(update: dict):
         elif cmd == "/monitor":
             today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: FT Giám sát (FT follow monitor)</b>\n"
-                "<i>(Chạm vào vùng code bên dưới để copy nhanh)</i>\n\n"
+                "📝 <b>Template: FT Follow Monitor</b>\n"
+                "<i>(Tap the code block below to copy)</i>\n\n"
                 f"<pre><code>Name of FT staff member accompanying to supervise the quality of premium oil and ensure the correct quantity is poured according to the plan: Paung Aung Soe - {today_str} TNI0213 + 660L, TNI0129 + 660L</code></pre>"
             )
             tg_reply(chat_id, reply_text)
@@ -284,14 +284,14 @@ def process_update(update: dict):
             
         elif cmd in ("/start", "/help"):
             reply_text = (
-                "👋 <b>Chào mừng bạn đến với TNI Refuel Bot!</b>\n\n"
-                "Danh sách lệnh lấy mẫu thông tin (Template):\n"
-                "• /refuel - Template Báo cáo đã đổ dầu (Refueled)\n"
-                "• /plan - Template Kế hoạch đổ dầu (Plan)\n"
-                "• /request - Template Yêu cầu cấp dầu (Request)\n"
-                "• /letter - Template Công văn Trình/Duyệt\n"
-                "• /monitor - Template FT Giám sát (FT follow monitor)\n\n"
-                "<i>Hãy gõ lệnh và chạm vào tin nhắn bot phản hồi để copy nhanh mẫu điền nhé!</i>"
+                "👋 <b>Welcome to TNI Refuel Bot!</b>\n\n"
+                "Available template commands:\n"
+                "• /refuel - Refueled Report template\n"
+                "• /plan - Refuel Plan template\n"
+                "• /request - Refuel Request template\n"
+                "• /letter - Transport Letter template\n"
+                "• /monitor - FT Follow Monitor template\n\n"
+                "<i>Tap any command to receive the template, then copy and fill out.</i>"
             )
             tg_reply(chat_id, reply_text)
             return
