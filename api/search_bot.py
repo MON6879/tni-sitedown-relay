@@ -818,6 +818,20 @@ def handle(update: dict) -> None:
                 tg_send(chat_id, "✅ Đã reload dữ liệu")
                 return
 
+            elif cmd == "/tni":
+                parts = text.split()
+                if len(parts) > 1:
+                    text = " ".join(parts[1:])
+                else:
+                    tg_send(chat_id,
+                        "🔍 <b>How to Search Site:</b>\n\n"
+                        "Please specify a site code after the command, for example:\n"
+                        "• <code>/tni TNI0001</code>\n"
+                        "• <code>/tni TNI0001_01</code>",
+                        parse_mode="HTML"
+                    )
+                    return
+
     # ── DAILY REPORT ────────────────────────────────────────────────────────
     if is_daily(text):
         submit_daily(chat_id, user_id, first_name, text)
