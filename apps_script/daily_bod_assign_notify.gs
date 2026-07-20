@@ -17,20 +17,46 @@ function checkBodAssign() {
     const token = props.getProperty("SEND_BOT_TOKEN") || "8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A";
     const controlChatId = "-5251698940";
 
+    const todayStr = Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy");
+    const sentControlKey = "BOD_INDIV_CONTROL_SENT_" + todayStr;
+    const sentTeamKey = "BOD_INDIV_TEAM_SENT_" + todayStr;
+
+    let sentControlRows = [];
+    let sentTeamRows = [];
+    try { sentControlRows = JSON.parse(props.getProperty(sentControlKey) || "[]"); } catch(e) {}
+    try { sentTeamRows = JSON.parse(props.getProperty(sentTeamKey) || "[]"); } catch(e) {}
+
     // Đọc từ dòng 2 đến lastRow, các cột từ A đến V (22 cột)
     const range = sheet.getRange(2, 1, lastRow - 1, 22);
     const values = range.getValues();
+
+    let newControlSent = false;
+    let newTeamSent = false;
 
     for (let i = 0; i < values.length; i++) {
       const rowNum = i + 2;
       const row = values[i];
       
+      const dateVal = row[3]; // Cột D: Date Assign (index 3)
+      let dateStr = "";
+      if (dateVal instanceof Date) {
+        dateStr = Utilities.formatDate(dateVal, "Asia/Rangoon", "dd/MM/yyyy");
+      } else {
+        dateStr = String(dateVal || "").trim();
+      }
+      
+      // Chỉ quét các dòng được giao trong ngày hôm nay
+      const datePart = dateStr.split(" ")[0].trim();
+      if (datePart !== todayStr) {
+        continue;
+      }
+
       const colR = String(row[17] || "").trim(); // Cột R (index 17)
       const colT = String(row[19] || "").trim(); // Cột T (index 19)
       const colU = String(row[20] || "").trim(); // Cột U (index 20)
 
       // 1. Quét gửi Control
-      if (colR) {
+      if (colR && sentControlRows.indexOf(rowNum) === -1) {
         const msgText = "BOD assing New task for : " + colR;
         
         // Tự động tìm và xóa tin cũ cùng nội dung trên Control
@@ -62,11 +88,13 @@ function checkBodAssign() {
         const newMsgId = sendTelegramMessage_(token, payload);
         if (newMsgId) {
           props.setProperty(oldMsgKey, String(newMsgId));
+          sentControlRows.push(rowNum);
+          newControlSent = true;
         }
       }
 
       // 2. Quét gửi Team
-      if (colT) {
+      if (colT && sentTeamRows.indexOf(rowNum) === -1) {
         const msgText = "New assing task: " + colT;
         
         // --- Gửi cho Control ---
@@ -132,11 +160,22 @@ function checkBodAssign() {
           const newMsgId = sendTelegramMessage_(token, payload);
           if (newMsgId) {
             props.setProperty(oldMsgKey, String(newMsgId));
+            sentTeamRows.push(rowNum);
+            newTeamSent = true;
           }
         } else {
           Logger.log("⚠️ Không tìm thấy chat ID cho team: " + colU);
+          sentTeamRows.push(rowNum);
+          newTeamSent = true;
         }
       }
+    }
+
+    if (newControlSent) {
+      props.setProperty(sentControlKey, JSON.stringify(sentControlRows));
+    }
+    if (newTeamSent) {
+      props.setProperty(sentTeamKey, JSON.stringify(sentTeamRows));
     }
   } catch (e) {
     Logger.log("❌ Lỗi checkBodAssign: " + e.message);

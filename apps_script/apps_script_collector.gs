@@ -127,10 +127,42 @@ function doGet(e) {
     if (action === "get_note_msgids")     return handleGetNoteMsgIds();
     if (action === "get_msgids")          return handleGetMsgIds(e.parameter || {});
     if (action === "get_refuel_data")     return doGetRefuelData_(e);
+    if (action === "get_bod_formulas") {
+      const ss = SpreadsheetApp.openById("1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8");
+      const sh = ss.getSheetByName("BOD assign");
+      const lastRow = sh.getLastRow();
+      const allFormulas = sh.getRange(2, 18, lastRow - 1, 3).getFormulas(); // Columns R, S, T
+      const allValues = sh.getRange(2, 18, lastRow - 1, 3).getValues();
+      const list = [];
+      for (let i = 0; i < allValues.length; i++) {
+        const valR = String(allValues[i][0]).trim();
+        const valT = String(allValues[i][2]).trim();
+        if (valR || valT) {
+          list.push({
+            row: i + 2,
+            values: [valR, String(allValues[i][1]).trim(), valT],
+            formulas: [allFormulas[i][0], allFormulas[i][1], allFormulas[i][2]]
+          });
+        }
+      }
+      return json({ status: "ok", total: list.length, list: list });
+    }
+    if (action === "debug_bod_sheet") {
+      const ss = SpreadsheetApp.openById("1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8");
+      const sh = ss.getSheetByName("BOD assign");
+      const lastRow = sh.getLastRow();
+      const lastCol = sh.getLastColumn();
+      const range = sh.getRange(1, 1, Math.min(100, lastRow), lastCol).getValues();
+      return json({ status: "ok", lastRow: lastRow, lastCol: lastCol, data: range });
+    }
     if (action === "setup_bod_triggers") {
       setupBodAssignTrigger();
       setupBodAssignMETrigger();
       return json({ status: "ok", message: "BOD triggers setup successfully to 1 minute" });
+    }
+    if (action === "fix_all_configs") {
+      const result = fixAllMismatchedConfigs();
+      return json({ status: "ok", message: result });
     }
 
     // ── Cable / MDG GET endpoints ─────────────────────────────────────────
@@ -2374,6 +2406,40 @@ function handleSetMsgId(body) {
     return json({ status: "ok", key: key, msg_id: msgId });
   } catch (err) {
     return json({ status: "error", message: err.message });
+  }
+}
+
+function fixAllMismatchedConfigs() {
+  try {
+    const ss = SpreadsheetApp.openById("19RBlwehMC6BLoueaTEzsJHMx4puB0CTE5i5x79-uI6c");
+    const sh = ss.getSheetByName("Auto_Copy_Config");
+    const lastRow = sh.getLastRow();
+    const range = sh.getRange(2, 1, lastRow - 1, 10);
+    const configRows = range.getValues();
+    
+    let count = 0;
+    for (let i = 0; i < configRows.length; i++) {
+      const rowNum = i + 2;
+      const sourceSheet = String(configRows[i][1] || "").trim();
+      const sourceColCond = String(configRows[i][2] || "").trim();
+      const targetSheet = String(configRows[i][5] || "").trim();
+      
+      // Fix 3. see to Task
+      if (sourceSheet === "3. see to Task!C:I" && sourceColCond === "3. see to Task!A:A" && targetSheet.indexOf("C4") !== -1) {
+        sh.getRange(rowNum, 2).setValue("3. see to Task!C3:I");
+        sh.getRange(rowNum, 3).setValue("3. see to Task!A3:A");
+        count++;
+      }
+      // Fix 2. See alalysis
+      if (sourceSheet === "2. See alalysis!C:Q" && sourceColCond === "2. See alalysis!A:A" && targetSheet.indexOf("C4") !== -1) {
+        sh.getRange(rowNum, 2).setValue("2. See alalysis!C3:Q");
+        sh.getRange(rowNum, 3).setValue("2. See alalysis!A3:A");
+        count++;
+      }
+    }
+    return "Successfully fixed " + count + " configuration rows in Auto_Copy_Config.";
+  } catch (e) {
+    return "Error: " + e.message;
   }
 }
 
