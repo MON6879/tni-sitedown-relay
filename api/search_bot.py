@@ -781,53 +781,42 @@ def handle(update: dict) -> None:
                 send_daily_template(chat_id)
                 return
 
-        elif cmd in ("/id", "/myid"):
-            chat_title = msg["chat"].get("title") or first_name or "Private"
-            chat_type  = msg["chat"].get("type", "private")
-            msg_extra  = ""
-            if APPS_SCRIPT_URL:
-                try:
-                    r = requests.post(APPS_SCRIPT_URL, json={
-                        "action":     "register_chat" if cmd == "/id" else "register_user",
-                        "chat_id":    str(chat_id),
-                        "chat_title": chat_title,
-                        "chat_type":  chat_type,
-                        "reg_by":     first_name,
-                        "user_id":    str(user_id),
-                        "user_name":  first_name,
-                    }, timeout=60)
-                    res = r.json()
-                    if res.get("status") == "ok":
-                        msg_extra = "\n✅ Saved"
-                    elif res.get("status") == "duplicate":
-                        msg_extra = "\n⚠️ Already exists"
-                except Exception:
-                    pass
-            tg_send(chat_id,
-                f"👤 <b>{html.escape(first_name)}</b>\n"
-                f"🔑 ID: <code>{user_id}</code>\n"
-                f"💬 Chat: <code>{chat_id}</code>\n"
-                f"📍 Type: {chat_type}"
-                + msg_extra)
+            elif cmd in ("/id", "/myid"):
+                chat_title = msg["chat"].get("title") or first_name or "Private"
+                chat_type  = msg["chat"].get("type", "private")
+                msg_extra  = ""
+                if APPS_SCRIPT_URL:
+                    try:
+                        r = requests.post(APPS_SCRIPT_URL, json={
+                            "action":     "register_chat" if cmd == "/id" else "register_user",
+                            "chat_id":    str(chat_id),
+                            "chat_title": chat_title,
+                            "chat_type":  chat_type,
+                            "reg_by":     first_name,
+                            "user_id":    str(user_id),
+                            "user_name":  first_name,
+                        }, timeout=60)
+                        res = r.json()
+                        if res.get("status") == "ok":
+                            msg_extra = "\n✅ Saved"
+                        elif res.get("status") == "duplicate":
+                            msg_extra = "\n⚠️ Already exists"
+                    except Exception:
+                        pass
+                tg_send(chat_id,
+                    f"👤 <b>{html.escape(first_name)}</b>\n"
+                    f"🔑 ID: <code>{user_id}</code>\n"
+                    f"💬 Chat: <code>{chat_id}</code>\n"
+                    f"📍 Type: {chat_type}"
+                    + msg_extra)
+                return
 
-        elif cmd == "/reload":
-            global _cache_ts
-            _cache_ts = 0   # force reload
-            load_all_sheets()
-            tg_send(chat_id, "✅ Đã reload dữ liệu")
-
-        elif cmd == "/help":
-            tg_send(chat_id,
-                "📖 <b>Hướng dẫn</b>\n\n"
-                "• Gõ mã TNI (vd: <code>TNI0009</code>) → tra cứu Site/Task/WO\n"
-                "• <code>T1</code> <code>T2</code> <code>T3</code> <code>T4</code> → xem Task/WO theo Team\n"
-                "• <code>T1notclose</code> → WO chưa Close (T1-T4)\n"
-                "• <code>T1waitcd</code> → WO chờ CD (T1-T4)\n"
-                "• Gửi báo cáo Daily → tự lưu vào Sheet\n"
-                "• /daily → xem mẫu báo cáo\n"
-                "• /reload → cập nhật dữ liệu\n"
-                "• /myid → xem Telegram ID")
-        return
+            elif cmd == "/reload":
+                global _cache_ts
+                _cache_ts = 0   # force reload
+                load_all_sheets()
+                tg_send(chat_id, "✅ Đã reload dữ liệu")
+                return
 
     # ── DAILY REPORT ────────────────────────────────────────────────────────
     if is_daily(text):
