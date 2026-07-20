@@ -818,18 +818,78 @@ async def handle(data: dict):
 
         text    = msg.text.strip()
 
-        # ── /start ────────────────────────────────────────────────────────
-        if text.startswith("/start"):
-            kws = get_keywords()
-            kw_lines = "\n".join(f"<code>{k.title()}: TNI0001 detail</code>" for k in kws)
-            await bot.send_message(
-                chat_id,
-                f"👋 <b>Asset Request Bot</b>\n"
-                f"📌 Send asset commands in this format:\n"
-                f"{kw_lines}",
-                parse_mode="HTML"
-            )
-            return
+        # ── Commands ──────────────────────────────────────────────────────
+        if text.startswith("/"):
+            cmd = text.split()[0].split("@")[0].lower()
+            
+            if cmd in ("/start", "/help"):
+                await bot.send_message(
+                    chat_id,
+                    "👋 <b>TNI Asset & Cable Bot</b>\n\n"
+                    "Available template commands:\n"
+                    "• /order - Order template\n"
+                    "• /revoke - Revoke template\n"
+                    "• /move - Move template\n"
+                    "• /export - Export template\n"
+                    "• /done - Done template\n"
+                    "• /find - Search tasks, WOs, or site details\n\n"
+                    "<i>Tap any command to receive the template, then copy and fill out.</i>",
+                    parse_mode="HTML"
+                )
+                return
+            elif cmd == "/order":
+                await bot.send_message(
+                    chat_id,
+                    "📝 <b>Template: Order</b>\n"
+                    "<i>(Tap the code block below to copy)</i>\n\n"
+                    "<pre><code>Order: TNIXXXX [Description/Item detail]</code></pre>",
+                    parse_mode="HTML"
+                )
+                return
+            elif cmd == "/revoke":
+                await bot.send_message(
+                    chat_id,
+                    "📝 <b>Template: Revoke</b>\n"
+                    "<i>(Tap the code block below to copy)</i>\n\n"
+                    "<pre><code>Revoke: TNIXXXX [Description/Reason]</code></pre>",
+                    parse_mode="HTML"
+                )
+                return
+            elif cmd == "/move":
+                await bot.send_message(
+                    chat_id,
+                    "📝 <b>Template: Move</b>\n"
+                    "<i>(Tap the code block below to copy)</i>\n\n"
+                    "<pre><code>Move: TNIXXXX [From station A to station B]</code></pre>",
+                    parse_mode="HTML"
+                )
+                return
+            elif cmd == "/export":
+                await bot.send_message(
+                    chat_id,
+                    "📝 <b>Template: Export</b>\n"
+                    "<i>(Tap the code block below to copy)</i>\n\n"
+                    "<pre><code>Export: TNIXXXX [Detail]</code></pre>",
+                    parse_mode="HTML"
+                )
+                return
+            elif cmd == "/done":
+                await bot.send_message(
+                    chat_id,
+                    "📝 <b>Template: Done</b>\n"
+                    "<i>(Tap the code block below to copy)</i>\n\n"
+                    "<pre><code>Done: #XXXXX [Action taken]</code></pre>",
+                    parse_mode="HTML"
+                )
+                return
+            elif cmd == "/find":
+                await bot.send_message(
+                    chat_id,
+                    "🔍 <b>How to Search:</b>\n\n"
+                    "Just send the site code (e.g. <code>TNI0001</code>) or staff name directly to the bot to search for tasks, WOs, or site details.",
+                    parse_mode="HTML"
+                )
+                return
 
         # ── Done ──────────────────────────────────────────────────────────
         if re.match(r"^done\b", text, re.IGNORECASE):

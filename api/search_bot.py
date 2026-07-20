@@ -675,8 +675,8 @@ def send_daily_template(chat_id: int) -> None:
         lines.append(f"{i}. {f}:")
     template = "\n".join(lines)
     tg_send(chat_id,
-        f"📋 <b>Mẫu Daily Report</b>\n"
-        f"Copy → chỉnh sửa → gửi lại:\n\n"
+        f"📋 <b>Daily Report Template</b>\n"
+        f"Copy → Edit → Send back:\n\n"
         f"<pre>{html.escape(template)}</pre>",
     )
 
@@ -687,7 +687,7 @@ def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None
     if "Daily report" not in parsed:
         parsed["Daily report"] = now_mm.strftime("%d/%m/%Y")
     if not DAILY_APPS_SCRIPT_URL:
-        tg_send(chat_id, "❌ Bot chưa cấu hình DAILY_APPS_SCRIPT_URL")
+        tg_send(chat_id, "❌ Bot DAILY_APPS_SCRIPT_URL not configured")
         return
     try:
         resp   = requests.post(DAILY_APPS_SCRIPT_URL,
@@ -699,13 +699,13 @@ def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None
         if result.get("status") == "ok":
             name = result.get("name") or first_name or str(user_id)
             tg_send(chat_id,
-                f"✅ Đã lưu — {html.escape(name)}\n"
+                f"✅ Recorded — {html.escape(name)}\n"
                 f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}")
         else:
-            tg_send(chat_id, f"❌ Lỗi lưu\n{result.get('message','')[:120]}")
+            tg_send(chat_id, f"❌ Save error\n{result.get('message','')[:120]}")
     except Exception as ex:
         logger.error(f"submit_daily: {ex}")
-        tg_send(chat_id, f"❌ Lỗi kết nối\n{str(ex)[:80]}")
+        tg_send(chat_id, f"❌ Connection error\n{str(ex)[:80]}")
 
 def submit_photo(chat_id: int, user_id: int, file_id: str) -> None:
     """Gửi ảnh lên GAS để lưu Drive — GAS tự attach vào dòng gần nhất."""
@@ -754,17 +754,17 @@ def handle(update: dict) -> None:
     if text.startswith("/"):
         cmd = text.split()[0].lower().split("@")[0]
 
-        if cmd == "/start":
+        if cmd in ("/start", "/help"):
             tg_send(chat_id,
                 "👋 <b>TNI Search Bot</b>\n\n"
-                "• Gõ mã <code>TNI...</code> để tra cứu Task/WO\n"
-                "• <code>T1</code> <code>T2</code> <code>T3</code> <code>T4</code> — xem Task/WO theo Team\n"
-                "• <code>T1notclose</code> — WO chưa Close của Team\n"
-                "• <code>T1waitcd</code> — WO chờ CD của Team\n"
-                "• <code>mysite</code> <code>mycable</code> <code>mydia</code>... — thống kê cá nhân\n"
-                "• <code>Q1:U1</code> — xem toàn bộ chỉ số my*\n"
-                "• Gửi báo cáo có chữ <b>Daily</b> để lưu\n"
-                "• /daily — xem mẫu báo cáo")
+                "• Send site code (e.g. <code>TNI0001</code>) to lookup Task/WO\n"
+                "• Send <code>T1</code>, <code>T2</code>, <code>T3</code>, or <code>T4</code> to view Task/WO by Team\n"
+                "• Send <code>T1notclose</code> to view unclosed WOs for the team\n"
+                "• Send <code>T1waitcd</code> to view WOs waiting for CD for the team\n"
+                "• Send <code>mysite</code>, <code>mycable</code>, <code>mydia</code>... to view personal stats\n"
+                "• Send <code>Q1:U1</code> to view all personal indices\n"
+                "• Send report containing <b>Daily</b> to save it\n"
+                "• Type /daily to see the report template")
 
         elif cmd == "/daily":
             send_daily_template(chat_id)
