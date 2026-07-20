@@ -589,18 +589,35 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
 
     text = msg.text.strip()
 
-    # ── /start ──────────────────────────────────────────────────────────
-    if text.lower().startswith("/start"):
-        await bot.send_message(
-            chat_id,
-            "⚡ <b>TNI MDG Run & Inventory Collector</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━━\n"
-            "📌 <b>Send report in correct format</b>\n"
-            "✅ <b>Confirm:</b> Reply bot message with <code>Confirm</code>\n"
-            "📷 <b>Photo:</b> Send photo (reply to bot msg with REF) — max 6",
-            parse_mode="HTML",
-        )
-        return
+    # ── Commands ────────────────────────────────────────────────────────
+    if text.startswith("/"):
+        cmd = text.split()[0].split("@")[0].lower()
+        if cmd in ("/start", "/help"):
+            await bot.send_message(
+                chat_id,
+                "👋 <b>TNI MDG Run & Inventory Bot</b>\n\n"
+                "Available template command:\n"
+                "• /inventory - Inventory report template\n\n"
+                "<i>Tap the command to receive the template, then copy and fill out.</i>",
+                parse_mode="HTML"
+            )
+            return
+        elif cmd == "/inventory":
+            await bot.send_message(
+                chat_id,
+                "📝 <b>Template: Inventory Fuel</b>\n"
+                "<i>(Tap the code block below to copy)</i>\n\n"
+                "<pre><code>Inventory fuel:\n"
+                "DG ID: TNIXXXX\n"
+                "Fuel cm: \n"
+                "Fuel %: \n"
+                "Fuel level: \n"
+                "Kwh: \n"
+                "Rh: \n"
+                "Note: </code></pre>",
+                parse_mode="HTML"
+            )
+            return
 
     # ── Confirm reply ────────────────────────────────────────────────────
     if text.lower() == "confirm" and msg.reply_to_message:
