@@ -119,8 +119,18 @@ function doPost(e) {
 
     // 5. Tiến hành đối chiếu nhận diện bằng Gemini AI
     let matches = [];
+    let extractedImageName = "";
     if (geminiApiKey) {
-      matches = identifyFaces_(imageBlob, staffList, geminiApiKey);
+      const geminiResult = identifyFaces_(imageBlob, staffList, geminiApiKey);
+      if (geminiResult) {
+        matches = geminiResult.matches || [];
+        extractedImageName = geminiResult.imageName || "";
+      }
+    }
+
+    // Nếu không tìm thấy tên ảnh từ Gemini, sử dụng caption làm dự phòng
+    if (!extractedImageName && msg.caption) {
+      extractedImageName = String(msg.caption).trim();
     }
 
     // 6. Nếu Gemini không nhận dạng được ai (hoặc chưa cài đặt API key/ảnh mẫu):
@@ -152,8 +162,21 @@ function doPost(e) {
       return ContentService.createTextOutput("List Attendance sheet not found");
     }
 
+    // Tính số thứ tự điểm danh (tạo số cho bot trả lời)
+    let nextNum = 1;
+    const lastRow = attendanceSheet.getLastRow();
+    if (lastRow >= 2) {
+      const currentTopNum = parseInt(attendanceSheet.getRange(2, 1).getValue(), 10);
+      if (!isNaN(currentTopNum)) {
+        nextNum = currentTopNum + 1;
+      }
+    }
+
     let successCount = 0;
-    let replyMsg = "✅ **Attendance Recorded**:\n";
+    let replyMsg = "✅ **Attendance Recorded #" + nextNum + "**:\n";
+    if (extractedImageName) {
+      replyMsg += `📍 Site/Task: *${extractedImageName}*\n`;
+    }
 
     for (let i = 0; i < matches.length; i++) {
       const match = matches[i];
@@ -171,16 +194,17 @@ function doPost(e) {
         continue;
       }
 
-      // Thêm dòng mới vào List Attendance (7 cột)
-      attendanceSheet.appendRow([
-        finalDep,
+      // Thêm dòng mới vào đầu bảng (dưới tiêu đề ở dòng 1)
+      attendanceSheet.insertRowAfter(1); // Chèn dòng trống ở dòng 2
+      attendanceSheet.getRange(2, 1, 1, 7).setValues([[
+        nextNum,
         dateStr,
         timeStr,
         finalTgId,
-        finalShortName,
-        finalFullName,
-        driveFileUrl
-      ]);
+        extractedImageName, // E: Name (Nội dung trích xuất từ hình, vd TNI0295)
+        finalFullName,      // F: Full name
+        driveFileUrl        // G: photo
+      ]]);
       
       replyMsg += `- ${finalShortName} (${finalDep})\n`;
       successCount++;
@@ -285,7 +309,7 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
   const candidates = staffList.filter(s => s.photoUrl && s.photoUrl.trim() !== "").slice(0, 15);
   if (candidates.length === 0) {
     Logger.log("⚠️ Không tìm thấy ảnh mẫu đối chiếu nào.");
-    return [];
+    return { matches: [], imageName: "" };
   }
 
   const parts = [];
@@ -322,10 +346,17 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
     }
   }
 
-  promptText += "\nTask: Identify which of the reference staff members are clearly present in the target attendance photo (Image 1).\n";
-  promptText += "Return the matched staff members as a strict JSON array of objects, containing name and telegramId. Do not write any markdown formatting, only return the raw JSON.\n";
+  promptText += "\nTask:\n";
+  promptText += "1. Identify which of the reference staff members are clearly present in the target attendance photo (Image 1).\n";
+  promptText += "2. Look at the target attendance photo (Image 1) and find any text watermark containing \"Name: [Value]\" or any site name/code written on the photo (e.g. \"TNI0295\"). Extract that value.\n\n";
+  promptText += "Return the result as a strict JSON object containing:\n";
+  promptText += "- \"matches\": Array of objects, each containing:\n";
+  promptText += "  - \"name\": String, name of matched staff member.\n";
+  promptText += "  - \"telegramId\": String, telegram ID of matched staff member.\n";
+  promptText += "- \"imageName\": String, the extracted name/code from the photo (e.g., \"TNI0295\"). If not found, return empty string \"\".\n\n";
+  promptText += "Do not write any markdown code block formatting (like ```json), only return the raw JSON.\n";
   promptText += "Example Output:\n";
-  promptText += '[{"name": "Ye Lwin", "telegramId": "123456"}]';
+  promptText += '{"matches": [{"name": "Ye Lwin", "telegramId": "123456"}], "imageName": "TNI0295"}';
 
   parts.push({
     text: promptText
@@ -348,17 +379,24 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
 
   if (resp.getResponseCode() !== 200) {
     Logger.log("❌ Gemini API failed: " + resp.getContentText());
-    return [];
+    return { matches: [], imageName: "" };
   }
 
   try {
     const resData = JSON.parse(resp.getContentText());
     const textResult = resData.candidates[0].content.parts[0].text.trim();
     Logger.log("Gemini matched result: " + textResult);
-    return JSON.parse(textResult);
+    
+    // Clean markdown blocks if Gemini accidentally included them
+    let cleanJson = textResult;
+    if (cleanJson.indexOf("```") !== -1) {
+      cleanJson = cleanJson.replace(/```json/g, "").replace(/```/g, "").trim();
+    }
+    
+    return JSON.parse(cleanJson);
   } catch (e) {
     Logger.log("❌ Lỗi parse kết quả Gemini: " + e.message);
-    return [];
+    return { matches: [], imageName: "" };
   }
 }
 
