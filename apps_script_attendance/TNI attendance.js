@@ -118,12 +118,12 @@ function doPost(e) {
     }
 
     // 5. Tiến hành đối chiếu nhận diện bằng Gemini AI
-    let matches = [];
+    let geminiMatches = [];
     let extractedImageName = "";
     if (geminiApiKey) {
       const geminiResult = identifyFaces_(imageBlob, staffList, geminiApiKey);
       if (geminiResult) {
-        matches = geminiResult.matches || [];
+        geminiMatches = geminiResult.matches || [];
         extractedImageName = geminiResult.imageName || "";
       }
     }
@@ -133,25 +133,46 @@ function doPost(e) {
       extractedImageName = String(msg.caption).trim();
     }
 
-    // 6. Nếu Gemini không nhận dạng được ai (hoặc chưa cài đặt API key/ảnh mẫu):
-    // Đối chiếu dự phòng theo Telegram ID của người gửi tin nhắn.
-    if (matches.length === 0) {
-      const fallbackStaff = staffList.find(s => s.telegramId === senderId);
-      if (fallbackStaff) {
-        matches.push({
-          name: fallbackStaff.name,
-          fullName: fallbackStaff.fullName,
-          telegramId: fallbackStaff.telegramId,
-          department: fallbackStaff.department
-        });
-      } else {
-        // Nếu không tìm thấy Telegram ID, lưu tạm bằng tên Telegram của người gửi
-        matches.push({
-          name: senderName,
-          fullName: senderName,
-          telegramId: senderId,
-          department: ""
-        });
+    // 6. Xây dựng danh sách người điểm danh cuối cùng
+    const finalMatches = [];
+
+    // Luôn ưu tiên đưa người gửi tin nhắn (sender) vào danh sách điểm danh
+    const senderStaff = staffList.find(s => s.telegramId === senderId);
+    if (senderStaff) {
+      finalMatches.push({
+        name: senderStaff.name,
+        fullName: senderStaff.fullName,
+        telegramId: senderStaff.telegramId,
+        department: senderStaff.department
+      });
+    } else {
+      // Nếu người gửi chưa có trong database, vẫn thêm tạm bằng thông tin Telegram của họ
+      finalMatches.push({
+        name: senderName,
+        fullName: senderName,
+        telegramId: senderId,
+        department: ""
+      });
+    }
+
+    // Nếu là chụp chung (Gemini nhận diện được nhiều người hơn hoặc người khác)
+    // Thêm các nhân viên khác được Gemini nhận diện vào danh sách điểm danh
+    for (let i = 0; i < geminiMatches.length; i++) {
+      const gMatch = geminiMatches[i];
+      const isAlreadyAdded = finalMatches.some(m => 
+        (m.telegramId && m.telegramId === gMatch.telegramId) || 
+        (m.name.toLowerCase() === gMatch.name.toLowerCase())
+      );
+      if (!isAlreadyAdded) {
+        const dbStaff = staffList.find(s => s.name.toLowerCase() === gMatch.name.toLowerCase() || (s.telegramId && s.telegramId === gMatch.telegramId));
+        if (dbStaff) {
+          finalMatches.push({
+            name: dbStaff.name,
+            fullName: dbStaff.fullName,
+            telegramId: dbStaff.telegramId,
+            department: dbStaff.department
+          });
+        }
       }
     }
 
@@ -178,15 +199,12 @@ function doPost(e) {
       replyMsg += `📍 Site/Task: *${extractedImageName}*\n`;
     }
 
-    for (let i = 0; i < matches.length; i++) {
-      const match = matches[i];
-      
-      // Tìm thông tin phòng ban đầy đủ nếu chưa có từ Gemini
-      const dbStaff = staffList.find(s => s.name.toLowerCase() === match.name.toLowerCase() || (s.telegramId && s.telegramId === match.telegramId));
-      const finalShortName = dbStaff ? dbStaff.name : match.name;
-      const finalFullName = dbStaff ? dbStaff.fullName : (match.fullName || match.name);
-      const finalTgId = dbStaff ? dbStaff.telegramId : match.telegramId;
-      const finalDep = dbStaff ? dbStaff.department : (match.department || "");
+    for (let i = 0; i < finalMatches.length; i++) {
+      const match = finalMatches[i];
+      const finalShortName = match.name;
+      const finalFullName = match.fullName;
+      const finalTgId = match.telegramId;
+      const finalDep = match.department;
 
       // Kiểm tra trùng lặp trong ngày hôm nay
       if (isAlreadyLoggedToday_(attendanceSheet, dateStr, finalShortName)) {
@@ -201,7 +219,7 @@ function doPost(e) {
         dateStr,
         timeStr,
         finalTgId,
-        extractedImageName, // E: Name (Nội dung trích xuất từ hình, vd TNI0295)
+        extractedImageName, // E: Name Trên Hình (Nội dung trích xuất từ hình, vd TNI0295)
         finalFullName,      // F: Full name
         driveFileUrl        // G: photo
       ]]);
