@@ -1456,7 +1456,7 @@ async def run_eod_or_update(mode: str):
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             team_num = group_key[1:] if (group_key.startswith("T") and group_key[1:].isdigit()) else "1"
-            button_url = f"https://t.me/SEARCHTNITASKWOBOT?start=plan_T{team_num}"
+            button_url = f"https://tni-bot.vercel.app/plan_editor.html?team={team_num}&chat_id={chat_id}"
             reply_markup = InlineKeyboardMarkup([
                 [InlineKeyboardButton(text="📋 Sửa & Gửi Plan", url=button_url)]
             ])
@@ -1702,7 +1702,7 @@ async def run_morning():
 
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             team_num = group_key[1:] if (group_key.startswith("T") and group_key[1:].isdigit()) else "1"
-            button_url = f"https://t.me/SEARCHTNITASKWOBOT?start=plan_T{team_num}"
+            button_url = f"https://tni-bot.vercel.app/plan_editor.html?team={team_num}&chat_id={chat_id}"
             reply_markup = InlineKeyboardMarkup([
                 [InlineKeyboardButton(text="📋 Sửa & Gửi Plan", url=button_url)]
             ])
