@@ -148,6 +148,8 @@ def tg_send(chat_id: int, text: str, parse_mode: str = "HTML", reply_markup: dic
     chunks = split_messages(text)
     for i, chunk in enumerate(chunks):
         markup = reply_markup if i == len(chunks) - 1 else None
+        if chat_id > 0 and not markup:
+            markup = MAIN_MENU_KEYBOARD
         payload = {"chat_id": chat_id, "text": chunk, "parse_mode": parse_mode}
         if markup:
             payload["reply_markup"] = markup
