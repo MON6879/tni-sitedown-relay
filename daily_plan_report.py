@@ -1132,13 +1132,13 @@ async def send_msg(bot, cid, text, label="", reply_markup=None):
     try:
         chunks = chunk_text(text)
         if len(chunks) == 1:
-            result = await bot.send_message(chat_id=cid, text=text, reply_markup=reply_markup)
+            result = await bot.send_message(chat_id=cid, text=text, reply_markup=reply_markup, disable_web_page_preview=True)
             sent_ids.append(result.message_id)
         else:
             for i, p in enumerate(chunks):
                 if p.strip():
                     markup = reply_markup if i == len(chunks) - 1 else None
-                    result = await bot.send_message(chat_id=cid, text=p, reply_markup=markup)
+                    result = await bot.send_message(chat_id=cid, text=p, reply_markup=markup, disable_web_page_preview=True)
                     sent_ids.append(result.message_id)
                     await asyncio.sleep(0.3)
         logger.info(f"✅ {label} → {cid}")
