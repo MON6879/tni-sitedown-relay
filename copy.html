@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copy Plan</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e3a8a);
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 30px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            color: #38bdf8;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+            margin-top: 20px;
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 id="title">TNI Daily Plan</h2>
+        <p style="color: #cbd5e1; font-size: 0.95rem; margin-bottom: 20px;">Click the button below to copy the plan to your clipboard.</p>
+        <button id="copyBtn" class="btn">📋 COPY PLAN TEMPLATE</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const team = urlParams.get('team') || '1';
+        document.getElementById('title').innerText = `Copy Plan — Team ${team}`;
+
+        let templateText = "";
+
+        // Fetch template
+        fetch(`/api/search_bot?action=template&team=${team}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.template) {
+                    templateText = data.template;
+                }
+            });
+
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            if (!templateText) {
+                alert("Loading template, please wait...");
+                return;
+            }
+            navigator.clipboard.writeText(templateText).then(() => {
+                document.querySelector('.container').innerHTML = `
+                    <h2 style="color: #48bb78; background: none; -webkit-text-fill-color: #48bb78;">✓ Copied!</h2>
+                    <p style="color: #ffffff; font-size: 1.05rem; margin-top: 15px;">
+                        Plan template copied to clipboard.
+                    </p>
+                    <p style="color: #93c5fd; font-size: 0.9rem; margin-top: 15px;">
+                        Please paste it in the chat box to edit and send.
+                    </p>
+                `;
+                setTimeout(() => {
+                    if (tg && typeof tg.close === 'function') {
+                        tg.close();
+                    }
+                }, 1500);
+            }).catch(err => {
+                alert("Failed to copy automatically. Please manually copy the text.");
+            });
+        });
+    </script>
+</body>
+</html>

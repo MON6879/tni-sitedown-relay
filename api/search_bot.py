@@ -726,8 +726,22 @@ def is_daily(text: str) -> bool:
     text_l = text.lower()
     return "daily" in text_l or "result" in text_l
 
+def get_copy_markup(chat_id: int, team_arg: str, text_label: str) -> dict:
+    button_url = f"https://tni-bot.vercel.app/copy.html?team={team_arg}"
+    if chat_id < 0:
+        return {
+            "inline_keyboard": [
+                [{"text": text_label, "url": button_url}]
+            ]
+        }
+    else:
+        return {
+            "inline_keyboard": [
+                [{"text": text_label, "web_app": {"url": button_url}}]
+            ]
+        }
+
 def send_daily_template(chat_id: int) -> None:
-    import urllib.parse
     fields = fetch_daily_fields()
     now_mm = datetime.now(TZ_MM)
     lines  = [f"Daily report: {now_mm.strftime('%d/%m/%Y')}"]
@@ -735,13 +749,7 @@ def send_daily_template(chat_id: int) -> None:
         lines.append(f"{i}. {f}:")
     template = "\n".join(lines)
     
-    encoded = urllib.parse.quote(template)
-    button_url = f"tg://msg_url?text={encoded}"
-    reply_markup = {
-        "inline_keyboard": [
-            [{"text": "📋 Copy Report", "url": button_url}]
-        ]
-    }
+    reply_markup = get_copy_markup(chat_id, "daily", "📋 Copy Report")
     tg_send(chat_id, template, reply_markup=reply_markup)
 
 def get_user_team_number(user_id: int) -> int | None:
@@ -813,15 +821,8 @@ def get_plan_template_text(team_num: int) -> str:
         return f"Error: {str(e)}"
 
 def send_daily_plan_template(chat_id: int, team_num: int) -> None:
-    import urllib.parse
     template = get_plan_template_text(team_num)
-    encoded = urllib.parse.quote(template)
-    button_url = f"tg://msg_url?text={encoded}"
-    reply_markup = {
-        "inline_keyboard": [
-            [{"text": "📋 Copy Plan", "url": button_url}]
-        ]
-    }
+    reply_markup = get_copy_markup(chat_id, str(team_num), "📋 Copy Plan")
     tg_send(chat_id, template, reply_markup=reply_markup)
 
 def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None:
@@ -1284,8 +1285,21 @@ class handler(BaseHTTPRequestHandler):
         
         action = query.get("action", [None])[0]
         if action == "template":
-            team_num = int(query.get("team", ["1"])[0])
-            template_text = get_plan_template_text(team_num)
+            team_arg = query.get("team", ["1"])[0]
+            if team_arg == "daily":
+                fields = fetch_daily_fields()
+                now_mm = datetime.now(TZ_MM)
+                lines  = [f"Daily report: {now_mm.strftime('%d/%m/%Y')}"]
+                for i, f in enumerate(fields[1:], start=1):
+                    lines.append(f"{i}. {f}:")
+                template_text = "\n".join(lines)
+            else:
+                try:
+                    team_num = int(team_arg)
+                except ValueError:
+                    team_num = 1
+                template_text = get_plan_template_text(team_num)
+                
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
