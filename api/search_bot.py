@@ -950,8 +950,7 @@ def handle(update: dict) -> None:
                     "• Send <code>mydata</code> to view all personal stats (mysite to mymw)\n"
                     "• Send report containing <b>Daily</b> to save it\n"
                     "• Type /daily to see the report template\n"
-                    "• Type /plan to see the Daily Plan template with FT list for your Team",
-                    reply_markup=MAIN_MENU_KEYBOARD)
+                    "• Type /plan to see the Daily Plan template with FT list for your Team")
                 return
 
             elif cmd == "/help":
@@ -965,8 +964,7 @@ def handle(update: dict) -> None:
                     "• Send <code>mydata</code> to view all personal stats (mysite to mymw)\n"
                     "• Send report containing <b>Daily</b> to save it\n"
                     "• Type /daily to see the report template\n"
-                    "• Type /plan to see the Daily Plan template with FT list for your Team",
-                    reply_markup=MAIN_MENU_KEYBOARD)
+                    "• Type /plan to see the Daily Plan template with FT list for your Team")
                 return
 
             elif cmd == "/daily":
