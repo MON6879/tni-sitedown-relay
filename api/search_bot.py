@@ -139,22 +139,13 @@ DAILY_FIELDS_DEFAULT = [
 # ── Telegram API helper ───────────────────────────────────────────────────────
 TG_API = f"https://api.telegram.org/bot{TOKEN}"
 
-MAIN_MENU_KEYBOARD = {
-    "keyboard": [
-        [{"text": "📋 Plan"}],
-        [{"text": "❓ Help"}]
-    ],
-    "resize_keyboard": True,
-    "one_time_keyboard": False
-}
-
 def tg_send(chat_id: int, text: str, parse_mode: str = "HTML", reply_markup: dict | None = None) -> None:
     """Gửi tin nhắn Telegram, tự chia chunk nếu > 4096 ký tự."""
     chunks = split_messages(text)
     for i, chunk in enumerate(chunks):
         markup = reply_markup if i == len(chunks) - 1 else None
         if chat_id > 0 and not markup:
-            markup = MAIN_MENU_KEYBOARD
+            markup = {"remove_keyboard": True}
         payload = {
             "chat_id": chat_id,
             "text": chunk,
