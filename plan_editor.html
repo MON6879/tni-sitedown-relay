@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sửa & Gửi Daily Plan</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #1a1c23;
+            --container-bg: rgba(30, 32, 45, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #ffffff;
+            --text-secondary: #a0aec0;
+            --accent-color: #3182ce;
+            --accent-glow: rgba(49, 130, 206, 0.3);
+            --accent-hover: #4299e1;
+            --textarea-bg: rgba(15, 17, 26, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--container-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            text-align: center;
+            background: linear-gradient(135deg, #63b3ed 0%, #3182ce 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .description {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        textarea {
+            width: 100%;
+            height: 380px;
+            background-color: var(--textarea-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px;
+            color: var(--text-primary);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        textarea:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .btn {
+            width: 100%;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 14px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background-color: var(--accent-hover);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            background-color: #4a5568;
+            color: #718096;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 id="title">Chỉnh Sửa Daily Plan</h2>
+        <p class="description">Chỉnh sửa nội dung phân công công việc dưới đây rồi bấm nút gửi trực tiếp lên nhóm chat.</p>
+        <textarea id="editor" placeholder="Đang tải mẫu kế hoạch..."></textarea>
+        <button id="sendBtn" class="btn" disabled>
+            <div id="spinner" class="spinner"></div>
+            <span id="btnText">🚀 Gửi Lên Nhóm Chat</span>
+        </button>
+    </div>
+
+    <script>
+        // Khởi tạo Telegram WebApp
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+        }
+
+        // Lấy query parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const team = urlParams.get('team') || '1';
+        const chatId = urlParams.get('chat_id');
+
+        document.getElementById('title').innerText = `Chỉnh Sửa Plan — Team ${team}`;
+
+        const editor = document.getElementById('editor');
+        const sendBtn = document.getElementById('sendBtn');
+        const spinner = document.getElementById('spinner');
+        const btnText = document.getElementById('btnText');
+
+        // Tải mẫu từ API
+        fetch(`/api/search_bot?action=template&team=${team}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.template) {
+                    editor.value = data.template;
+                    sendBtn.disabled = false;
+                } else {
+                    editor.value = 'Không thể lấy dữ liệu mẫu.';
+                }
+            })
+            .catch(err => {
+                editor.value = 'Lỗi kết nối máy chủ: ' + err.message;
+            });
+
+        // Bấm nút gửi
+        sendBtn.addEventListener('click', () => {
+            const text = editor.value.trim();
+            if (!text) return;
+
+            sendBtn.disabled = true;
+            spinner.style.display = 'block';
+            btnText.innerText = 'Đang gửi...';
+
+            // Gửi dữ liệu qua API bot để post lên group
+            fetch('/api/search_bot', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'submit_plan',
+                    chat_id: chatId,
+                    text: text
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    // Thành công, đóng WebApp
+                    if (tg) {
+                        tg.close();
+                    } else {
+                        alert('Đã gửi kế hoạch thành công!');
+                    }
+                } else {
+                    alert('Lỗi gửi: ' + (data.message || 'Không rõ nguyên nhân'));
+                    resetBtn();
+                }
+            })
+            .catch(err => {
+                alert('Lỗi kết nối: ' + err.message);
+                resetBtn();
+            });
+        });
+
+        function resetBtn() {
+            sendBtn.disabled = false;
+            spinner.style.display = 'none';
+            btnText.innerText = '🚀 Gửi Lên Nhóm Chat';
+        }
+    </script>
+</body>
+</html>

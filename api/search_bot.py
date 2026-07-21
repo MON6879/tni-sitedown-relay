@@ -135,8 +135,7 @@ TG_API = f"https://api.telegram.org/bot{TOKEN}"
 
 MAIN_MENU_KEYBOARD = {
     "keyboard": [
-        [{"text": "📋 Plan T1"}, {"text": "📋 Plan T2"}],
-        [{"text": "📋 Plan T3"}, {"text": "📋 Plan T4"}],
+        [{"text": "📋 Plan"}],
         [{"text": "❓ Help"}]
     ],
     "resize_keyboard": True,
@@ -759,12 +758,11 @@ def get_user_team_number(user_id: int) -> int | None:
         logger.error(f"get_user_team_number error: {e}")
     return None
 
-def send_daily_plan_template(chat_id: int, team_num: int) -> None:
+def get_plan_template_text(team_num: int) -> str:
     try:
         df = get_staff_df()
         if df is None or df.empty:
-            tg_send(chat_id, "❌ Không thể tải dữ liệu Staff.")
-            return
+            return "Error loading staff data"
         
         data = df.iloc[2:]
         team_str = f"Team 0{team_num}"
@@ -798,15 +796,18 @@ def send_daily_plan_template(chat_id: int, team_num: int) -> None:
         for i, name in enumerate(matched_staff, start=1):
             lines.append(f"{i}. {name}: ")
             
-        template = "\n".join(lines)
-        tg_send(chat_id,
-            f"📋 <b>Daily Plan Template (Team {team_num})</b>\n"
-            f"Copy → Edit → Send back:\n\n"
-            f"<pre>{html.escape(template)}</pre>",
-        )
+        return "\n".join(lines)
     except Exception as e:
-        logger.error(f"send_daily_plan_template error: {e}")
-        tg_send(chat_id, f"❌ Lỗi tạo template: {str(e)[:80]}")
+        logger.error(f"get_plan_template_text error: {e}")
+        return f"Error: {str(e)}"
+
+def send_daily_plan_template(chat_id: int, team_num: int) -> None:
+    template = get_plan_template_text(team_num)
+    tg_send(chat_id,
+        f"📋 <b>Daily Plan Template (Team {team_num})</b>\n"
+        f"Copy → Edit → Send back:\n\n"
+        f"<pre>{html.escape(template)}</pre>",
+    )
 
 def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None:
     fields = fetch_daily_fields()
@@ -1230,15 +1231,53 @@ class handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0))
             data   = json.loads(self.rfile.read(length))
+            
+            action = data.get("action")
+            if action == "submit_plan":
+                chat_id = data.get("chat_id")
+                text = data.get("text", "")
+                if chat_id and text:
+                    tg_send(int(chat_id), text)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "ok"}).encode("utf-8"))
+                    return
+                else:
+                    self.send_response(400)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Missing chat_id or text"}).encode("utf-8"))
+                    return
+            
             handle(data)
-        except Exception as ex:
-            logger.error(f"Webhook POST error: {ex}")
-        finally:
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"OK")
+        except Exception as ex:
+            logger.error(f"Webhook POST error: {ex}")
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(str(ex).encode())
 
     def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        parsed_url = urlparse(self.path)
+        query = parse_qs(parsed_url.query)
+        
+        action = query.get("action", [None])[0]
+        if action == "template":
+            team_num = int(query.get("team", ["1"])[0])
+            template_text = get_plan_template_text(team_num)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({"template": template_text}).encode("utf-8"))
+            return
+
         tok_ok  = "SET" if TOKEN else "MISSING"
         gas_ok  = "SET" if DAILY_APPS_SCRIPT_URL else "MISSING"
         log_val = APPS_SCRIPT_URL if APPS_SCRIPT_URL else "MISSING"

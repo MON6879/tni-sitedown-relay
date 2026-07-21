@@ -9,6 +9,7 @@
     { "src": "/api/index",             "dest": "api/index.py" },
     { "src": "/api/collector",         "dest": "api/collector.py" },
     { "src": "/api/search_bot",        "dest": "api/search_bot.py" },
-    { "src": "/api/refuel_collector",  "dest": "api/refuel_collector.py" }
+    { "src": "/api/refuel_collector",  "dest": "api/refuel_collector.py" },
+    { "src": "/(.*)",                  "dest": "/$1" }
   ]
 }
