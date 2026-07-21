@@ -845,6 +845,7 @@ def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None
         resp   = requests.post(DAILY_APPS_SCRIPT_URL,
                                json={"action": "daily_add",
                                      "telegram_id": str(user_id),
+                                     "user_name": first_name or str(user_id),
                                      "fields": parsed},
                                timeout=45)
         result = resp.json()
