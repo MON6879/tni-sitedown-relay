@@ -50,6 +50,26 @@ _daily_fields: list[str] = []
 _daily_fields_ts: float  = 0.0
 DAILY_FIELDS_TTL = 600   # 10 phút
 
+_df_staff: pd.DataFrame | None = None
+_df_staff_ts: float = 0.0
+STAFF_TTL = 30   # 30 giây
+
+def get_staff_df() -> pd.DataFrame:
+    global _df_staff, _df_staff_ts
+    import time
+    if _df_staff is not None and time.time() - _df_staff_ts < STAFF_TTL:
+        return _df_staff
+    try:
+        df = fetch_csv(GID_STAFF)
+        _df_staff = df
+        _df_staff_ts = time.time()
+        return df
+    except Exception as e:
+        logger.error(f"get_staff_df fetch error: {e}")
+        if _df_staff is not None:
+            return _df_staff
+        raise e
+
 _allowed_info_ids: set[str] | None = None
 _allowed_info_ids_ts: float = 0.0
 ALLOWED_IDS_TTL = 300 # 5 minutes cache
@@ -303,7 +323,7 @@ def get_staff_data(sender_id: int | str, field_name: str | None = None) -> str:
     """
     def e(s): return html.escape(str(s))
     try:
-        df = fetch_csv(GID_STAFF)   # row 0 = headers, row 1+ = data
+        df = get_staff_df()   # row 0 = headers, row 1+ = data
     except Exception as ex:
         logger.error(f"get_staff_data fetch: {ex}")
         return f"❌ Error loading Staff data: {e(str(ex)[:80])}"
@@ -680,6 +700,79 @@ def send_daily_template(chat_id: int) -> None:
         f"<pre>{html.escape(template)}</pre>",
     )
 
+def get_user_team_number(user_id: int) -> int | None:
+    try:
+        df = get_staff_df()
+        if df is None or df.empty:
+            return None
+        data = df.iloc[2:]
+        sid = str(user_id).strip()
+        col_a = data.iloc[:, 0].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+        matched = data[col_a == sid]
+        if not matched.empty:
+            row = matched.iloc[0]
+            team_val = str(row.iloc[12]).strip().lower()
+            if "team 01" in team_val or "team 1" in team_val or "t1" in team_val:
+                return 1
+            elif "team 02" in team_val or "team 2" in team_val or "t2" in team_val:
+                return 2
+            elif "team 03" in team_val or "team 3" in team_val or "t3" in team_val:
+                return 3
+            elif "team 04" in team_val or "team 4" in team_val or "t4" in team_val:
+                return 4
+    except Exception as e:
+        logger.error(f"get_user_team_number error: {e}")
+    return None
+
+def send_daily_plan_template(chat_id: int, team_num: int) -> None:
+    try:
+        df = get_staff_df()
+        if df is None or df.empty:
+            tg_send(chat_id, "❌ Không thể tải dữ liệu Staff.")
+            return
+        
+        data = df.iloc[2:]
+        team_str = f"Team 0{team_num}"
+        
+        matched_staff = []
+        for idx, row in data.iterrows():
+            row_team = str(row.iloc[12]).strip()
+            probation_status = str(row.iloc[13]).strip().lower()
+            if "resign" in probation_status or "nghi" in probation_status or "nghỉ" in probation_status:
+                continue
+                
+            if row_team.lower() == team_str.lower() or row_team.lower() == f"team {team_num}":
+                full_name = str(row.iloc[5]).strip()
+                if full_name and full_name.lower() != "nan" and full_name != "-":
+                    matched_staff.append(full_name)
+                    
+        now_mm = datetime.now(TZ_MM)
+        date_str = now_mm.strftime("%d/%m/%Y")
+        
+        lines = [
+            f"Daily Plan: {date_str}",
+            f"Team {team_num}",
+            "I. Hot task Rescue Cell down: ",
+            "II. Hot task Repair DG abnomal: ",
+            "III. Hot task Repair DG run>16H:",
+            "IV. Hot task other: ",
+            "V.  Note: /Find /TNIxxxx Yesterday check which /Tool, /material need /bring for do on Site. All material using new or move or order all people can sent folow menu: https://t.me/+atexSvtj13gyYjI1",
+            "VI. List name FT : Name Site ( WO + Task)"
+        ]
+        
+        for i, name in enumerate(matched_staff, start=1):
+            lines.append(f"{i}. {name}: ")
+            
+        template = "\n".join(lines)
+        tg_send(chat_id,
+            f"📋 <b>Daily Plan Template (Team {team_num})</b>\n"
+            f"Copy → Edit → Send back:\n\n"
+            f"<pre>{html.escape(template)}</pre>",
+        )
+    except Exception as e:
+        logger.error(f"send_daily_plan_template error: {e}")
+        tg_send(chat_id, f"❌ Lỗi tạo template: {str(e)[:80]}")
+
 def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None:
     fields = fetch_daily_fields()
     parsed = parse_daily_report(text, fields)
@@ -774,11 +867,38 @@ def handle(update: dict) -> None:
                     "• Send <code>mysite</code>, <code>mycable</code>, <code>mymw</code>... to view personal stats\n"
                     "• Send <code>mydata</code> to view all personal stats (mysite to mymw)\n"
                     "• Send report containing <b>Daily</b> to save it\n"
-                    "• Type /daily to see the report template")
+                    "• Type /daily to see the report template\n"
+                    "• Type /plan to see the Daily Plan template with FT list for your Team")
                 return
 
             elif cmd == "/daily":
                 send_daily_template(chat_id)
+                return
+
+            elif cmd in ("/plan", "/dailyplan"):
+                team_num = None
+                parts = text.split()
+                if len(parts) > 1:
+                    team_arg = parts[1].upper()
+                    m = re.match(r"^(T(?:EAM)?\s*([1-4])|[1-4])$", team_arg, re.IGNORECASE)
+                    if m:
+                        team_num = int(m.group(2) if m.group(2) else m.group(1))
+                
+                if not team_num:
+                    from tni_config import TELEGRAM_GROUPS
+                    for k, gid in TELEGRAM_GROUPS.items():
+                        if str(chat_id) == str(gid):
+                            if k.startswith("T") and k[1:].isdigit():
+                                team_num = int(k[1:])
+                                break
+
+                if not team_num:
+                    team_num = get_user_team_number(user_id)
+                
+                if not team_num:
+                    team_num = 1
+                
+                send_daily_plan_template(chat_id, team_num)
                 return
 
             elif cmd in ("/id", "/myid"):
