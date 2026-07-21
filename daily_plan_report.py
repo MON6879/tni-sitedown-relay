@@ -1454,11 +1454,11 @@ async def run_eod_or_update(mode: str):
                 lines.append("❌ Team Leader: Not yet submitted")
             lines.append(divider)
 
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             team_num = group_key[1:] if (group_key.startswith("T") and group_key[1:].isdigit()) else "1"
-            button_url = f"https://tni-bot.vercel.app/plan_editor.html?team={team_num}&chat_id={chat_id}"
+            button_url = f"https://t.me/SEARCHTNITASKWOBOT?start=plan_T{team_num}"
             reply_markup = InlineKeyboardMarkup([
-                [InlineKeyboardButton(text="📋 Sửa & Gửi Plan", web_app=WebAppInfo(url=button_url))]
+                [InlineKeyboardButton(text="📋 Sửa & Gửi Plan", url=button_url)]
             ])
 
             msg = "\n".join(lines)
@@ -1700,11 +1700,11 @@ async def run_morning():
 
             lines.append(divider)
 
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
             team_num = group_key[1:] if (group_key.startswith("T") and group_key[1:].isdigit()) else "1"
-            button_url = f"https://tni-bot.vercel.app/plan_editor.html?team={team_num}&chat_id={chat_id}"
+            button_url = f"https://t.me/SEARCHTNITASKWOBOT?start=plan_T{team_num}"
             reply_markup = InlineKeyboardMarkup([
-                [InlineKeyboardButton(text="📋 Sửa & Gửi Plan", web_app=WebAppInfo(url=button_url))]
+                [InlineKeyboardButton(text="📋 Sửa & Gửi Plan", url=button_url)]
             ])
 
             msg = "\n".join(lines)
