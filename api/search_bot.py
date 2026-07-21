@@ -135,7 +135,7 @@ TG_API = f"https://api.telegram.org/bot{TOKEN}"
 
 MAIN_MENU_KEYBOARD = {
     "keyboard": [
-        [{"text": "📋 Plan"}],
+        [{"text": "📋 Plan", "web_app": {"url": "https://tni-bot.vercel.app/plan_editor.html?team=1&chat_id=-1004215695747"}}],
         [{"text": "❓ Help"}]
     ],
     "resize_keyboard": True,
