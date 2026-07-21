@@ -18,20 +18,22 @@ const DRIVE_PARENT     = "1 VCM BRANCH TNI";
 const DRIVE_FOLDER     = "2.5 Daily report and Businesstrip Telegram";
 const TIMEZONE         = "Asia/Yangon";   // UTC+6:30
 
-// ─── CỘT (1-indexed) sau khi xóa cột REF, Employee Name và Transportation Used ──────────────────
-// A-N (1-14) → 14 cột dữ liệu (A=1)
-// O=15       → 1 ảnh Google Drive (cột Image)
-// P=16       → Timestamp
-// Q=17       → Telegram ID người gửi
-// R=18       → User name người gửi
-const COL_DATA_START   = 1;   // A
-const NUM_DATA_COLS    = 14;  // A → N
-const COL_PHOTO_START  = 15;  // O
-const NUM_PHOTO_COLS   = 1;   // O
-const COL_TIMESTAMP    = 16;  // P
+// ─── CỘT (1-indexed) sau khi khôi phục cột REF và Tên nhân viên ──────────────────
+// A=1   → số thứ tự (REF)
+// B=2   → Tên nhân viên (lookup qua ARRAYFORMULA)
+// C-P   → 14 cột dữ liệu (bắt đầu từ cột C, tương ứng index 2)
+// Q=17  → Telegram ID người gửi
+// R=18  → User name người gửi (cũ là tên nhân viên)
+// S-X   → 6 ảnh Google Drive (cột 19 đến 24)
+const COL_REF          = 1;   // A
+const COL_EMP_NAME     = 2;   // B
+const COL_DATA_START   = 3;   // C
+const NUM_DATA_COLS    = 14;  // C → P
 const COL_TG_ID        = 17;  // Q
 const COL_USER_NAME    = 18;  // R
-const DR_TOTAL_COLS    = 18;  // A → R
+const COL_PHOTO_START  = 19;  // S
+const NUM_PHOTO_COLS   = 6;   // S → X
+const DR_TOTAL_COLS    = 24;  // A → X
 const TEMPLATE_ROWS    = 0;
 
 // ================================================================
@@ -157,16 +159,35 @@ function handleDailyAdd(body) {
     return "";
   });
 
-  // Build full row (A→R = 18 cột)
+  // Build full row (A→X = 24 cột)
   const row = new Array(DR_TOTAL_COLS).fill("");
-  dataRow.forEach((v, i) => { row[COL_DATA_START - 1 + i] = v; }); // A:N = data
+  dataRow.forEach((v, i) => { row[COL_DATA_START - 1 + i] = v; }); // C:P = data
   row[COL_TG_ID - 1]      = tgId;   // Q = Telegram ID
   row[COL_USER_NAME - 1]  = userName; // R = User name
-  row[COL_TIMESTAMP - 1]  = Utilities.formatDate(new Date(), TIMEZONE, "dd/MM/yyyy HH:mm:ss"); // P = Timestamp
+
+  // Tính REF bằng cách quét giá trị cột A hiện tại để tìm số lớn nhất (tránh lỗi dòng trống hoặc khi bị xóa hàng)
+  const lastRow = sheet.getLastRow();
+  let maxRef = 0;
+  if (lastRow > 1) {
+    const refValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < refValues.length; i++) {
+      const val = parseInt(refValues[i][0], 10);
+      if (!isNaN(val) && val > maxRef) {
+        maxRef = val;
+      }
+    }
+  }
+  const ref = String(maxRef + 1).padStart(5, "0");
+  row[COL_REF - 1] = ref; // Ghi REF vào cột A (index 0)
 
   // Chèn dòng mới tại dòng 2 (ngay dưới header) để báo cáo mới nhất luôn ở đầu
   sheet.insertRowBefore(2);
-  sheet.getRange(2, 1, 1, DR_TOTAL_COLS).setValues([row]);
+
+  // Ghi dữ liệu vào dòng 2. Để tránh ghi đè làm hỏng ARRAYFORMULA tại cột B (COL_EMP_NAME = 2):
+  // 1) Ghi cột A (REF)
+  sheet.getRange(2, 1).setValue(ref).setFontWeight("bold").setHorizontalAlignment("center");
+  // 2) Ghi cột C->R (cột 3 đến 18). Cột B (index 1) bỏ qua không ghi đè.
+  sheet.getRange(2, 3, 1, 16).setValues([row.slice(2, 18)]);
 
   // Màu nền cho dòng dữ liệu mới
   sheet.getRange(2, 1, 1, DR_TOTAL_COLS).setBackground("#EBF3FB");
@@ -176,12 +197,14 @@ function handleDailyAdd(body) {
   const pKey    = "DPENDING_" + tgId;
   const pending = JSON.parse(props.getProperty(pKey) || "[]");
   if (pending.length > 0) {
-    sheet.getRange(2, COL_PHOTO_START).setValue(pending[0]); // Ghi ảnh đầu tiên vào cột Image (O)
+    pending.slice(0, NUM_PHOTO_COLS).forEach((link, idx) => {
+      sheet.getRange(2, COL_PHOTO_START + idx).setValue(link);
+    });
     props.deleteProperty(pKey);
   }
 
-  Logger.log("✅ Daily row added to row 2: tgId=" + tgId);
-  return jsonOut({ status: "ok", row: 2, name: userName || tgId });
+  Logger.log("✅ Daily row added to row 2: REF:" + ref + " tgId=" + tgId);
+  return jsonOut({ status: "ok", row: 2, ref: ref, name: userName || tgId });
 }
 
 // ================================================================

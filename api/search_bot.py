@@ -121,13 +121,19 @@ def get_allowed_info_search_ids() -> set[str]:
 
 DAILY_FIELDS_DEFAULT = [
     "Daily Result",
-    "Full Name", "Detail WO", "Detail task",
-    "Name Site rescue", "Name Cell rescue", "Resuce Cable",
-    "Name Site follow partner refuel", "Other task",
+    "Full Name",
+    "Transportation Used",
+    "I. Hot task rescue Site down >24 :",
+    "II Hot task Cell rescue",
+    "III. Hot task Repair DG abnomal",
+    "IV. Hot task Repair DG run>16H:",
+    "V. Hot task other:",
+    "VII. Detail WO",
+    "VII. Detail task",
     "Name and detail Site go busines trip start go",
     "Name and detail Site go busines trip end go",
-    "Name and detail Site repair alarm",
-    "Km moto bike start", "Km moto bike the end",
+    "Km moto bike start",
+    "Km moto bike the end",
 ]
 
 # ── Telegram API helper ───────────────────────────────────────────────────────
