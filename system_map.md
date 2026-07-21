@@ -82,15 +82,16 @@ Tabs: `Plan refuel` | `Team request` | `Refueled` | `Lettel Progress` | `Templat
 
 ---
 
-## 📊 Google Sheets — HAI SPREADSHEET RIÊNG BIỆT
+## 📊 Google Sheets — BA SPREADSHEET RIÊNG BIỆT
 
 > [!CAUTION]
-> Hệ thống có **2 Google Spreadsheet khác nhau**. Nhầm lẫn giữa 2 sheet này sẽ làm mất dữ liệu hoặc bot ghi sai chỗ!
+> Hệ thống có **3 Google Spreadsheet khác nhau**. Nhầm lẫn giữa các sheet này sẽ làm mất dữ liệu hoặc bot ghi sai chỗ!
 
 | Tên | Sheet ID | Dùng cho | Ai xem |
 |---|---|---|---|
 | **Team All Find** (sheet chính) | `1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8` | Search Log, Dashboard Report, Asset Stats, Chat IDs | **USER xem hàng ngày** |
 | **Site Down sheet** | `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow` | Site Down data (store_site_down), Task Remain riêng | Bot ghi, dùng bởi botlookup_relay |
+| **Attendance sheet** | `18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54` | List Attendance (ghi nhận điểm danh), Staff attendance | Bot điểm danh ghi |
 
 Trong `apps_script_collector.js`:
 - `SHEET_ID` = `1Etd2P...` → **Team All Find** (sheet chính, user xem) ← **DÙNG cho handleLogSearch**
@@ -166,6 +167,7 @@ Trong `apps_script_collector.js`:
 | `@TNIREPORTTASK_BOT` | `REPORT_TASK_BOT_TOKEN` | `8646913750:AAG3...` | ⚠️ Không dùng nữa cho nhân viên (nhân viên chưa start bot này) | — |
 | `@TNITECHINICALDEPREPORT_BOT` | `TECHNICAL_DEP_BOT_TOKEN` | `8928677923:AAE_...` | Gửi cho Technical Dept (E75:E87) | GitHub Actions |
 | `SEND_BOT` | `SEND_BOT_TOKEN` | `8897800070:AAHc...` | Gửi cho **TẤT CẢ**: Nhân viên + Team Leaders + Management + BOD | GitHub Actions |
+| `ATTENDANCE_BOT` | `SEND_BOT_TOKEN` *(trong dự án Attendance)* | `8628370628:AAE4...` | Nhận ảnh điểm danh, đối chiếu Gemini và ghi nhận vào sheet | Webhook (Apps Script) |
 
 ---
 
@@ -182,6 +184,7 @@ Trong `apps_script_collector.js`:
 | [auto_copy_processor.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/auto_copy_processor.js) | **Apps Script** | Tự động xử lý Copy-Paste & Xóa dòng theo file Config lúc 22:00 |
 | [cross_check_wo.gs](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script/cross_check_wo.gs) | **Apps Script** | Tự động gửi báo cáo Cross Check WO hàng ngày lúc 17:00 |
 | [auto_fetch_ict.py](file:///d:/6.%20AI/1.%20QLTC/ICT%20Fetch/auto_fetch_ict.py) | **Local PC** | Script Python cào dữ liệu ICT, tự động tịnh tiến lịch sử cột và ghi giờ Myanmar vào W1 |
+| [TNI attendance.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_attendance/TNI%20attendance.js) | **Apps Script** *(Dự án riêng)* | Nhận diện điểm danh khuôn mặt bằng Gemini AI, lưu Sheet & Drive |
 
 ---
 
@@ -349,6 +352,44 @@ Team 1: Total Site down: 11...
 | Thay đổi | Chi tiết |
 |---|---|
 | **botlookup_relay.py delay: 3–21p → 1–5p** | `MIN_DELAY_SEC = 1*60`, `MAX_DELAY_SEC = 5*60` — delay ngắn hơn vì công ty đã update TRƯỚC trigger, không cần đợi lâu. Timeout workflow: 50p → 15p |
+
+---
+
+## 🤖 Daily Attendance System (21/07/2026)
+
+**File:** [`TNI attendance.js`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_attendance/TNI%20attendance.js) — trong repo `phonghdpxd-cmd/tni-bot`
+
+### Flow hoạt động
+```
+Nhân viên gửi ảnh điểm danh (kèm/không kèm caption) vào chatbot Attendance
+         ↓
+Telegram Webhook chuyển tiếp đến Web App URL của dự án Apps Script riêng biệt
+         ↓
+Kiểm tra và chặn trùng lặp tin bằng CacheService (update_id trong 10 phút)
+         ↓
+Tải ảnh từ Telegram → Lưu vào thư mục Google Drive (1qT8RxGKgVyUo-EG7...)
+         ↓
+Đọc database nhân viên (tab "Staff attendance")
+         ↓
+Gọi Gemini 2.5 Flash đối chiếu khuôn mặt & trích xuất mã TNI từ watermark/caption
+         ↓
+Kiểm tra trùng lặp trong ngày hôm nay theo Telegram ID (Cột D)
+         ↓
+Ghi nhận dòng mới vào tab "List Attendance"
+         ↓
+Bot gửi tin nhắn xác nhận hoàn thành điểm danh về cho người dùng/nhóm
+```
+
+### Cấu hình và Dự án Apps Script riêng biệt
+- **Script ID:** `166XawHNCvkXmo7NGjydYJPTpaQMr1FTk_cqFSjFm8yiSxLEjsyr73XtW` (folder `apps_script_attendance`)
+- **Spreadsheet ID:** `18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54` (Attendance sheet)
+- **Drive Folder ID:** `1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb`
+- **Script Properties cần thiết (Trong Apps Script Editor):**
+  - `SEND_BOT_TOKEN` = `8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw` (Token bot điểm danh)
+  - `ATTENDANCE_SS_ID` = `18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54` (ID bảng tính điểm danh)
+  - `DRIVE_FOLDER_ID` = `1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb` (ID thư mục lưu ảnh)
+  - `GEMINI_API_KEY` = *(API Key kết nối Gemini AI)*
+- **Cách chạy khởi tạo cấu hình:** Chọn chạy hàm `initAttendanceScriptProperties()` và `setupAttendanceWebhook()` từ Editor.
 
 ---
 
