@@ -59,10 +59,22 @@ function doPost(e) {
       const cache = CacheService.getScriptCache();
       const cacheKey = "attendance_upd_" + update.update_id;
       if (cache.get(cacheKey)) {
-        logToSheet_("Duplicate update_id: " + update.update_id + ", ignoring.");
+        logToSheet_("Duplicate update_id (cache): " + update.update_id + ", ignoring.");
         return ContentService.createTextOutput("OK");
       }
-      cache.put(cacheKey, "1", 600); // Cache for 10 minutes
+      cache.put(cacheKey, "1", 21600); // Cache for 6 hours
+
+      // Deduplicate permanently in PropertiesService (keep last 100 update_ids)
+      const rawUpds = props.getProperty("PROCESSED_UPDATES") || "[]";
+      let processedUpds = [];
+      try { processedUpds = JSON.parse(rawUpds); } catch (ex) {}
+      if (processedUpds.indexOf(update.update_id) !== -1) {
+        logToSheet_("Duplicate update_id (props): " + update.update_id + ", ignoring.");
+        return ContentService.createTextOutput("OK");
+      }
+      processedUpds.push(update.update_id);
+      if (processedUpds.length > 100) processedUpds = processedUpds.slice(-100);
+      props.setProperty("PROCESSED_UPDATES", JSON.stringify(processedUpds));
     }
 
     logToSheet_("Update received: " + JSON.stringify(update));
@@ -71,6 +83,13 @@ function doPost(e) {
     const msg = update.message;
     if (!msg) {
       return ContentService.createTextOutput("No message object");
+    }
+
+    // Ignore old messages (older than 10 minutes = 600 seconds)
+    const nowSec = Math.floor((new Date()).getTime() / 1000);
+    if (msg.date && (nowSec - msg.date > 600)) {
+      logToSheet_("Message too old (" + (nowSec - msg.date) + "s old), update_id: " + update.update_id + ", ignoring.");
+      return ContentService.createTextOutput("OK");
     }
 
     const chatId = msg.chat.id.toString();
@@ -91,10 +110,10 @@ function doPost(e) {
     const imageBlob = getTelegramFile_(token, fileId);
 
     logToSheet_("Photo downloaded. Saving to Google Drive folder " + folderId + "...");
-    const now = new Date();
-    const dateStr = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
-    const timeStr = Utilities.formatDate(now, "Asia/Rangoon", "HH:mm");
-    const fileDateSuffix = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMdd_HHmmss");
+    const msgDateObj = msg.date ? new Date(msg.date * 1000) : new Date();
+    const dateStr = Utilities.formatDate(msgDateObj, "Asia/Rangoon", "dd/MM/yyyy");
+    const timeStr = Utilities.formatDate(msgDateObj, "Asia/Rangoon", "HH:mm");
+    const fileDateSuffix = Utilities.formatDate(msgDateObj, "Asia/Rangoon", "yyyyMMdd_HHmmss");
     
     const fileName = "attendance_" + fileDateSuffix + "_" + senderId + ".jpg";
     const driveFileUrl = saveToDrive_(imageBlob, folderId, fileName);
@@ -236,8 +255,8 @@ function doPost(e) {
       const finalTgId = match.telegramId;
       const finalDep = match.department;
 
-      // Kiểm tra trùng lặp trong ngày hôm nay theo Telegram ID
-      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, finalTgId)) {
+      // Kiểm tra trùng lặp trong ngày hôm nay theo Telegram ID và Mã Site (nếu có)
+      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, finalTgId, extractedImageName)) {
         replyMsg += `- ${finalShortName} (Already logged today)\n`;
         continue;
       }
@@ -329,15 +348,16 @@ function getStaffColumns_(sheet) {
   return { nameCol: nameCol, fullNameCol: fullNameCol, idCol: idCol, photoCol: photoCol, depCol: depCol };
 }
 
-/** Kiểm tra xem nhân viên đã điểm danh trong ngày hôm nay chưa theo Telegram ID */
-function isAlreadyLoggedToday_(sheet, dateStr, telegramId) {
+/** Kiểm tra xem nhân viên đã điểm danh trong ngày hôm nay chưa theo Telegram ID và Mã Site (nếu có) */
+function isAlreadyLoggedToday_(sheet, dateStr, telegramId, siteCode) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return false;
-  // Đọc từ cột B (Date) đến cột D (Telegram ID) -> 3 cột
-  const values = sheet.getRange(2, 2, lastRow - 1, 3).getValues(); 
+  // Đọc từ cột B (Date) đến cột E (Name Trên Hình / Site) -> 4 cột
+  const values = sheet.getRange(2, 2, lastRow - 1, 4).getValues(); 
   for (let i = 0; i < values.length; i++) {
     const rowDate = values[i][0];
-    const rowTgId = String(values[i][2] || "").trim(); // Cột D (Telegram ID) là index 2 trong mảng [B, C, D]
+    const rowTgId = String(values[i][2] || "").trim(); // Cột D (Telegram ID)
+    const rowSite = String(values[i][3] || "").trim(); // Cột E (Name Trên Hình / Site)
     
     let formattedRowDate = "";
     if (rowDate instanceof Date) {
@@ -347,7 +367,15 @@ function isAlreadyLoggedToday_(sheet, dateStr, telegramId) {
     }
     
     if (formattedRowDate.split(" ")[0] === dateStr && rowTgId === telegramId) {
-      return true;
+      if (siteCode && siteCode.trim() !== "") {
+        if (rowSite.toLowerCase() === siteCode.trim().toLowerCase()) {
+          return true; // Đã điểm danh mã site này rồi
+        }
+      } else {
+        if (!rowSite || rowSite.toLowerCase() === (siteCode || "").trim().toLowerCase()) {
+          return true;
+        }
+      }
     }
   }
   return false;
