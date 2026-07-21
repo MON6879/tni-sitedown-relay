@@ -806,7 +806,8 @@ def send_daily_plan_template(chat_id: int, team_num: int) -> None:
     template = get_plan_template_text(team_num)
     
     if chat_id < 0:
-        button_url = f"https://t.me/SEARCHTNITASKWOBOT?start=plan_T{team_num}"
+        button_url = f"https://tni-app.vercel.app/plan_editor.html" # wait, the vercel domain is tni-bot.vercel.app
+        button_url = f"https://tni-bot.vercel.app/plan_editor.html?team={team_num}&chat_id={chat_id}"
         reply_markup = {
             "inline_keyboard": [
                 [{"text": "📋 Sửa & Gửi Plan", "url": button_url}]
@@ -814,7 +815,7 @@ def send_daily_plan_template(chat_id: int, team_num: int) -> None:
         }
         tg_send(chat_id,
             f"📋 <b>Daily Plan Template (Team {team_num})</b>\n"
-            f"Copy → Edit → Send back, hoặc bấm nút dưới để sang chat riêng sửa nhanh:\n\n"
+            f"Bấm nút dưới đây để mở trang soạn thảo sửa trực tiếp:\n\n"
             f"<pre>{html.escape(template)}</pre>",
             reply_markup=reply_markup
         )
