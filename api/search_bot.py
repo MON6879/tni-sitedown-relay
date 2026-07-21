@@ -120,13 +120,13 @@ def get_allowed_info_search_ids() -> set[str]:
         return set()
 
 DAILY_FIELDS_DEFAULT = [
-    "Daily report",
-    "Transportation Used", "Full Name", "Detail WO", "Detail task",
+    "Daily Result",
+    "Full Name", "Detail WO", "Detail task",
     "Name Site rescue", "Name Cell rescue", "Resuce Cable",
-    "Name and detail Site repair alarm",
     "Name Site follow partner refuel", "Other task",
     "Name and detail Site go busines trip start go",
     "Name and detail Site go busines trip end go",
+    "Name and detail Site repair alarm",
     "Km moto bike start", "Km moto bike the end",
 ]
 
@@ -744,13 +744,13 @@ def get_copy_markup(chat_id: int, team_arg: str, text_label: str) -> dict:
 def send_daily_template(chat_id: int) -> None:
     fields = fetch_daily_fields()
     now_mm = datetime.now(TZ_MM)
-    lines  = [f"Daily report: {now_mm.strftime('%d/%m/%Y')}"]
+    lines  = [f"Daily Result: {now_mm.strftime('%d/%m/%Y')}"]
     for i, f in enumerate(fields[1:], start=1):
         lines.append(f"{i}. {f}:")
     template = "\n".join(lines)
     
     tg_send(chat_id,
-        f"📋 <b>Daily Report Template</b>\n"
+        f"📋 <b>Daily Result Template</b>\n"
         f"Copy → Edit → Send back:\n\n"
         f"<pre>{html.escape(template)}</pre>"
     )
