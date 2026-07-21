@@ -142,11 +142,10 @@
 <body>
     <div class="container">
         <h2 id="title">Chỉnh Sửa Daily Plan</h2>
-        <p class="description">Chỉnh sửa nội dung phân công công việc dưới đây rồi bấm nút gửi trực tiếp lên nhóm chat.</p>
+        <p class="description">Chỉnh sửa nội dung phân công công việc dưới đây rồi bấm nút Copy để dán và tự gửi vào nhóm chat.</p>
         <textarea id="editor" placeholder="Đang tải mẫu kế hoạch..."></textarea>
         <button id="sendBtn" class="btn" disabled>
-            <div id="spinner" class="spinner"></div>
-            <span id="btnText">🚀 Gửi Lên Nhóm Chat</span>
+            <span id="btnText">📋 Sao Chép Kế Hoạch (Copy)</span>
         </button>
     </div>
 
@@ -185,51 +184,40 @@
                 editor.value = 'Lỗi kết nối máy chủ: ' + err.message;
             });
 
-        // Bấm nút gửi
+        // Bấm nút copy
         sendBtn.addEventListener('click', () => {
             const text = editor.value.trim();
             if (!text) return;
 
-            sendBtn.disabled = true;
-            spinner.style.display = 'block';
-            btnText.innerText = 'Đang gửi...';
-
-            // Gửi dữ liệu qua API bot để post lên group
-            fetch('/api/search_bot', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    action: 'submit_plan',
-                    chat_id: chatId,
-                    text: text
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'ok') {
-                    // Thành công, đóng WebApp
-                    if (tg) {
-                        tg.close();
-                    } else {
-                        alert('Đã gửi kế hoạch thành công!');
-                    }
-                } else {
-                    alert('Lỗi gửi: ' + (data.message || 'Không rõ nguyên nhân'));
-                    resetBtn();
+            navigator.clipboard.writeText(text).then(() => {
+                showSuccess();
+            }).catch(err => {
+                // Fallback for older browsers
+                editor.select();
+                try {
+                    document.execCommand('copy');
+                    showSuccess();
+                } catch (e) {
+                    alert('Không thể tự động copy. Vui lòng chọn toàn bộ văn bản và tự copy.');
                 }
-            })
-            .catch(err => {
-                alert('Lỗi kết nối: ' + err.message);
-                resetBtn();
             });
         });
 
-        function resetBtn() {
-            sendBtn.disabled = false;
-            spinner.style.display = 'none';
-            btnText.innerText = '🚀 Gửi Lên Nhóm Chat';
+        function showSuccess() {
+            document.querySelector('.container').innerHTML = `
+                <h2 style="color: #48bb78; background: none; -webkit-text-fill-color: #48bb78; font-size: 1.5rem; margin: 20px 0;">✓ Đã Sao Chép!</h2>
+                <p class="description" style="color: #ffffff; font-size: 1rem; margin-top: 10px; line-height: 1.6;">
+                    Nội dung Plan đã được copy vào khay nhớ tạm.
+                </p>
+                <div style="color: #38bdf8; font-size: 0.95rem; margin-top: 15px; font-weight: 600; border: 1px dashed rgba(56,189,248,0.3); padding: 12px; border-radius: 8px; background: rgba(56,189,248,0.05); text-align: center; line-height: 1.5;">
+                    👉 Hãy quay lại nhóm chat, dán (Paste/Ctrl+V) vào ô soạn thảo và tự bấm gửi!
+                </div>
+            `;
+            setTimeout(() => {
+                if (tg && typeof tg.close === 'function') {
+                    tg.close();
+                }
+            }, 4000);
         }
     </script>
 </body>
