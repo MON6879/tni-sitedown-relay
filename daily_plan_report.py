@@ -1105,7 +1105,7 @@ def calc_3day_completion_rate(all_plans: list, team_comparisons: dict,
 
 # ── Send message helper ────────────────────────────────────────
 
-async def send_msg(bot, cid, text, label=""):
+async def send_msg(bot, cid, text, label="", reply_markup=None):
     """Send message with auto-split for >4096 chars. Returns (ok, msg_ids)."""
     MAX = 4000
     sent_ids = []  # collect message_id from each sent message
@@ -1130,13 +1130,15 @@ async def send_msg(bot, cid, text, label=""):
         return parts
 
     try:
-        if len(text) <= MAX:
-            result = await bot.send_message(chat_id=cid, text=text)
+        chunks = chunk_text(text)
+        if len(chunks) == 1:
+            result = await bot.send_message(chat_id=cid, text=text, reply_markup=reply_markup)
             sent_ids.append(result.message_id)
         else:
-            for p in chunk_text(text):
+            for i, p in enumerate(chunks):
                 if p.strip():
-                    result = await bot.send_message(chat_id=cid, text=p)
+                    markup = reply_markup if i == len(chunks) - 1 else None
+                    result = await bot.send_message(chat_id=cid, text=p, reply_markup=markup)
                     sent_ids.append(result.message_id)
                     await asyncio.sleep(0.3)
         logger.info(f"✅ {label} → {cid}")
@@ -1452,10 +1454,17 @@ async def run_eod_or_update(mode: str):
                 lines.append("❌ Team Leader: Not yet submitted")
             lines.append(divider)
 
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            team_num = group_key[1:] if (group_key.startswith("T") and group_key[1:].isdigit()) else "1"
+            button_url = f"https://t.me/SEARCHTNITASKWOBOT?start=plan_T{team_num}"
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton(text="📋 Lấy mẫu Plan", url=button_url)]
+            ])
+
             msg = "\n".join(lines)
             delete_key = f"{delete_prefix}_{group_key}"
             delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, delete_key)
-            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-{mode_label}-{group_key}")
+            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-{mode_label}-{group_key}", reply_markup=reply_markup)
             if ok and msg_ids:
                 save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
             await asyncio.sleep(0.5)
@@ -1691,10 +1700,17 @@ async def run_morning():
 
             lines.append(divider)
 
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            team_num = group_key[1:] if (group_key.startswith("T") and group_key[1:].isdigit()) else "1"
+            button_url = f"https://t.me/SEARCHTNITASKWOBOT?start=plan_T{team_num}"
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton(text="📋 Lấy mẫu Plan", url=button_url)]
+            ])
+
             msg = "\n".join(lines)
             delete_key = f"{delete_prefix}_{group_key}"
             delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, delete_key)
-            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-MRN-{group_key}")
+            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-MRN-{group_key}", reply_markup=reply_markup)
             if ok and msg_ids:
                 save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
             await asyncio.sleep(0.5)

@@ -135,9 +135,9 @@ TG_API = f"https://api.telegram.org/bot{TOKEN}"
 
 MAIN_MENU_KEYBOARD = {
     "keyboard": [
-        [{"text": "📋 Plan"}, {"text": "📝 Daily"}],
-        [{"text": "📊 My Data"}, {"text": "❓ Help"}],
-        [{"text": "🔵 T1"}, {"text": "🟡 T2"}, {"text": "🟢 T3"}, {"text": "🔴 T4"}]
+        [{"text": "📋 Plan T1"}, {"text": "📋 Plan T2"}],
+        [{"text": "📋 Plan T3"}, {"text": "📋 Plan T4"}],
+        [{"text": "❓ Help"}]
     ],
     "resize_keyboard": True,
     "one_time_keyboard": False
@@ -878,22 +878,19 @@ def handle(update: dict) -> None:
 
     # Map reply keyboard button labels to actual commands
     text_l = text.lower().strip()
-    if "plan" in text_l and ("📋" in text or text_l == "plan"):
-        text = "/plan"
-    elif "daily" in text_l and ("📝" in text or text_l == "daily"):
-        text = "/daily"
-    elif "my data" in text_l or text_l == "mydata" or "📊" in text:
-        text = "mydata"
-    elif "help" in text_l or text_l == "help" or "❓" in text:
+    if "plan" in text_l and "📋" in text:
+        if "t1" in text_l or "1" in text_l:
+            text = "/plan T1"
+        elif "t2" in text_l or "2" in text_l:
+            text = "/plan T2"
+        elif "t3" in text_l or "3" in text_l:
+            text = "/plan T3"
+        elif "t4" in text_l or "4" in text_l:
+            text = "/plan T4"
+        else:
+            text = "/plan"
+    elif "help" in text_l or "❓" in text:
         text = "/help"
-    elif "t1" in text_l:
-        text = "T1"
-    elif "t2" in text_l:
-        text = "T2"
-    elif "t3" in text_l:
-        text = "T3"
-    elif "t4" in text_l:
-        text = "T4"
 
     # ── COMMANDS ────────────────────────────────────────────────────────────
     if text.startswith("/"):
@@ -909,7 +906,31 @@ def handle(update: dict) -> None:
             # Strip slash and fall through to main search parsers
             text = text[1:]
         else:
-            if cmd in ("/start", "/help"):
+            if cmd == "/start":
+                parts = text.split()
+                if len(parts) > 1:
+                    arg = parts[1].upper()
+                    if arg.startswith("PLAN_T"):
+                        team_num_str = arg[6:]
+                        if team_num_str.isdigit():
+                            send_daily_plan_template(chat_id, int(team_num_str))
+                            return
+
+                tg_send(chat_id,
+                    "👋 <b>TNI Search Bot</b>\n\n"
+                    "• Send site code (e.g. <code>TNI0001</code>) to lookup Task/WO\n"
+                    "• Send <code>T1</code>, <code>T2</code>, <code>T3</code>, or <code>T4</code> to view Task/WO by Team\n"
+                    "• Send <code>T1notclose</code> to view unclosed WOs for the team\n"
+                    "• Send <code>T1waitcd</code> to view WOs waiting for CD for the team\n"
+                    "• Send <code>mysite</code>, <code>mycable</code>, <code>mymw</code>... to view personal stats\n"
+                    "• Send <code>mydata</code> to view all personal stats (mysite to mymw)\n"
+                    "• Send report containing <b>Daily</b> to save it\n"
+                    "• Type /daily to see the report template\n"
+                    "• Type /plan to see the Daily Plan template with FT list for your Team",
+                    reply_markup=MAIN_MENU_KEYBOARD)
+                return
+
+            elif cmd == "/help":
                 tg_send(chat_id,
                     "👋 <b>TNI Search Bot</b>\n\n"
                     "• Send site code (e.g. <code>TNI0001</code>) to lookup Task/WO\n"
