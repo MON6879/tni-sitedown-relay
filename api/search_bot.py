@@ -57,12 +57,31 @@ STAFF_TTL = 30   # 30 giây
 def get_staff_df() -> pd.DataFrame:
     global _df_staff, _df_staff_ts
     import time
-    if _df_staff is not None and time.time() - _df_staff_ts < STAFF_TTL:
+    now_ts = time.time()
+    
+    should_reload = False
+    if _df_staff is None:
+        should_reload = True
+    else:
+        try:
+            # Check if it has passed 23:00 MM time on a new day
+            last_mm = datetime.fromtimestamp(_df_staff_ts, tz=TZ_MM)
+            now_mm = datetime.now(TZ_MM)
+            if now_mm.date() > last_mm.date():
+                if now_mm.hour >= 23:
+                    should_reload = True
+            elif (now_ts - _df_staff_ts) > 86400:  # Fallback 24 hours
+                should_reload = True
+        except Exception:
+            should_reload = True
+
+    if _df_staff is not None and not should_reload:
         return _df_staff
+
     try:
         df = fetch_csv(GID_STAFF)
         _df_staff = df
-        _df_staff_ts = time.time()
+        _df_staff_ts = now_ts
         return df
     except Exception as e:
         logger.error(f"get_staff_df fetch error: {e}")
@@ -114,14 +133,28 @@ DAILY_FIELDS_DEFAULT = [
 # ── Telegram API helper ───────────────────────────────────────────────────────
 TG_API = f"https://api.telegram.org/bot{TOKEN}"
 
-def tg_send(chat_id: int, text: str, parse_mode: str = "HTML") -> None:
+MAIN_MENU_KEYBOARD = {
+    "keyboard": [
+        [{"text": "📋 Plan"}, {"text": "📝 Daily"}],
+        [{"text": "📊 My Data"}, {"text": "❓ Help"}],
+        [{"text": "🔵 T1"}, {"text": "🟡 T2"}, {"text": "🟢 T3"}, {"text": "🔴 T4"}]
+    ],
+    "resize_keyboard": True,
+    "one_time_keyboard": False
+}
+
+def tg_send(chat_id: int, text: str, parse_mode: str = "HTML", reply_markup: dict | None = None) -> None:
     """Gửi tin nhắn Telegram, tự chia chunk nếu > 4096 ký tự."""
     chunks = split_messages(text)
-    for chunk in chunks:
+    for i, chunk in enumerate(chunks):
+        markup = reply_markup if i == len(chunks) - 1 else None
+        payload = {"chat_id": chat_id, "text": chunk, "parse_mode": parse_mode}
+        if markup:
+            payload["reply_markup"] = markup
         try:
             requests.post(
                 f"{TG_API}/sendMessage",
-                json={"chat_id": chat_id, "text": chunk, "parse_mode": parse_mode},
+                json=payload,
                 timeout=60,
             )
         except Exception as ex:
@@ -843,6 +876,25 @@ def handle(update: dict) -> None:
     if not text:
         return
 
+    # Map reply keyboard button labels to actual commands
+    text_l = text.lower().strip()
+    if "plan" in text_l and ("📋" in text or text_l == "plan"):
+        text = "/plan"
+    elif "daily" in text_l and ("📝" in text or text_l == "daily"):
+        text = "/daily"
+    elif "my data" in text_l or text_l == "mydata" or "📊" in text:
+        text = "mydata"
+    elif "help" in text_l or text_l == "help" or "❓" in text:
+        text = "/help"
+    elif "t1" in text_l:
+        text = "T1"
+    elif "t2" in text_l:
+        text = "T2"
+    elif "t3" in text_l:
+        text = "T3"
+    elif "t4" in text_l:
+        text = "T4"
+
     # ── COMMANDS ────────────────────────────────────────────────────────────
     if text.startswith("/"):
         cmd = text.split()[0].lower().split("@")[0]
@@ -868,7 +920,8 @@ def handle(update: dict) -> None:
                     "• Send <code>mydata</code> to view all personal stats (mysite to mymw)\n"
                     "• Send report containing <b>Daily</b> to save it\n"
                     "• Type /daily to see the report template\n"
-                    "• Type /plan to see the Daily Plan template with FT list for your Team")
+                    "• Type /plan to see the Daily Plan template with FT list for your Team",
+                    reply_markup=MAIN_MENU_KEYBOARD)
                 return
 
             elif cmd == "/daily":
