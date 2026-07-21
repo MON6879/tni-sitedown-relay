@@ -1279,6 +1279,15 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(b"OK")
         except Exception as ex:
             logger.error(f"Webhook POST error: {ex}")
+            try:
+                import traceback
+                tb = traceback.format_exc()
+                msg = data.get("message") or data.get("edited_message") or {}
+                chat_id = msg.get("chat", {}).get("id")
+                if chat_id:
+                    tg_send(chat_id, f"⚠️ <b>Webhook Error Traceback:</b>\n<pre>{html.escape(tb[:3500])}</pre>")
+            except Exception:
+                pass
             self.send_response(500)
             self.end_headers()
             self.wfile.write(str(ex).encode())
