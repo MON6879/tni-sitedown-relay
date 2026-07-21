@@ -149,7 +149,12 @@ def tg_send(chat_id: int, text: str, parse_mode: str = "HTML", reply_markup: dic
         markup = reply_markup if i == len(chunks) - 1 else None
         if chat_id > 0 and not markup:
             markup = MAIN_MENU_KEYBOARD
-        payload = {"chat_id": chat_id, "text": chunk, "parse_mode": parse_mode}
+        payload = {
+            "chat_id": chat_id,
+            "text": chunk,
+            "parse_mode": parse_mode,
+            "disable_web_page_preview": True
+        }
         if markup:
             payload["reply_markup"] = markup
         try:
@@ -722,13 +727,22 @@ def is_daily(text: str) -> bool:
     return "daily" in text_l or "result" in text_l
 
 def send_daily_template(chat_id: int) -> None:
+    import urllib.parse
     fields = fetch_daily_fields()
     now_mm = datetime.now(TZ_MM)
     lines  = [f"Daily report: {now_mm.strftime('%d/%m/%Y')}"]
     for i, f in enumerate(fields[1:], start=1):
         lines.append(f"{i}. {f}:")
     template = "\n".join(lines)
-    tg_send(chat_id, template)
+    
+    encoded = urllib.parse.quote(template)
+    button_url = f"tg://msg_url?text={encoded}"
+    reply_markup = {
+        "inline_keyboard": [
+            [{"text": "📋 Copy Report", "url": button_url}]
+        ]
+    }
+    tg_send(chat_id, template, reply_markup=reply_markup)
 
 def get_user_team_number(user_id: int) -> int | None:
     try:
@@ -799,8 +813,16 @@ def get_plan_template_text(team_num: int) -> str:
         return f"Error: {str(e)}"
 
 def send_daily_plan_template(chat_id: int, team_num: int) -> None:
+    import urllib.parse
     template = get_plan_template_text(team_num)
-    tg_send(chat_id, template)
+    encoded = urllib.parse.quote(template)
+    button_url = f"tg://msg_url?text={encoded}"
+    reply_markup = {
+        "inline_keyboard": [
+            [{"text": "📋 Copy Plan", "url": button_url}]
+        ]
+    }
+    tg_send(chat_id, template, reply_markup=reply_markup)
 
 def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None:
     fields = fetch_daily_fields()
