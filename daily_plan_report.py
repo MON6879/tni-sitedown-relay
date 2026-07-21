@@ -1454,17 +1454,10 @@ async def run_eod_or_update(mode: str):
                 lines.append("❌ Team Leader: Not yet submitted")
             lines.append(divider)
 
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            team_num = group_key[1:] if (group_key.startswith("T") and group_key[1:].isdigit()) else "1"
-            button_url = f"https://tni-bot.vercel.app/plan_editor.html?team={team_num}&chat_id={chat_id}"
-            reply_markup = InlineKeyboardMarkup([
-                [InlineKeyboardButton(text="📋 Sửa & Gửi Plan", url=button_url)]
-            ])
-
             msg = "\n".join(lines)
             delete_key = f"{delete_prefix}_{group_key}"
             delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, delete_key)
-            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-{mode_label}-{group_key}", reply_markup=reply_markup)
+            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-{mode_label}-{group_key}")
             if ok and msg_ids:
                 save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
             await asyncio.sleep(0.5)
@@ -1700,17 +1693,10 @@ async def run_morning():
 
             lines.append(divider)
 
-            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            team_num = group_key[1:] if (group_key.startswith("T") and group_key[1:].isdigit()) else "1"
-            button_url = f"https://tni-bot.vercel.app/plan_editor.html?team={team_num}&chat_id={chat_id}"
-            reply_markup = InlineKeyboardMarkup([
-                [InlineKeyboardButton(text="📋 Sửa & Gửi Plan", url=button_url)]
-            ])
-
             msg = "\n".join(lines)
             delete_key = f"{delete_prefix}_{group_key}"
             delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, delete_key)
-            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-MRN-{group_key}", reply_markup=reply_markup)
+            ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-MRN-{group_key}")
             if ok and msg_ids:
                 save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
             await asyncio.sleep(0.5)

@@ -135,7 +135,7 @@ TG_API = f"https://api.telegram.org/bot{TOKEN}"
 
 MAIN_MENU_KEYBOARD = {
     "keyboard": [
-        [{"text": "📋 Plan", "web_app": {"url": "https://tni-bot.vercel.app/plan_editor.html?team=1&chat_id=-1004215695747"}}],
+        [{"text": "📋 Plan"}],
         [{"text": "❓ Help"}]
     ],
     "resize_keyboard": True,
@@ -804,35 +804,11 @@ def get_plan_template_text(team_num: int) -> str:
 
 def send_daily_plan_template(chat_id: int, team_num: int) -> None:
     template = get_plan_template_text(team_num)
-    
-    if chat_id < 0:
-        button_url = f"https://tni-app.vercel.app/plan_editor.html" # wait, the vercel domain is tni-bot.vercel.app
-        button_url = f"https://tni-bot.vercel.app/plan_editor.html?team={team_num}&chat_id={chat_id}"
-        reply_markup = {
-            "inline_keyboard": [
-                [{"text": "📋 Sửa & Gửi Plan", "url": button_url}]
-            ]
-        }
-        tg_send(chat_id,
-            f"📋 <b>Daily Plan Template (Team {team_num})</b>\n"
-            f"Bấm nút dưới đây để mở trang soạn thảo sửa trực tiếp:\n\n"
-            f"<pre>{html.escape(template)}</pre>",
-            reply_markup=reply_markup
-        )
-    else:
-        from tni_config import TELEGRAM_GROUPS
-        group_chat_id = TELEGRAM_GROUPS.get(f"T{team_num}", chat_id)
-        button_url = f"https://tni-bot.vercel.app/plan_editor.html?team={team_num}&chat_id={group_chat_id}"
-        reply_markup = {
-            "inline_keyboard": [
-                [{"text": "✍️ Mở hộp thoại sửa Plan", "web_app": {"url": button_url}}]
-            ]
-        }
-        tg_send(chat_id,
-            f"📋 <b>Daily Plan Template (Team {team_num})</b>\n"
-            f"Bấm nút dưới đây để mở hộp thoại sửa trực tiếp:",
-            reply_markup=reply_markup
-        )
+    tg_send(chat_id,
+        f"📋 <b>Daily Plan Template (Team {team_num})</b>\n"
+        f"Copy → Edit → Send back:\n\n"
+        f"<pre>{html.escape(template)}</pre>"
+    )
 
 def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None:
     fields = fetch_daily_fields()
