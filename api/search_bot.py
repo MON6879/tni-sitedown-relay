@@ -749,8 +749,11 @@ def send_daily_template(chat_id: int) -> None:
         lines.append(f"{i}. {f}:")
     template = "\n".join(lines)
     
-    reply_markup = get_copy_markup(chat_id, "daily", "📋 Copy Report")
-    tg_send(chat_id, template, reply_markup=reply_markup)
+    tg_send(chat_id,
+        f"📋 <b>Daily Report Template</b>\n"
+        f"Copy → Edit → Send back:\n\n"
+        f"<pre>{html.escape(template)}</pre>"
+    )
 
 def get_user_team_number(user_id: int) -> int | None:
     try:
@@ -822,8 +825,11 @@ def get_plan_template_text(team_num: int) -> str:
 
 def send_daily_plan_template(chat_id: int, team_num: int) -> None:
     template = get_plan_template_text(team_num)
-    reply_markup = get_copy_markup(chat_id, str(team_num), "📋 Copy Plan")
-    tg_send(chat_id, template, reply_markup=reply_markup)
+    tg_send(chat_id,
+        f"📋 <b>Daily Plan Template (Team {team_num})</b>\n"
+        f"Copy → Edit → Send back:\n\n"
+        f"<pre>{html.escape(template)}</pre>"
+    )
 
 def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None:
     fields = fetch_daily_fields()
