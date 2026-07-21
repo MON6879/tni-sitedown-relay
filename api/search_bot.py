@@ -807,12 +807,13 @@ def get_plan_template_text(team_num: int) -> str:
         lines = [
             f"Daily Plan: {date_str}",
             f"Team {team_num}",
-            "I. Hot task Rescue Cell down: ",
-            "II. Hot task Repair DG abnomal: ",
-            "III. Hot task Repair DG run>16H:",
-            "IV. Hot task other: ",
-            "V.  Note: /Find /TNIxxxx Yesterday check which /Tool, /material need /bring for do on Site. All material using new or move or order all people can sent folow menu: https://t.me/+atexSvtj13gyYjI1",
-            "VI. List name FT : Name Site ( WO + Task)"
+            "I. Hot task rescue Site down >24 :",
+            "II. Hot task Rescue Cell down: ",
+            "III. Hot task Repair DG abnomal: ",
+            "IV. Hot task Repair DG run>16H:",
+            "V. Hot task other: ",
+            "VI.  Note: /Find /TNIxxxx Yesterday check which /Tool, /material need /bring for do on Site. All material using new or move or order all people can sent folow menu: https://t.me/+atexSvtj13gyYjI1",
+            "VII. List name FT : Name Site ( WO + Task)"
         ]
         
         for i, name in enumerate(matched_staff, start=1):
