@@ -777,7 +777,8 @@ def get_plan_template_text(team_num: int) -> str:
             if row_team.lower() == team_str.lower() or row_team.lower() == f"team {team_num}":
                 full_name = str(row.iloc[5]).strip()
                 if full_name and full_name.lower() != "nan" and full_name != "-":
-                    matched_staff.append(full_name)
+                    if full_name not in matched_staff:
+                        matched_staff.append(full_name)
                     
         now_mm = datetime.now(TZ_MM)
         date_str = now_mm.strftime("%d/%m/%Y")
