@@ -1005,7 +1005,7 @@ def handle(update: dict) -> None:
                 global _cache_ts
                 _cache_ts = 0   # force reload
                 load_all_sheets()
-                tg_send(chat_id, "✅ Đã reload dữ liệu")
+                tg_send(chat_id, "✅ Data reloaded")
                 return
 
             elif cmd == "/tni":
@@ -1167,13 +1167,13 @@ def handle(update: dict) -> None:
         user_id_str = str(user_id).strip()
         if user_id_str not in allowed_ids:
             # Simulate searching then return "Not found"
-            tg_send(chat_id, f"⏳ Đang tìm thông tin <b>{html.escape(tni)}</b>...")
+            tg_send(chat_id, f"⏳ Searching info for <b>{html.escape(tni)}</b>...")
             import time
             time.sleep(1)
-            tg_send(chat_id, f"❌ Không tìm thấy <b>{html.escape(tni)}</b> trong danh sách Site Info.")
+            tg_send(chat_id, f"❌ Info for <b>{html.escape(tni)}</b> not found in Site Info list.")
             return
 
-        tg_send(chat_id, f"⏳ Đang tìm thông tin <b>{html.escape(tni)}</b>...")
+        tg_send(chat_id, f"⏳ Searching info for <b>{html.escape(tni)}</b>...")
         try:
             info = get_info(tni)
             if info and any(info.values()):
@@ -1182,11 +1182,11 @@ def handle(update: dict) -> None:
                     tg_send(chat_id, chunk)
             else:
                 tg_send(chat_id,
-                    f"❌ Không tìm thấy <b>{html.escape(tni)}</b> trong danh sách Site Info."
+                    f"❌ Info for <b>{html.escape(tni)}</b> not found in Site Info list."
                 )
         except Exception as err:
             logger.error(f"Info error [{tni}]: {err}")
-            tg_send(chat_id, f"❌ Lỗi tra cứu: {html.escape(str(err))}")
+            tg_send(chat_id, f"❌ Lookup error: {html.escape(str(err))}")
 
         # ── Không ghi log cho tra cứu Info theo yêu cầu (chỉ đếm TNIxxxx) ──
         return
