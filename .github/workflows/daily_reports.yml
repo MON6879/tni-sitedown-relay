@@ -2,21 +2,21 @@ name: Unified Daily Reports  # last-updated: 2026-07-10
 
 on:
   schedule:
-    - cron: '0 11 * * *'   # 17:30 Myanmar / 11:00 UTC → daily_task + plan_eod + bod_assign + cable_report + refuel_report
+    - cron: '0 11 * * *'   # 17:30 Myanmar / 11:00 UTC → daily_task + plan_eod + bod_assign + cable_report
     - cron: '30 22 * * *'  # 05:00 Myanmar / 22:30 UTC → refuel_report
     - cron: '30 6 * * *'   # 13:00 Myanmar / 06:30 UTC → refuel_report
-    - cron: '30 0 * * *'   # 07:00 Myanmar / 00:30 UTC → plan_morning(5.1) + refuel_plan_report
-    - cron: '0 1 * * *'    # 07:30 Myanmar / 01:00 UTC → plan_morning(5.1)
-    - cron: '30 1 * * *'   # 08:00 Myanmar / 01:30 UTC → plan_morning(5.1)
-    - cron: '0 2 * * *'    # 08:30 Myanmar / 02:00 UTC → plan_morning(5.1)
-    - cron: '0 3 * * *'    # 09:30 Myanmar / 03:00 UTC → plan_morning(5.1) [10:00 Myanmar]
-    - cron: '20 10 * * *'  # 17:20 Myanmar (approx) / 10:20 UTC → plan_morning(5.1)
+    - cron: '30 0 * * *'   # 07:00 Myanmar / 00:30 UTC → 5.1 + refuel_plan_report
+    - cron: '0 1 * * *'    # 07:30 Myanmar / 01:00 UTC → 5.1
+    - cron: '30 1 * * *'   # 08:00 Myanmar / 01:30 UTC → 5.1
+    - cron: '0 2 * * *'    # 08:30 Myanmar / 02:00 UTC → 5.1
+    - cron: '30 3 * * *'   # 10:00 Myanmar / 03:30 UTC → 5.1
+    - cron: '50 10 * * *'  # 17:20 Myanmar / 10:50 UTC → 5.1
     - cron: '30 14 * * *'  # 21:00 Myanmar / 14:30 UTC → plan_update
     - cron: '0 14 * * *'   # 20:30 Myanmar / 14:00 UTC → read_report
-    - cron: '30 11 * * *'  # 18:00 Myanmar / 11:30 UTC → refuel_plan_report (1)
-    - cron: '30 15 * * *'  # 22:00 Myanmar / 15:30 UTC → refuel_plan_report (4) + plan_morning(5.1)
-    - cron: '30 2 * * *'   # 09:00 Myanmar / 02:30 UTC → refuel_plan_report (2)
-    - cron: '30 13 * * *'  # 20:00 Myanmar / 13:30 UTC → refuel_plan_report (2) + plan_morning(5.1)
+    - cron: '30 11 * * *'  # 18:00 Myanmar / 11:30 UTC → refuel_plan_report
+    - cron: '30 15 * * *'  # 22:00 Myanmar / 15:30 UTC → 5.1 + refuel_plan_report
+    - cron: '30 2 * * *'   # 09:00 Myanmar / 02:30 UTC → refuel_plan_report
+    - cron: '30 13 * * *'  # 20:00 Myanmar / 13:30 UTC → 5.1 + refuel_plan_report
   workflow_dispatch:
     inputs:
       report_type:
@@ -126,8 +126,8 @@ jobs:
             github.event.schedule == '0 1 * * *'   ||
             github.event.schedule == '30 1 * * *'  ||
             github.event.schedule == '0 2 * * *'   ||
-            github.event.schedule == '0 3 * * *'   ||
-            github.event.schedule == '20 10 * * *' ||
+            github.event.schedule == '30 3 * * *'  ||
+            github.event.schedule == '50 10 * * *' ||
             github.event.schedule == '30 13 * * *' ||
             github.event.schedule == '30 15 * * *'
           )) ||
