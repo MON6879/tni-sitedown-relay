@@ -19,6 +19,19 @@
 
 ## 📅 CHANGELOG
 
+### 22/07/2026
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `tni_site_down_repo/site_down_v2.gs` | Cập nhật bóc tách Cột C theo vị trí hàng cố định: C1:C3 (Tiêu đề/Tổng), C4 (T1), C5 (T2), C6 (T3), C7 (T4), C10:C (Chi tiết site) | Khắc phục lỗi missing lines/No data cho T3 và CONTROL |
+| `tni_site_down_repo/site_down_v2.gs` | CONTROL nhận TOÀN BỘ Cột C ("Copy ALL" pre box). Các Team nhận dữ liệu riêng, tự động bỏ qua nhóm không có dữ liệu | Đáp ứng yêu cầu Copy ALL cho CONTROL và chặn gửi tin rác vào nhóm trống |
+| `tni_site_down_repo/site_down_v2.gs` | Bổ sung icon 🔥 `Dont Forget` và 🕒 `Duty:` vào `addKeywordIcons()`, đưa tất cả icon tiêu đề về đầu dòng (`\n`). Loại bỏ Regex lookbehind `(?<!...)` | Giao diện rõ ràng thoáng mắt, 100% tương thích V8 Apps Script |
+| `tni_site_down_repo/site_down_v2.gs` | `checkAwAz()` (Tin 2 Summary): dùng `formatTsHeader()` lọc timestamp ngắn, xóa dòng trùng lặp và bỏ khoảng trống thừa giữa các dòng | Tin Summary ngắn gọn, không trùng text |
+| `apps_script_attendance/TNI attendance.js` | Chuyển tất cả thông báo phản hồi sang Tiếng Anh. Hỗ trợ 4 khung giờ báo cáo điểm danh (`<08:30`, `10:00-12:00`, `13:00-14:00`, `16:00-17:00`) | Ghi nhận ảnh điểm danh ở các khung giờ mới trong ngày mà không bị báo trùng |
+| `apps_script_attendance/TNI attendance.js` | Tự động lấy Web App URL qua `ScriptApp.getService().getUrl()` khi thiết lập Webhook | Tiện lợi khởi tạo Webhook không cần điền ScriptProperties |
+| `daily_plan_report.py` | Thêm timestamp `(sent at DD/MM/YYYY HH:MM)` cho tiêu đề Plan và danh sách 3-Day Completion Rate | Hiển thị ngày giờ nộp báo cáo |
+| `botlookup_relay.py` & `.github/workflows/botlookup_relay.yml` | Tích hợp `botlookup_relay.py` và cron workflow (`8,38 * * * *`) trực tiếp vào repository `tni-bot` | Tự động cào tin Bot Lookup 30p/lần |
+| `.github/workflows/` & Repository Settings | Chuyển repository `phonghdpxd-cmd/tni-bot` sang **Public** | Mở khóa GitHub Actions, nhận Hạn mức MIỄN PHÍ UNLIMITED 24/7 |
+
 ### 21/07/2026
 | File | Thay đổi | Lý do |
 |---|---|---|
