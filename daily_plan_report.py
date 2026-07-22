@@ -875,6 +875,14 @@ async def scan_group_for_plans(client, chat_id: int, since_utc: datetime, leader
     return plans
 
 
+def fmt_sent_at(val) -> str:
+    if not val:
+        return ""
+    if isinstance(val, datetime):
+        return val.strftime("%d/%m/%Y %H:%M")
+    return str(val)
+
+
 # ── Stats building ─────────────────────────────────────────────
 
 def parse_plan_date(date_str: str) -> datetime | None:
@@ -1023,7 +1031,7 @@ async def scan_plan_tomorrow(client, group_key: str, chat_id: int,
                             msg.date.replace(tzinfo=timezone.utc).astimezone(MYANMAR_TZ)
                         result = {
                             "found": True,
-                            "sent_time": dt_mm.strftime("%H:%M"),
+                            "sent_time": dt_mm.strftime("%d/%m/%Y %H:%M"),
                             "content": parsed.get("content", msg.message),
                             "plan": parsed,
                         }
@@ -1449,7 +1457,11 @@ async def run_eod_or_update(mode: str):
             pt = plan_tomorrow_status.get(group_key, {"found": False})
             lines.append(f"📝 Plan Tomorrow ({tomorrow_str}):")
             if pt["found"]:
-                lines.append(f"✅ Team Leader: Submitted ✓ (sent at {pt['sent_time']})")
+                sent_str = fmt_sent_at(pt.get("sent_time"))
+                if sent_str:
+                    lines.append(f"✅ Team Leader: Submitted ✓ (sent at {sent_str})")
+                else:
+                    lines.append(f"✅ Team Leader: Submitted ✓")
             else:
                 lines.append("❌ Team Leader: Not yet submitted")
             lines.append(divider)
@@ -1540,7 +1552,11 @@ async def run_eod_or_update(mode: str):
             team_name = GROUP_NAMES.get(group_key, group_key)
             pt = plan_tomorrow_status.get(group_key, {"found": False})
             if pt["found"]:
-                ctrl_lines.append(f"   ✅ {team_name}: Submitted ✓ (sent at {pt['sent_time']})")
+                sent_str = fmt_sent_at(pt.get("sent_time"))
+                if sent_str:
+                    ctrl_lines.append(f"   ✅ {team_name}: Submitted ✓ (sent at {sent_str})")
+                else:
+                    ctrl_lines.append(f"   ✅ {team_name}: Submitted ✓")
             else:
                 ctrl_lines.append(f"   ❌ {team_name}: Not yet submitted")
 
@@ -1615,7 +1631,7 @@ async def run_morning():
             sp = sheet_plans_today[0]
             plan_today_status[group_key] = {
                 "found": True,
-                "sent_time": sp.get("msg_date", ""),  # có thể trống nếu chỉ có từ sheet
+                "sent_time": fmt_sent_at(sp.get("msg_date", "")),  # có thể trống nếu chỉ có từ sheet
                 "content": sp.get("content", ""),
                 "plan": sp,
                 "from_sheet": True,
@@ -1654,7 +1670,7 @@ async def run_morning():
             # Plan today status
             lines.append(f"📝 Plan for {date_str}:")
             if pt["found"]:
-                sent_at = pt.get("sent_time", "")
+                sent_at = fmt_sent_at(pt.get("sent_time", ""))
                 if sent_at:
                     lines.append(f"✅ Team Leader: Submitted ✓ (sent at {sent_at})")
                 else:
@@ -1721,7 +1737,11 @@ async def run_morning():
 
             ctrl_lines.append(f"🏷️ {team_name}:")
             if pt["found"]:
-                ctrl_lines.append(f"   ✅ Plan Submitted ✓ (sent at {pt['sent_time']})")
+                sent_at = fmt_sent_at(pt.get("sent_time", ""))
+                if sent_at:
+                    ctrl_lines.append(f"   ✅ Plan Submitted ✓ (sent at {sent_at})")
+                else:
+                    ctrl_lines.append("   ✅ Plan Submitted ✓ (recorded in sheet)")
             else:
                 ctrl_lines.append("   ⚠️ NOT SUBMITTED (Deadline: before 07:00)")
             ctrl_lines.append(
