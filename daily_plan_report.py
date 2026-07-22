@@ -1071,8 +1071,16 @@ def calc_3day_completion_rate(all_plans: list, team_comparisons: dict,
             # Tìm plans cho ngày đó
             day_plans = find_plans_for_date(all_plans, target_str, team_filter=gk)
             if not day_plans:
-                team_days.append({"date": target_str, "plan_count": 0, "done_count": 0, "pct": 0})
+                team_days.append({"date": target_str, "plan_count": 0, "done_count": 0, "pct": 0, "sent_at": ""})
                 continue
+
+            sent_at_str = ""
+            for p in day_plans:
+                m_at = p.get("msg_date") or p.get("sent_time") or p.get("sent_at")
+                if m_at:
+                    sent_at_str = fmt_sent_at(m_at)
+                    if sent_at_str:
+                        break
 
             # Đếm TNI codes trong plan
             plan_tni = set()
@@ -1091,7 +1099,13 @@ def calc_3day_completion_rate(all_plans: list, team_comparisons: dict,
                         done_count = max(done_count, int(done_match.group(1)))
 
             pct = round(done_count / plan_count * 100) if plan_count > 0 else 0
-            team_days.append({"date": target_str, "plan_count": plan_count, "done_count": done_count, "pct": pct})
+            team_days.append({
+                "date": target_str,
+                "plan_count": plan_count,
+                "done_count": done_count,
+                "pct": pct,
+                "sent_at": sent_at_str
+            })
             team_plan_total += plan_count
             team_done_total += done_count
 
@@ -1692,9 +1706,10 @@ async def run_morning():
             lines.append("")
             lines.append("📈 3-Day Completion Rate:")
             for day_info in cr["days"]:
+                sent_info = f" (sent at {day_info['sent_at']})" if day_info.get("sent_at") else ""
                 if day_info["plan_count"] > 0:
                     lines.append(
-                        f"   {day_info['date']}: Plan {day_info['plan_count']} "
+                        f"   {day_info['date']}: Plan {day_info['plan_count']}{sent_info} "
                         f"→ Done {day_info['done_count']} ({day_info['pct']}%)"
                     )
                 else:
