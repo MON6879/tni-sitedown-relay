@@ -656,8 +656,26 @@ function buildAwAzControlMessage(ts, awaz) {
 
 
 // ============================================================
-// SEND HELPERS — delete old → send new
+// HELPER TELEGRAM — IN-PLACE EDITING VIA BOT API
 // ============================================================
+
+function splitMessage(text, maxLen) {
+  if (!text) return [""];
+  if (text.length <= maxLen) return [text];
+  const chunks = [];
+  const lines = text.split("\n");
+  let cur = "";
+  for (const line of lines) {
+    if ((cur + "\n" + line).length > maxLen) {
+      if (cur) chunks.push(cur.trim());
+      cur = line;
+    } else {
+      cur = cur ? cur + "\n" + line : line;
+    }
+  }
+  if (cur) chunks.push(cur.trim());
+  return chunks;
+}
 
 function sendOrEditTelegram(chatId, text, msgKey, tag) {
   const oldIds = getSavedMsgIds_(msgKey);
