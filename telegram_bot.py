@@ -74,14 +74,19 @@ def fetch_csv(gid: str, has_header: bool = True) -> pd.DataFrame:
     """Tải CSV từ Google Sheet qua requests (xử lý redirect tốt hơn urllib)."""
     url = BASE_URL + gid
     headers = {"User-Agent": "Mozilla/5.0"}
-    resp = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
-    resp.raise_for_status()
-    content = resp.content.decode("utf-8", errors="replace")
-    if has_header:
-        return pd.read_csv(io.StringIO(content), dtype=str, on_bad_lines="skip")
-    else:
-        return pd.read_csv(io.StringIO(content), header=None,
-                           dtype=str, on_bad_lines="skip")
+    try:
+        resp = requests.get(url, headers=headers, timeout=30, allow_redirects=True)
+        resp.raise_for_status()
+        content = resp.content.decode("utf-8", errors="replace")
+        if has_header:
+            return pd.read_csv(io.StringIO(content), dtype=str, on_bad_lines="skip")
+        else:
+            return pd.read_csv(io.StringIO(content), header=None,
+                               dtype=str, on_bad_lines="skip")
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 401:
+            raise RuntimeError("❌ Google Sheet đang bị Khóa (Restricted). Bạn hãy đổi quyền Chia sẻ của Sheet sang 'Bất kỳ ai có đường link đều có thể xem (Viewer)' để Bot đọc dữ liệu.") from e
+        raise e
 
 
 def load_all_sheets():
