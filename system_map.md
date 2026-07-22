@@ -23,13 +23,11 @@
 | File | Thay đổi | Lý do |
 |---|---|---|
 | `tni_site_down_repo/site_down_v2.gs` | Cập nhật bóc tách Cột C theo vị trí hàng cố định: C1:C3 (Tiêu đề/Tổng), C4 (T1), C5 (T2), C6 (T3), C7 (T4), C10:C (Chi tiết site) | Khắc phục lỗi missing lines/No data cho T3 và CONTROL |
-| `tni_site_down_repo/site_down_v2.gs` | CONTROL nhận TOÀN BỘ Cột C ("Copy ALL" pre box). Các Team nhận dữ liệu riêng, tự động bỏ qua nhóm không có dữ liệu | Đáp ứng yêu cầu Copy ALL cho CONTROL và chặn gửi tin rác vào nhóm trống |
-| `tni_site_down_repo/site_down_v2.gs` | Bổ sung icon 🔥 `Dont Forget` và 🕒 `Duty:` vào `addKeywordIcons()`, đưa tất cả icon tiêu đề về đầu dòng (`\n`). Loại bỏ Regex lookbehind `(?<!...)` | Giao diện rõ ràng thoáng mắt, 100% tương thích V8 Apps Script |
-| `tni_site_down_repo/site_down_v2.gs` | `checkAwAz()` (Tin 2 Summary): dùng `formatTsHeader()` lọc timestamp ngắn, xóa dòng trùng lặp và bỏ khoảng trống thừa giữa các dòng | Tin Summary ngắn gọn, không trùng text |
-| `apps_script_attendance/TNI attendance.js` | Chuyển tất cả thông báo phản hồi sang Tiếng Anh. Hỗ trợ 4 khung giờ báo cáo điểm danh (`<08:30`, `10:00-12:00`, `13:00-14:00`, `16:00-17:00`) | Ghi nhận ảnh điểm danh ở các khung giờ mới trong ngày mà không bị báo trùng |
-| `apps_script_attendance/TNI attendance.js` | Tự động lấy Web App URL qua `ScriptApp.getService().getUrl()` khi thiết lập Webhook | Tiện lợi khởi tạo Webhook không cần điền ScriptProperties |
-| `daily_plan_report.py` | Thêm timestamp `(sent at DD/MM/YYYY HH:MM)` cho tiêu đề Plan và danh sách 3-Day Completion Rate | Hiển thị ngày giờ nộp báo cáo |
-| `botlookup_relay.py` & `.github/workflows/botlookup_relay.yml` | Tích hợp `botlookup_relay.py` và toàn bộ daily report scripts sang repo `MON6879/tni-sitedown-relay` | Chạy báo cáo tự động ở chế độ PRIVATE 100% trên tài khoản phụ |
+| `tni_site_down_repo/site_down_v2.gs` | CONTROL nhận C1..C3 (Header/Duty) và C10:C (Chi tiết site), bỏ qua từng Team Total. Bỏ hoàn toàn `editMessageText`, luôn xóa tin nhắn cũ (`deleteOldMessages_`) và gửi tin nhắn mới với mốc giờ hiện tại | Giao diện CONTROL đẹp gọn, bong bóng tin nhắn Telegram hiển thị đúng mốc thời gian cập nhật hiện tại |
+| `tni_site_down_repo/site_down_v2.gs` | Bổ sung icon 🔥 `Dont Forget` và 🕒 `Duty:` vào `addKeywordIcons()`, đưa tất cả icon tiêu đề về đầu dòng (`\n`). `checkAwAz()` dùng mốc Ngày/Giờ (`tsKey`) làm key so sánh tránh nhảy tin liên tục do công thức lẻ phút | Giao diện rõ ràng thoáng mắt, chống gửi trùng lặp 100% |
+| `telegram_bot.py` | Cập nhật xử lý lỗi HTTP 401 Unauthorized thân thiện khi Google Sheet ở chế độ Restricted. Hướng dẫn đổi quyền Chia sẻ sang Viewer | Giúp người dùng biết cách mở lại quyền cho Bot tra cứu dữ liệu |
+| `.github/workflows/daily_reports.yml` | Chuyển lịch chạy báo cáo định kỳ cuối ca chiều từ 17:20/17:30 về đúng **16:00 giờ Myanmar (`30 9 * * *` UTC)** | Gửi báo cáo định kỳ đúng khung giờ 16:00 theo yêu cầu |
+| `.github/workflows/` | Dọn dẹp triệt để `daily_reports.yml` và `botlookup_relay.yml` khỏi repo `phonghdpxd-cmd`, chỉ duy nhất repo `MON6879/tni-sitedown-relay` chạy tự động | Chặn hoàn toàn việc gửi 2 tin trùng lặp do 2 bot GitHub chạy song song |
 | `.github/workflows/` & Repository Settings | Chuyển cả 2 repository `phonghdpxd-cmd/tni-bot` và `MON6879/tni-sitedown-relay` về **PRIVATE** | Bảo mật mã nguồn 100%, tận dụng 2.000 phút Private của tài khoản mới |
 
 ### 21/07/2026

@@ -193,13 +193,12 @@ function checkAndSend(isWebhookCall) {
   const hour   = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "H"), 10);
   const minute = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "m"), 10);
 
-  // ── Kiểm tra thời gian nếu không phải là Webhook call ──
+  // ── Kiểm tra thời gian ──
   const props = PropertiesService.getScriptProperties();
   if (isWebhookCall !== true) {
-    if (minute !== 8 && minute !== 38) return { sent_tin1: false, sent_tin2: false };
     if (hour < 3 || hour > 22) return { sent_tin1: false, sent_tin2: false };
-    if (hour === 3 && minute < 38) return { sent_tin1: false, sent_tin2: false };   // 03:38 là sớm nhất
-    if (hour === 22 && minute > 8) return { sent_tin1: false, sent_tin2: false };  // 22:08 là muộn nhất
+    if (hour === 3 && minute < 38) return { sent_tin1: false, sent_tin2: false };
+    if (hour === 22 && minute > 15) return { sent_tin1: false, sent_tin2: false };
 
     // ── Chống chạy 2 lần trong cùng phút (chỉ áp dụng cho time trigger) ──
     const doneKey = "SD_DONE_" + Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHHmm");
@@ -430,18 +429,25 @@ function checkColC(sheet) {
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
-      const controlParts = [...globalHeaderLines];
-      for (const team of teams) {
-        const { summary, sites } = teamData[team];
-        controlParts.push("...");
-        if (summary.length > 0) controlParts.push(...summary);
-        if (sites.length > 0) {
-          controlParts.push(...sites);
-        } else {
-          controlParts.push("  (No site down)");
-        }
+  // ① CONTROL: Chỉ lấy C1..C3 (Header + Total + Duty) và C10:C (Chi tiết Site) — KHÔNG lấy từng Team Total
+  const controlId = SD_GROUPS["CONTROL"];
+  if (controlId) {
+    try {
+      const colC = colCRaw.split("\n");
+      const headerLines = [];
+      for (let i = 0; i < 9; i++) {
+        const line = colC[i] || "";
+        if (!line) continue;
+        // Gặp bắt đầu dòng Team 1 / Team 2... thì dừng lấy header
+        if (/^Team\s*\d+:/i.test(line)) break;
+        headerLines.push(line);
       }
-      sendOrEditTelegramPre(controlId, colorizeTeams(controlParts.join("\n")), "TIN1_CONTROL", "[Tin1][CONTROL]");
+      const siteLines = colC.slice(9).filter(l => l.length > 0 && l !== "...");
+      const fullControlText = [...headerLines, ...siteLines].join("\n");
+
+      if (fullControlText) {
+        sendOrEditTelegramPre(controlId, addKeywordIcons(colorizeTeams(fullControlText)), "TIN1_CONTROL", "[Tin1][CONTROL]");
+      }
     } catch (controlErr) {
       Logger.log("[Tin1][CONTROL] ❌ Lỗi gửi: " + controlErr.message);
     }
@@ -490,28 +496,19 @@ function colorizeTeams(text) {
 
 
 // ============================================================
-// TIN 2 — AW:AZ SUMMARY
-// Gửi khi AW7 timestamp thay đổi
+// TIN 2 — SUMMARY (AW7:AZ15)
+// Gửi khi AW7 timestamp (ngày/giờ) thay đổi
 // ============================================================
 function checkAwAz(sheet) {
-  const ts = parseAW7Timestamp(sheet);
-  if (!ts) { Logger.log("[Tin2] Không có timestamp trong AW7"); return false; }
+  const rawTs = sheet.getRange("AW7").getValue().toString().trim();
+  if (!rawTs) { Logger.log("[Tin2] AW7 rỗng — bỏ qua"); return false; }
 
-  const cache = CacheService.getScriptCache();
-  const cacheKey2 = "SD_CACHE_KEY_AW7_" + ts.replace(/[^a-zA-Z0-9]/g, "_");
-  if (cache.get(cacheKey2)) {
-    Logger.log("[Tin2] AW7 trùng cache (" + ts + ") — bỏ qua");
-    return false;
-  }
+  // Lấy riêng mốc Ngày/Giờ (ví dụ: "22/07/2026 15:16") để làm key so sánh ổn định,
+  // tránh việc công thức Sheet tự tính toán lẻ phút làm thay đổi chuỗi liên tục.
+  const tsKey = formatTsHeader(rawTs);
 
   const props  = PropertiesService.getScriptProperties();
   const lastTs = props.getProperty(TS_KEY_AW7) || "";
-  if (ts === lastTs) {
-    Logger.log("[Tin2] AW7 không đổi (" + ts + ") — bỏ qua");
-    return false;
-  }
-
-  cache.put(cacheKey2, "1", 300);
   Logger.log("[Tin2] 🆕 " + ts + " → gửi summary...");
 
   const awaz  = readAwAz(sheet);
@@ -678,44 +675,18 @@ function splitMessage(text, maxLen) {
 }
 
 function sendOrEditTelegram(chatId, text, msgKey, tag) {
-  const oldIds = getSavedMsgIds_(msgKey);
+  // ① Xóa tin nhắn cũ có cùng tiêu đề
+  deleteOldMessages_(chatId, msgKey);
+  Utilities.sleep(300);
+
+  // ② Gửi tin nhắn mới và lưu ID
   const props  = PropertiesService.getScriptProperties();
   const idKey  = "SD_MSGID_" + msgKey;
-  const chunks = splitMessage(text, 4000);
-
-  if (oldIds.length > 0) {
-    const edited = editTelegramMsg_(chatId, oldIds[0], chunks[0], "HTML", tag);
-    if (edited) {
-      for (let i = 1; i < oldIds.length; i++) deleteTelegramMsgBot_(chatId, oldIds[i]);
-      const newIds = [oldIds[0]];
-      for (let i = 1; i < chunks.length; i++) {
-        Utilities.sleep(300);
-        try {
-          const r = UrlFetchApp.fetch(
-            "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/sendMessage", {
-              method: "post", contentType: "application/json",
-              payload: JSON.stringify({ chat_id: chatId, text: chunks[i], parse_mode: "HTML" }),
-              muteHttpExceptions: true,
-          });
-          const res = JSON.parse(r.getContentText());
-          if (res.ok && res.result) newIds.push(res.result.message_id);
-        } catch(e) {}
-      }
-      props.setProperty(idKey, JSON.stringify(newIds));
-      return;
-    }
-    deleteOldMessages_(chatId, msgKey);
-  }
   const newIds = sendTelegramCollectIds_(chatId, text, tag);
   props.setProperty(idKey, JSON.stringify(newIds));
 }
 
 function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
-  const oldIds  = getSavedMsgIds_(msgKey);
-  const props   = PropertiesService.getScriptProperties();
-  const idKey   = "SD_MSGID_" + msgKey;
-  const escaped = escHtml(plainContent);
-  const chunks  = splitMessage(escaped, 3800);
 
   // ① Thử edit tin cũ (không cần quyền admin)
   if (oldIds.length > 0) {
