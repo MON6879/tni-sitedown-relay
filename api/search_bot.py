@@ -1218,8 +1218,9 @@ def handle(update: dict) -> None:
         return
 
     # ── TNI LOOKUP ──────────────────────────────────────────────────────────
+    # Chỉ đọc 12 ký tự đầu từ trái sang để tìm mã TNIxxxx hay TNIXXXX_01 (tránh quét tin nhắn báo cáo dài)
     m = re.search(r"(TNI\w+)", text, re.IGNORECASE)
-    if not m:
+    if not m or m.start() >= 12:
         return
 
     tni = m.group(1).upper()

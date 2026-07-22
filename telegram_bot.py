@@ -658,8 +658,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ── 2. TNI Lookup (existing logic)
+    # Chỉ đọc 12 ký tự đầu từ trái sang để tìm mã TNIxxxx hay TNIXXXX_01 (tránh quét tin nhắn báo cáo dài)
     m = re.search(r"(TNI\w+)", text, re.IGNORECASE)
-    if not m:
+    if not m or m.start() >= 12:
         return
     tni      = m.group(1).upper()
     logger.info(f"Lookup: {tni}")

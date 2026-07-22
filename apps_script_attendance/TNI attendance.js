@@ -255,9 +255,9 @@ function doPost(e) {
       const finalTgId = match.telegramId;
       const finalDep = match.department;
 
-      // Kiểm tra trùng lặp trong ngày hôm nay theo Telegram ID và Mã Site (nếu có)
-      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, finalTgId, extractedImageName)) {
-        replyMsg += `- ${finalShortName} (Already logged today)\n`;
+      // Kiểm tra trùng lặp trong cùng khung giờ hôm nay theo Telegram ID và Mã Site
+      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, timeStr, finalTgId, extractedImageName)) {
+        replyMsg += `- ${finalShortName} (Already logged for this time slot)\n`;
         continue;
       }
 
@@ -280,7 +280,7 @@ function doPost(e) {
     if (successCount > 0) {
       sendTelegramMessage_(token, chatId, replyMsg);
     } else {
-      sendTelegramMessage_(token, chatId, "⚠️ Điểm danh hôm nay của bạn/nhóm đã được ghi nhận trước đó.");
+      sendTelegramMessage_(token, chatId, "⚠️ Today's attendance for you/your group has already been recorded for this time slot.");
     }
 
     return ContentService.createTextOutput("OK");
@@ -348,16 +348,45 @@ function getStaffColumns_(sheet) {
   return { nameCol: nameCol, fullNameCol: fullNameCol, idCol: idCol, photoCol: photoCol, depCol: depCol };
 }
 
-/** Kiểm tra xem nhân viên đã điểm danh trong ngày hôm nay chưa theo Telegram ID và Mã Site (nếu có) */
-function isAlreadyLoggedToday_(sheet, dateStr, telegramId, siteCode) {
+/** Xác định khung giờ điểm danh (<8:30, 10:00-12:00, 13:00-14:00, 16:00-17:00) */
+function getAttendanceSlot_(timeVal) {
+  if (!timeVal) return "slot_other";
+  let h = 0, m = 0;
+  if (timeVal instanceof Date) {
+    h = timeVal.getHours();
+    m = timeVal.getMinutes();
+  } else {
+    const str = String(timeVal).trim();
+    const mMatch = str.match(/(\d{1,2}):(\d{2})/);
+    if (mMatch) {
+      h = parseInt(mMatch[1], 10);
+      m = parseInt(mMatch[2], 10);
+    }
+  }
+  const totalMin = h * 60 + m;
+
+  if (totalMin < 8 * 60 + 30) return "slot_morning_1";                       // < 08:30
+  if (totalMin >= 10 * 60 && totalMin <= 12 * 60) return "slot_morning_2";   // 10:00 - 12:00
+  if (totalMin >= 13 * 60 && totalMin <= 14 * 60) return "slot_afternoon_1"; // 13:00 - 14:00
+  if (totalMin >= 16 * 60 && totalMin <= 17 * 60) return "slot_afternoon_2"; // 16:00 - 17:00
+  
+  return "slot_custom_" + h;
+}
+
+/** Kiểm tra xem nhân viên đã điểm danh trong cùng KHUNG GIỜ hôm nay chưa */
+function isAlreadyLoggedToday_(sheet, dateStr, currentTimeStr, telegramId, siteCode) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return false;
-  // Đọc từ cột B (Date) đến cột E (Name Trên Hình / Site) -> 4 cột
+  
+  const currentSlot = getAttendanceSlot_(currentTimeStr);
+
+  // Đọc từ cột B (Date), C (Time), D (Telegram ID), E (Site) -> 4 cột
   const values = sheet.getRange(2, 2, lastRow - 1, 4).getValues(); 
   for (let i = 0; i < values.length; i++) {
     const rowDate = values[i][0];
+    const rowTime = values[i][1];
     const rowTgId = String(values[i][2] || "").trim(); // Cột D (Telegram ID)
-    const rowSite = String(values[i][3] || "").trim(); // Cột E (Name Trên Hình / Site)
+    const rowSite = String(values[i][3] || "").trim(); // Cột E (Site)
     
     let formattedRowDate = "";
     if (rowDate instanceof Date) {
@@ -367,12 +396,14 @@ function isAlreadyLoggedToday_(sheet, dateStr, telegramId, siteCode) {
     }
     
     if (formattedRowDate.split(" ")[0] === dateStr && rowTgId === telegramId) {
-      if (siteCode && siteCode.trim() !== "") {
-        if (rowSite.toLowerCase() === siteCode.trim().toLowerCase()) {
-          return true; // Đã điểm danh mã site này rồi
-        }
-      } else {
-        if (!rowSite || rowSite.toLowerCase() === (siteCode || "").trim().toLowerCase()) {
+      const rowSlot = getAttendanceSlot_(rowTime);
+      // Chỉ trùng nếu ĐÃ ĐIỂM DANH TRONG CÙNG KHUNG GIỜ
+      if (rowSlot === currentSlot) {
+        if (siteCode && siteCode.trim() !== "") {
+          if (rowSite.toLowerCase() === siteCode.trim().toLowerCase()) {
+            return true;
+          }
+        } else {
           return true;
         }
       }
@@ -509,10 +540,15 @@ function sendTelegramMessage_(token, chatId, text) {
 function setupAttendanceWebhook() {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
-  const webAppUrl = props.getProperty("WEBAPP_URL") || "";
+  let webAppUrl = props.getProperty("WEBAPP_URL") || "";
+  if (!webAppUrl) {
+    try {
+      webAppUrl = ScriptApp.getService().getUrl() || "";
+    } catch(e) {}
+  }
   
   if (!webAppUrl) {
-    Logger.log("❌ Thiếu WEBAPP_URL trong Script Properties. Hãy deploy làm Web App trước.");
+    Logger.log("❌ Thiếu WEBAPP_URL. Hãy Deploy làm Web App (Execute as: Me, Access: Anyone) rồi thử lại.");
     return;
   }
   

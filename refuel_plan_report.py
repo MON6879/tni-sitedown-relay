@@ -115,6 +115,24 @@ def parse_date_str(val) -> str:
     return s
 
 
+def parse_date_to_datetime(val) -> datetime | None:
+    """Parse bất kỳ định dạng ngày nào về datetime object (không kèm timezone) để so sánh."""
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val
+    s = str(val).strip()
+    if not s or s.lower() == "none":
+        return None
+    # Thử các định dạng ngày phổ biến
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m/%Y %H:%M", "%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(s[:len(fmt)], fmt)
+        except ValueError:
+            pass
+    return None
+
+
 def safe_int(val) -> int:
     """Chuyển đổi giá trị số nguyên an toàn — trả 0 nếu không parse được."""
     if val is None:
@@ -233,17 +251,23 @@ class RefuelData:
         ws = wb["Lettel Progress"]
         latest_submitted = ""
         latest_approved  = ""
+        max_sub_dt = None
+        max_app_dt = None
         for r in range(2, ws.max_row + 1):
             val_b = ws.cell(row=r, column=2).value  # B: Date Letter Submit
             val_c = ws.cell(row=r, column=3).value  # C: Date Letter Approved
             if val_b:
-                s = parse_date_str(val_b)
-                if s and s != "None":
-                    latest_submitted = s
+                dt_b = parse_date_to_datetime(val_b)
+                if dt_b:
+                    if max_sub_dt is None or dt_b > max_sub_dt:
+                        max_sub_dt = dt_b
+                        latest_submitted = parse_date_str(val_b)
             if val_c:
-                s = parse_date_str(val_c)
-                if s and s != "None":
-                    latest_approved = s
+                dt_c = parse_date_to_datetime(val_c)
+                if dt_c:
+                    if max_app_dt is None or dt_c > max_app_dt:
+                        max_app_dt = dt_c
+                        latest_approved = parse_date_str(val_c)
         self.letter_submitted = latest_submitted
         self.letter_approved  = latest_approved
  
@@ -355,16 +379,6 @@ def report_1(data: RefuelData):
     refueled_today = [r for r in data.records if r["cat"] == "REFUELED" and r["date"] == today_str]
     request_today  = [r for r in data.records if r["cat"] == "REQUEST"  and r["date"] == today_str]
 
-    if not plan_today:
-        tg_send(
-            f"📋 <b>[Report 1] Plan - Request - Refueled</b>\n"
-            f"📅 {today_str} | \u23f0 {now.strftime('%H:%M')} Myanmar\n"
-            f"📭 No Plan submitted for today.",
-            "report1"
-        )
-        print("\u2705 Report 1 sent (no plan today).")
-        return
-
     # ── Build lookup: site → qty cho Refueled & Request ──
     refueled_by_site: dict[str, int] = {}
     for r in refueled_today:
@@ -384,67 +398,74 @@ def report_1(data: RefuelData):
         if sid not in sender_team_map:
             sender_team_map[sid] = r["team"]
 
-    # ── Group: Sender → Team → Sites ──
-    sender_order: list[str] = []
-    sender_data: dict = {}
+    # ── Group: Team → Sender → list of sites ──
+    team_order: list[str] = []
+    # team → { sender_order: [], senders: { name: [sites] } }
+    team_data: dict = {}
 
     for r in sorted(plan_today, key=lambda x: x["ts"]):
-        sid  = r["sender_id"]
-        name = r["sender"] or sid or "Unknown"
-        team = r.get("team") or sender_team_map.get(sid, "") or "No Team"
+        sid   = r["sender_id"]
+        name  = r["sender"] or sid or "Unknown"
+        team  = r.get("team") or sender_team_map.get(sid, "") or "No Team"
+        site  = r["site"]
+        qty   = r["qty"]
 
-        if sid not in sender_data:
-            sender_order.append(sid)
-            sender_data[sid] = {"name": name, "team_order": [], "team_sites": {}}
+        if team not in team_data:
+            team_order.append(team)
+            team_data[team] = {"sender_order": [], "senders": {}}
 
-        sd = sender_data[sid]
-        if team not in sd["team_sites"]:
-            sd["team_order"].append(team)
-            sd["team_sites"][team] = []
-        sd["team_sites"][team].append({"site": r["site"], "plan": r["qty"]})
+        td = team_data[team]
+        if name not in td["senders"]:
+            td["sender_order"].append(name)
+            td["senders"][name] = []
+        td["senders"][name].append({"site": site, "plan": qty})
 
     # ── Build message ──
-
     lines = [
         f"📋 <b>[Report 1] Plan - Request - Refueled</b>",
         f"📅 {today_str} | ⏰ {now.strftime('%H:%M')} Myanmar",
-        f"<code>{'Site ID':<12} | {'Plan':>5} | {'Refueled':>8} | {'Req':>5}</code>",
-        "<code>" + "─────────────┼───────┼──────────┼───────" + "</code>",
     ]
 
     total_plan = total_filled = total_req = 0
 
-    for sid in sender_order:
-        sd = sender_data[sid]
-        lines.append(f"\n👤 <b>{sd['name']}</b>")
+    if not team_order:
+        lines.append("📭 No Plan submitted for today.")
+    else:
+        for team in team_order:
+            lines.append(f"\n🏷 <b>{team}</b>")
+            td = team_data[team]
 
-        for team in sd["team_order"]:
-            lines.append(f"  🏷 <b>{team}</b>")
-            for item in sd["team_sites"][team]:
-                site   = item["site"]
-                plan_q = item["plan"]
-                fill_q = refueled_by_site.get(site, 0)
-                req_q  = request_by_site.get(site, 0)
+            for sender_name in td["sender_order"]:
+                lines.append(f"  👤 <b>{sender_name}</b>")
+                lines.append(f"  <code>{'Site ID':<12} | {'Plan':>5} | {'Refueled':>8} | {'Req':>5}</code>")
+                lines.append("  <code>" + "─────────────┼───────┼──────────┼───────" + "</code>")
 
-                if fill_q == 0 and plan_q > 0:
-                    icon = "❌"
-                elif fill_q >= plan_q or abs(fill_q - plan_q) <= 50:
-                    icon = "✅"
-                else:
-                    icon = "⚠️"
+                for item in td["senders"][sender_name]:
+                    site   = item["site"]
+                    plan_q = item["plan"]
+                    fill_q = refueled_by_site.get(site, 0)
+                    req_q  = request_by_site.get(site, 0)
 
-                lines.append(
-                    f"    {icon} <code>{site:<12} | {plan_q:>4}L | {fill_q:>7}L | {req_q:>4}L</code>"
-                )
-                total_plan  += plan_q
-                total_filled += fill_q
-                total_req   += req_q
+                    if fill_q == 0 and plan_q > 0:
+                        icon = "❌"
+                    elif fill_q >= plan_q or abs(fill_q - plan_q) <= 50:
+                        icon = "✅"
+                    else:
+                        icon = "⚠️"
 
-    lines += [
-        "\n<code>" + "─────────────┴───────┴──────────┴───────" + "</code>",
-        f"<code>{'Total':<12} | {total_plan:>4}L | {total_filled:>7}L | {total_req:>4}L</code>",
-        "\n🤖 <i>Auto report — Refuel Plan System</i>"
-    ]
+                    lines.append(
+                        f"  {icon} <code>{site:<12} | {plan_q:>4}L | {fill_q:>7}L | {req_q:>4}L</code>"
+                    )
+                    total_plan  += plan_q
+                    total_filled += fill_q
+                    total_req   += req_q
+
+        lines += [
+            "\n<code>" + "─────────────┴───────┴──────────┴───────" + "</code>",
+            f"<code>{'Total':<12} | {total_plan:>4}L | {total_filled:>7}L | {total_req:>4}L</code>",
+        ]
+
+    lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
 
     tg_send("\n".join(lines), "report1")
     print("✅ Report 1 sent.")
