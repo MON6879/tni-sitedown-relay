@@ -29,8 +29,8 @@
 | `apps_script_attendance/TNI attendance.js` | Chuyển tất cả thông báo phản hồi sang Tiếng Anh. Hỗ trợ 4 khung giờ báo cáo điểm danh (`<08:30`, `10:00-12:00`, `13:00-14:00`, `16:00-17:00`) | Ghi nhận ảnh điểm danh ở các khung giờ mới trong ngày mà không bị báo trùng |
 | `apps_script_attendance/TNI attendance.js` | Tự động lấy Web App URL qua `ScriptApp.getService().getUrl()` khi thiết lập Webhook | Tiện lợi khởi tạo Webhook không cần điền ScriptProperties |
 | `daily_plan_report.py` | Thêm timestamp `(sent at DD/MM/YYYY HH:MM)` cho tiêu đề Plan và danh sách 3-Day Completion Rate | Hiển thị ngày giờ nộp báo cáo |
-| `botlookup_relay.py` & `.github/workflows/botlookup_relay.yml` | Tích hợp `botlookup_relay.py` và cron workflow (`8,38 * * * *`) trực tiếp vào repository `tni-bot` | Tự động cào tin Bot Lookup 30p/lần |
-| `.github/workflows/` & Repository Settings | Chuyển repository `phonghdpxd-cmd/tni-bot` sang **Public** | Mở khóa GitHub Actions, nhận Hạn mức MIỄN PHÍ UNLIMITED 24/7 |
+| `botlookup_relay.py` & `.github/workflows/botlookup_relay.yml` | Tích hợp `botlookup_relay.py` và toàn bộ daily report scripts sang repo `MON6879/tni-sitedown-relay` | Chạy báo cáo tự động ở chế độ PRIVATE 100% trên tài khoản phụ |
+| `.github/workflows/` & Repository Settings | Chuyển cả 2 repository `phonghdpxd-cmd/tni-bot` và `MON6879/tni-sitedown-relay` về **PRIVATE** | Bảo mật mã nguồn 100%, tận dụng 2.000 phút Private của tài khoản mới |
 
 ### 21/07/2026
 | File | Thay đổi | Lý do |
