@@ -92,7 +92,8 @@ async def main():
         # Build entity map tu tat ca dialogs
         print(f"[{myanmar_now()}] Building entity map from dialogs...")
         entity_map = {}  # gname -> entity
-        for dialog in client.iter_dialogs():
+        dialogs = await client.get_dialogs(limit=200)
+        for dialog in dialogs:
             did = str(getattr(dialog.entity, 'id', 0))
             for gname, gid in ALL_GROUPS.items():
                 if did == str(abs(int(gid))):
