@@ -363,12 +363,14 @@ const DAILY_PLAN_TAB = "Team leader assign Plan";
  */
 function parseDateToDDMMYYYY_(rawDate) {
   if (!rawDate) return "";
-  const s = rawDate.toString().trim();
+  const s = rawDate.toString().trim().replace(/\./g, "/");
 
-  // Already DD/MM/YYYY or D/M/YYYY
-  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  // DD/MM/YYYY or D/M/YYYY or YY
+  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (dmy) {
-    return dmy[1].padStart(2, "0") + "/" + dmy[2].padStart(2, "0") + "/" + dmy[3];
+    let yr = dmy[3];
+    if (yr.length === 2) yr = "20" + yr;
+    return dmy[1].padStart(2, "0") + "/" + dmy[2].padStart(2, "0") + "/" + yr;
   }
 
   // JS Date toString: "Wed Jul 15 2026 00:00:00 GMT+0630 (Myanmar Time)"

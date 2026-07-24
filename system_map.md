@@ -1,19 +1,48 @@
-# 🗺️ TNI Bot System Map
+﻿# TNI Bot System Map
 
 > [!IMPORTANT]
-> **Đọc file này TRƯỚC khi sửa bất kỳ thứ gì!**
+> **Doc file nay TRUOC khi sua bat ky thu gi!**
 
 ---
 
-## ⚠️ QUY TẮc LÀM VIỆC BẮT BUỘC
+## QUAT TAC LAM VIEC BAT BUOC
 
 > [!CAUTION]
-> **Sau mỗi lần sửa code — PHẢI thực hiện đủ 3 bước sau:**
-> 1. **Lưu dự phòng** — tạo file `backup_context_DDMMYYYY.md` ghi lại nội dung thay đổi
-> 2. **Cập nhật `system_map.md`** — ghi vào Changelog bên dưới
-> 3. **Đóng băng (commit + push)** — `git add ... ; git commit -m "..." ; git push`
+> **Sau moi lan sua code - PHAI thuc hien du 3 buoc sau:**
+> 1. **Luu du phong** - tao file backup_context_DDMMYYYY.md ghi lai noi dung thay doi
+> 2. **Cap nhat system_map.md** - ghi vao Changelog ben duoi
+> 3. **Dong bang (commit + push)** - git add ... ; git commit -m ... ; git push
 >
-> Không được dừng lại ở bước nào. Bot trên GitHub Actions chỉ chạy file đã push lên!
+> Khong duoc dung lai o buoc nao. Bot tren GitHub Actions chi chay file da push len!
+
+---
+
+## QUY TAC AI - BAT BUOC DOC TRUOC KHI LAM BAT CU VIEC GI
+
+AI phai tuan thu TUYET DOI - khong co ngoai le:
+
+### 1. CHI SUA DUNG CAI DUOC YEU CAU
+- KHONG tu y sua file khac ngoai file duoc yeu cau
+- KHONG them comment/code ngoai yeu cau du nghi la tot hon
+- Hoi lai neu khong chac pham vi thay doi
+
+### 2. DOC FILE TRUOC KHI SUA
+- Luon view_file xem noi dung hien tai truoc khi edit
+- Grep xac dinh dung dong can sua
+- Chi thay doan can thay, khong overwrite ca file
+
+### 3. KIEM TRA TRUOC KHI PUSH
+- Chay git diff xem lai tat ca thay doi truoc khi commit
+- YAML: KHONG co # comment ben trong if-expression
+- Moi commit = 1 viec cu the, message ro rang
+
+### 4. KHONG LAM NHIEU VIEC CUNG LUC
+- KHONG sua nhieu file khong lien quan trong 1 lan tra loi
+- Hoan thanh 1 viec - bao ket qua - doi lenh tiep theo
+
+### 5. BAO CAO LOI THANH THAT
+- Loi do AI gay ra: thua nhan ngay, khong giai thich vong vo
+- Giai thich ro: loi o dau, tai sao, fix the nao
 
 ---
 

@@ -848,9 +848,8 @@ def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None
         result = resp.json()
         if result.get("status") == "ok":
             name = result.get("name") or first_name or str(user_id)
-            tg_send(chat_id,
-                f"✅ Recorded — {html.escape(name)}\n"
-                f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}")
+            logger.info(f"submit_daily ok: {name}")
+            # Silent save: tắt tin nhắn 'Recorded' gây rác nhóm
         else:
             tg_send(chat_id, f"❌ Save error\n{result.get('message','')[:120]}")
     except Exception as ex:

@@ -249,10 +249,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if result.get("status") == "ok":
         ref_id = str(result.get("row", "???")).zfill(5)
-        sent   = await msg.reply_text(
-            f"✅ Recorded — REF:{ref_id}\n"
-            f"📅 {now.strftime('%d/%m/%Y %H:%M')}",
-        )
+        logger.info(f"Collector record ok: REF:{ref_id}")
+        # Silent save: không gửi tin nhắn 'Recorded' gây rác nhóm
         # Lưu mapping: tin gốc → REF (để Done reply vào tin gốc cũng tìm được)
         MSG_REF_MAP[msg.message_id] = ref_id
         # Cũng lưu message_id của tin xác nhận

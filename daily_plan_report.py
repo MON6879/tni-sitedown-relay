@@ -82,27 +82,37 @@ def myanmar_now() -> datetime:
 
 def is_daily_plan_msg(text: str) -> bool:
     """
+def normalize_date_str(s: str) -> str:
+    """Normalize any date string ('24.07.2026', '24/07/2026', '24.7.26', '2026-07-24') to DD/MM/YYYY."""
+    if not s:
+        return ""
+    s = str(s).strip().replace(".", "/")
+    m = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', s)
+    if m:
+        d, mon, y = int(m.group(1)), int(m.group(2)), m.group(3)
+        if len(y) == 2:
+            y = "20" + y
+        return f"{d:02d}/{mon:02d}/{y}"
+    return s
+
+
+def is_daily_plan_msg(text: str) -> bool:
+    """
     Nhận dạng tin plan linh hoạt:
     - Dòng đầu có chữ 'plan' (bất kỳ vị trí, case-insensitive)
-    - Và có ngày tháng (dạng d/m/yyyy hoặc dd/mm/yyyy) ở BẤT KỲ chỗ trong tin
-    Ví dụ hợp lệ: 'Team04 Plan ( 27/6/2026 )', 'Plan Team4 27/6/2026', 'Daily Plan: 26/06/2026'
+    - Và có ngày tháng (dạng d/m/yyyy, dd/mm/yyyy hoặc dd.mm.yyyy) ở BẤT KỲ chỗ trong tin
     """
     if not text:
         return False
     first_line = text.strip().split("\n")[0].lower()
     has_plan_word = "plan" in first_line
-    has_date = bool(re.search(r'\d{1,2}/\d{1,2}/\d{2,4}', text))
+    has_date = bool(re.search(r'\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}', text))
     return has_plan_word and has_date
 
 
 def parse_daily_plan(text: str) -> dict | None:
     """
     Parse một tin plan (liệt linh hoạt) thành {date, team, content}.
-
-    Các định dạng được hỗ trợ:
-      Daily Plan: 26/06/2026          (cú pháp cũ)
-      Team04 Plan ( 27/6/2026 )       (cú pháp mới)
-      Plan Team4 27/6/2026            (bất kỳ thứ tự nào)
     """
     if not text:
         return None
@@ -111,18 +121,11 @@ def parse_daily_plan(text: str) -> dict | None:
     if not lines:
         return None
 
-    # Extract date: tìm ngày trong toàn bộ tin (flexible)
+    # Extract date: tìm ngày trong toàn bộ tin (hỗ trợ cả / và .)
     date_str = ""
-    date_match = re.search(r'(\d{1,2}/\d{1,2}/\d{2,4})', text)
+    date_match = re.search(r'(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text)
     if date_match:
-        date_str = date_match.group(1)
-        # Chuẩn hoá thành dd/mm/yyyy nếu thiếu zero-padding
-        parts = date_str.split("/")
-        if len(parts) == 3:
-            d, m, y = parts
-            if len(y) == 2:
-                y = "20" + y
-            date_str = f"{d.zfill(2)}/{m.zfill(2)}/{y}"
+        date_str = normalize_date_str(date_match.group(1))
     else:
         date_str = myanmar_now().strftime("%d/%m/%Y")
 
@@ -665,8 +668,10 @@ def get_daily_reports_from_sheet(target_date: str) -> dict:
             if emp_name.lower() in ("nan", "none", ""): emp_name = ""
             if tg_id.lower() in ("nan", "none", ""): tg_id = ""
 
-            # Filter by date
-            if target_date and date_cell and target_date not in date_cell:
+            # Filter by date — convert all dot dates (dd.mm.yyyy) to slash format (dd/mm/yyyy)
+            norm_target = normalize_date_str(target_date)
+            norm_cell   = normalize_date_str(date_cell)
+            if norm_target and norm_cell and norm_target != norm_cell:
                 continue
 
             # Determine team from telegram ID
