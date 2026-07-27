@@ -484,9 +484,12 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
 
 
 def is_daily_report(text: str) -> bool:
-    """Có chữ 'daily' hoặc 'result' (không phân biệt hoa thường) là daily report."""
+    """Chỉ nhận diện Daily Result/Daily Report, loại trừ Daily Plan."""
     text_l = text.lower()
-    return "daily" in text_l or "result" in text_l
+    if "daily plan" in text_l or "plan:" in text_l or "kế hoạch" in text_l:
+        return False
+    return "daily result" in text_l or "daily report" in text_l or "result:" in text_l
+
 
 
 async def cmd_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -721,7 +721,11 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
 
 def is_daily(text: str) -> bool:
     text_l = text.lower()
-    return "daily" in text_l or "result" in text_l
+    # Loại trừ Daily Plan không cho nộp nhầm vào tab Daily Result
+    if "daily plan" in text_l or "plan:" in text_l or "kế hoạch" in text_l:
+        return False
+    return "daily result" in text_l or "daily report" in text_l or "result:" in text_l
+
 
 def get_copy_markup(chat_id: int, team_arg: str, text_label: str) -> dict:
     button_url = f"https://tni-bot.vercel.app/copy.html?team={team_arg}"
@@ -804,7 +808,7 @@ def get_plan_template_text(team_num: int) -> str:
         lines = [
             f"Daily Plan: {date_str}",
             f"Team {team_num}",
-            "I. Hot task rescue Site down >24 :",
+            "I. Hot task rescue Site down/ link Down >24 :",
             "II. Hot task Rescue Cell down: ",
             "III. Hot task Repair DG abnomal: ",
             "IV. Hot task Repair DG run>16H:",
