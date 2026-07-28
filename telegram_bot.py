@@ -819,6 +819,58 @@ async def reload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                         parse_mode="HTML")
 
 
+def get_site_access_template(site_id: str = "TNI0401", date_str: str = None) -> str:
+    if not site_id or site_id.startswith("/"):
+        site_id = "TNI0401"
+    if not date_str:
+        from datetime import datetime, timezone, timedelta
+        mm_now = datetime.now(timezone(timedelta(hours=6, minutes=30)))
+        date_str = mm_now.strftime("%d/%m/%Y")
+    return (
+        f"Site access format\n"
+        f"Site ID: {site_id}\n"
+        f"Towerco ID: OCK\n"
+        f"Contact Me: Khant Chaw Nyo\n"
+        f"Contact No: 09688433214\n"
+        f"NRC NO: 6/KaTaNa(N)114981\n"
+        f"Mail add: Khantchaw.nyo@vcm.com.mm\n"
+        f"Date: {date_str}\n"
+        f"Activity Detail: Site down check\n"
+        f"Activity Start time: 2 PM\n"
+        f"Activity End Time: 4 PM"
+    )
+
+
+async def cmd_siteaccess(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    site_id = "TNI0401"
+    if context.args:
+        site_id = context.args[0].upper().strip()
+    reply = get_site_access_template(site_id)
+    await update.message.reply_text(reply)
+
+
+async def post_init(application):
+    from telegram import BotCommand
+    commands = [
+        BotCommand("request_enter_site", "Request enter Site towerco format"),
+        BotCommand("mycable", "All your cable route"),
+        BotCommand("mymw", "All your MW link"),
+        BotCommand("mydia", "All your customer DIA control"),
+        BotCommand("myolt", "All Site have OLT"),
+        BotCommand("mysn", "All SN you control"),
+        BotCommand("mysite", "All Site you control"),
+        BotCommand("mydata", "All your personal stats"),
+        BotCommand("daily", "Daily report template"),
+        BotCommand("plan", "Daily plan template"),
+        BotCommand("help", "Show help menu"),
+    ]
+    try:
+        await application.bot.set_my_commands(commands)
+        logger.info("✅ Set bot menu commands successfully")
+    except Exception as e:
+        logger.warning(f"set_my_commands error: {e}")
+
+
 # ===================== ENTRY POINT =====================
 async def main():
     if not TOKEN:
@@ -826,7 +878,8 @@ async def main():
 
     load_all_sheets()
 
-    app = ApplicationBuilder().token(TOKEN).build()
+    app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
+    app.add_handler(CommandHandler("request_enter_site", cmd_siteaccess))
     app.add_handler(CommandHandler("start",  start_command))
     app.add_handler(CommandHandler("help",   help_command))
     app.add_handler(CommandHandler("reload", reload_command))

@@ -418,7 +418,7 @@ function checkColC(sheet) {
   for (const team of teams) {
     const teamNum    = team.replace("T", "");
     const sitePat    = new RegExp("\\|\\s*T" + teamNum + "(?:\\s+S\\w*)?\\s*\\|", "i");
-    const summaryPat = new RegExp("^\\s*Team\\s*" + teamNum, "i");
+    const summaryPat = new RegExp("Team\\s*" + teamNum + "\\s*:", "i");
     teamData[team] = {
       summary:    lines.filter(l => summaryPat.test(l)),
       sites:      lines.filter(l => sitePat.test(l)),
@@ -429,20 +429,18 @@ function checkColC(sheet) {
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
-  // ① CONTROL: Chỉ lấy C1..C3 (Header + Total + Duty) và C10:C (Chi tiết Site) — KHÔNG lấy từng Team Total
+  // ① CONTROL: Chỉ lấy C1..C3 (Header + Total + Duty) và C10:C (Chi tiết Site) — KHÔNG lấy từng Team Total (C4..C7)
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
       const colC = colCRaw.split("\n");
       const headerLines = [];
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < Math.min(9, colC.length); i++) {
         const line = colC[i] || "";
-        if (!line) continue;
-        // Gặp bắt đầu dòng Team 1 / Team 2... thì dừng lấy header
-        if (/^Team\s*\d+:/i.test(line)) break;
+        if (!line || /^Team\s*\d+:/i.test(line)) break;
         headerLines.push(line);
       }
-      const siteLines = colC.slice(9).filter(l => l.length > 0 && l !== "...");
+      const siteLines = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !/^Team\s*\d+:/i.test(l));
       const fullControlText = [...headerLines, ...siteLines].join("\n");
 
       if (fullControlText) {
@@ -458,6 +456,10 @@ function checkColC(sheet) {
     try {
       const chatId = SD_GROUPS[team];
       if (!chatId) continue;
+      if (chatId === controlId) {
+        Logger.log("[Tin1][" + team + "] ⚠️ Chat ID trùng với CONTROL (" + chatId + ") ➔ Bỏ qua không xả tin Team vào CONTROL.");
+        continue;
+      }
       const { summary, sites } = teamData[team];
       const content = sites.length > 0
         ? [...globalHeaderLines, "...", ...summary, "...", ...sites].join("\n")

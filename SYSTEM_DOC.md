@@ -50,13 +50,13 @@ Telegram Groups (per-team + consolidated to CONTROL)
 - **Asset Stats** — all teams combined with 3Day/7Day/Month
 - **Summary Report** — all TL reports + Search Stats (all teams)
 
-### 2. `daily_read_report.py` — Note Read Report (20:30 Myanmar)
-- **Trigger:** GitHub Actions `daily_read_report.yml` (cron + workflow_dispatch)
-- **Schedule:** 20:30 Myanmar = 14:00 UTC
-- **API:** Telethon (TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_SESSION)
-- **Tracks:** Who read the **Note message** ("Team leader and Staff control Site down make plan rescue Site not forgot Bring MDG or MBB")
-- **Read Cutoff:** Counts who read the message before/at the **20:25 Myanmar** cutoff time today
-- **Member Source:** Sheet col E (rows 4-59) for Teams, group participants for CONTROL
+### 2. `daily_read_report.py` — Note Read Report (10:00 & 20:30 Myanmar)
+- **Trigger:** GitHub Actions `daily_reports.yml` (cron + workflow_dispatch)
+- **Schedule:** 10:00 sáng & 20:30 tối Myanmar (03:30 UTC & 14:00 UTC)
+- **API:** Telethon (TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_SESSION under `@phongha79`)
+- **Tracks:** Who read the **Note message** ("Note: Above are the end-of-day work results, checks, and feedback.")
+- **Read Window:** 04:00 - 23:59 Myanmar cutoff active window today
+- **Member Source:** Staff Sheet (GID 1684930643) for Teams, group participants for CONTROL
 
 #### Per Team Group (T1, T2, T3, T4):
 ```
@@ -220,16 +220,15 @@ Missing: TNI0052, TNI0185, TNI0058
 
 | Time | Script | Workflow / Input | What |
 |---|---|---|---|
+| **07:00 & 16:00** | `cron_send.py` + `backlog_send.py` | `daily_reports.yml` (`daily_task`) | Reports 1-4: Daily EOD Task + Auto-Note H2 + Search reports (Deletes old before send) |
 | **16:00** | `daily_bod_assign.py` | `daily_reports.yml` (`bod_assign`) | Report 2: BOD-assigned task statistics (Consolidated) to CONTROL |
-| **16:00** | `backlog_send.py` | `daily_reports.yml` (`daily_task`) | Report 1, 2, 3: Daily Backlog reports to team groups |
-| **16:00** | `cron_send.py` | `daily_reports.yml` (`daily_task`) | Report 4: Daily EOD Task + Asset + Search reports to all groups |
 | **16:00** | `daily_plan_report.py --mode eod` | `daily_reports.yml` (`plan_eod`) | Report 5A: EOD Plan vs Actual + Plan Tomorrow status |
 | **21:00** | `daily_plan_report.py --mode update` | `daily_reports.yml` (`plan_update`) | Report 5B: Updated Plan Tomorrow status |
 | **07:00** | `daily_plan_report.py --mode morning` | `daily_reports.yml` (`plan_morning`) | Report 5C: Morning Plan forward + 3D/7D/1M stats + completion rate |
 | **09:00** | `refuel_plan_report.py --report 2` | `daily_reports.yml` (`Report 2 - Progress Sent Plan`) | Refuel Plan Report 2: Progress Sent Plan (9:00 Myanmar) |
 | **13:00** | `refuel_plan_report.py --report 2` | `daily_reports.yml` (`Report 2 - Progress Sent Plan`) | Refuel Plan Report 2: Progress Sent Plan (13:00 Myanmar) |
 | **20:00** | `refuel_plan_report.py --report 2` | `daily_reports.yml` (`Report 2 - Progress Sent Plan`) | Refuel Plan Report 2: Progress Sent Plan (20:00 Myanmar) |
-| **20:30** | `daily_read_report.py` | `daily_reports.yml` (`read_report`) | Report 6: Note read status per-person (Cutoff at 20:25) to teams + CONTROL |
+| **10:00 & 20:30** | `daily_read_report.py` | `daily_reports.yml` (`read_report`) | Report 6: Note read status per-person (Read window 04:00-23:59) to teams + CONTROL |
 
 ---
 
@@ -253,7 +252,7 @@ Missing: TNI0052, TNI0185, TNI0058
 ## 🔧 Key Design Decisions
 
 1. **Per-person tracking:** Both Search Stats and Note Read use per-person format with 3Day/7Day/Month
-2. **3Day format:** `d2/d1/d0` = day-before-yesterday / yesterday / today
+2. **3Day format:** `d0/d1/d2` = today / yesterday / day-before-yesterday
 3. **Deduplication:** Team member lists deduplicate by name (keep highest search count)
 4. **Read Cutoff:** Note reads only count if read before/at 20:25 Myanmar cutoff time (anytime today prior to 20:25)
 5. **Team members source:** Sheet col E rows 4-59 (not Telegram group participants) — ensures only actual team members are counted

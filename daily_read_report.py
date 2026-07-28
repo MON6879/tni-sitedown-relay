@@ -70,8 +70,24 @@ S_COL_NAME = 5   # F: Tên nhân viên
 S_COL_TEAM = 12  # M: Team (Team 1/2/3/4)
 S_COL_EXIT = 13  # N: Ngày nghỉ / inactive — RỔNG = còn làm việc (active)
 
-# Keywords to identify EOD Report message (sent around 17:30 Myanmar)
-NOTE_KEYWORDS = ["daily eod task", "task & stats", "eod task"]
+# Keywords to identify EOD Report message (sent around 16:00-17:30 Myanmar)
+NOTE_KEYWORDS = [
+    "note: above are the end-of-day work results, checks, and feedback.",
+    "above are the end-of-day work results, checks, and feedback.",
+    "note: above are the end-of-day work results",
+    "above are the end-of-day work results",
+    "above are the end of day work results",
+    "above are the end-of-day",
+    "daily eod task", "task & stats", "eod task",
+    "4. report", "daily backlog", "daily task",   # broader match for Report 4
+    "eod report", "end of day",
+]
+
+# Exclude self-generated reports from being mistaken as the Note/EOD message
+EXCLUDE_KEYWORDS = [
+    "6. report", "daily note read report", "read report",
+    "summary report", "5. report", "daily plan report",
+]
 # ──────────────────────────────────────────────────────────────────
 
 def myanmar_now() -> str:
@@ -84,8 +100,10 @@ def days_ago_utc(n: int) -> datetime:
     return target.astimezone(timezone.utc)
 
 def is_note_msg(text: str) -> bool:
-    """Check if message matches EOD Report keywords."""
+    """Check if message matches EOD Report keywords and is NOT a self-report."""
     t = (text or "").lower()
+    if any(ex in t for ex in EXCLUDE_KEYWORDS):
+        return False
     return any(kw in t for kw in NOTE_KEYWORDS)
 
 
@@ -354,14 +372,14 @@ async def process_group(client, group_key: str, chat_id: int,
     d7_start = today_start - timedelta(days=7)
 
     def in_read_window(read_dt, day_start):
-        """Check if read_dt is between 03:30 and 20:30 Myanmar cutoff of that day."""
+        """Check if read_dt is between 04:00 and 23:59 Myanmar cutoff of that day."""
         if read_dt is None:
             return True  # no timestamp → count anyway
         if read_dt.tzinfo is None:
             read_dt = read_dt.replace(tzinfo=timezone.utc)
         read_mm = read_dt.astimezone(MYANMAR_TZ)
-        start_time = day_start.replace(hour=3, minute=30, second=0, microsecond=0)
-        end_time = day_start.replace(hour=20, minute=30, second=0, microsecond=0)
+        start_time = day_start.replace(hour=4, minute=0, second=0, microsecond=0)
+        end_time = day_start.replace(hour=23, minute=59, second=59, microsecond=0)
         return start_time <= read_mm <= end_time
 
     # Per-person tracking: {user_id: {d0:0/1, d1:0/1, d2:0/1, d7:count, month:count}}
@@ -497,7 +515,7 @@ async def main():
                 icon = "✅" if p["d0"] else "❌"
                 lines.append(
                     f"  {icon} {p['name']}: "
-                    f"3Day:{p['d2']}/{p['d1']}/{p['d0']}  "
+                    f"3Day:{p['d0']}/{p['d1']}/{p['d2']}  "
                     f"7Day:{p['d7']}  Month:{p['month']}"
                 )
             return lines
@@ -512,9 +530,9 @@ async def main():
             tl = [
                 f"📋 6. Report — Daily Note Read Report — {gk}",
                 f"📅 {date_str}  |  🕐 {now_str}",
-                f"⏰ Read Window: 03:30 - 20:30 Myanmar",
+                f"⏰ Read Window: 04:00 - 23:59 Myanmar",
                 f"📅 Cycle: {cycle_str}",
-                f"📌 Shows who read the Note message during the active window (03:30 - 20:30) today.",
+                f"📌 Shows who read the Note message during the active window (04:00 - 23:59) today.",
             ]
             if note_line:
                 tl.append(f"📝 Note: {r['note_preview']}...")
@@ -543,9 +561,9 @@ async def main():
         lines = [
             f"📋 6. Report — Daily Note Read Report — Summary",
             f"📅 {date_str}  |  🕐 {now_str}",
-            f"⏰ Read Window: 03:30 - 20:30 Myanmar",
+            f"⏰ Read Window: 04:00 - 23:59 Myanmar",
             f"📅 Cycle: {cycle_str}",
-            f"📌 Shows who read the Note message during the active window (03:30 - 20:30) today.",
+            f"📌 Shows who read the Note message during the active window (04:00 - 23:59) today.",
             divider,
         ]
 
@@ -591,9 +609,45 @@ async def main():
         save_msgids(GAS_URL, "READREPORT_CONTROL", [sent.id])
         print(f"📤 Consolidated report sent to CONTROL SITE")
 
+        # ── 3. Ghi dữ liệu lượt đọc vào Google Sheet tab 'Read Group' ──
+        log_read_group_to_gas(all_results, date_str, now_str)
+
     print(f"\n[{myanmar_now()}] 🎉 Complete!")
+
+
+def log_read_group_to_gas(all_results: dict, date_str: str, now_str: str):
+    """POST collected read statistics to GAS to record into 'Read Group' sheet tab."""
+    if not GAS_URL:
+        return
+    records = []
+    for gk, r in all_results.items():
+        note_msg = r.get("note_preview", "")
+        for p in r.get("per_member", []):
+            records.append({
+                "date": date_str,
+                "time": now_str,
+                "team": gk,
+                "name": p["name"],
+                "telegram_id": str(p.get("id", "")),
+                "status": "Read" if p["d0"] == 1 else "Unread",
+                "trend_3day": f"{p['d0']}/{p['d1']}/{p['d2']}",
+                "count_7day": p["d7"],
+                "count_month": p["month"],
+                "note_msg": note_msg,
+            })
+    if not records:
+        return
+    try:
+        resp = requests.post(GAS_URL, json={
+            "action": "log_read_group",
+            "records": records
+        }, timeout=30)
+        print(f"  💾 Logged {len(records)} records to 'Read Group' tab on Google Sheets")
+    except Exception as e:
+        print(f"  ⚠️  Failed to log to Read Group tab: {e}")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 

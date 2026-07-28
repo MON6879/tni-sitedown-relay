@@ -1555,9 +1555,7 @@ async def main():
     if asset_msg:
         mgmt_parts.append("━" * 20)
         mgmt_parts.append(asset_msg)
-    if control_note:
-        mgmt_parts.append("━" * 20)
-        mgmt_parts.append(f"📝 CONTROL NOTE:\n{control_note}")
+    # CONTROL NOTE đã được bỏ khỏi tin bot và phát riêng bằng @phongha79
     mgmt_report = "\n".join(mgmt_parts)
 
     # Chat ID nhóm "5 TNI TECHNICA DEP CONTROL SITE"

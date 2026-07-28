@@ -38,6 +38,27 @@ GID_STAFF      = "1684930643"  # Tab: Staff — col A=Telegram ID, row 1=headers
 TZ_MM    = timezone(timedelta(hours=6, minutes=30))   # Myanmar UTC+6:30
 MAX_LEN  = 4096
 
+def get_site_access_template(site_id: str = "TNI0401", date_str: str = None) -> str:
+    if not site_id or site_id.startswith("/"):
+        site_id = "TNI0401"
+    if not date_str:
+        from datetime import datetime
+        mm_now = datetime.now(TZ_MM)
+        date_str = mm_now.strftime("%d/%m/%Y")
+    return (
+        f"Site access format\n"
+        f"Site ID: {site_id}\n"
+        f"Towerco ID: OCK\n"
+        f"Contact Me: Khant Chaw Nyo\n"
+        f"Contact No: 09688433214\n"
+        f"NRC NO: 6/KaTaNa(N)114981\n"
+        f"Mail add: Khantchaw.nyo@vcm.com.mm\n"
+        f"Date: {date_str}\n"
+        f"Activity Detail: Site down check\n"
+        f"Activity Start time: 2 PM\n"
+        f"Activity End Time: 4 PM"
+    )
+
 # ── Data cache (module-level, shared within Vercel instance) ──────────────────
 _df_site: pd.DataFrame | None = None
 _df_task: pd.DataFrame | None = None
@@ -923,6 +944,12 @@ def handle(update: dict) -> None:
     if text.startswith("/"):
         cmd = text.split()[0].lower().split("@")[0]
         clean_cmd = cmd[1:]
+        if clean_cmd == "request_enter_site":
+            parts = text.split(maxsplit=1)
+            passed_site = parts[1].upper().strip() if len(parts) > 1 else "TNI0401"
+            reply = get_site_access_template(passed_site)
+            tg_send(chat_id, reply)
+            return
 
         if clean_cmd in ("mysite", "mycable", "myolt", "mysn", "mydia", "mymw", "mydata"):
             reply = get_staff_data(user_id, clean_cmd)
