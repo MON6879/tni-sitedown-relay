@@ -74,14 +74,18 @@ def post_gas(payload: dict) -> dict:
 
 
 def tg_reply(chat_id: str, text: str):
-    """Gửi tin nhắn xác nhận 2 dòng vào group Telegram."""
+    """Gửi tin nhắn vào group Telegram."""
     try:
+        cid = str(chat_id).strip()
+        if not cid.startswith("-") and cid.isdigit():
+            cid = "-" + cid
         url = f"https://api.telegram.org/bot{REFUEL_BOT_TOKEN}/sendMessage"
-        requests.post(url, json={
-            "chat_id": "-" + chat_id,
+        r = requests.post(url, json={
+            "chat_id": cid,
             "text": text,
             "parse_mode": "HTML"
         }, timeout=10)
+        logger.info(f"tg_reply to {cid}: status={r.status_code}, resp={r.text[:80]}")
     except Exception as e:
         logger.error(f"tg_reply error: {e}")
 
