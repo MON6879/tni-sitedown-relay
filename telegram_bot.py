@@ -850,15 +850,15 @@ async def cmd_siteaccess(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def post_init(application):
-    from telegram import BotCommand
+    from telegram import BotCommand, BotCommandScopeAllPrivateChats
     commands = [
         BotCommand("request_enter_site", "Request enter Site towerco format"),
+        BotCommand("mysite", "All Site you control"),
         BotCommand("mycable", "All your cable route"),
         BotCommand("mymw", "All your MW link"),
         BotCommand("mydia", "All your customer DIA control"),
         BotCommand("myolt", "All Site have OLT"),
         BotCommand("mysn", "All SN you control"),
-        BotCommand("mysite", "All Site you control"),
         BotCommand("mydata", "All your personal stats"),
         BotCommand("daily", "Daily report template"),
         BotCommand("plan", "Daily plan template"),
@@ -866,6 +866,7 @@ async def post_init(application):
     ]
     try:
         await application.bot.set_my_commands(commands)
+        await application.bot.set_my_commands(commands, scope=BotCommandScopeAllPrivateChats())
         logger.info("✅ Set bot menu commands successfully")
     except Exception as e:
         logger.warning(f"set_my_commands error: {e}")
