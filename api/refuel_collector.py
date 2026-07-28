@@ -190,15 +190,23 @@ def process_update(update: dict):
     if not msg:
         return
 
-    chat    = msg.get("chat", {})
-    chat_id = str(abs(chat.get("id", 0)))   # bỏ dấu - để so sánh
-    text    = (msg.get("text") or msg.get("caption") or "").strip()
+    chat        = msg.get("chat", {})
+    raw_chat_id = chat.get("id", 0)
+    chat_id     = str(abs(raw_chat_id))
+    chat_title  = chat.get("title", "")
+    text        = (msg.get("text") or msg.get("caption") or "").strip()
 
     if not text:
         return
 
-    # Chỉ xử lý tin từ group refuel
-    if chat_id != PLAN_GROUP_ID:
+    logger.info(f"Received msg from raw_chat_id={raw_chat_id} (title='{chat_title}'): {text[:50]}")
+
+    if text.startswith("/id") or text.startswith("/chatid") or text.startswith("/start"):
+        tg_reply(str(raw_chat_id), f"<b>Chat Title:</b> {chat_title}\n<b>Chat ID:</b> <code>{raw_chat_id}</code>")
+        return
+
+    # Chỉ xử lý tin từ group refuel chính
+    if chat_id != PLAN_GROUP_ID and "cross check" not in chat_title.lower() and "9.1" not in chat_title:
         logger.info(f"Skip chat_id={chat_id}")
         return
 
