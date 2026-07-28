@@ -879,7 +879,7 @@ async def main():
     load_all_sheets()
 
     app = ApplicationBuilder().token(TOKEN).post_init(post_init).build()
-    app.add_handler(CommandHandler("request_enter_site", cmd_siteaccess))
+    app.add_handler(CommandHandler(["request_enter_site", "request_site_enter", "site_access", "siteaccess", "site_enter", "request_site"], cmd_siteaccess))
     app.add_handler(CommandHandler("start",  start_command))
     app.add_handler(CommandHandler("help",   help_command))
     app.add_handler(CommandHandler("reload", reload_command))

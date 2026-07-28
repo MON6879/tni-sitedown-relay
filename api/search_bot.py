@@ -940,11 +940,18 @@ def handle(update: dict) -> None:
     elif "help" in text_l or "❓" in text:
         text = "/help"
 
+    if any(kw in text_l for kw in ("request enter site", "request site enter", "site access format", "site access", "site enter")):
+        parts = text.split(maxsplit=1)
+        passed_site = parts[1].upper().strip() if len(parts) > 1 and parts[1].upper().startswith("TNI") else "TNI0401"
+        reply = get_site_access_template(passed_site)
+        tg_send(chat_id, reply)
+        return
+
     # ── COMMANDS ────────────────────────────────────────────────────────────
     if text.startswith("/"):
         cmd = text.split()[0].lower().split("@")[0]
         clean_cmd = cmd[1:]
-        if clean_cmd == "request_enter_site":
+        if clean_cmd in ("request_enter_site", "request_site_enter", "site_access", "siteaccess", "site_enter", "request_site"):
             parts = text.split(maxsplit=1)
             passed_site = parts[1].upper().strip() if len(parts) > 1 else "TNI0401"
             reply = get_site_access_template(passed_site)
