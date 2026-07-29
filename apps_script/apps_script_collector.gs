@@ -54,6 +54,7 @@ function doPost(e) {
     if (body.action === "register_user")    return handleRegisterUser(ss, body);
     if (body.action === "get_users")        return handleGetUsers(ss);
     if (body.action === "log_search")       return handleLogSearch(ss, body);
+    if (body.action === "log_read_group")   return handleLogReadGroup(ss, body);
     if (body.action === "clean_search_log") return handleCleanSearchLog(ss);
     if (body.action === "refresh_general") return handleRefreshGeneral(ss);
     if (body.action === "get_general")      return handleGetGeneral(ss);
@@ -173,6 +174,8 @@ function doGet(e) {
     if (action === "cable_get_stats" || action === "cable_check_row") return doGetCable_(e);
     if (action === "mdg_get_stats"   || action === "mdg_check_row")   return doGetMdg_(e);
     if (action === "get_fields")                                       return doGetDaily_(e);
+
+    if (action === "trigger_16h") return handleWebhookRequest_(e);
 
     // ── Default: status check ─────────────────────────────────
     const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -753,6 +756,52 @@ function handleLogSearch(ss, body) {
   refreshStats(ss);
   return json({ status: "ok", ref: ref });
 }
+
+// ============================================================
+// ACTION: LOG_READ_GROUP — Ghi lịch sử đọc tin nhắn vào tab "Read Group"
+// ============================================================
+function handleLogReadGroup(ss, body) {
+  const records = body.records || [];
+  if (!records || !records.length) {
+    return json({ status: "ok", message: "No records to save" });
+  }
+
+  const READ_GROUP_TAB = "Read Group";
+  let sheet = ss.getSheetByName(READ_GROUP_TAB);
+  if (!sheet) {
+    sheet = ss.insertSheet(READ_GROUP_TAB);
+    sheet.appendRow(["Date", "Time", "Team", "Employee Name", "Telegram ID", "Read Status", "3Day", "7Day", "Month", "Note Message"]);
+    sheet.getRange(1, 1, 1, 10).setFontWeight("bold")
+         .setBackground("#4285F4").setFontColor("#FFFFFF");
+    sheet.setFrozenRows(1);
+  }
+
+  const TZ = "Asia/Rangoon";
+  const rows = [];
+  records.forEach(r => {
+    rows.push([
+      r.date || Utilities.formatDate(new Date(), TZ, "dd/MM/yyyy"),
+      r.time || Utilities.formatDate(new Date(), TZ, "HH:mm"),
+      r.team || "",
+      r.name || "",
+      r.telegram_id || "",
+      r.status || "Unread",
+      r.trend_3day || "0/0/0",
+      r.count_7day != null ? r.count_7day : 0,
+      r.count_month != null ? r.count_month : 0,
+      r.note_msg || ""
+    ]);
+  });
+
+  if (rows.length > 0) {
+    // Chèn các dòng mới lên trên cùng (dưới row 1 header) để luôn xem dữ liệu mới nhất
+    sheet.insertRowsBefore(2, rows.length);
+    sheet.getRange(2, 1, rows.length, 10).setValues(rows);
+  }
+
+  return json({ status: "ok", count: rows.length });
+}
+
 
 // ============================================================
 // ACTION: CLEAN_SEARCH_LOG — xóa rows 133+ (test data) để reset về đúng vị trí

@@ -23,10 +23,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run cron_send script
+      - name: Run backlog_send and cron_send scripts
         env:
           SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
           REPORT_TASK_BOT_TOKEN: ${{ secrets.REPORT_TASK_BOT_TOKEN }}
           TECHNICAL_DEP_BOT_TOKEN: ${{ secrets.TECHNICAL_DEP_BOT_TOKEN }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
-        run: python cron_send.py
+        run: |
+          python backlog_send.py
+          python cron_send.py
+
