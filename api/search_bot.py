@@ -9,7 +9,7 @@ Chức năng:
   - Ảnh: gửi kèm báo cáo → lưu Drive qua GAS
   - /daily → gửi mẫu báo cáo
 """
-import os, re, io, json, html, time, asyncio, logging, requests
+import os, re, io, json, html, time, asyncio, logging, requests, threading
 import pandas as pd
 from http.server import BaseHTTPRequestHandler
 from datetime import datetime, timezone, timedelta
@@ -203,6 +203,26 @@ def fetch_csv(gid: str) -> pd.DataFrame:
     resp.raise_for_status()
     content = resp.content.decode("utf-8", errors="replace")
     return pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
+
+def log_search_bg(user_name: str, user_id, tni_code: str) -> None:
+    """Ghi log search trong background thread — không block response user."""
+    if not APPS_SCRIPT_URL:
+        return
+    def _do():
+        try:
+            now_mm = datetime.now(TZ_MM)
+            requests.post(APPS_SCRIPT_URL, json={
+                "action":    "log_search",
+                "user_name": user_name,
+                "user_id":   str(user_id),
+                "tni_code":  tni_code,
+                "date":      now_mm.strftime("%d/%m/%Y"),
+                "time":      now_mm.strftime("%H:%M"),
+                "date_iso":  now_mm.strftime("%d/%m/%Y"),
+            }, timeout=5)
+        except Exception as e:
+            logger.error(f"log_search_bg failed: {e}")
+    threading.Thread(target=_do, daemon=True).start()
 
 def load_all_sheets():
     global _df_site, _df_task, _df_wo, _cache_ts
@@ -1124,21 +1144,7 @@ def handle(update: dict) -> None:
         team_code = team_match.group(1).upper()
         logger.info(f"Team lookup: {team_code} | chat={chat_id}")
         tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)}</b> data...")
-        # Ghi log search
-        if APPS_SCRIPT_URL:
-            try:
-                now_mm = datetime.now(TZ_MM)
-                requests.post(APPS_SCRIPT_URL, json={
-                    "action":    "log_search",
-                    "user_name": first_name or str(user_id),
-                    "user_id":   str(user_id),
-                    "tni_code":  team_code,
-                    "date":      now_mm.strftime("%d/%m/%Y"),
-                    "time":      now_mm.strftime("%H:%M"),
-                    "date_iso":  now_mm.strftime("%d/%m/%Y"),
-                }, timeout=60)
-            except Exception as e:
-                logger.error(f"log_search failed: {e}")
+        log_search_bg(first_name or str(user_id), user_id, team_code)
         try:
             messages = lookup_team(team_code)
             for msg in messages:
@@ -1154,21 +1160,7 @@ def handle(update: dict) -> None:
         team_code = nc_match.group(1).upper()
         logger.info(f"NotClose lookup: {team_code} | chat={chat_id}")
         tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)} Not Close</b> data...")
-        # Ghi log search
-        if APPS_SCRIPT_URL:
-            try:
-                now_mm = datetime.now(TZ_MM)
-                requests.post(APPS_SCRIPT_URL, json={
-                    "action":    "log_search",
-                    "user_name": first_name or str(user_id),
-                    "user_id":   str(user_id),
-                    "tni_code":  f"{team_code}notclose",
-                    "date":      now_mm.strftime("%d/%m/%Y"),
-                    "time":      now_mm.strftime("%H:%M"),
-                    "date_iso":  now_mm.strftime("%d/%m/%Y"),
-                }, timeout=60)
-            except Exception as e:
-                logger.error(f"log_search failed: {e}")
+        log_search_bg(first_name or str(user_id), user_id, f"{team_code}notclose")
         try:
             messages = lookup_notclose(team_code)
             for msg in messages:
@@ -1184,21 +1176,7 @@ def handle(update: dict) -> None:
         team_code = wc_match.group(1).upper()
         logger.info(f"WaitCD lookup: {team_code} | chat={chat_id}")
         tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)} Wait CD</b> data...")
-        # Ghi log search
-        if APPS_SCRIPT_URL:
-            try:
-                now_mm = datetime.now(TZ_MM)
-                requests.post(APPS_SCRIPT_URL, json={
-                    "action":    "log_search",
-                    "user_name": first_name or str(user_id),
-                    "user_id":   str(user_id),
-                    "tni_code":  f"{team_code}waitcd",
-                    "date":      now_mm.strftime("%d/%m/%Y"),
-                    "time":      now_mm.strftime("%H:%M"),
-                    "date_iso":  now_mm.strftime("%d/%m/%Y"),
-                }, timeout=60)
-            except Exception as e:
-                logger.error(f"log_search failed: {e}")
+        log_search_bg(first_name or str(user_id), user_id, f"{team_code}waitcd")
         try:
             messages = lookup_waitcd(team_code)
             for msg in messages:
@@ -1214,21 +1192,7 @@ def handle(update: dict) -> None:
         tni = clear_match.group(1).upper()
         logger.info(f"Clear site lookup: {tni} | chat={chat_id}")
         tg_send(chat_id, f"⏳ Loading clear data for <b>{html.escape(tni)}</b>...")
-        # Ghi log search
-        if APPS_SCRIPT_URL:
-            try:
-                now_mm = datetime.now(TZ_MM)
-                requests.post(APPS_SCRIPT_URL, json={
-                    "action":    "log_search",
-                    "user_name": first_name or str(user_id),
-                    "user_id":   str(user_id),
-                    "tni_code":  f"CLEAR {tni}",
-                    "date":      now_mm.strftime("%d/%m/%Y"),
-                    "time":      now_mm.strftime("%H:%M"),
-                    "date_iso":  now_mm.strftime("%d/%m/%Y"),
-                }, timeout=60)
-            except Exception as e:
-                logger.error(f"log_search failed: {e}")
+        log_search_bg(first_name or str(user_id), user_id, f"CLEAR {tni}")
         try:
             message = lookup_clear_site(tni)
             tg_send(chat_id, message)
@@ -1279,21 +1243,8 @@ def handle(update: dict) -> None:
         return
 
     tni = m.group(1).upper()
-    # ── Ghi log tìm kiếm đồng bộ trước khi chạy tác vụ nặng ──
-    if APPS_SCRIPT_URL:
-        try:
-            now_mm = datetime.now(TZ_MM)
-            requests.post(APPS_SCRIPT_URL, json={
-                "action":    "log_search",
-                "user_name": first_name or str(user_id),
-                "user_id":   str(user_id),
-                "tni_code":  tni,
-                "date":      now_mm.strftime("%d/%m/%Y"),   # dd/mm/yyyy — khớp format dữ liệu cũ
-                "time":      now_mm.strftime("%H:%M"),
-                "date_iso":  now_mm.strftime("%d/%m/%Y"),
-            }, timeout=60)
-        except Exception as e:
-            logger.error(f"log_search failed: {e}")
+    # ── Ghi log tìm kiếm trong background — không block kết quả trả về user ──
+    log_search_bg(first_name or str(user_id), user_id, tni)
 
     result = lookup_tni(tni)
     for chunk in split_messages(result):
