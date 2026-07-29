@@ -1,4 +1,4 @@
-﻿# TNI Bot System Map
+# TNI Bot System Map
 
 > [!IMPORTANT]
 > **Doc file nay TRUOC khi sua bat ky thu gi!**
@@ -203,7 +203,7 @@ Trong `apps_script_collector.js`:
 | Bot | Token env var | Token | Chức năng | Deploy |
 |---|---|---|---|---|
 | `@TNIASSETorderREQUEST_BOT` | `COLLECTOR_BOT_TOKEN` | `8928677923:AAE_...` | Thu thập Order/Revoke/Export/Move/Asset Sent/Destroys | Vercel webhook |
-| `@SEARCHTNITASKWOBOT` | `TELEGRAM_TOKEN` | `8606383435:AAEs...` | Tra cứu TNI Site/Task/WO + Daily Report | **Vercel webhook 24/7** |
+| `@SEARCHTNITASKWOBOT` | `TELEGRAM_TOKEN` | `8606383435:AAEs...` | Tra cứu TNI Site/Task/WO + Daily Report | **Vercel webhook 24/7 (ĐÓNG BĂNG v2.0 - `f71aa5a`)** |
 | `@TNIREPORTTASK_BOT` | `REPORT_TASK_BOT_TOKEN` | `8646913750:AAG3...` | ⚠️ Không dùng nữa cho nhân viên (nhân viên chưa start bot này) | — |
 | `@TNITECHINICALDEPREPORT_BOT` | `TECHNICAL_DEP_BOT_TOKEN` | `8928677923:AAE_...` | Gửi cho Technical Dept (E75:E87) | GitHub Actions |
 | `SEND_BOT` | `SEND_BOT_TOKEN` | `8897800070:AAHc...` | Gửi cho **TẤT CẢ**: Nhân viên + Team Leaders + Management + BOD | GitHub Actions |
