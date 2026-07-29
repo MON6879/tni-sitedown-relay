@@ -484,9 +484,12 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
 
 
 def is_daily_report(text: str) -> bool:
-    """Chỉ nhận diện Daily Result/Daily Report, loại trừ Daily Plan."""
+    """Chỉ nhận diện Daily Result/Daily Report do người dùng gửi, loại trừ Daily Plan và Auto Notes."""
     text_l = text.lower()
     if "daily plan" in text_l or "plan:" in text_l or "kế hoạch" in text_l:
+        return False
+    # Loại trừ tuyệt đối các tin nhắn Note tự động / hệ thống phản hồi
+    if "above are the end-of-day work results" in text_l or "note: above are" in text_l or text_l.startswith("note:"):
         return False
     return "daily result" in text_l or "daily report" in text_l or "result:" in text_l
 

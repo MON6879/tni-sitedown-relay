@@ -765,6 +765,9 @@ def is_daily(text: str) -> bool:
     # Loại trừ Daily Plan không cho nộp nhầm vào tab Daily Result
     if "daily plan" in text_l or "plan:" in text_l or "kế hoạch" in text_l:
         return False
+    # Loại trừ tuyệt đối các tin nhắn Note tự động / hệ thống phản hồi
+    if "above are the end-of-day work results" in text_l or "note: above are" in text_l or text_l.startswith("note:"):
+        return False
     return "daily result" in text_l or "daily report" in text_l or "result:" in text_l
 
 
