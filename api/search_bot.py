@@ -993,7 +993,7 @@ def handle(update: dict) -> None:
             tg_send(chat_id, reply)
             return
 
-        if clean_cmd.startswith("info") or clean_cmd.startswith("clear") or clean_cmd.endswith("notclose") or clean_cmd.endswith("waitcd"):
+        if clean_cmd.startswith("info") or clean_cmd.startswith("clear") or clean_cmd.endswith("notclose") or clean_cmd.endswith("waitcd") or clean_cmd in ("t1", "t2", "t3", "t4"):
             # Strip slash and fall through to main search parsers
             text = text[1:]
         else:
