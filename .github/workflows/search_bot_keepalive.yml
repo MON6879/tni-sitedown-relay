@@ -1,0 +1,18 @@
+name: Search Bot 24/7 Webhook Keepalive
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # Chạy tự động mỗi 5 phút từ GitHub Actions Cloud 24/7
+  workflow_dispatch:       # Cho phép kích hoạt thủ công khi cần
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lock & Ensure Webhook 100% Active 24/7 on Vercel Serverless
+        run: |
+          echo "🔒 Re-locking Webhook for Bot 3 (@SEARCHTNITASKWOBOT)..."
+          curl -s -f "https://api.telegram.org/bot8606383435:AAEstcN4Om6_9ZAjs4OoFV2uVlRALgae2Ac/setWebhook?url=https://tni-bot.vercel.app/api/search_bot" || true
+          echo ""
+          echo "⚡ Ping Vercel Serverless endpoint..."
+          curl -s "https://tni-bot.vercel.app/api/search_bot" || true
