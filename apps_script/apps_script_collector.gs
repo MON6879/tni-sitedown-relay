@@ -175,7 +175,7 @@ function doGet(e) {
     if (action === "mdg_get_stats"   || action === "mdg_check_row")   return doGetMdg_(e);
     if (action === "get_fields")                                       return doGetDaily_(e);
 
-    if (action === "trigger_16h") return handleWebhookRequest_(e);
+    if (action === "trigger_16h" || action === "trigger_report" || action === "relay_all") return handleWebhookRequest_(e);
 
     // ── Default: status check ─────────────────────────────────
     const ss = SpreadsheetApp.openById(SHEET_ID);

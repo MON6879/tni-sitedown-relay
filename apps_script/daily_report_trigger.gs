@@ -136,15 +136,17 @@ function handleWebhookRequest_(e) {
   const params = e.parameter || {};
   const action = (params.action || '').trim();
   const reqSecret = (params.secret || '').trim();
+  const reportType = (params.type || params.report_type || '').trim();
 
   const props = PropertiesService.getScriptProperties();
   const configuredSecret = (props.getProperty('WEBHOOK_SECRET') || 'TNI_REPORTS_SECURE_KEY_2026').trim();
 
-  // 1. Kiểm tra action
-  if (action !== 'trigger_16h') {
+  // 1. Kiểm tra action hợp lệ
+  const validActions = ['trigger_16h', 'trigger_report', 'relay_all'];
+  if (validActions.indexOf(action) === -1) {
     return ContentService.createTextOutput(JSON.stringify({
       status: 'error',
-      message: 'Invalid action parameter'
+      message: 'Invalid action parameter. Supported: ' + validActions.join(', ')
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -156,26 +158,49 @@ function handleWebhookRequest_(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // 3. Chống Spam / Rate limiting: Giới hạn tối thiểu 5 phút giữa 2 lần trigger qua Webhook
+  // 3. Chống Spam / Rate limiting: Giới hạn tối thiểu 1 phút giữa 2 lần trigger qua Webhook
   const lastTrigger = parseInt(props.getProperty('LAST_WEBHOOK_TRIGGER_TS') || '0', 10);
   const nowMs = Date.now();
-  if (nowMs - lastTrigger < 300000) { // 5 phút = 300,000 ms
+  if (nowMs - lastTrigger < 60000) { // 1 phút = 60,000 ms
     return ContentService.createTextOutput(JSON.stringify({
       status: 'rate_limited',
-      message: 'Triggered recently within 5 minutes. Request ignored to prevent duplicate sending.'
+      message: 'Triggered recently within 1 minute. Request ignored to prevent duplicate sending.'
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
   // Cập nhật timestamp lần trigger này
   props.setProperty('LAST_WEBHOOK_TRIGGER_TS', String(nowMs));
 
-  // 4. Kích hoạt gửi báo cáo 1, 2, 3, 4 qua GitHub API
-  const success = triggerDailyReport_();
+  // 4. Kích hoạt gửi báo cáo tương ứng
+  let success = false;
+  let runMessage = '';
   const nowStr = Utilities.formatDate(new Date(), 'Asia/Yangon', 'dd/MM/yyyy HH:mm:ss');
 
+  if (action === 'trigger_16h') {
+    success = triggerDailyReport_();
+    runMessage = `[${nowStr}] Trigger Reports 1, 2, 3, 4 dispatch sent to GitHub Actions!`;
+  } else if (action === 'trigger_report') {
+    const targetType = reportType || GH_REPORT;
+    if (typeof triggerDailyWorkflow === 'function') {
+      success = triggerDailyWorkflow(targetType);
+      runMessage = `[${nowStr}] Trigger report "${targetType}" dispatched to GitHub Actions!`;
+    } else {
+      success = triggerDailyReport_();
+      runMessage = `[${nowStr}] Trigger default report dispatched to GitHub Actions!`;
+    }
+  } else if (action === 'relay_all') {
+    if (typeof relayDailyReports === 'function') {
+      relayDailyReports();
+      success = true;
+      runMessage = `[${nowStr}] Executed relayDailyReports() for all scheduled daily reports!`;
+    } else {
+      runMessage = `[${nowStr}] relayDailyReports function not found`;
+    }
+  }
+
   return ContentService.createTextOutput(JSON.stringify({
-    status: success !== false ? 'success' : 'error',
-    message: `[${nowStr}] Trigger Reports 1, 2, 3, 4 dispatch sent to GitHub Actions!`,
+    status: success ? 'success' : 'error',
+    message: runMessage,
     timestamp: nowStr
   })).setMimeType(ContentService.MimeType.JSON);
 }
