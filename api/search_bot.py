@@ -977,153 +977,118 @@ def handle(update: dict) -> None:
         tg_send(chat_id, reply)
         return
 
-    # ── COMMANDS ────────────────────────────────────────────────────────────
+    # ── UNIFIED COMMAND NORMALIZATION: Tự động loại bỏ '/' và '@bot_username' ──
     if text.startswith("/"):
-        cmd = text.split()[0].lower().split("@")[0]
-        clean_cmd = cmd[1:]
-        if clean_cmd in ("request_enter_site", "request_site_enter", "site_access", "siteaccess", "site_enter", "request_site"):
-            parts = text.split(maxsplit=1)
-            passed_site = parts[1].upper().strip() if len(parts) > 1 else "TNI0401"
+        parts = text.split(maxsplit=1)
+        first_word = parts[0][1:].lower().split("@")[0]  # e.g. "/t4notclose@bot" -> "t4notclose"
+        rest = parts[1] if len(parts) > 1 else ""
+        
+        # Xử lý các hệ thống lệnh chính
+        if first_word in ("request_enter_site", "request_site_enter", "site_access", "siteaccess", "site_enter", "request_site"):
+            passed_site = rest.upper().strip() if rest else "TNI0401"
             reply = get_site_access_template(passed_site)
             tg_send(chat_id, reply)
             return
 
-        if clean_cmd in ("mysite", "mycable", "myolt", "mysn", "mydia", "mymw", "mydata"):
-            reply = get_staff_data(user_id, clean_cmd)
-            tg_send(chat_id, reply)
+        elif first_word in ("start", "help"):
+            if rest.upper().startswith("PLAN_T"):
+                team_num_str = rest[6:]
+                if team_num_str.isdigit():
+                    send_daily_plan_template(chat_id, int(team_num_str))
+                    return
+            tg_send(chat_id,
+                "👋 <b>TNI Search Bot</b>\n\n"
+                "• Tra cứu Task/WO: Gõ <code>TNI0001</code> hoặc <code>/tni TNI0001</code>\n"
+                "• Tra cứu Not Close: Gõ <code>t1notclose</code>, <code>t2notclose</code>...\n"
+                "• Tra cứu Wait CD: Gõ <code>t1waitcd</code>, <code>t2waitcd</code>...\n"
+                "• Tra cứu Cá nhân: Gõ <code>mysite</code>, <code>mycable</code>, <code>mydata</code>...\n"
+                "• Lấy mẫu báo cáo: Gõ <code>/daily</code> hoặc <code>/plan</code>",
+                parse_mode="HTML")
             return
 
-        if clean_cmd.startswith("info") or clean_cmd.startswith("clear") or clean_cmd.endswith("notclose") or clean_cmd.endswith("waitcd") or clean_cmd in ("t1", "t2", "t3", "t4"):
-            # Strip slash and bot username suffix if present, then fall through to main search parsers
-            parts = text.split(maxsplit=1)
-            rest = parts[1] if len(parts) > 1 else ""
-            text = f"{clean_cmd} {rest}".strip()
+        elif first_word == "daily":
+            send_daily_template(chat_id)
+            return
+
+        elif first_word in ("plan", "dailyplan"):
+            team_num = None
+            if rest:
+                team_arg = rest.upper()
+                m = re.match(r"^(T(?:EAM)?\s*([1-4])|[1-4])$", team_arg, re.IGNORECASE)
+                if m:
+                    team_num = int(m.group(2) if m.group(2) else m.group(1))
+            
+            title = (msg.get("chat", {}).get("title") or "").upper()
+            if not team_num:
+                m_title = re.search(r"TEAM\s*([1-4])", title)
+                if m_title:
+                    team_num = int(m_title.group(1))
+
+            if not team_num:
+                from tni_config import TELEGRAM_GROUPS
+                def norm_id(cid):
+                    return str(cid).replace("-100", "").replace("-", "")
+                for k, gid in TELEGRAM_GROUPS.items():
+                    if norm_id(chat_id) == norm_id(gid):
+                        if k.startswith("T") and k[1:].isdigit():
+                            team_num = int(k[1:])
+                            break
+
+            if not team_num:
+                team_num = get_user_team_number(user_id)
+            
+            if not team_num:
+                team_num = 1
+            
+            send_daily_plan_template(chat_id, team_num)
+            return
+
+        elif first_word in ("id", "myid"):
+            chat_title = msg["chat"].get("title") or first_name or "Private"
+            chat_type  = msg["chat"].get("type", "private")
+            msg_extra  = ""
+            if APPS_SCRIPT_URL:
+                try:
+                    r = requests.post(APPS_SCRIPT_URL, json={
+                        "action":     "register_chat" if first_word == "id" else "register_user",
+                        "chat_id":    str(chat_id),
+                        "chat_title": chat_title,
+                        "chat_type":  chat_type,
+                        "reg_by":     first_name,
+                        "user_id":    str(user_id),
+                        "user_name":  first_name,
+                    }, timeout=60)
+                    res = r.json()
+                    if res.get("status") == "ok":
+                        msg_extra = "\n✅ Saved"
+                    elif res.get("status") == "duplicate":
+                        msg_extra = "\n⚠️ Already exists"
+                except Exception:
+                    pass
+            tg_send(chat_id,
+                f"👤 <b>{html.escape(first_name)}</b>\n"
+                f"🔑 ID: <code>{user_id}</code>\n"
+                f"💬 Chat: <code>{chat_id}</code>\n"
+                f"📍 Type: {chat_type}"
+                + msg_extra)
+            return
+
+        elif first_word == "reload":
+            global _cache_ts
+            _cache_ts = 0
+            load_all_sheets()
+            tg_send(chat_id, "✅ Data reloaded")
+            return
+
+        elif first_word == "tni":
+            if rest:
+                text = rest
+            else:
+                tg_send(chat_id, "🔍 Gõ mã trạm sau lệnh, ví dụ: <code>/tni TNI0001</code>")
+                return
         else:
-            if cmd == "/start":
-                parts = text.split()
-                if len(parts) > 1:
-                    arg = parts[1].upper()
-                    if arg.startswith("PLAN_T"):
-                        team_num_str = arg[6:]
-                        if team_num_str.isdigit():
-                            send_daily_plan_template(chat_id, int(team_num_str))
-                            return
-
-                tg_send(chat_id,
-                    "👋 <b>TNI Search Bot</b>\n\n"
-                    "• Send site code (e.g. <code>TNI0001</code>) to lookup Task/WO\n"
-                    "• Send <code>T1</code>, <code>T2</code>, <code>T3</code>, or <code>T4</code> to view Task/WO by Team\n"
-                    "• Send <code>T1notclose</code> to view unclosed WOs for the team\n"
-                    "• Send <code>T1waitcd</code> to view WOs waiting for CD for the team\n"
-                    "• Send <code>mysite</code>, <code>mycable</code>, <code>mymw</code>... to view personal stats\n"
-                    "• Send <code>mydata</code> to view all personal stats (mysite to mymw)\n"
-                    "• Send report containing <b>Daily</b> to save it\n"
-                    "• Type /daily to see the report template\n"
-                    "• Type /plan to see the Daily Plan template with FT list for your Team")
-                return
-
-            elif cmd == "/help":
-                tg_send(chat_id,
-                    "👋 <b>TNI Search Bot</b>\n\n"
-                    "• Send site code (e.g. <code>TNI0001</code>) to lookup Task/WO\n"
-                    "• Send <code>T1</code>, <code>T2</code>, <code>T3</code>, or <code>T4</code> to view Task/WO by Team\n"
-                    "• Send <code>T1notclose</code> to view unclosed WOs for the team\n"
-                    "• Send <code>T1waitcd</code> to view WOs waiting for CD for the team\n"
-                    "• Send <code>mysite</code>, <code>mycable</code>, <code>mymw</code>... to view personal stats\n"
-                    "• Send <code>mydata</code> to view all personal stats (mysite to mymw)\n"
-                    "• Send report containing <b>Daily</b> to save it\n"
-                    "• Type /daily to see the report template\n"
-                    "• Type /plan to see the Daily Plan template with FT list for your Team")
-                return
-
-            elif cmd == "/daily":
-                send_daily_template(chat_id)
-                return
-
-            elif cmd in ("/plan", "/dailyplan"):
-                team_num = None
-                parts = text.split()
-                if len(parts) > 1:
-                    team_arg = parts[1].upper()
-                    m = re.match(r"^(T(?:EAM)?\s*([1-4])|[1-4])$", team_arg, re.IGNORECASE)
-                    if m:
-                        team_num = int(m.group(2) if m.group(2) else m.group(1))
-                
-                title = (msg.get("chat", {}).get("title") or "").upper()
-                if not team_num:
-                    m_title = re.search(r"TEAM\s*([1-4])", title)
-                    if m_title:
-                        team_num = int(m_title.group(1))
-
-                if not team_num:
-                    from tni_config import TELEGRAM_GROUPS
-                    def norm_id(cid):
-                        return str(cid).replace("-100", "").replace("-", "")
-                    for k, gid in TELEGRAM_GROUPS.items():
-                        if norm_id(chat_id) == norm_id(gid):
-                            if k.startswith("T") and k[1:].isdigit():
-                                team_num = int(k[1:])
-                                break
-
-                if not team_num:
-                    team_num = get_user_team_number(user_id)
-                
-                if not team_num:
-                    team_num = 1
-                
-                send_daily_plan_template(chat_id, team_num)
-                return
-
-            elif cmd in ("/id", "/myid"):
-                chat_title = msg["chat"].get("title") or first_name or "Private"
-                chat_type  = msg["chat"].get("type", "private")
-                msg_extra  = ""
-                if APPS_SCRIPT_URL:
-                    try:
-                        r = requests.post(APPS_SCRIPT_URL, json={
-                            "action":     "register_chat" if cmd == "/id" else "register_user",
-                            "chat_id":    str(chat_id),
-                            "chat_title": chat_title,
-                            "chat_type":  chat_type,
-                            "reg_by":     first_name,
-                            "user_id":    str(user_id),
-                            "user_name":  first_name,
-                        }, timeout=60)
-                        res = r.json()
-                        if res.get("status") == "ok":
-                            msg_extra = "\n✅ Saved"
-                        elif res.get("status") == "duplicate":
-                            msg_extra = "\n⚠️ Already exists"
-                    except Exception:
-                        pass
-                tg_send(chat_id,
-                    f"👤 <b>{html.escape(first_name)}</b>\n"
-                    f"🔑 ID: <code>{user_id}</code>\n"
-                    f"💬 Chat: <code>{chat_id}</code>\n"
-                    f"📍 Type: {chat_type}"
-                    + msg_extra)
-                return
-
-            elif cmd == "/reload":
-                global _cache_ts
-                _cache_ts = 0   # force reload
-                load_all_sheets()
-                tg_send(chat_id, "✅ Data reloaded")
-                return
-
-            elif cmd == "/tni":
-                parts = text.split()
-                if len(parts) > 1:
-                    text = " ".join(parts[1:])
-                else:
-                    tg_send(chat_id,
-                        "🔍 <b>How to Search Site:</b>\n\n"
-                        "Please specify a site code after the command, for example:\n"
-                        "• <code>/tni TNI0001</code>\n"
-                        "• <code>/tni TNI0001_01</code>",
-                        parse_mode="HTML"
-                    )
-                    return
+            # Tự động chuyển tất cả các lệnh gõ '/' khác (như /t4notclose, /t1waitcd, /mysite) thành chuỗi thô để tra cứu đồng nhất
+            text = f"{first_word} {rest}".strip()
 
     # ── DAILY REPORT ────────────────────────────────────────────────────────
     if is_daily(text):
