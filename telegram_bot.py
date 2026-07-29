@@ -947,12 +947,8 @@ async def main():
     ))
 
     logger.info("Bot TNI dang lang nghe...")
-    async with app:
-        await app.start()
-        await app.updater.start_polling()
-        logger.info("Bot ONLINE!")
-        await asyncio.Event().wait()
-
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    print("⚠️ THÔNG BÁO: Bot 3 (@SEARCHTNITASKWOBOT) đã được chuyển hoàn toàn sang Vercel Cloud Webhook 24/7.")
+    print("Vui lòng KHÔNG chạy telegram_bot.py trên máy tính vì start_polling() sẽ làm xóa Webhook URL trên Vercel Serverless!")
+    import sys
+    sys.exit(0)
