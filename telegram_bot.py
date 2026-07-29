@@ -665,10 +665,62 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    # ── 2. TNI Lookup (existing logic)
-    # Chỉ đọc 12 ký tự đầu từ trái sang để tìm mã TNIxxxx hay TNIXXXX_01 (tránh quét tin nhắn báo cáo dài)
-    m = re.search(r"(TNI\w+)", text, re.IGNORECASE)
-    if not m or m.start() >= 12:
+    # ── 1.6 INFO: TNIxxxx — Tra cứu Site/Cable/Gpon/DIA ───────────────────
+    info_match = re.match(r"^info[:\s]+\s*(TNI\w+)", text.strip(), re.IGNORECASE)
+    if info_match:
+        tni = info_match.group(1).upper()
+        logger.info(f"Info lookup: {tni}")
+        wait_msg = await update.message.reply_text(
+            f"⏳ Searching info for <b>{html.escape(tni)}</b>...", parse_mode="HTML"
+        )
+        try:
+            # GID 171059303 (Tab: Name Site / Site / Cable / Gpon / DIA)
+            url_info = "https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/gviz/tq?tqx=out:csv&gid=171059303"
+            hdrs = {"User-Agent": "Mozilla/5.0"}
+            resp = requests.get(url_info, headers=hdrs, timeout=30, allow_redirects=True)
+            resp.raise_for_status()
+            content = resp.content.decode("utf-8", errors="replace")
+            df_info = pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
+            
+            matched = df_info[df_info.iloc[:, 0].str.upper() == tni] if len(df_info) > 0 else pd.DataFrame()
+            if not matched.empty:
+                row = matched.iloc[0]
+                site  = str(row.iloc[1]).strip() if len(row) > 1 and str(row.iloc[1]).strip() not in ("nan", "None", "") else ""
+                cable = str(row.iloc[2]).strip() if len(row) > 2 and str(row.iloc[2]).strip() not in ("nan", "None", "") else ""
+                gpon  = str(row.iloc[3]).strip() if len(row) > 3 and str(row.iloc[3]).strip() not in ("nan", "None", "") else ""
+                dia   = str(row.iloc[4]).strip() if len(row) > 4 and str(row.iloc[4]).strip() not in ("nan", "None", "") else ""
+                
+                lines = [f"📡 <b>Info: {html.escape(tni)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
+                if site:  lines.append(f"\n🏢 <b>Site</b>\n{html.escape(site)}")
+                if cable: lines.append(f"\n🔌 <b>Cable</b>\n{html.escape(cable)}")
+                if gpon:  lines.append(f"\n📶 <b>Gpon</b>\n{html.escape(gpon)}")
+                if dia:   lines.append(f"\n🌐 <b>DIA</b>\n{html.escape(dia)}")
+                lines.append("━━━━━━━━━━━━━━━━━━━━")
+                reply = "\n".join(lines)
+            else:
+                reply = f"❌ Info for <b>{html.escape(tni)}</b> not found in Site Info list."
+            
+            chunks = split_messages(reply)
+            await wait_msg.edit_text(chunks[0], parse_mode="HTML")
+            for chunk in chunks[1:]:
+                await update.message.reply_text(chunk, parse_mode="HTML")
+        except Exception as err:
+            logger.error(f"Info lookup error [{tni}]: {err}")
+            await wait_msg.edit_text(
+                f"❌ <b>Error</b> – INFO {html.escape(tni)}\n<i>{html.escape(str(err))}</i>",
+                parse_mode="HTML",
+            )
+        return
+
+    # ── 2. TNI Lookup (Khóa chặt: Chỉ nhận khi tin nhắn bắt đầu bằng TNIxxxx hoặc /tni TNIxxxx)
+    text_clean = text.strip()
+    if text_clean.lower().startswith("/tni"):
+        parts = text_clean.split(maxsplit=1)
+        if len(parts) > 1:
+            text_clean = parts[1].strip()
+
+    m = re.match(r"^(TNI\w+)", text_clean, re.IGNORECASE)
+    if not m:
         return
     tni      = m.group(1).upper()
     logger.info(f"Lookup: {tni}")
