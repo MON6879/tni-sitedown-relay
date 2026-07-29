@@ -924,6 +924,16 @@ def handle(update: dict) -> None:
     if not text:
         return
 
+    # ── SITE DOWN V2 RELAY ──────────────────────────────────────────────────
+    text_l = text.lower()
+    if "site down" in text_l or "cell down" in text_l or "dg abnormal" in text_l or "dg run>16h" in text_l or "down_tni" in text_l:
+        sd_url = "https://script.google.com/macros/s/AKfycbxVi0BGDW7B_KBxcSEdw3yuHB9Rs2BemQEYeKDwsybJQdmQv-_0HqyGHjpZI6jupxll/exec"
+        logger.info(f"[SD Relay] Forwarding Site Down report update to Apps Script...")
+        try:
+            requests.post(sd_url, json=update, timeout=15)
+        except Exception as e:
+            logger.error(f"[SD Relay] Forward error: {e}")
+
     # Map reply keyboard button labels to actual commands
     text_l = text.lower().strip()
     if "plan" in text_l and "📋" in text:
