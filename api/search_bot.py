@@ -1154,8 +1154,8 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
-    # ── NOT CLOSE SEARCH (T1notclose / T2notclose / ...) ──────────────────
-    nc_match = re.match(r"^(T[1-4])notclose$", text.strip(), re.IGNORECASE)
+    # ── NOT CLOSE SEARCH (T1notclose / T1 not close / T1_notclose ...) ────
+    nc_match = re.match(r"^(T[1-4])[\s_]?(not[\s_]?close|notclose)$", text.strip(), re.IGNORECASE)
     if nc_match:
         team_code = nc_match.group(1).upper()
         logger.info(f"NotClose lookup: {team_code} | chat={chat_id}")
@@ -1170,8 +1170,8 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
-    # ── WAIT CD SEARCH (T1waitcd / T2waitcd / ...) ────────────────────────
-    wc_match = re.match(r"^(T[1-4])waitcd$", text.strip(), re.IGNORECASE)
+    # ── WAIT CD SEARCH (T1waitcd / T1 wait cd / T1_waitcd ...) ────────────
+    wc_match = re.match(r"^(T[1-4])[\s_]?(wait[\s_]?cd|waitcd)$", text.strip(), re.IGNORECASE)
     if wc_match:
         team_code = wc_match.group(1).upper()
         logger.info(f"WaitCD lookup: {team_code} | chat={chat_id}")
