@@ -994,8 +994,10 @@ def handle(update: dict) -> None:
             return
 
         if clean_cmd.startswith("info") or clean_cmd.startswith("clear") or clean_cmd.endswith("notclose") or clean_cmd.endswith("waitcd") or clean_cmd in ("t1", "t2", "t3", "t4"):
-            # Strip slash and fall through to main search parsers
-            text = text[1:]
+            # Strip slash and bot username suffix if present, then fall through to main search parsers
+            parts = text.split(maxsplit=1)
+            rest = parts[1] if len(parts) > 1 else ""
+            text = f"{clean_cmd} {rest}".strip()
         else:
             if cmd == "/start":
                 parts = text.split()
