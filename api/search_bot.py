@@ -894,7 +894,7 @@ def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None
         if result.get("status") == "ok":
             name = result.get("name") or first_name or str(user_id)
             logger.info(f"submit_daily ok: {name}")
-            # Silent save: tắt tin nhắn 'Recorded' gây rác nhóm
+            tg_send(chat_id, f"✅ Recorded Daily Result: <b>{html.escape(name)}</b>")
         else:
             tg_send(chat_id, f"❌ Save error\n{result.get('message','')[:120]}")
     except Exception as ex:
