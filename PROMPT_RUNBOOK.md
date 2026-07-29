@@ -205,4 +205,6 @@ FIX: Đã đổi sang HTML format trong sendTelegram():
 | Cron sai timezone | Thêm workflow mới | Tính kỹ: Myanmar = UTC+6:30, 17:30 → 11:00 UTC |
 | GitHub Actions fail 3-5s (đỏ) | Để yên | Chạy `get_session.py` ở local để tạo session mới và update vào Secret `TELEGRAM_SESSION` |
 | Dispatch GitHub 24/7 gây lãng phí | Trigger vô điều kiện từ GAS | Kiểm tra khung giờ hoạt động (04:00 - 21:30 Myanmar) trên GAS trước khi gọi API dispatch |
+| Tin Team (T2, T3, T4) gửi chui vào CONTROL | Quên Re-deploy GAS hoặc gán nhầm Chat ID T1..T4 thành ID CONTROL | Kiểm tra `SD_GROUPS` trên Script Properties có đúng ID Channel riêng cho T1..T4 không, và Re-deploy New Version sau khi sửa `checkColC()` |
+
 

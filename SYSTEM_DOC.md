@@ -50,9 +50,9 @@ Telegram Groups (per-team + consolidated to CONTROL)
 - **Asset Stats** — all teams combined with 3Day/7Day/Month
 - **Summary Report** — all TL reports + Search Stats (all teams)
 
-### 2. `daily_read_report.py` — Note Read Report (10:00 & 20:30 Myanmar)
+### 2. `daily_read_report.py` — Note Read Report (10:00, 14:00 & 20:30 Myanmar)
 - **Trigger:** GitHub Actions `daily_reports.yml` (cron + workflow_dispatch)
-- **Schedule:** 10:00 sáng & 20:30 tối Myanmar (03:30 UTC & 14:00 UTC)
+- **Schedule:** 10:00 sáng, 14:00 chiều & 20:30 tối Myanmar (03:30, 07:30 & 14:00 UTC)
 - **API:** Telethon (TELEGRAM_API_ID, TELEGRAM_API_HASH, TELEGRAM_SESSION under `@phongha79`)
 - **Tracks:** Who read the **Note message** ("Note: Above are the end-of-day work results, checks, and feedback.")
 - **Read Window:** 04:00 - 23:59 Myanmar cutoff active window today
@@ -228,7 +228,7 @@ Missing: TNI0052, TNI0185, TNI0058
 | **09:00** | `refuel_plan_report.py --report 2` | `daily_reports.yml` (`Report 2 - Progress Sent Plan`) | Refuel Plan Report 2: Progress Sent Plan (9:00 Myanmar) |
 | **13:00** | `refuel_plan_report.py --report 2` | `daily_reports.yml` (`Report 2 - Progress Sent Plan`) | Refuel Plan Report 2: Progress Sent Plan (13:00 Myanmar) |
 | **20:00** | `refuel_plan_report.py --report 2` | `daily_reports.yml` (`Report 2 - Progress Sent Plan`) | Refuel Plan Report 2: Progress Sent Plan (20:00 Myanmar) |
-| **10:00 & 20:30** | `daily_read_report.py` | `daily_reports.yml` (`read_report`) | Report 6: Note read status per-person (Read window 04:00-23:59) to teams + CONTROL |
+| **10:00, 14:00 & 20:30** | `daily_read_report.py` | `daily_reports.yml` (`read_report`) | Report 6: Note read status per-person (Read window 04:00-23:59) to teams + CONTROL |
 
 ---
 

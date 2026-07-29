@@ -530,7 +530,16 @@ def get_employee_completed_tni_today_detailed(df_report, target_date: str, emplo
         fullname_val = str(row.iloc[fullname_idx]).strip() if len(row) > fullname_idx and not pd.isna(row.iloc[fullname_idx]) else ""
         search_name = f"{emp_name} {fullname_val}".strip()
         
-        if target_date and date_cell and target_date not in date_cell:
+        if emp_name.lower() in ("nan", "none", ""): emp_name = ""
+        if not emp_name:
+            continue
+
+        if not date_cell or date_cell.lower() in ("nan", "none", ""):
+            continue
+
+        norm_target = normalize_date_str(target_date)
+        norm_cell   = normalize_date_str(date_cell)
+        if not norm_cell or norm_cell != norm_target:
             continue
             
         matched_tg_ids = set()
@@ -668,10 +677,17 @@ def get_daily_reports_from_sheet(target_date: str) -> dict:
             if emp_name.lower() in ("nan", "none", ""): emp_name = ""
             if tg_id.lower() in ("nan", "none", ""): tg_id = ""
 
+            # Require employee name and valid date
+            if not emp_name:
+                continue
+
+            if not date_cell or date_cell.lower() in ("nan", "none", ""):
+                continue
+
             # Filter by date — convert all dot dates (dd.mm.yyyy) to slash format (dd/mm/yyyy)
             norm_target = normalize_date_str(target_date)
             norm_cell   = normalize_date_str(date_cell)
-            if norm_target and norm_cell and norm_target != norm_cell:
+            if not norm_cell or norm_cell != norm_target:
                 continue
 
             # Determine team from telegram ID
@@ -1410,6 +1426,8 @@ async def run_eod_or_update(mode: str):
                     sent_today = False
                     if daily_counts and tg_id in daily_counts:
                         sent_today = (daily_counts[tg_id].get("d0", 0) > 0)
+                    if completed_set:
+                        sent_today = True
 
                     report_status_text = "Sent" if sent_today else "Not sent"
 
@@ -1468,7 +1486,12 @@ async def run_eod_or_update(mode: str):
                     dr_part = "3Day: 0/0/0 | 7Day: 0 | Month: 0"
                     if daily_counts and tg_id in daily_counts:
                         dc = daily_counts[tg_id]
-                        dr_part = f"3Day: {dc['d2']}/{dc['d1']}/{dc['d0']} | 7Day: {dc['d7']} | Month: {dc['month']}"
+                        d0_val = max(dc.get("d0", 0), 1) if completed_set else dc.get("d0", 0)
+                        d7_val = max(dc.get("d7", 0), 1) if completed_set else dc.get("d7", 0)
+                        m_val  = max(dc.get("month", 0), 1) if completed_set else dc.get("month", 0)
+                        dr_part = f"3Day: {dc.get('d2', 0)}/{dc.get('d1', 0)}/{d0_val} | 7Day: {d7_val} | Month: {m_val}"
+                    elif completed_set:
+                        dr_part = "3Day: 0/0/1 | 7Day: 1 | Month: 1"
                     lines.append(f"   • Submission Stats: {dr_part}")
 
             # ── Plan Tomorrow section ──

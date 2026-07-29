@@ -64,11 +64,10 @@ STAFF_SHEET_URL = (
     "/export?format=csv&gid=1684930643"
 )
 # Col indices trong Staff sheet (0-based)
-S_COL_ID   = 0   # A: Employee ID
-S_COL_TID  = 2   # C: Telegram User ID (số không đổi dù đổi username)
-S_COL_NAME = 5   # F: Tên nhân viên
+S_COL_ID   = 0   # A: Employee ID / Telegram ID (số không đổi)
+S_COL_NAME = 5   # F: Tên nhân viên (hiển thị chính thức)
 S_COL_TEAM = 12  # M: Team (Team 1/2/3/4)
-S_COL_EXIT = 13  # N: Ngày nghỉ / inactive — RỔNG = còn làm việc (active)
+S_COL_EXIT = 13  # N: Ngày nghỉ / status — RỔNG = còn làm việc (active)
 
 # Keywords to identify EOD Report message (sent around 16:00-17:30 Myanmar)
 NOTE_KEYWORDS = [
@@ -206,9 +205,9 @@ def get_staff_from_staff_sheet() -> dict:
                 continue
 
             emp_id  = safe_col(S_COL_ID)
-            tid_raw = safe_col(S_COL_TID)
-            name    = safe_col(S_COL_NAME)
-            team    = safe_col(S_COL_TEAM)
+            tid_raw = safe_col(S_COL_ID)   # Col A = Telegram ID strictly
+            name    = safe_col(S_COL_NAME) # Col F = Full Name strictly
+            team    = safe_col(S_COL_TEAM) # Col M = Team
 
             if not name or not team:
                 continue
@@ -229,16 +228,16 @@ def get_staff_from_staff_sheet() -> dict:
             if not group_key:
                 continue
 
-            # Parse Telegram User ID (col C)
+            # Parse Telegram User ID (col A)
             tid_clean = tid_raw.replace(".0", "") if tid_raw.endswith(".0") else tid_raw
             telegram_id = int(tid_clean) if tid_clean.lstrip("-").isdigit() else None
 
             result.setdefault(group_key, [])
-            # Dedup theo tên
+            # Dedup theo tên cột F
             if not any(s["name"] == name for s in result[group_key]):
                 result[group_key].append({
-                    "name":        name,
-                    "telegram_id": telegram_id,
+                    "name":        name,       # Tên Cột F hiển thị chính thức
+                    "telegram_id": telegram_id, # ID Cột A
                     "emp_id":      emp_id,
                 })
 
@@ -338,8 +337,21 @@ async def process_group(client, group_key: str, chat_id: int,
         for s in staff_list:
             tid  = s.get("telegram_id")
             name = s["name"]
+
+            matched_id = None
             if tid and tid in participant_ids:
-                in_group_members.append({"id": tid, "name": name})
+                matched_id = tid
+            else:
+                # Fallback match by Col F Name only if tid missing or unmapped
+                norm_n = name.lower().replace(" ", "")
+                for p in group_participants:
+                    p_name = p["name"].lower().replace(" ", "")
+                    if norm_n and (norm_n in p_name or p_name in norm_n):
+                        matched_id = p["id"]
+                        break
+
+            if matched_id:
+                in_group_members.append({"id": matched_id, "name": name})
             else:
                 not_in_group_names.append(name)
 
