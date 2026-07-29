@@ -1027,10 +1027,18 @@ def handle(update: dict) -> None:
                     if m:
                         team_num = int(m.group(2) if m.group(2) else m.group(1))
                 
+                title = (msg.get("chat", {}).get("title") or "").upper()
+                if not team_num:
+                    m_title = re.search(r"TEAM\s*([1-4])", title)
+                    if m_title:
+                        team_num = int(m_title.group(1))
+
                 if not team_num:
                     from tni_config import TELEGRAM_GROUPS
+                    def norm_id(cid):
+                        return str(cid).replace("-100", "").replace("-", "")
                     for k, gid in TELEGRAM_GROUPS.items():
-                        if str(chat_id) == str(gid):
+                        if norm_id(chat_id) == norm_id(gid):
                             if k.startswith("T") and k[1:].isdigit():
                                 team_num = int(k[1:])
                                 break
