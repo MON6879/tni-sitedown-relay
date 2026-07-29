@@ -1140,53 +1140,55 @@ def handle(update: dict) -> None:
         tg_send(chat_id, reply)
         return
 
-    # ── TEAM LEADER SEARCH (T1/T2/T3/T4) ──────────────────────────────────
-    team_match = re.match(r"^(T[1-4])$", text.strip(), re.IGNORECASE)
-    if team_match:
-        team_code = team_match.group(1).upper()
-        logger.info(f"Team lookup: {team_code} | chat={chat_id}")
-        tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)}</b> data...")
-        log_search_bg(first_name or str(user_id), user_id, team_code)
-        try:
-            messages = lookup_team(team_code)
-            for msg in messages:
-                tg_send(chat_id, msg)
-        except Exception as err:
-            logger.error(f"Team lookup error [{team_code}]: {err}")
-            tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
-        return
+    # ── TEAM LEADER SEARCH (T1/T2/T3/T4) — Chỉ chạy trong Chat Riêng, BỎ khỏi Nhóm ────
+    chat_type = msg.get("chat", {}).get("type", "private")
+    if chat_type == "private":
+        team_match = re.match(r"^(T[1-4])$", text.strip(), re.IGNORECASE)
+        if team_match:
+            team_code = team_match.group(1).upper()
+            logger.info(f"Team lookup: {team_code} | chat={chat_id}")
+            tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)}</b> data...")
+            log_search_bg(first_name or str(user_id), user_id, team_code)
+            try:
+                messages = lookup_team(team_code)
+                for msg_txt in messages:
+                    tg_send(chat_id, msg_txt)
+            except Exception as err:
+                logger.error(f"Team lookup error [{team_code}]: {err}")
+                tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
+            return
 
-    # ── NOT CLOSE SEARCH (T1notclose / T1 not close / T1_notclose ...) ────
-    nc_match = re.match(r"^(T[1-4])[\s_]?(not[\s_]?close|notclose)$", text.strip(), re.IGNORECASE)
-    if nc_match:
-        team_code = nc_match.group(1).upper()
-        logger.info(f"NotClose lookup: {team_code} | chat={chat_id}")
-        tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)} Not Close</b> data...")
-        log_search_bg(first_name or str(user_id), user_id, f"{team_code}notclose")
-        try:
-            messages = lookup_notclose(team_code)
-            for msg in messages:
-                tg_send(chat_id, msg)
-        except Exception as err:
-            logger.error(f"NotClose lookup error [{team_code}]: {err}")
-            tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
-        return
+        # ── NOT CLOSE SEARCH (T1notclose ...) — Chỉ chạy trong Chat Riêng ──────
+        nc_match = re.match(r"^(T[1-4])[\s_]?(not[\s_]?close|notclose)$", text.strip(), re.IGNORECASE)
+        if nc_match:
+            team_code = nc_match.group(1).upper()
+            logger.info(f"NotClose lookup: {team_code} | chat={chat_id}")
+            tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)} Not Close</b> data...")
+            log_search_bg(first_name or str(user_id), user_id, f"{team_code}notclose")
+            try:
+                messages = lookup_notclose(team_code)
+                for msg_txt in messages:
+                    tg_send(chat_id, msg_txt)
+            except Exception as err:
+                logger.error(f"NotClose lookup error [{team_code}]: {err}")
+                tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
+            return
 
-    # ── WAIT CD SEARCH (T1waitcd / T1 wait cd / T1_waitcd ...) ────────────
-    wc_match = re.match(r"^(T[1-4])[\s_]?(wait[\s_]?cd|waitcd)$", text.strip(), re.IGNORECASE)
-    if wc_match:
-        team_code = wc_match.group(1).upper()
-        logger.info(f"WaitCD lookup: {team_code} | chat={chat_id}")
-        tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)} Wait CD</b> data...")
-        log_search_bg(first_name or str(user_id), user_id, f"{team_code}waitcd")
-        try:
-            messages = lookup_waitcd(team_code)
-            for msg in messages:
-                tg_send(chat_id, msg)
-        except Exception as err:
-            logger.error(f"WaitCD lookup error [{team_code}]: {err}")
-            tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
-        return
+        # ── WAIT CD SEARCH (T1waitcd ...) — Chỉ chạy trong Chat Riêng ──────────
+        wc_match = re.match(r"^(T[1-4])[\s_]?(wait[\s_]?cd|waitcd)$", text.strip(), re.IGNORECASE)
+        if wc_match:
+            team_code = wc_match.group(1).upper()
+            logger.info(f"WaitCD lookup: {team_code} | chat={chat_id}")
+            tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)} Wait CD</b> data...")
+            log_search_bg(first_name or str(user_id), user_id, f"{team_code}waitcd")
+            try:
+                messages = lookup_waitcd(team_code)
+                for msg_txt in messages:
+                    tg_send(chat_id, msg_txt)
+            except Exception as err:
+                logger.error(f"WaitCD lookup error [{team_code}]: {err}")
+                tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
+            return
 
     # ── CLEAR SITE SEARCH (CLEAR TNIxxxx) ────────────────────────
     clear_match = re.match(r"^clear[:\s]+\s*(TNI\w+)", text.strip(), re.IGNORECASE)
