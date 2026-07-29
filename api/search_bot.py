@@ -1237,9 +1237,15 @@ def handle(update: dict) -> None:
         return
 
     # ── TNI LOOKUP ──────────────────────────────────────────────────────────
-    # Chỉ đọc 12 ký tự đầu từ trái sang để tìm mã TNIxxxx hay TNIXXXX_01 (tránh quét tin nhắn báo cáo dài)
-    m = re.search(r"(TNI\w+)", text, re.IGNORECASE)
-    if not m or m.start() >= 12:
+    # Khóa chặt: Chỉ nhận khi tin nhắn bắt đầu bằng TNIxxxx, /tni TNIxxxx (tránh nhầm với Info: / Clear / tin nhắn dài)
+    text_clean = text.strip()
+    if text_clean.lower().startswith("/tni"):
+        parts = text_clean.split(maxsplit=1)
+        if len(parts) > 1:
+            text_clean = parts[1].strip()
+
+    m = re.match(r"^(TNI\w+)", text_clean, re.IGNORECASE)
+    if not m:
         return
 
     tni = m.group(1).upper()
