@@ -279,8 +279,9 @@ async def get_note_msgs_period(client, chat_id: int,
     """
     notes = []
     try:
+        peer = await client.get_input_entity(chat_id)
         history = await client(GetHistoryRequest(
-            peer=chat_id, limit=200,
+            peer=peer, limit=200,
             offset_date=None, offset_id=0,
             max_id=0, min_id=0, add_offset=0, hash=0,
         ))
@@ -298,8 +299,9 @@ async def get_note_msgs_period(client, chat_id: int,
 async def get_reader_ids_with_time(client, chat_id: int, msg_id: int) -> dict:
     """Get {user_id: read_datetime_utc} for msg_id."""
     try:
+        peer = await client.get_input_entity(chat_id)
         readers = await client(GetMessageReadParticipantsRequest(
-            peer=chat_id, msg_id=msg_id,
+            peer=peer, msg_id=msg_id,
         ))
         result = {}
         for r in readers:
