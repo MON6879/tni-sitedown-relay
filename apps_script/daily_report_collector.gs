@@ -159,6 +159,13 @@ function handleDailyAdd(body) {
     return "";
   });
 
+  // ✅ BẢO VỆ CHỐNG DÒNG RỖNG: Kiểm tra nếu không có dữ liệu nội dung → Bỏ qua không chèn dòng trống
+  const hasContent = dataRow.some(val => String(val || "").trim().length > 0);
+  if (!hasContent) {
+    Logger.log("⚠️ handleDailyAdd: Dữ liệu fields rỗng — Bỏ qua không chèn dòng trống.");
+    return jsonOut({ status: "error", message: "Empty report content — skipped creating empty row" });
+  }
+
   // Build full row (A→X = 24 cột)
   const row = new Array(DR_TOTAL_COLS).fill("");
   dataRow.forEach((v, i) => { row[COL_DATA_START - 1 + i] = v; }); // C:P = data
