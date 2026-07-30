@@ -790,14 +790,14 @@ def get_copy_markup(chat_id: int, team_arg: str, text_label: str) -> dict:
 def send_daily_template(chat_id: int) -> None:
     fields = fetch_daily_fields()
     now_mm = datetime.now(TZ_MM)
-    lines  = [f"Daily Result: {now_mm.strftime('%d/%m/%Y')}"]
+    lines  = [f"Daily result: {now_mm.strftime('%d/%m/%Y')}"]
     for i, f in enumerate(fields[1:], start=1):
         lines.append(f"{i}. {f}:")
     template = "\n".join(lines)
     
     tg_send(chat_id,
-        f"📋 <b>Daily Result Template</b>\n"
-        f"Copy → Edit → Send back:\n\n"
+        f"📋 <b>Mẫu Daily Result</b>\n"
+        f"Nhấn copy → chỉnh sửa → gửi lại:\n\n"
         f"<pre>{html.escape(template)}</pre>"
     )
 
