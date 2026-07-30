@@ -1196,22 +1196,10 @@ def handle(update: dict) -> None:
         return
 
     # ── INFO: TNIxxxx — tra cứu Site/Cable/Gpon/DIA ────────────────────────
-    info_match = re.match(r"^info[:\s]+\s*(TNI\w+)", text, re.IGNORECASE)
+    info_match = re.match(r"^info[:\s]+\s*(TNI\w+)", text.strip(), re.IGNORECASE)
     if info_match:
         tni = info_match.group(1).upper()
         logger.info(f"Info lookup: {tni} | chat={chat_id}")
-        
-        # Access control: Only Telegram IDs in Column E of Config sheet (GID 1236389870)
-        allowed_ids = get_allowed_info_search_ids()
-        user_id_str = str(user_id).strip()
-        if user_id_str not in allowed_ids:
-            # Simulate searching then return "Not found"
-            tg_send(chat_id, f"⏳ Searching info for <b>{html.escape(tni)}</b>...")
-            import time
-            time.sleep(1)
-            tg_send(chat_id, f"❌ Info for <b>{html.escape(tni)}</b> not found in Site Info list.")
-            return
-
         tg_send(chat_id, f"⏳ Searching info for <b>{html.escape(tni)}</b>...")
         try:
             info = get_info(tni)
@@ -1227,7 +1215,6 @@ def handle(update: dict) -> None:
             logger.error(f"Info error [{tni}]: {err}")
             tg_send(chat_id, f"❌ Lookup error: {html.escape(str(err))}")
 
-        # ── Không ghi log cho tra cứu Info theo yêu cầu (chỉ đếm TNIxxxx) ──
         return
 
     # ── TNI LOOKUP ──────────────────────────────────────────────────────────
