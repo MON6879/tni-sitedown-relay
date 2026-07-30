@@ -58,28 +58,6 @@ function doPost(e) {
 
     const update = JSON.parse(e.postData.contents);
 
-    // ── DEDUPLICATE TELEGRAM WEBHOOK RETRIES ──
-    if (update.update_id) {
-      const cache = CacheService.getScriptCache();
-      const cacheKey = "attendance_upd_" + update.update_id;
-      if (cache.get(cacheKey)) {
-        logToSheet_("Duplicate update_id (cache): " + update.update_id + ", ignoring.");
-        return ContentService.createTextOutput("OK");
-      }
-      cache.put(cacheKey, "1", 21600); // Cache for 6 hours
-
-      const rawUpds = props.getProperty("PROCESSED_UPDATES") || "[]";
-      let processedUpds = [];
-      try { processedUpds = JSON.parse(rawUpds); } catch (ex) {}
-      if (processedUpds.indexOf(update.update_id) !== -1) {
-        logToSheet_("Duplicate update_id (props): " + update.update_id + ", ignoring.");
-        return ContentService.createTextOutput("OK");
-      }
-      processedUpds.push(update.update_id);
-      if (processedUpds.length > 100) processedUpds = processedUpds.slice(-100);
-      props.setProperty("PROCESSED_UPDATES", JSON.stringify(processedUpds));
-    }
-
     logToSheet_("Update received: " + JSON.stringify(update));
     Logger.log("Update received: " + JSON.stringify(update));
 
@@ -88,23 +66,21 @@ function doPost(e) {
       return ContentService.createTextOutput("No message object");
     }
 
-    const nowSec = Math.floor((new Date()).getTime() / 1000);
-    if (msg.date && (nowSec - msg.date > 600)) {
-      logToSheet_("Message too old (" + (nowSec - msg.date) + "s old), update_id: " + update.update_id + ", ignoring.");
-      return ContentService.createTextOutput("OK");
-    }
-
     const chatId = msg.chat.id.toString();
     const telegramUser = msg.from;
-    const senderId = telegramUser.id.toString();
-    const senderName = telegramUser.first_name + (telegramUser.last_name ? " " + telegramUser.last_name : "");
+    const senderId = telegramUser ? telegramUser.id.toString() : "unknown";
+    const senderName = telegramUser ? (telegramUser.first_name + (telegramUser.last_name ? " " + telegramUser.last_name : "")) : "Staff";
 
-    const photoArray = msg.photo;
-    if (!photoArray || photoArray.length === 0) {
-      return ContentService.createTextOutput("Message does not contain photo");
+    let fileId = null;
+    if (msg.photo && msg.photo.length > 0) {
+      fileId = msg.photo[msg.photo.length - 1].file_id;
+    } else if (msg.document && msg.document.mime_type && msg.document.mime_type.indexOf("image/") === 0) {
+      fileId = msg.document.file_id;
     }
 
-    const fileId = photoArray[photoArray.length - 1].file_id;
+    if (!fileId) {
+      return ContentService.createTextOutput("Message does not contain photo");
+    }
 
     logToSheet_("Photo fileId: " + fileId + ", downloading from Telegram...");
     const imageBlob = getTelegramFile_(token, fileId);
@@ -149,6 +125,11 @@ function doPost(e) {
       const photoUrl = String(row[cols.photoCol - 1] || "").trim();
       const depName = cols.depCol ? String(row[cols.depCol - 1] || "").trim() : "";
 
+      const statusVal = cols.statusCol ? String(row[cols.statusCol - 1] || "").toLowerCase() : "";
+      if (statusVal.indexOf("resign") !== -1 || statusVal.indexOf("nghỉ") !== -1 || statusVal.indexOf("nghi") !== -1 || statusVal.indexOf("quit") !== -1 || statusVal.indexOf("off") !== -1) {
+        continue;
+      }
+
       if (shortName) {
         staffList.push({
           name: shortName,
@@ -181,39 +162,54 @@ function doPost(e) {
     }
 
     const finalMatches = [];
-    const senderStaff = staffList.find(s => s.telegramId === senderId);
-    if (senderStaff) {
-      finalMatches.push({
-        name: senderStaff.name,
-        fullName: senderStaff.fullName,
-        telegramId: senderStaff.telegramId,
-        department: senderStaff.department
-      });
-    } else {
-      finalMatches.push({
-        name: senderName,
-        fullName: senderName,
-        telegramId: senderId,
-        department: ""
-      });
-    }
 
-    for (let i = 0; i < geminiMatches.length; i++) {
-      const gMatch = geminiMatches[i];
-      const isAlreadyAdded = finalMatches.some(m => 
-        (m.telegramId && m.telegramId === gMatch.telegramId) || 
-        (m.name.toLowerCase() === gMatch.name.toLowerCase())
-      );
-      if (!isAlreadyAdded) {
-        const dbStaff = staffList.find(s => s.name.toLowerCase() === gMatch.name.toLowerCase() || (s.telegramId && s.telegramId === gMatch.telegramId));
+    // 1) Nếu AI nhận diện được khuôn mặt từ hình đối chiếu ở Cột O:
+    if (geminiMatches && geminiMatches.length > 0) {
+      for (let i = 0; i < geminiMatches.length; i++) {
+        const gMatch = geminiMatches[i];
+        const dbStaff = staffList.find(s => 
+          (s.name && s.name.toLowerCase() === String(gMatch.name).toLowerCase()) || 
+          (s.fullName && s.fullName.toLowerCase() === String(gMatch.name).toLowerCase()) ||
+          (s.telegramId && s.telegramId === String(gMatch.telegramId))
+        );
         if (dbStaff) {
+          const isAlreadyAdded = finalMatches.some(m => m.name.toLowerCase() === dbStaff.name.toLowerCase());
+          if (!isAlreadyAdded) {
+            finalMatches.push({
+              name: dbStaff.name,
+              fullName: dbStaff.fullName,
+              telegramId: senderId, // Col D luôn ghi ID Telegram người gửi
+              department: dbStaff.department
+            });
+          }
+        } else {
           finalMatches.push({
-            name: dbStaff.name,
-            fullName: dbStaff.fullName,
-            telegramId: dbStaff.telegramId,
-            department: dbStaff.department
+            name: gMatch.name,
+            fullName: gMatch.name,
+            telegramId: senderId,
+            department: ""
           });
         }
+      }
+    }
+
+    // 2) Dự phòng nếu AI chưa nhận diện được ai trên hình: Lấy thông tin người gửi
+    if (finalMatches.length === 0) {
+      const senderStaff = staffList.find(s => s.telegramId === senderId);
+      if (senderStaff) {
+        finalMatches.push({
+          name: senderStaff.name,
+          fullName: senderStaff.fullName,
+          telegramId: senderId,
+          department: senderStaff.department
+        });
+      } else {
+        finalMatches.push({
+          name: senderName,
+          fullName: senderName,
+          telegramId: senderId,
+          department: ""
+        });
       }
     }
 
@@ -242,23 +238,23 @@ function doPost(e) {
       const match = finalMatches[i];
       const finalShortName = match.name;
       const finalFullName = match.fullName;
-      const finalTgId = match.telegramId;
+      const finalTgId = match.telegramId; // ID Telegram người gửi
       const finalDep = match.department;
 
-      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, timeStr, finalTgId, extractedImageName)) {
+      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, timeStr, finalShortName, extractedImageName)) {
         replyMsg += `- ${finalShortName} (Already logged for this time slot)\n`;
         continue;
       }
 
       attendanceSheet.insertRowAfter(1);
       attendanceSheet.getRange(2, 1, 1, 7).setValues([[
-        nextNum,
-        dateStr,
-        timeStr,
-        finalTgId,
-        extractedImageName,
-        finalFullName,
-        driveFileUrl
+        nextNum,          // Col A: DEF / STT
+        dateStr,          // Col B: Date
+        timeStr,          // Col C: Time report
+        finalTgId,        // Col D: ID Telegram người gửi
+        finalShortName,   // Col E: Name Trên Hình (Tên ngắn người được nhận diện)
+        finalFullName,    // Col F: Full name (Họ tên người được nhận diện)
+        driveFileUrl      // Col G: photo (Link ảnh Google Drive)
       ]]);
       
       replyMsg += `- ${finalShortName} (${finalDep})\n`;
@@ -320,6 +316,7 @@ function getStaffColumns_(sheet) {
   let idCol = 1;        // Column A (Telegram ID)
   let photoCol = 15;    // Column O (Link Photo man power)
   let depCol = 11;      // Column K (Dep)
+  let statusCol = 14;   // Column N (Status / Probation / Resign)
 
   for (let j = 0; j < headers.length; j++) {
     const header = String(headers[j]).trim().toLowerCase();
@@ -333,9 +330,11 @@ function getStaffColumns_(sheet) {
       photoCol = j + 1;
     } else if (header.indexOf("dep") !== -1 || header.indexOf("phòng") !== -1 || header.indexOf("bộ phận") !== -1) {
       depCol = j + 1;
+    } else if (header.indexOf("status") !== -1 || header.indexOf("probation") !== -1 || header.indexOf("trạng thái") !== -1) {
+      statusCol = j + 1;
     }
   }
-  return { nameCol: nameCol, fullNameCol: fullNameCol, idCol: idCol, photoCol: photoCol, depCol: depCol };
+  return { nameCol: nameCol, fullNameCol: fullNameCol, idCol: idCol, photoCol: photoCol, depCol: depCol, statusCol: statusCol };
 }
 
 /** Xác định khung giờ điểm danh (<8:30, 10:00-12:00, 13:00-14:00, 16:00-17:00) */
@@ -511,6 +510,11 @@ function buildGeneralTab() {
     const tgId      = String(row[cols.idCol - 1] || "").trim();
     const dep       = cols.depCol ? String(row[cols.depCol - 1] || "").trim() : "";
 
+    const statusVal = cols.statusCol ? String(row[cols.statusCol - 1] || "").toLowerCase() : "";
+    if (statusVal.indexOf("resign") !== -1 || statusVal.indexOf("nghỉ") !== -1 || statusVal.indexOf("nghi") !== -1 || statusVal.indexOf("quit") !== -1 || statusVal.indexOf("off") !== -1) {
+      continue;
+    }
+
     if (!shortName) continue;
 
     const stats = attendanceMap[tgId] || {
@@ -660,6 +664,11 @@ function sendAttendanceSlotReport(slotKey) {
     const tgId      = String(row[cols.idCol - 1] || "").trim();
     const dep       = cols.depCol ? String(row[cols.depCol - 1] || "").trim() : "";
 
+    const statusVal = cols.statusCol ? String(row[cols.statusCol - 1] || "").toLowerCase() : "";
+    if (statusVal.indexOf("resign") !== -1 || statusVal.indexOf("nghỉ") !== -1 || statusVal.indexOf("nghi") !== -1 || statusVal.indexOf("quit") !== -1 || statusVal.indexOf("off") !== -1) {
+      continue;
+    }
+
     if (!shortName) continue;
 
     const isTeamMember = /team\s*[1-5]/i.test(dep) || /t[1-5]/i.test(dep);
@@ -725,26 +734,36 @@ function sendAttendanceSlotReport(slotKey) {
 
 
 // ============================================================
-// HỆ THỐNG TRIGGER HẸN GIỜ CHO 4 KHUNG (+15 PHÚT SAU MỖI KHUNG)
-// 08:45 | 12:15 | 14:15 | 17:15 Myanmar Time
+// HỆ THỐNG TRIGGER HẸN GIỜ CHO 4 KHUNG (+25 PHÚT SAU MỖI KHUNG GIỜ)
+// 08:55 | 12:25 | 14:25 | 17:25 Myanmar Time (+10m offset)
 // ============================================================
-function triggerSlotReport0845() { sendAttendanceSlotReport("slot_morning_1");   }
-function triggerSlotReport1215() { sendAttendanceSlotReport("slot_morning_2");   }
-function triggerSlotReport1415() { sendAttendanceSlotReport("slot_afternoon_1"); }
-function triggerSlotReport1715() { sendAttendanceSlotReport("slot_afternoon_2"); }
+function triggerSlotReport0855() { sendAttendanceSlotReport("slot_morning_1");   }
+function triggerSlotReport1225() { sendAttendanceSlotReport("slot_morning_2");   }
+function triggerSlotReport1425() { sendAttendanceSlotReport("slot_afternoon_1"); }
+function triggerSlotReport1725() { sendAttendanceSlotReport("slot_afternoon_2"); }
 
 function setupAttendanceReportTriggers() {
-  const handlerNames = ["triggerSlotReport0845", "triggerSlotReport1215", "triggerSlotReport1415", "triggerSlotReport1715"];
-  ScriptApp.getProjectTriggers()
-    .filter(t => handlerNames.indexOf(t.getHandlerFunction()) !== -1)
-    .forEach(t => ScriptApp.deleteTrigger(t));
+  const handlerNames = ["triggerSlotReport0855", "triggerSlotReport1225", "triggerSlotReport1425", "triggerSlotReport1725", "triggerSlotReport0845", "triggerSlotReport1215", "triggerSlotReport1415", "triggerSlotReport1715"];
+  try {
+    const triggers = ScriptApp.getProjectTriggers();
+    for (let i = 0; i < triggers.length; i++) {
+      if (handlerNames.indexOf(triggers[i].getHandlerFunction()) !== -1) {
+        ScriptApp.deleteTrigger(triggers[i]);
+      }
+    }
+  } catch(e) {
+    Logger.log("⚠️ Delete existing triggers warning: " + e.message);
+  }
 
-  ScriptApp.newTrigger("triggerSlotReport0845").timeBased().atHour(8).nearMinute(45).everyDays(1).inTimezone("Asia/Rangoon").create();
-  ScriptApp.newTrigger("triggerSlotReport1215").timeBased().atHour(12).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
-  ScriptApp.newTrigger("triggerSlotReport1415").timeBased().atHour(14).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
-  ScriptApp.newTrigger("triggerSlotReport1715").timeBased().atHour(17).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
-
-  Logger.log("✅ Đã cài đặt thành công 4 trigger hẹn giờ báo cáo (08:45, 12:15, 14:15, 17:15).");
+  try {
+    ScriptApp.newTrigger("triggerSlotReport0855").timeBased().atHour(8).nearMinute(55).everyDays(1).inTimezone("Asia/Rangoon").create();
+    ScriptApp.newTrigger("triggerSlotReport1225").timeBased().atHour(12).nearMinute(25).everyDays(1).inTimezone("Asia/Rangoon").create();
+    ScriptApp.newTrigger("triggerSlotReport1425").timeBased().atHour(14).nearMinute(25).everyDays(1).inTimezone("Asia/Rangoon").create();
+    ScriptApp.newTrigger("triggerSlotReport1725").timeBased().atHour(17).nearMinute(25).everyDays(1).inTimezone("Asia/Rangoon").create();
+    Logger.log("✅ Đã cài đặt thành công 4 trigger hẹn giờ báo cáo (+10m: 08:55, 12:25, 14:25, 17:25).");
+  } catch(e) {
+    Logger.log("⚠️ Create triggers warning: " + e.message);
+  }
 }
 
 /** Nhận dạng khuôn mặt & đọc mã Site trên hình bằng Gemini AI */
@@ -851,6 +870,9 @@ function setupAttendanceWebhook() {
   let webAppUrl = props.getProperty("WEBAPP_URL") || "";
   if (!webAppUrl) {
     try { webAppUrl = ScriptApp.getService().getUrl() || ""; } catch(e) {}
+  }
+  if (webAppUrl && webAppUrl.indexOf("/dev") !== -1) {
+    webAppUrl = webAppUrl.replace("/dev", "/exec");
   }
   if (!webAppUrl) return;
   
