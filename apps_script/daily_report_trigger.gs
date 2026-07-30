@@ -98,16 +98,16 @@ function setupDailyReportTrigger() {
     .filter(t => t.getHandlerFunction() === 'triggerDailyReport_')
     .forEach(t => ScriptApp.deleteTrigger(t));
 
-  // Tao trigger moi: 16:00 Myanmar (Asia/Yangon) moi ngay
-  // GAS dung timezone cua project (Asia/Yangon) → atHour(16) = 16:00 Myanmar
+  // Tao trigger moi: 16:10 Myanmar (Asia/Yangon) moi ngay
+  // GAS dung timezone cua project (Asia/Yangon) → atHour(16) nearMinute(10) = 16:10 Myanmar
   ScriptApp.newTrigger('triggerDailyReport_')
     .timeBased()
     .atHour(16)
-    .nearMinute(0)
+    .nearMinute(10)
     .everyDays(1)
     .create();
 
-  Logger.log('✅ Trigger da tao: triggerDailyReport_ luc 16:00 Myanmar moi ngay');
+  Logger.log('✅ Trigger da tao: triggerDailyReport_ luc 16:10 Myanmar moi ngay');
 
   // Kiem tra token
   const token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');

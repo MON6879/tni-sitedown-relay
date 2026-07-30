@@ -31,8 +31,8 @@ function relayDailyReports() {
     });
   }
 
-  // 2. 15:55–16:25 Myanmar → gửi Task Remain & dispatch plan_eod, bod_assign, daily_task (16:00)
-  const isEodReportTime = (myanmarHour === 15 && myanmarMin >= 55) || (myanmarHour === 16 && myanmarMin <= 25);
+  // 2. 16:05–16:35 Myanmar → gửi Task Remain & dispatch plan_eod, bod_assign, daily_task (16:10)
+  const isEodReportTime = (myanmarHour === 16 && myanmarMin >= 5 && myanmarMin <= 35);
   if (isEodReportTime) {
     runOnceToday("DAILY_PLAN_EOD_DATE_", function() {
       return triggerDailyWorkflow("plan_eod");
