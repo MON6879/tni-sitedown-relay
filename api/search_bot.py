@@ -1251,9 +1251,22 @@ def handle(update: dict) -> None:
         tg_send(chat_id, chunk)
 
 
+def ensure_webhook_locked_bg():
+    """Tự động khóa lại Webhook Telegram cho Bot 3 trong background thread nếu bị nhả."""
+    if not TOKEN:
+        return
+    def _do():
+        try:
+            target_url = "https://tni-bot.vercel.app/api/search_bot"
+            requests.get(f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={target_url}", timeout=5)
+        except Exception as e:
+            logger.error(f"ensure_webhook_locked_bg error: {e}")
+    threading.Thread(target=_do, daemon=True).start()
+
 # ── Vercel entry point (redeploy triggered) ──────────────────────────────────
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
+        ensure_webhook_locked_bg()
         try:
             length = int(self.headers.get("Content-Length", 0))
             data   = json.loads(self.rfile.read(length))
@@ -1298,6 +1311,7 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(str(ex).encode())
 
     def do_GET(self):
+        ensure_webhook_locked_bg()
         from urllib.parse import urlparse, parse_qs
         parsed_url = urlparse(self.path)
         query = parse_qs(parsed_url.query)
