@@ -1,7 +1,19 @@
 # TNI Bot System Documentation
-> **Last Updated:** 24/06/2026 21:49 Myanmar  
+> **Last Updated:** 30/07/2026 13:42 Myanmar  
 > **Maintainer:** Phong Ha Duc  
 > **Repo:** github.com/phonghdpxd-cmd/tni-bot
+
+---
+
+## 🤖 System Bot Routing & Webhook Map (100% Online Cloud)
+
+| Bot # | Bot Name & Username | Server / Cloud Environment | Webhook URL / Trigger | Key Functions |
+|---|---|---|---|---|
+| **Bot 1 & 3** | **TNI Search & Daily Result Bot**<br>`@SEARCHTNITASKWOBOT`<br>(`3. TNI PERSONAL FIND TASK...`) | **Vercel Cloud Serverless** | `https://tni-bot.vercel.app/api/search_bot` | • `/daily` ➔ Mẫu `Daily result: DD/MM/YYYY`<br>• Thu thập `Daily result: DD/MM/YYYY` vào Google Sheet<br>• Tra cứu Not Close (`T1notclose`..`T4notclose`)<br>• Tra cứu Wait CD (`T1waitcd`..`T4waitcd`)<br>• Tra cứu mã trạm (`TNI0001`, `/tni`) |
+| **Bot Asset** | **TNI Asset & Cable Collector Bot** | **Vercel Cloud Serverless** | `https://tni-bot.vercel.app/api/collector` | • Quản lý lệnh Order/Revoke/Move/Export/Done/Inventory tài sản |
+| **Bot 2** | **TNI Auto Report Daily Bot**<br>`@TNIREPORTTASK_BOT`<br>(`2. TNI Auto Report Daily`) | **GitHub Actions Cloud 24/7** | Cron Workflows (`daily_plan_report.yml`, `daily_read_report.yml`) | • Báo cáo Kế hoạch (Plan Report 17:30 MMT)<br>• Báo cáo Đọc Note (09:30, 14:00, 16:00, 21:00 MMT)<br>• Báo cáo Công việc ngày (17:00 MMT) |
+| **Bot 5** | **TNI Site Down Cell Alarm Bot**<br>`@TNISITEDOWN_BOT`<br>(`5T TNI_SITE_DOWN_CELL_ALARM`) | **Google Apps Script Cloud** | Project: `site_down_v2.gs` (1-min trigger) | • Tin 1 (Chi tiết Site Down từ Cột C)<br>• Tin 2 (SUMMARY từ AW7:AZ15)<br>• **Quy tắc tuyệt đối**: Tin 2 SUMMARY LUÔN ÉP BẮN NỐI ĐUÔI Ở DƯỚI CÙNG ĐÁY CHAT bên dưới Tin 1 |
+| **Bot Attendance** | **TNI Attendance Bot**<br>`@TNIATTENDANCE_BOT` | **Google Apps Script Cloud** | Project: `TNI attendance.js` (Web App `/exec`) | • Đọc ảnh điểm danh & Nhận diện khuôn mặt Gemini 2.5 Flash<br>• Tự lưu ảnh vào thư mục `2.11 Attendance photo`<br>• Tự cập nhật tab `General`<br>• Tự động phát báo cáo 4 mốc giờ (08:45, 12:15, 14:15, 17:15 MMT) |
 
 ---
 
