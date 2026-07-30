@@ -517,11 +517,16 @@ async def main():
         now_str  = myanmar_now()
         divider  = "━" * 30
 
-        # Helper: build per-member lines
+        # Helper: build per-member lines with ❓ for members not joined/mapped yet
         def member_lines(per_member):
             lines = []
             for p in per_member:
-                icon = "✅" if p["d0"] else "❌"
+                if p["d0"]:
+                    icon = "✅"
+                elif not p.get("id"):
+                    icon = "❓"  # Chưa tham gia / Chưa khớp ID Telegram
+                else:
+                    icon = "❌"  # Đã vào nhóm nhưng chưa đọc bài
                 lines.append(
                     f"  {icon} {p['name']}: "
                     f"3Day:{p['d0']}/{p['d1']}/{p['d2']}  "
@@ -535,6 +540,9 @@ async def main():
             if not r:
                 continue
 
+            cnt_unread = sum(1 for p in r["per_member"] if not p["d0"] and p.get("id"))
+            cnt_not_joined = sum(1 for p in r["per_member"] if not p.get("id"))
+
             note_line = f"📝 Note: {r['note_preview']}...\n" if r["note_preview"] else ""
             tl = [
                 f"📋 6. Report — Daily Note Read Report — {gk}",
@@ -547,17 +555,10 @@ async def main():
                 tl.append(f"📝 Note: {r['note_preview']}...")
             tl.append(divider)
             tl.append(f"👥 Team Members: {r['member_count']}  |  "
-                       f"✅ Read: {r['cnt_d0']}  |  ❌ Unread: {len(r['today_unread'])}")
+                       f"✅ Read: {r['cnt_d0']}  |  ❌ Unread: {cnt_unread}  |  ❓ Not Joined: {cnt_not_joined}")
             tl.append(divider)
             tl.extend(member_lines(r["per_member"]))
             tl.append(divider)
-
-            # Phần "Chưa có trong nhóm" — highlight cuối report
-            if r.get("not_in_group"):
-                tl.append(f"⚠️ Not in Group yet ({len(r['not_in_group'])} members):")
-                for name in r["not_in_group"]:
-                    tl.append(f"  • {name}")
-                tl.append("")
 
             chat_id = GROUPS[gk]
             await delete_old_messages_telethon(client, chat_id, GAS_URL, f"READREPORT_{gk}")
@@ -585,9 +586,11 @@ async def main():
 
         # Per-group with per-person details
         for gk, r in all_results.items():
+            cnt_unread = sum(1 for p in r["per_member"] if not p["d0"] and p.get("id"))
+            cnt_not_joined = sum(1 for p in r["per_member"] if not p.get("id"))
             lines.append(
                 f"🏷️ {gk}  |  👥 {r['member_count']}  |  "
-                f"✅ {r['cnt_d0']}  ❌ {len(r['today_unread'])}"
+                f"✅ {r['cnt_d0']}  ❌ {cnt_unread}  ❓ {cnt_not_joined}"
             )
             lines.extend(member_lines(r["per_member"]))
 
