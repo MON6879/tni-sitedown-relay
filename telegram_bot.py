@@ -510,13 +510,13 @@ async def cmd_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now_mm = datetime.now(TZ_MM)
     date_s = now_mm.strftime("%d/%m/%Y")
 
-    lines = [f"Daily report: {date_s}"]
+    lines = [f"Daily result: {date_s}"]
     for i, f in enumerate(fields[1:], start=1):
         lines.append(f"{i}. {f}:")
     template = "\n".join(lines)
 
     await update.message.reply_text(
-        f"📋 *Mẫu Daily Report*\n"
+        f"📋 *Mẫu Daily Result*\n"
         f"Nhấn copy → chỉnh sửa → gửi lại:\n\n"
         f"```\n{template}\n```",
         parse_mode="Markdown",
@@ -539,8 +539,8 @@ async def submit_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = update.effective_chat.id
 
     # Tự thêm ngày nếu chưa có
-    if "Daily report" not in parsed:
-        parsed["Daily report"] = now_mm.strftime("%d/%m/%Y")
+    if "Daily result" not in parsed and "Daily report" not in parsed:
+        parsed["Daily result"] = now_mm.strftime("%d/%m/%Y")
 
     if not DAILY_APPS_SCRIPT_URL or DAILY_APPS_SCRIPT_URL.startswith("CHƯA"):
         return True
