@@ -483,16 +483,20 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
     return result
 
 
-def is_daily_report(text: str) -> bool:
-    """Chỉ nhận diện Daily Result/Daily Report do người dùng gửi, loại trừ Daily Plan và Auto Notes."""
+def is_daily_report(text: str, user=None) -> bool:
+    """Chỉ nhận diện Daily Result/Daily Report do người dùng gửi, loại trừ tin nhắn từ Bot và tin nhắn Note tự động."""
+    if not text:
+        return False
+    if user and getattr(user, "is_bot", False):
+        return False
+
     text_l = text.lower()
     if "daily plan" in text_l or "plan:" in text_l or "kế hoạch" in text_l:
         return False
-    # Loại trừ tuyệt đối các tin nhắn Note tự động / hệ thống phản hồi
-    if "above are the end-of-day work results" in text_l or "note: above are" in text_l or text_l.startswith("note:"):
+    if "above are the end-of-day" in text_l or "note:" in text_l or "ft result daily" in text_l or "ref:" in text_l or "đã lưu" in text_l:
         return False
-    return "daily result" in text_l or "daily report" in text_l or "result:" in text_l
 
+    return "daily result" in text_l or "daily report" in text_l or "result:" in text_l
 
 
 async def cmd_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -520,13 +524,13 @@ async def submit_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE
     Trả về True nếu đã xử lý.
     """
     text = update.message.text or ""
-    if not is_daily_report(text):
+    user = update.effective_user
+    if not is_daily_report(text, user):
         return False
 
     fields  = fetch_daily_fields()
     parsed  = parse_daily_report(text, fields)
     now_mm  = datetime.now(TZ_MM)
-    user    = update.effective_user
     chat_id = update.effective_chat.id
 
     # Tự thêm ngày nếu chưa có
@@ -534,9 +538,6 @@ async def submit_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE
         parsed["Daily report"] = now_mm.strftime("%d/%m/%Y")
 
     if not DAILY_APPS_SCRIPT_URL or DAILY_APPS_SCRIPT_URL.startswith("CHƯA"):
-        await update.message.reply_text(
-            "❌ Bot chưa cấu hình DAILY_APPS_SCRIPT_URL"
-        )
         return True
 
     payload = {
@@ -550,19 +551,13 @@ async def submit_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE
         if result.get("status") == "ok":
             name = result.get("name") or user.first_name or str(user.id)
             ref  = result.get("ref", "")
-            _last_daily[chat_id] = time.time()   # lưu để attach ảnh
-            ref_line = f" | REF:{ref}" if ref else ""
-            await update.message.reply_text(
-                f"✅ Đã lưu{ref_line} — {html.escape(str(name))}\n"
-                f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}"
-            )
+            _last_daily[chat_id] = time.time()
+            logger.info(f"✅ Đã lưu Daily Report REF:{ref} cho {name}")
+            # ✅ Đã tắt nhắn tin phản hồi Telegram theo yêu cầu
         else:
-            await update.message.reply_text(
-                f"❌ Lỗi lưu\n{result.get('message', '')[:120]}"
-            )
+            logger.warning(f"❌ Lỗi lưu Daily Report: {result.get('message', '')[:120]}")
     except Exception as ex:
         logger.error(f"submit_daily_report: {ex}")
-        await update.message.reply_text(f"❌ Lỗi kết nối\n{str(ex)[:80]}")
 
     return True
 
