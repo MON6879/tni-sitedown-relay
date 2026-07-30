@@ -734,16 +734,16 @@ function sendAttendanceSlotReport(slotKey) {
 
 
 // ============================================================
-// HỆ THỐNG TRIGGER HẸN GIỜ CHO 4 KHUNG (+25 PHÚT SAU MỖI KHUNG GIỜ)
-// 08:55 | 12:25 | 14:25 | 17:25 Myanmar Time (+10m offset)
+// HỆ THỐNG TRIGGER HẸN GIỜ CHO 4 KHUNG (+15 PHÚT SAU MỖI KHUNG)
+// 08:45 | 12:15 | 14:15 | 17:15 Myanmar Time
 // ============================================================
-function triggerSlotReport0855() { sendAttendanceSlotReport("slot_morning_1");   }
-function triggerSlotReport1225() { sendAttendanceSlotReport("slot_morning_2");   }
-function triggerSlotReport1425() { sendAttendanceSlotReport("slot_afternoon_1"); }
-function triggerSlotReport1725() { sendAttendanceSlotReport("slot_afternoon_2"); }
+function triggerSlotReport0845() { sendAttendanceSlotReport("slot_morning_1");   }
+function triggerSlotReport1215() { sendAttendanceSlotReport("slot_morning_2");   }
+function triggerSlotReport1415() { sendAttendanceSlotReport("slot_afternoon_1"); }
+function triggerSlotReport1715() { sendAttendanceSlotReport("slot_afternoon_2"); }
 
 function setupAttendanceReportTriggers() {
-  const handlerNames = ["triggerSlotReport0855", "triggerSlotReport1225", "triggerSlotReport1425", "triggerSlotReport1725", "triggerSlotReport0845", "triggerSlotReport1215", "triggerSlotReport1415", "triggerSlotReport1715"];
+  const handlerNames = ["triggerSlotReport0845", "triggerSlotReport1215", "triggerSlotReport1415", "triggerSlotReport1715"];
   try {
     const triggers = ScriptApp.getProjectTriggers();
     for (let i = 0; i < triggers.length; i++) {
@@ -756,11 +756,11 @@ function setupAttendanceReportTriggers() {
   }
 
   try {
-    ScriptApp.newTrigger("triggerSlotReport0855").timeBased().atHour(8).nearMinute(55).everyDays(1).inTimezone("Asia/Rangoon").create();
-    ScriptApp.newTrigger("triggerSlotReport1225").timeBased().atHour(12).nearMinute(25).everyDays(1).inTimezone("Asia/Rangoon").create();
-    ScriptApp.newTrigger("triggerSlotReport1425").timeBased().atHour(14).nearMinute(25).everyDays(1).inTimezone("Asia/Rangoon").create();
-    ScriptApp.newTrigger("triggerSlotReport1725").timeBased().atHour(17).nearMinute(25).everyDays(1).inTimezone("Asia/Rangoon").create();
-    Logger.log("✅ Đã cài đặt thành công 4 trigger hẹn giờ báo cáo (+10m: 08:55, 12:25, 14:25, 17:25).");
+    ScriptApp.newTrigger("triggerSlotReport0845").timeBased().atHour(8).nearMinute(45).everyDays(1).inTimezone("Asia/Rangoon").create();
+    ScriptApp.newTrigger("triggerSlotReport1215").timeBased().atHour(12).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
+    ScriptApp.newTrigger("triggerSlotReport1415").timeBased().atHour(14).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
+    ScriptApp.newTrigger("triggerSlotReport1715").timeBased().atHour(17).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
+    Logger.log("✅ Đã cài đặt thành công 4 trigger hẹn giờ báo cáo (08:45, 12:15, 14:15, 17:15).");
   } catch(e) {
     Logger.log("⚠️ Create triggers warning: " + e.message);
   }
