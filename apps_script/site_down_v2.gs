@@ -1,25 +1,29 @@
 // ============================================================
-// TNI Site Down Auto-Notification — v4 CLEAN
+// TNI Site Down Auto-Notification — v5 (STRICT SEPARATION)
 // ============================================================
-// Chỉ làm 2 việc:
-//   Tin 1: Poll Telegram → phát hiện báo cáo site down → ghi Col A → gửi Col C
-//   Tin 2: AW7 timestamp thay đổi → gửi SUMMARY (AW7:AZ15) vào tất cả groups
+// HỆ THỐNG PHÂN LUỒNG ĐỘC LẬP 100% TRONG 1 GOOGLE APPS SCRIPT:
 //
-// Trigger: checkAndSend() mỗi 5 phút (24/7 — không giới hạn giờ)
-// Setup:   Chạy setupSdTrigger() 1 lần từ Apps Script Editor
+// 1. LUỒNG A1 / CỘT C (TIN 1 — Chi tiết Site Down):
+//    - Đọc timestamp từ A1. So sánh riêng với TS_KEY_A1.
+//    - Lấy dữ liệu chi tiết site từ Cột C để gửi Telegram.
+//    - Ghi dữ liệu Cột A (qua doPost) CHỈ kích hoạt Luồng A1/Cột C.
+//
+// 2. LUỒNG AW7 (TIN 2 — Bảng SUMMARY):
+//    - Đọc timestamp riêng từ ô AW7. So sánh riêng với TS_KEY_AW7.
+//    - Lấy dữ liệu bảng từ AW7:AZ15 để gửi Telegram.
+//    - Chạy hoàn toàn độc lập, TUYỆT ĐỐI KHÔNG can thiệp/ghi đè/dùng chung giờ với A1.
 // ============================================================
 
-// ── Bot token (set trong Script Properties: SD_BOT_TOKEN) ──
+// ── Telegram Bot Token ──────────────────────────────────────
 const SD_BOT_TOKEN = PropertiesService.getScriptProperties().getProperty("SD_BOT_TOKEN") || "";
 
-// ── Group Chat IDs ──────────────────────────────────────────
-// T1-T4 đã migrate sang supergroup (Channel) — trong Bot API cần prefix "-100"
+// ── Telegram Group Chat IDs ──────────────────────────────────
 const SD_GROUPS = {
   T1:      "-1004215695747",  // TNI TEAM 1 (Dawei)
   T2:      "-1004480845549",  // TNI TEAM 2 (Myeik + Team5)
   T3:      "-1004369170658",  // TNI TEAM 3 (Bokpyin)
   T4:      "-1004293741999",  // TNI TEAM 4 (Kawthoung)
-  CONTROL: "-5251698940",     // TNI TECHNICA DEP CONTROL SITE (Chat thường)
+  CONTROL: "-5251698940",     // TNI TECHNICA DEP CONTROL SITE
 };
 
 // ── Cá nhân nhận Tin 2 (DM) ────────────────────────────────
@@ -27,19 +31,18 @@ const SD_PERSONAL_IDS = [
   "6859790680",   // Ha Duc Phong
 ];
 
-// ── Sheet ───────────────────────────────────────────────────
+// ── Google Sheet Metadata ───────────────────────────────────
 const SD_SHEET_ID  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
 const SD_SHEET_GID = "0";
 
-// ── PropertiesService keys ──────────────────────────────────
-const TS_KEY_A1      = "SD_LAST_TS_A1";    // dedup Tin 1
-const TS_KEY_AW7     = "SD_LAST_TS_AW7";   // dedup Tin 2
-const LAST_UPDATE_KEY = "SD_LAST_UPDATE_ID"; // offset Telegram polling
+// ── DEDUP KEYS RIÊNG BIỆT 100% (KHÔNG BAO GIỜ TRÙNG NHAU) ────
+const TS_KEY_A1       = "SD_KEY_A1_INDEPENDENT_V5";  // Chìa khóa dedup riêng của A1/Col C
+const TS_KEY_AW7      = "SD_KEY_AW7_INDEPENDENT_V5"; // Chìa khóa dedup riêng của AW7
+const LAST_UPDATE_KEY = "SD_LAST_UPDATE_ID";          // Offset Telegram polling
 
-// ── AW:AZ column mapping (0-based, AW=T1, AX=T2, AY=T3, AZ=T4) ──
+// ── AW:AZ Column & Label Mappings ───────────────────────────
 const AWAZ_COL = { T1: 0, T2: 1, T3: 2, T4: 3 };
 
-// ── AW:AZ row labels (rows 7–11 = 5 metrics) ────────────────
 const AWAZ_LABELS = [
   { emoji: "⚡", name: "Site down"   },
   { emoji: "🔴", name: "Cell down"   },
@@ -48,77 +51,65 @@ const AWAZ_LABELS = [
   { emoji: "🔗", name: "Link down"   },
 ];
 
-// ── Team colors ─────────────────────────────────────────────
 const TEAM_COLORS = { T1: "🔵", T2: "🟡", T3: "🟢", T4: "🔴" };
 
 
-
 // ============================================================
-// WEB APP — doPost() nhận data từ botlookup_relay.py
-// Deploy: Extensions → Deploy → New deployment → Web App
-//   Execute as: Me | Who has access: Anyone
-// Actions:
-//   store_site_down  → ghi text vào Col A (từng dòng = 1 ô)
-//   get_note_b2b5    → đọc B2:B5 (Note gửi bằng @Phongha79)
-//   save_note_msgids → lưu message IDs của Note vào Properties
-//   get_note_msgids  → đọc message IDs đã lưu
+// WEB APP — doPost() (Xử lý dán Cột A — CHỈ GỌI LUỒNG COL C)
 // ============================================================
-function doPostSiteDown_(e) {
+function doPost(e) {
   try {
-    const data   = JSON.parse(e.postData.contents);
+    const data = JSON.parse(e.postData.contents);
+
+    if (data.update_id !== undefined && !data.action) {
+      return handleTelegramWebhook_(data);
+    }
+
     const action = data.action || "";
 
     if (action === "store_site_down") {
-      // Ghi text từ botlookup_relay vào Col A (mỗi dòng = 1 ô)
       const text  = (data.text || "").trim();
       const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
       const sheet = getSheetByGid(ss, SD_SHEET_GID);
       if (!sheet) return _json({ ok: false, msg: "Sheet not found" });
 
-      // ── Kiểm tra nội dung có thay đổi so với lần trước không ──
-      // Nếu cùng bot data (relay chạy 2 lần cùng dữ liệu), không reset dedup
-      const props    = PropertiesService.getScriptProperties();
-      const newHash  = text.substring(0, 200);  // fingerprint: 200 ký tự đầu
-      const lastHash = props.getProperty("SD_LAST_TEXT_HASH") || "";
-      const sameData = (newHash === lastHash);
+      const props   = PropertiesService.getScriptProperties();
+      const relayTs = data.relay_ts || 0;
 
-      // Xóa Col A cũ
+      // Clear & ghi dữ liệu mới vào Cột A
       const lastRow = Math.max(sheet.getLastRow(), 1);
       sheet.getRange(1, 1, lastRow, 1).clearContent();
 
-      // Ghi từng dòng vào Col A (A1, A2, A3, ...)
       const lines = text.split("\n");
       if (lines.length > 0) {
         const values = lines.map(l => [l]);
         sheet.getRange(1, 1, values.length, 1).setValues(values);
       }
-      Logger.log("[doPost] store_site_down — " + lines.length + " dòng ghi vào Col A" + (sameData ? " (DATA GIỐNG CŨ — giữ dedup key)" : " (data mới)"));
-      props.setProperty("SD_LAST_TEXT_HASH", newHash);
+      Logger.log("[doPost] store_site_down — " + lines.length + " dòng ghi vào Col A | relay_ts=" + relayTs);
 
-      // Chỉ reset dedup key Tin 1 khi data MỚI — tránh gửi 2 lần khi relay chạy 2 lần
-      if (!sameData) {
-        props.deleteProperty(TS_KEY_A1);
-      }
+      // ✅ TÁCH BIỆT LUỒNG: Xóa chìa khóa A1 để Luồng A1/Col C BẮN TIN 1 NGAY LẬP TỨC
+      props.deleteProperty(TS_KEY_A1);
+
+      if (relayTs > 0) props.setProperty("SD_LAST_RELAY_TS", relayTs.toString());
 
       SpreadsheetApp.flush();
-      Utilities.sleep(10000); // Chờ công thức Cột C và AW7:AZ15 cập nhật hoàn toàn
+      Utilities.sleep(1500);
+      SpreadsheetApp.flush();
 
-      var checkResult = { sent_tin1: false, sent_tin2: false };
+      // ✅ CHỈ CHẠY LUỒNG A1 / COL C (Không đụng chạm gì tới Luồng AW7)
+      var sentColC = false;
       try {
-        var r = checkAndSend(true);
-        if (r && typeof r === "object") {
-          checkResult = r;
-        }
-        Logger.log("[doPost] checkAndSend() xong. Result: " + JSON.stringify(checkResult));
-      } catch(callErr) {
-        Logger.log("[doPost] ⚠️ checkAndSend() lỗi: " + callErr.message);
+        sentColC = processSiteDownColC(sheet);
+        Logger.log("[doPost] Luồng A1/Col C chạy xong. Kết quả: " + sentColC);
+      } catch(errColC) {
+        Logger.log("[doPost] ❌ Lỗi Luồng A1/Col C: " + errColC.message);
       }
 
       return _json({ 
         ok: true, 
         lines: lines.length,
-        sent_tin1: !!checkResult.sent_tin1,
-        sent_tin2: !!checkResult.sent_tin2
+        relay_ts: relayTs,
+        sent_tin1: sentColC
       });
     }
 
@@ -150,7 +141,7 @@ function doPostSiteDown_(e) {
   }
 }
 
-function doGetSiteDown_(e) {
+function doGet(e) {
   try {
     const action = (e.parameter && e.parameter.action) || "";
 
@@ -182,10 +173,8 @@ function _json(obj) {
 }
 
 
-
 // ============================================================
-// ENTRY POINT — trigger 1 phút, chỉ chạy đúng phút :01 và :31
-// Lịch: 03:01 → 03:31 → 04:01 → 04:31 → ... → 21:01 → 21:31
+// MAIN TRIGGER — checkAndSend() (CHẠY 2 LUỒNG ĐỘC LẬP TÁCH BIỆT)
 // ============================================================
 function checkAndSend(isWebhookCall) {
   const now    = new Date();
@@ -193,406 +182,294 @@ function checkAndSend(isWebhookCall) {
   const hour   = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "H"), 10);
   const minute = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "m"), 10);
 
-  // ── Kiểm tra thời gian ──
   const props = PropertiesService.getScriptProperties();
+
+  // ── 1. Reset đệm độc lập vào 03:30 AM đầu ngày ─────────────────────────
+  const todayStr = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMdd");
+  const lastDay  = props.getProperty("SD_LAST_RUN_DATE") || "";
+  if (todayStr !== lastDay) {
+    props.setProperty("SD_LAST_RUN_DATE", todayStr);
+    props.deleteProperty(TS_KEY_A1);
+    props.deleteProperty(TS_KEY_AW7);
+    Logger.log("🌅 NGÀY MỚI (" + todayStr + ") — Đã reset chìa khóa A1 & AW7!");
+  }
+
+  // ── 2. Kiểm tra khung giờ hoạt động (03:30 - 22:30 Myanmar) ────────────
   if (isWebhookCall !== true) {
     if (hour < 3 || hour > 22) return { sent_tin1: false, sent_tin2: false };
-    if (hour === 3 && minute < 38) return { sent_tin1: false, sent_tin2: false };
-    if (hour === 22 && minute > 15) return { sent_tin1: false, sent_tin2: false };
+    if (hour === 3 && minute < 30) return { sent_tin1: false, sent_tin2: false };
+    if (hour === 22 && minute > 30) return { sent_tin1: false, sent_tin2: false };
 
-    // ── Chống chạy 2 lần trong cùng phút (chỉ áp dụng cho time trigger) ──
-    const doneKey = "SD_DONE_" + Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHHmm");
-    if (props.getProperty(doneKey)) {
-      Logger.log("⏭️ " + mytime + " Myanmar — đã chạy rồi, bỏ qua.");
+    const thisMinute = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHHmm");
+    const lastDoneMinute = props.getProperty("SD_LAST_DONE_MINUTE") || "";
+    if (thisMinute === lastDoneMinute) {
       return { sent_tin1: false, sent_tin2: false };
     }
-    props.setProperty(doneKey, "1");
-  }
+    props.setProperty("SD_LAST_DONE_MINUTE", thisMinute);
 
-  Logger.log("✅ checkAndSend — " + mytime + " Myanmar" + (isWebhookCall === true ? " (Webhook)" : ""));
+    // Kích hoạt cào GitHub ở mốc 5 phút
+    if (minute % 5 === 0) {
+      const cycleSlot = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHH") + (minute < 30 ? "_00" : "_30");
+      const lastSlot  = props.getProperty("SD_DISPATCH_SLOT") || "";
 
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) {
-    Logger.log("⏭️ Lock bận — bỏ qua");
-    return { sent_tin1: false, sent_tin2: false };
-  }
-  try {
-    const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
-    const sheet = getSheetByGid(ss, SD_SHEET_GID);
-    if (!sheet) { Logger.log("❌ Không tìm thấy sheet GID=" + SD_SHEET_GID); return { sent_tin1: false, sent_tin2: false }; }
+      let count = parseInt(props.getProperty("SD_DISPATCH_COUNT") || "0", 10);
+      if (cycleSlot !== lastSlot) {
+        count = 0;
+        props.setProperty("SD_DISPATCH_SLOT", cycleSlot);
+        props.setProperty("SD_DISPATCH_COUNT", "0");
+      }
 
-    // Bước 1: Relay được GitHub Actions cron tự kích hoạt mỗi giờ lúc :08 Myanmar
-    //   (không cần GAS dispatch nữa — tránh gửi 2 lần)
-    // triggerBotlookupRelay();  // ← ĐÃ TẮT: GitHub Actions cron thay thế
+      const lastSentSlot   = props.getProperty("SD_LAST_SENT_SLOT") || "";
+      const lastDispatchTs = parseInt(props.getProperty("SD_LAST_DISPATCH_TS") || "0", 10);
+      const minSinceDisp   = (Date.now() - lastDispatchTs) / 60000;
 
-    // Bước 2: Kiểm tra và gửi (data được botlookup_relay ghi từ lần trước)
-    const sentTin1 = checkColC(sheet);   // Tin 1: A1 thay đổi → gửi Col C vào T1/T2/T3/T4 + CONTROL
-    const sentTin2 = checkAwAz(sheet);   // Tin 2: AW7 thay đổi → gửi SUMMARY vào T1/T2/T3/T4 + CONTROL
-
-    return { sent_tin1: sentTin1, sent_tin2: sentTin2 };
-  } catch(e) {
-    Logger.log("❌ checkAndSend error: " + e.message);
-    return { sent_tin1: false, sent_tin2: false };
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-
-// ============================================================
-// DISPATCH botlookup_relay → GitHub Actions
-// botlookup_relay.py sẽ:
-//   1. Gửi /down_tni@auto_nocpro_bot vào BOT LOOKUP group
-//   2. Đọc kết quả từ Auto Report NocPro bot
-//   3. Ghi dữ liệu vào Col A của sheet
-//   4. Gửi Note B2:B5 bằng tài khoản @Phongha79
-// Kết quả sẽ có sau ~2–3 phút → trigger tiếp theo sẽ gửi Tin 1
-// ============================================================
-function triggerBotlookupRelay() {
-  const props = PropertiesService.getScriptProperties();
-  const pat   = props.getProperty("GITHUB_PAT") || "";
-  const owner = "phonghdpxd-cmd";
-  const repo  = "TNI-SITE-DOWN";
-  if (!pat) { Logger.log("[Relay] ⚠️ GITHUB_PAT chưa set — bỏ qua dispatch"); return; }
-
-  // ── Chống dispatch 2 lần trong vòng 35 phút (> 30p trigger interval) ──
-  const nowMs       = new Date().getTime();
-  const lastMs      = parseInt(props.getProperty("SD_RELAY_LAST_DISPATCH_TS") || "0", 10);
-  const elapsedMin  = (nowMs - lastMs) / 60000;
-  if (lastMs > 0 && elapsedMin < 35) {
-    Logger.log("[Relay] ⏭️ Đã dispatch " + elapsedMin.toFixed(1) + " phút trước — chờ đủ 35 phút.");
-    return;
-  }
-  props.setProperty("SD_RELAY_LAST_DISPATCH_TS", nowMs.toString());
-
-  try {
-    const url  = "https://api.github.com/repos/" + owner + "/" + repo + "/actions/workflows/botlookup_relay.yml/dispatches";
-    const resp = UrlFetchApp.fetch(url, {
-      method:  "post",
-      headers: {
-        "Authorization": "token " + pat,
-        "Accept":        "application/vnd.github.v3+json",
-      },
-      contentType:        "application/json",
-      payload:            JSON.stringify({ ref: "main", inputs: { skip_delay: "1" } }),
-      muteHttpExceptions: true,
-    });
-    const code = resp.getResponseCode();
-    if (code === 204) {
-      Logger.log("[Relay] ✅ Dispatched botlookup_relay → GitHub Actions");
-    } else {
-      Logger.log("[Relay] ⚠️ HTTP " + code + ": " + resp.getContentText().substring(0, 200));
+      if (lastSentSlot !== cycleSlot && count < 3 && (lastDispatchTs === 0 || minSinceDisp >= 3)) {
+        Logger.log("⏰ " + mytime + " Myanmar → Ép GitHub dispatch relay");
+        triggerBotlookupRelay();
+        props.setProperty("SD_DISPATCH_COUNT", (count + 1).toString());
+      }
     }
-  } catch(e) {
-    Logger.log("[Relay] ❌ " + e.message);
   }
-}
 
+  // ── 3. Mở Google Sheet và THỰC THI 2 LUỒNG TRONG 2 KHỐI TRY/CATCH TÁCH BIỆT ──
+  const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
+  const sheet = getSheetByGid(ss, SD_SHEET_GID);
+  if (!sheet) return { sent_tin1: false, sent_tin2: false };
 
-// ============================================================
-// BƯỚC 1: POLL TELEGRAM — lấy tin mới từ CONTROL group
-// ============================================================
-function fetchTelegramUpdates(sheet) {
-  if (!SD_BOT_TOKEN) { Logger.log("[Poll] ❌ SD_BOT_TOKEN chưa set"); return false; }
+  var r1 = false;
+  var r2 = false;
 
-  const props       = PropertiesService.getScriptProperties();
-  const lastId      = parseInt(props.getProperty(LAST_UPDATE_KEY) || "0");
-  const offsetToUse = lastId === 0 ? 0 : lastId + 1;
-  const url         = "https://api.telegram.org/bot" + SD_BOT_TOKEN
-                    + "/getUpdates?offset=" + offsetToUse
-                    + "&limit=100&allowed_updates=message,channel_post";
-
-  let data;
+  // 🔹 LUỒNG 1: DÀNH RIÊNG CHO A1 / CỘT C (TIN 1)
   try {
-    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-    data = JSON.parse(resp.getContentText());
-  } catch(e) {
-    Logger.log("[Poll] ❌ getUpdates lỗi: " + e.message);
-    return false;
+    r1 = processSiteDownColC(sheet);
+  } catch(e1) {
+    Logger.log("❌ Lỗi Luồng 1 (A1/Col C): " + e1.message);
   }
 
-  if (!data.ok) {
-    Logger.log("[Poll] ❌ Telegram: " + data.description);
-    return false;
+  // 🔹 LUỒNG 2: DÀNH RIÊNG CHO AW7 (TIN 2 SUMMARY)
+  try {
+    r2 = processSummaryAwAz(sheet);
+  } catch(e2) {
+    Logger.log("❌ Lỗi Luồng 2 (AW7 Summary): " + e2.message);
   }
 
-  const updates = data.result || [];
-  if (updates.length === 0) { Logger.log("[Poll] Không có tin mới"); return false; }
-
-  let maxId         = lastId;
-  let latestReport  = null;
-
-  for (const upd of updates) {
-    if (upd.update_id > maxId) maxId = upd.update_id;
-    const msg = upd.message || upd.channel_post;
-    if (!msg) continue;
-    const chatId = msg.chat.id.toString();
-    if (chatId !== SD_GROUPS.CONTROL) continue;
-    const text = (msg.text || msg.caption || "").trim();
-    if (!isSiteDownReport(text)) continue;
-    latestReport = text;
-    Logger.log("[Poll] ✅ Phát hiện báo cáo: " + text.substring(0, 60));
-  }
-
-  props.setProperty(LAST_UPDATE_KEY, maxId.toString());
-  Logger.log("[Poll] Xử lý " + updates.length + " updates, maxId=" + maxId);
-
-  if (latestReport) {
-    writeToColumnA(sheet, latestReport);
-    // Xóa dedup key → ép Tin 1 gửi ngay dù A1 key có thể giống cũ
-    props.deleteProperty(TS_KEY_A1);
-    SpreadsheetApp.flush();
-    Utilities.sleep(3000);  // chờ công thức Col C cập nhật
-    return true;
-  }
-  return false;
-}
-
-
-// ── Kiểm tra có phải báo cáo site down không ────────────────
-function isSiteDownReport(text) {
-  if (!text) return false;
-  if (text.startsWith("📋")) return false;  // bỏ qua báo cáo bot
-  return /site down/i.test(text)
-      && (/tanintharyi/i.test(text) || /\bTNI\b/.test(text) || /TNI\d{4}/.test(text))
-      && /\d{2}\/\d{2}\/\d{4}/i.test(text);
-}
-
-
-// ── Ghi nội dung báo cáo vào Col A (xóa cũ, ghi mới) ───────
-function writeToColumnA(sheet, text) {
-  const lines     = text.split("\n");
-  const lastRow   = sheet.getLastRow();
-  if (lastRow > 0) sheet.getRange(1, 1, lastRow, 1).clearContent();
-  const writeData = lines.map(l => [l]);
-  if (writeData.length > 0) sheet.getRange(1, 1, writeData.length, 1).setValues(writeData);
-  Logger.log("📝 Đã ghi " + writeData.length + " dòng vào Col A");
+  return { sent_tin1: r1, sent_tin2: r2 };
 }
 
 
 // ============================================================
-// TIN 1 — Col C: danh sách site chi tiết
-// Gửi khi A1 thay đổi
+// LUỒNG 1 — XỬ LÝ A1 / CỘT C (TIN 1 — Chi tiết Site Down)
+// Độc lập 100% — Chỉ đọc mốc giờ A1 & ghi chìa khóa TS_KEY_A1
 // ============================================================
-function checkColC(sheet) {
-  const raw = sheet.getRange("A1").getValue().toString().trim();
-  if (!raw) { Logger.log("[Tin1] A1 rỗng — bỏ qua"); return false; }
-
-  const ts1     = parseA1Timestamp(sheet);
-  const storeKey = ts1 ? (ts1 + "|" + raw.substring(0, 60)) : raw.substring(0, 200);
-
-  const cache = CacheService.getScriptCache();
-  const cacheKey1 = "SD_CACHE_KEY_A1_" + storeKey.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 100);
-  if (cache.get(cacheKey1)) {
-    Logger.log("[Tin1] A1 trùng cache (" + storeKey.substring(0, 40) + ") — bỏ qua");
+function processSiteDownColC(sheet) {
+  const storeKey = parseA1Timestamp(sheet);
+  if (!storeKey) {
+    Logger.log("[Luồng A1] Không tìm thấy timestamp hợp lệ trong A1");
     return false;
   }
 
   const props   = PropertiesService.getScriptProperties();
   const lastKey = props.getProperty(TS_KEY_A1) || "";
+
   if (storeKey === lastKey) {
-    Logger.log("[Tin1] A1 không đổi (" + storeKey.substring(0, 40) + ") — bỏ qua");
+    Logger.log("[Luồng A1] Timestamp A1 không đổi (" + storeKey.substring(0, 30) + ") → Bỏ qua Luồng 1");
     return false;
   }
-  
-  cache.put(cacheKey1, "1", 300);
-  Logger.log("[Tin1] 🆕 A1 thay đổi → gửi Col C...");
 
-  const colCRaw = readColCRaw(sheet);
-  if (!colCRaw) { Logger.log("[Tin1] Col C trống — bỏ qua"); return false; }
+  // ✅ ĐỘC LẬP: Lưu ngay khóa A1
+  props.setProperty(TS_KEY_A1, storeKey);
+  Logger.log("[Luồng A1] 🆕 Timestamp A1 thay đổi: " + storeKey + " → Đang gửi Tin 1...");
 
-  const lines = colCRaw.split("\n");
-  const teams = ["T1", "T2", "T3", "T4"];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 1) return false;
 
-  // ── Tách header chung (không phải site line, không phải team summary) ──
-  const globalHeaderLines = lines.filter(l => {
-    if (!l.trim()) return false;
-    if (/^\d+:/.test(l)) return false;          // site lines
-    if (/^Team\s*\d+\s*:/i.test(l)) return false; // team summaries
-    if (/^\s*\.\.\.\s*$/.test(l)) return false;  // separator
-    return true;
-  });
+  const colC = sheet.getRange(1, 3, lastRow, 1).getValues().flat().map(v => (v || "").toString().trim());
 
-  // ── Tách site lines và team summary lines theo từng team ──
-  const teamData = {};
-  for (const team of teams) {
-    const teamNum    = team.replace("T", "");
-    const sitePat    = new RegExp("\\|\\s*T" + teamNum + "(?:\\s+S\\w*)?\\s*\\|", "i");
-    const summaryPat = new RegExp("Team\\s*" + teamNum + "\\s*:", "i");
-    teamData[team] = {
-      summary:    lines.filter(l => summaryPat.test(l)),
-      sites:      lines.filter(l => sitePat.test(l)),
-    };
+  function isTeamSummaryLine(l) {
+    return /Team\s+[1-4]\s*:\s*Total\s+Site\s+down/i.test(l);
   }
 
-  // ① CONTROL: header chung + từng team (summary + sites) — đầy đủ tất cả teams
+  // Gửi nhóm CONTROL
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
-  // ① CONTROL: Chỉ lấy C1..C3 (Header + Total + Duty) và C10:C (Chi tiết Site) — KHÔNG lấy từng Team Total (C4..C7)
-  const controlId = SD_GROUPS["CONTROL"];
-  if (controlId) {
-    try {
-      const colC = colCRaw.split("\n");
-      const headerLines = [];
-      for (let i = 0; i < Math.min(9, colC.length); i++) {
-        const line = colC[i] || "";
-        if (!line || /^Team\s*\d+:/i.test(line)) break;
-        headerLines.push(line);
+      const header = [colC[0]||"", colC[1]||"", colC[2]||""].filter(l => l.length > 0);
+      const sites  = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !isTeamSummaryLine(l));
+      const msg    = [...header, ...sites].join("\n");
+      if (msg) {
+        sendOrEditTelegramPre(controlId, addKeywordIcons(colorizeTeams(msg)), "TIN1_CONTROL", "[Tin1][CONTROL]");
       }
-      const siteLines = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !/^Team\s*\d+:/i.test(l));
-      const fullControlText = [...headerLines, ...siteLines].join("\n");
-
-      if (fullControlText) {
-        sendOrEditTelegramPre(controlId, addKeywordIcons(colorizeTeams(fullControlText)), "TIN1_CONTROL", "[Tin1][CONTROL]");
-      }
-    } catch (controlErr) {
-      Logger.log("[Tin1][CONTROL] ❌ Lỗi gửi: " + controlErr.message);
+    } catch (e) {
+      Logger.log("[Luồng A1][CONTROL] ❌ " + e.message);
     }
   }
 
-  // ② Mỗi Team: header chung + summary team đó + site của team đó
+  // Phân loại site theo 4 Teams (T1, T2, T3, T4)
+  const teamCells = { T1: colC[3]||"", T2: colC[4]||"", T3: colC[5]||"", T4: colC[6]||"" };
+  const teams = ["T1", "T2", "T3", "T4"];
+  const allC10 = colC.slice(9).filter(l => l.length > 0 && l !== "...");
+
+  for (const team of teams) {
+    if (!teamCells[team]) {
+      const n = team[1];
+      const found = allC10.find(l => new RegExp("Team\\s+" + n + "\\s*:\\s*Total\\s+Site\\s+down", "i").test(l));
+      if (found) teamCells[team] = found;
+    }
+  }
+
+  const siteOnly  = allC10.filter(l => !isTeamSummaryLine(l));
+  const teamSites = { T1: [], T2: [], T3: [], T4: [] };
+
+  for (const line of siteOnly) {
+    const fields = line.split("|");
+    if (fields.length < 2) continue;
+    const teamField = fields[1].trim().toUpperCase();
+    for (const team of teams) {
+      const tn  = team.slice(1);
+      const idx = teamField.indexOf("T" + tn);
+      if (idx < 0) continue;
+      const afterChar = teamField[idx + 1 + tn.length];
+      if (!afterChar || !/\d/.test(afterChar)) {
+        teamSites[team].push(line);
+        break;
+      }
+    }
+  }
+
+  // Gửi sang 4 nhóm Team
   for (const team of teams) {
     try {
       const chatId = SD_GROUPS[team];
-      if (!chatId) continue;
-      if (chatId === controlId) {
-        Logger.log("[Tin1][" + team + "] ⚠️ Chat ID trùng với CONTROL (" + chatId + ") ➔ Bỏ qua không xả tin Team vào CONTROL.");
-        continue;
+      if (!chatId || String(chatId).trim() === String(controlId).trim()) continue;
+      const summary = teamCells[team];
+      const sites   = teamSites[team];
+      if (sites.length > 0) {
+        const parts = summary ? [summary, ...sites] : [...sites];
+        sendOrEditTelegramPre(chatId, addKeywordIcons(colorizeTeams(parts.join("\n"))), "TIN1_" + team, "[Tin1][" + team + "]");
+      } else if (summary) {
+        sendOrEditTelegramPre(chatId, addKeywordIcons(colorizeTeams(summary)), "TIN1_" + team, "[Tin1][" + team + "]");
       }
-      const { summary, sites } = teamData[team];
-      const content = sites.length > 0
-        ? [...globalHeaderLines, "...", ...summary, "...", ...sites].join("\n")
-        : [...globalHeaderLines, "...", ...summary, "No site down"].join("\n");
-      sendOrEditTelegramPre(chatId, colorizeTeams(content), "TIN1_" + team, "[Tin1][" + team + "]");
-    } catch (teamErr) {
-      Logger.log("[Tin1][" + team + "] ❌ Lỗi gửi: " + teamErr.message);
+    } catch (e) {
+      Logger.log("[Luồng A1][" + team + "] ❌ " + e.message);
     }
   }
 
-  props.setProperty(TS_KEY_A1, storeKey);
-  Logger.log("[Tin1] ✅ Xong — key: " + storeKey.substring(0, 60));
+  const now = new Date();
+  const sentSlot = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHH") + (now.getMinutes() < 30 ? "_00" : "_30");
+  props.setProperty("SD_LAST_SENT_SLOT", sentSlot);
+  Logger.log("[Luồng A1] ✅ Hoàn tất gửi Tin 1!");
   return true;
 }
 
 
-// ── Đọc toàn bộ nội dung Col C (raw text) ───────────────────
-function readColCRaw(sheet) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 1) return "";
-  const data = sheet.getRange(1, 3, lastRow, 1).getValues().flat();
-  return data
-    .map(c => (c || "").toString().trim())
-    .filter(l => l.length > 0)
-    .join("\n");
-}
-
-
-// ── Tô màu team codes ────────────────────────────────────────
-function colorizeTeams(text) {
-  return (text || "").replace(/\|\s*(T[1-4])(\s+S\w*)?\s*\|/gi, (match, team, sub) => {
-    const emoji = TEAM_COLORS[team.toUpperCase()] || "";
-    return "| " + emoji + team + (sub || "") + " |";
-  });
-}
-
-
 // ============================================================
-// TIN 2 — SUMMARY (AW7:AZ15)
-// Gửi khi AW7 timestamp (ngày/giờ) thay đổi
+// LUỒNG 2 — XỬ LÝ AW7 (TIN 2 — Bảng SUMMARY)
+// Độc lập 100% — Chỉ đọc mốc giờ ô AW7 & ghi chìa khóa TS_KEY_AW7
 // ============================================================
-function checkAwAz(sheet) {
+function processSummaryAwAz(sheet) {
   const rawTs = sheet.getRange("AW7").getValue().toString().trim();
-  if (!rawTs) { Logger.log("[Tin2] AW7 rỗng — bỏ qua"); return false; }
+  if (!rawTs) {
+    Logger.log("[Luồng AW7] Ô AW7 rỗng — Bỏ qua Luồng 2");
+    return false;
+  }
 
-  // Lấy riêng mốc Ngày/Giờ (ví dụ: "22/07/2026 15:16") để làm key so sánh ổn định,
-  // tránh việc công thức Sheet tự tính toán lẻ phút làm thay đổi chuỗi liên tục.
-  const tsKey = formatTsHeader(rawTs);
+  // ✅ ĐỘC LẬP 100%: Chỉ đọc mốc giờ riêng của ô AW7
+  const tsKey = parseAW7Timestamp(sheet) || formatTsHeader(rawTs);
 
   const props  = PropertiesService.getScriptProperties();
   const lastTs = props.getProperty(TS_KEY_AW7) || "";
-  Logger.log("[Tin2] 🆕 " + ts + " → gửi summary...");
+
+  if (tsKey === lastTs) {
+    Logger.log("[Luồng AW7] Timestamp AW7 không đổi (" + tsKey + ") → Bỏ qua Luồng 2");
+    return false;
+  }
+
+  // ✅ ĐỘC LẬP: Lưu ngay khóa AW7
+  props.setProperty(TS_KEY_AW7, tsKey);
+  Logger.log("[Luồng AW7] 🆕 Timestamp AW7 thay đổi: " + tsKey + " → Đang gửi Tin 2 (SUMMARY)...");
 
   const awaz  = readAwAz(sheet);
   const teams = ["T1", "T2", "T3", "T4"];
 
-  // Gửi từng team
+  // Gửi sang 4 nhóm Team
   for (const team of teams) {
     try {
       const chatId = SD_GROUPS[team];
       if (!chatId) continue;
       const colIdx = AWAZ_COL[team];
       if (colIdx === undefined) continue;
-      const msg = buildAwAzTeamMessage(team, ts, awaz, colIdx);
+      const msg = buildAwAzTeamMessage(team, tsKey, awaz, colIdx);
       sendOrEditTelegram(chatId, msg, "TIN2_" + team, "[Tin2][" + team + "]");
-    } catch (teamErr) {
-      Logger.log("[Tin2][" + team + "] ❌ Lỗi gửi: " + teamErr.message);
+    } catch (err) {
+      Logger.log("[Luồng AW7][" + team + "] ❌ " + err.message);
     }
   }
 
-  // Gửi CONTROL
+  // Gửi nhóm CONTROL
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
-      const msg = buildAwAzControlMessage(ts, awaz);
+      const msg = buildAwAzControlMessage(tsKey, awaz);
       sendOrEditTelegram(controlId, msg, "TIN2_CONTROL", "[Tin2][CONTROL]");
     } catch(e) {
-      Logger.log("[Tin2][CONTROL] ❌ " + e.message);
+      Logger.log("[Luồng AW7][CONTROL] ❌ " + e.message);
     }
   }
 
   // Gửi DM cá nhân
   for (const pid of SD_PERSONAL_IDS) {
     try {
-      sendOrEditTelegram(pid, buildAwAzControlMessage(ts, awaz), "TIN2_P_" + pid, "[Tin2][DM]");
-    } catch(e) {
-      Logger.log("[Tin2][DM] ❌ " + e.message);
-    }
-    Utilities.sleep(300);
+      sendOrEditTelegram(pid, buildAwAzControlMessage(tsKey, awaz), "TIN2_P_" + pid, "[Tin2][DM]");
+    } catch(e) {}
+    Utilities.sleep(200);
   }
 
-  props.setProperty(TS_KEY_AW7, ts);
-  Logger.log("[Tin2] ✅ Xong — ts: " + ts);
+  Logger.log("[Luồng AW7] ✅ Hoàn tất gửi Tin 2 SUMMARY!");
   return true;
 }
 
 
-// ── Đọc AW7:AZ15 (9 rows × 4 cols) ─────────────────────────
-function readAwAz(sheet) {
-  return sheet.getRange(7, 49, 9, 4).getValues();  // AW=col49
+// ============================================================
+// HELPER PARSERS & UTILITIES
+// ============================================================
+function parseA1Timestamp(sheet) {
+  const maxRow = Math.min(sheet.getLastRow(), 50);
+  if (maxRow < 1) return null;
+  const vals = sheet.getRange(1, 1, maxRow, 1).getValues().flat();
+
+  for (const cellVal of vals) {
+    const raw = (cellVal || "").toString();
+    const m1 = raw.match(/(\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2}:\d{2})/);
+    if (m1) return m1[1].replace(/[\-T]/g, " ").trim();
+    const m2 = raw.match(/(\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2})/);
+    if (m2) return m2[1].replace(/[\-T]/g, " ").trim();
+  }
+
+  const textHead = vals.map(v => v.toString().trim()).filter(v => v.length > 0).slice(0, 5).join(" ");
+  if (textHead) {
+    const nowStr = Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy HH:mm");
+    return "RAW_" + nowStr + "_" + textHead.substring(0, 40).replace(/[^a-zA-Z0-9]/g, "");
+  }
+  return null;
 }
 
-
-// ── Parse timestamp từ AW7 (flexible regex) ─────────────────
 function parseAW7Timestamp(sheet) {
   const raw = sheet.getRange("AW7").getValue().toString();
-  // Ưu tiên: "Site down: DD/MM/YYYY HH:MM"
   const m1 = raw.match(/Site\s*down[^:]*:\s*(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/i);
   if (m1) return m1[1].trim();
-  // Fallback: bất kỳ DD/MM/YYYY HH:MM trong cell
   const m2 = raw.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
   if (m2) return m2[1].trim();
   return null;
 }
 
-
-// ── Parse timestamp từ A1 (để làm dedup key) ────────────────
-function parseA1Timestamp(sheet) {
-  const raw = sheet.getRange("A1").getValue().toString();
-  // Ưu tiên HH:MM:SS
-  const m1 = raw.match(/(\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2}:\d{2})/);
-  if (m1) return m1[1].replace(/[\-T]/g, " ").trim();
-  // Fallback HH:MM
-  const m2 = raw.match(/(\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2})/);
-  return m2 ? m2[1].replace(/[\-T]/g, " ").trim() : null;
+function readAwAz(sheet) {
+  return sheet.getRange(7, 49, 9, 4).getValues();
 }
 
-
-// ── Build Tin 2 cho từng Team ────────────────────────────────
 function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
-  const label    = "Team " + teamKey.replace("T", "");
-  const numRows  = awaz.length;
-  const lines    = [];
+  const label   = "Team " + teamKey.replace("T", "");
+  const numRows = awaz.length;
+  const lines   = [];
   lines.push("📊 <b>SUMMARY — " + label + "</b>");
   lines.push("📅 " + escHtml(ts));
   lines.push("━".repeat(26));
@@ -615,8 +492,6 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
   return lines.join("\n");
 }
 
-
-// ── Build Tin 2 tổng hợp cho CONTROL ────────────────────────
 function buildAwAzControlMessage(ts, awaz) {
   const teamDefs = [
     { key: "T1", label: "Team 1 Dawei",     emoji: "🔵", col: 0 },
@@ -655,9 +530,8 @@ function buildAwAzControlMessage(ts, awaz) {
 
 
 // ============================================================
-// HELPER TELEGRAM — IN-PLACE EDITING VIA BOT API
+// TELEGRAM BOT API HELPERS (IN-PLACE EDITING & DELETE)
 // ============================================================
-
 function splitMessage(text, maxLen) {
   if (!text) return [""];
   if (text.length <= maxLen) return [text];
@@ -677,11 +551,8 @@ function splitMessage(text, maxLen) {
 }
 
 function sendOrEditTelegram(chatId, text, msgKey, tag) {
-  // ① Xóa tin nhắn cũ có cùng tiêu đề
   deleteOldMessages_(chatId, msgKey);
-  Utilities.sleep(300);
-
-  // ② Gửi tin nhắn mới và lưu ID
+  Utilities.sleep(200);
   const props  = PropertiesService.getScriptProperties();
   const idKey  = "SD_MSGID_" + msgKey;
   const newIds = sendTelegramCollectIds_(chatId, text, tag);
@@ -689,70 +560,26 @@ function sendOrEditTelegram(chatId, text, msgKey, tag) {
 }
 
 function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
-
-  // ① Thử edit tin cũ (không cần quyền admin)
-  if (oldIds.length > 0) {
-    const edited = editTelegramMsg_(chatId, oldIds[0],
-      "<pre>" + chunks[0] + "</pre>", "HTML", tag);
-    if (edited) {
-      // Edit thành công → xóa các chunk cũ dư
-      for (let i = 1; i < oldIds.length; i++) deleteTelegramMsgBot_(chatId, oldIds[i]);
-      // Gửi chunk mới nếu nội dung dài hơn (hiếm)
-      const newIds = [oldIds[0]];
-      for (let i = 1; i < chunks.length; i++) {
-        Utilities.sleep(300);
-        try {
-          const r = UrlFetchApp.fetch(
-            "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/sendMessage", {
-              method: "post", contentType: "application/json",
-              payload: JSON.stringify({
-                chat_id: chatId,
-                text: "<pre>" + chunks[i] + "</pre>",
-                parse_mode: "HTML"
-              }),
-              muteHttpExceptions: true,
-          });
-          const res = JSON.parse(r.getContentText());
-          if (res.ok && res.result) newIds.push(res.result.message_id);
-        } catch(e) {}
-      }
-      props.setProperty(idKey, JSON.stringify(newIds));  // REPLACE
-      Logger.log((tag||"")+" ✏️ Edited in-place msgId="+oldIds[0]);
-      return;
-    }
-    // Edit thất bại (tin quá cũ hoặc bị xóa) → xóa và gửi mới
-    deleteOldMessages_(chatId, msgKey);
-  }
-
-  // ② Gửi mới (không có tin cũ hoặc edit thất bại)
+  // ✅ Xóa tin cũ và bắn tin mới xuống ĐÁY CHAT TELEGRAM (Không edit ngầm lên tin cũ ở lịch sử 2 tiếng trước)
+  deleteOldMessages_(chatId, msgKey);
+  Utilities.sleep(200);
+  const props  = PropertiesService.getScriptProperties();
+  const idKey  = "SD_MSGID_" + msgKey;
   const newIds = sendTelegramPreCollectIds_(chatId, plainContent, tag);
-  props.setProperty(idKey, JSON.stringify(newIds));  // REPLACE
+  props.setProperty(idKey, JSON.stringify(newIds));
 }
 
-// ── Edit tin nhắn Telegram (không cần admin, chỉ cần bot là tác giả) ──────────────
 function editTelegramMsg_(chatId, messageId, text, parseMode, tag) {
   try {
-    const resp = UrlFetchApp.fetch(
-      "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/editMessageText", {
-        method:             "post",
-        contentType:        "application/json",
-        payload:            JSON.stringify({
-          chat_id:    chatId,
-          message_id: messageId,
-          text:       text,
-          parse_mode: parseMode || "HTML",
-        }),
-        muteHttpExceptions: true,
-      }
-    );
+    const resp = UrlFetchApp.fetch("https://api.telegram.org/bot" + SD_BOT_TOKEN + "/editMessageText", {
+      method:             "post",
+      contentType:        "application/json",
+      payload:            JSON.stringify({ chat_id: chatId, message_id: messageId, text: text, parse_mode: parseMode || "HTML" }),
+      muteHttpExceptions: true,
+    });
     const res = JSON.parse(resp.getContentText());
-    Logger.log((tag||"")+" [edit] "+(res.ok?"✏️":"⚠️")+" msg="+messageId+" → "+chatId
-      +(!res.ok?" | "+res.description:""));
-    // "message is not modified" = nội dung y chang → coi như edit thành công, không cần gửi lại
-    return res.ok === true
-        || (!!res.description && res.description.indexOf("message is not modified") >= 0);
+    return res.ok === true || (!!res.description && res.description.indexOf("message is not modified") >= 0);
   } catch(e) {
-    Logger.log((tag||"")+" [edit] ❌ "+e.message);
     return false;
   }
 }
@@ -764,17 +591,13 @@ function sendTelegramCollectIds_(chatId, text, tag) {
   chunks.forEach((chunk, i) => {
     try {
       const resp = UrlFetchApp.fetch(url, {
-        method:             "post",
-        contentType:        "application/json",
-        payload:            JSON.stringify({ chat_id: chatId, text: chunk, parse_mode: "HTML" }),
+        method: "post", contentType: "application/json",
+        payload: JSON.stringify({ chat_id: chatId, text: chunk, parse_mode: "HTML" }),
         muteHttpExceptions: true,
       });
       const res = JSON.parse(resp.getContentText());
       if (res.ok && res.result && res.result.message_id) ids.push(res.result.message_id);
-      Logger.log((tag || "") + (res.ok ? " ✅→" : " ❌→") + chatId
-        + (chunks.length > 1 ? " [" + (i+1) + "/" + chunks.length + "]" : "")
-        + (!res.ok ? " | " + res.description : ""));
-    } catch(e) { Logger.log((tag || "") + " ❌ " + e.message); }
+    } catch(e) {}
   });
   return ids;
 }
@@ -782,109 +605,103 @@ function sendTelegramCollectIds_(chatId, text, tag) {
 function sendTelegramPreCollectIds_(chatId, plainContent, tag) {
   const url     = "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/sendMessage";
   const escaped = escHtml(plainContent);
-  const chunks  = splitMessage(escaped, 3800);  // để lại room cho <pre></pre>
+  const chunks  = splitMessage(escaped, 3800);
   const ids     = [];
   chunks.forEach((chunk, i) => {
     try {
       const resp = UrlFetchApp.fetch(url, {
-        method:             "post",
-        contentType:        "application/json",
-        payload:            JSON.stringify({ chat_id: chatId, text: "<pre>" + chunk + "</pre>", parse_mode: "HTML" }),
+        method: "post", contentType: "application/json",
+        payload: JSON.stringify({ chat_id: chatId, text: "<pre>" + chunk + "</pre>", parse_mode: "HTML" }),
         muteHttpExceptions: true,
       });
       const res = JSON.parse(resp.getContentText());
       if (res.ok && res.result && res.result.message_id) ids.push(res.result.message_id);
-      Logger.log((tag || "") + (res.ok ? " ✅→" : " ❌→") + chatId
-        + (chunks.length > 1 ? " [" + (i+1) + "/" + chunks.length + "]" : "")
-        + (!res.ok ? " | " + res.description : ""));
-    } catch(e) { Logger.log((tag || "") + " ❌ " + e.message); }
-    if (i < chunks.length - 1) Utilities.sleep(300);
+    } catch(e) {}
+    if (i < chunks.length - 1) Utilities.sleep(200);
   });
   return ids;
 }
 
-// Gửi ảnh: chỉ lưu ID mới, THAY THẾ hoàn toàn củ (không dồn thêm)
-function saveMsgIds_(msgKey, messageIds) {
-  PropertiesService.getScriptProperties()
-    .setProperty("SD_MSGID_" + msgKey, JSON.stringify(messageIds));
-}
-
 function getSavedMsgIds_(msgKey) {
-  const val = PropertiesService.getScriptProperties()
-    .getProperty("SD_MSGID_" + msgKey) || "";
+  const val = PropertiesService.getScriptProperties().getProperty("SD_MSGID_" + msgKey) || "";
   if (!val) return [];
   try {
     const arr = JSON.parse(val);
     if (Array.isArray(arr)) return arr;
   } catch(e) {}
-  // fallback: format cũ có "|date"
-  const idx = val.lastIndexOf("|");
-  if (idx > 0) {
-    try { const arr2 = JSON.parse(val.substring(0, idx)); if (Array.isArray(arr2)) return arr2; }
-    catch(e2) {}
-  }
   return [];
-}
-
-function clearMsgIds_(msgKey) {
-  PropertiesService.getScriptProperties().deleteProperty("SD_MSGID_" + msgKey);
 }
 
 function deleteTelegramMsgBot_(chatId, messageId) {
   try {
-    const resp = UrlFetchApp.fetch(
-      "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/deleteMessage", {
-        method:             "post",
-        contentType:        "application/json",
-        payload:            JSON.stringify({ chat_id: chatId, message_id: messageId }),
-        muteHttpExceptions: true,
-      }
-    );
+    const resp = UrlFetchApp.fetch("https://api.telegram.org/bot" + SD_BOT_TOKEN + "/deleteMessage", {
+      method: "post", contentType: "application/json",
+      payload: JSON.stringify({ chat_id: chatId, message_id: messageId }),
+      muteHttpExceptions: true,
+    });
     const res = JSON.parse(resp.getContentText());
-    Logger.log("[delete] " + (res.ok ? "🗑️" : "⚠️") + " msg=" + messageId + " → " + chatId
-      + (!res.ok ? " | " + res.description : ""));
-    // Trả về true nếu xóa thành công HOẶC tin nhắn đã bị xóa trước đó rồi (không tìm thấy)
     return res.ok === true || (res.description && res.description.indexOf("message to delete not found") >= 0);
-  } catch(e) { Logger.log("[delete] ❌ " + e.message); return false; }
+  } catch(e) { return false; }
 }
 
 function deleteOldMessages_(chatId, msgKey) {
   const oldIds = getSavedMsgIds_(msgKey);
-  // Thử xóa tất cả — kết quả không quan trọng, luôn xóa key sau
   for (let i = 0; i < oldIds.length; i++) {
     deleteTelegramMsgBot_(chatId, oldIds[i]);
     if (i < oldIds.length - 1) Utilities.sleep(100);
   }
-  // Luôn xóa key để không tích dồn IDs lỗi
   PropertiesService.getScriptProperties().deleteProperty("SD_MSGID_" + msgKey);
 }
 
-
-// ============================================================
-// UTILITIES
-// ============================================================
-
-function escHtml(str) {
-  return (str || "").toString()
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+function colorizeTeams(text) {
+  if (!text) return "";
+  let s = text;
+  s = s.replace(/\|\s*(T[1-4])(\s+S\w*)?\s*\|/gi, (match, team, sub) => {
+    const emoji = TEAM_COLORS[team.toUpperCase()] || "";
+    return "| " + emoji + team + (sub || "") + " |";
+  });
+  s = s.replace(/(Team\s+([1-4])\s*:)/gi, function(match, fullTeam, teamNum) {
+    const teamKey = "T" + teamNum;
+    const emoji = TEAM_COLORS[teamKey] || "";
+    return emoji + " " + fullTeam + ":";
+  });
+  return s;
 }
 
-function splitMessage(text, maxLen) {
-  if (text.length <= maxLen) return [text];
-  const chunks = [], lines = text.split("\n");
-  let cur = "";
-  for (const line of lines) {
-    if ((cur + "\n" + line).length > maxLen) {
-      if (cur) chunks.push(cur.trim());
-      cur = line;
-    } else {
-      cur = cur ? cur + "\n" + line : line;
-    }
-  }
-  if (cur.trim()) chunks.push(cur.trim());
-  return chunks;
+function formatTsHeader(ts) {
+  if (!ts) return "";
+  const match = ts.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
+  if (match) return match[1];
+  return ts.length > 30 ? ts.substring(0, 30) : ts;
+}
+
+function addKeywordIcons(text) {
+  if (!text) return "";
+  let s = text;
+  s = s.replace(/(?:^|\n|\s*)(Dont\s+Forget)/gi, "\n🔥 Dont Forget");
+  s = s.replace(/(?:^|\n|\s*)>(?:\s*)(Cell down:)/gi, "\n🔴 Cell down:");
+  s = s.replace(/(?:^|\n|\s*)>(?:\s*)(DG Abnormal:)/gi, "\n⚙️ DG Abnormal:");
+  s = s.replace(/(?:^|\n|\s*)>(?:\s*)(Link down:)/gi, "\n🔗 Link down:");
+  s = s.replace(/(?:^|\n|\s*)>(?:\s*)(Duty:)/gi, "\n🕒 Duty:");
+  s = s.replace(/\|\s*(DG Abnormal:)/gi, "\n⚙️ DG Abnormal:");
+  s = s.replace(/\|\s*(Link down:)/gi, "\n🔗 Link down:");
+  s = s.replace(/\|\s*(Cell down:)/gi, "\n🔴 Cell down:");
+  s = s.replace(/\|\s*(Duty:)/gi, "\n🕒 Duty:");
+  s = s.replace(/(?:^|\s)(Duty:)/gi, "\n🕒 Duty:");
+
+  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(DG Run>16H:)\s*([^\n\|]*)/gi, function(match, keyword, dataStr) {
+     let c = dataStr.replace(/[*_]/g, "").trim();
+     let icon = (c && c !== "0" && c !== "-" && c.toLowerCase() !== "none") ? "❌" : "✅";
+     return "\n" + icon + " " + keyword + " " + dataStr;
+  });
+
+  s = s.replace(/(?:🔥\s*)+Dont\s+Forget/gi, "🔥 Dont Forget");
+  s = s.replace(/(?:🕒\s*)+Duty:/gi, "🕒 Duty:");
+  return s.trim();
+}
+
+function escHtml(str) {
+  return (str || "").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function getSheetByGid(ss, gid) {
@@ -894,94 +711,42 @@ function getSheetByGid(ss, gid) {
   return null;
 }
 
+function triggerBotlookupRelay() {
+  const props = PropertiesService.getScriptProperties();
+  const pat   = props.getProperty("GITHUB_PAT") || "";
+  if (!pat) return;
+  try {
+    UrlFetchApp.fetch("https://api.github.com/repos/MON6879/tni-sitedown-relay/actions/workflows/botlookup_relay.yml/dispatches", {
+      method: "post",
+      headers: { "Authorization": "token " + pat, "Accept": "application/vnd.github.v3+json" },
+      contentType: "application/json",
+      payload: JSON.stringify({ ref: "main", inputs: { skip_delay: "1" } }),
+      muteHttpExceptions: true,
+    });
+    props.setProperty("SD_LAST_DISPATCH_TS", Date.now().toString());
+  } catch(e) {}
+}
+
 
 // ============================================================
-// SETUP — Chạy 1 lần từ Apps Script Editor
+// TIỆN ÍCH CHẠY THỬ & ĐẶT TRIGGER
 // ============================================================
-
-/**
- * Cài trigger checkAndSend() mỗi 1 phút.
- * Trigger chạy mỗi phút nhưng chỉ làm việc thực sự khi
- * đồng hồ Myanmar đúng phút :08 hoặc :38 — không trễ.
- * Lịch: 03:38 → 04:08 → ... → 22:08 Myanmar.
- */
 function setupSdTrigger() {
-  // Xóa trigger cũ cùng tên
   ScriptApp.getProjectTriggers()
     .filter(t => t.getHandlerFunction() === "checkAndSend")
     .forEach(t => ScriptApp.deleteTrigger(t));
-  // Tạo mới — mỗi 1 phút (check đúng :08 và :38)
   ScriptApp.newTrigger("checkAndSend").timeBased().everyMinutes(1).create();
-  Logger.log("✅ Trigger checkAndSend() mỗi 1 phút đã cài.");
-  Logger.log("   Chỉ thực sự chạy lúc :08 và :38 mỗi giờ (03:38–22:08 Myanmar). Không trễ.");
+  Logger.log("✅ Trigger checkAndSend() mỗi 1 phút đã cài đặt.");
 }
 
-/** Xóa webhook (bắt buộc trước khi dùng polling) */
-function deleteWebhook() {
-  const resp = UrlFetchApp.fetch(
-    "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/deleteWebhook"
-  );
-  Logger.log("deleteWebhook → " + resp.getContentText());
-}
-
-/** Kiểm tra webhook hiện tại */
-function checkWebhook() {
-  const resp = UrlFetchApp.fetch(
-    "https://api.telegram.org/bot" + SD_BOT_TOKEN + "/getWebhookInfo"
-  );
-  const info = JSON.parse(resp.getContentText());
-  const r    = info.result || {};
-  Logger.log("📡 URL: " + (r.url || "(trống — OK cho polling)"));
-  Logger.log("⏳ Pending: " + (r.pending_update_count || 0));
-  Logger.log("❌ Last error: " + (r.last_error_message || "không có"));
-}
-
-
-// ============================================================
-// TEST — Ép gửi ngay (bỏ qua dedup timestamp)
-// ============================================================
+// 🧪 CHẠY THỬ ĐỘC LẬP 2 LUỒNG
 function testSendNow() {
-  // Bypass minute check — gọi thẳng logic không qua checkAndSend()
   const props = PropertiesService.getScriptProperties();
   props.deleteProperty(TS_KEY_A1);
   props.deleteProperty(TS_KEY_AW7);
-  Logger.log("🧪 testSendNow — ép gửi Tin 1 + Tin 2 (bypass minute check)...");
   const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
   const sheet = getSheetByGid(ss, SD_SHEET_GID);
-  if (!sheet) { Logger.log("❌ Không tìm thấy sheet"); return; }
-  fetchTelegramUpdates(sheet);
-  checkColC(sheet);
-  checkAwAz(sheet);
-  Logger.log("🧪 testSendNow — xong.");
-}
-
-function testTin1Only() {
-  PropertiesService.getScriptProperties().deleteProperty(TS_KEY_A1);
-  Logger.log("🧪 Ép gửi Tin 1...");
-  const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
-  const sheet = getSheetByGid(ss, SD_SHEET_GID);
-  if (sheet) checkColC(sheet);
-}
-
-function testTin2Only() {
-  PropertiesService.getScriptProperties().deleteProperty(TS_KEY_AW7);
-  Logger.log("🧪 Ép gửi Tin 2 (SUMMARY)...");
-  const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
-  const sheet = getSheetByGid(ss, SD_SHEET_GID);
-  if (sheet) checkAwAz(sheet);
-}
-
-function resetSiteDownProperties() {
-  const props = PropertiesService.getScriptProperties();
-  props.deleteProperty(TS_KEY_A1);
-  props.deleteProperty(TS_KEY_AW7);
-  Logger.log("✅ resetSiteDownProperties: Đã xóa bộ nhớ đệm A1 và AW7.");
-}
-
-function testFullFlow() {
-  const props = PropertiesService.getScriptProperties();
-  props.deleteProperty(TS_KEY_A1);
-  props.deleteProperty(TS_KEY_AW7);
-  Logger.log("🧪 testFullFlow — ép trigger GitHub Actions + gửi tin...");
-  triggerBotlookupRelay();
+  if (!sheet) return;
+  processSiteDownColC(sheet);
+  processSummaryAwAz(sheet);
 }
