@@ -328,23 +328,23 @@ async def process_group(client, group_key: str, chat_id: int,
     participant_ids = {p["id"] for p in group_participants}
     print(f"  👥 Group participants: {len(participant_ids)}")
 
-    # Phân loại: in_group (có Telegram ID và đã join) vs not_in_group (chưa join)
-    in_group_members   = []
-    not_in_group_names = []
+    # Build per_person tracking for ALL staff members in the team
+    per_person = {}
+    member_ids = set()
 
     if group_key == "CONTROL":
-        # CONTROL: dùng toàn bộ participants, không giới hạn theo staff list
-        in_group_members = [{"id": p["id"], "name": p["name"]} for p in group_participants]
+        for p in group_participants:
+            uid = p["id"]
+            member_ids.add(uid)
+            per_person[uid] = {"name": p["name"], "id": uid, "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0}
     else:
         for s in staff_list:
-            tid  = s.get("telegram_id")
             name = s["name"]
-
+            tid  = s.get("telegram_id")
             matched_id = None
             if tid and tid in participant_ids:
                 matched_id = tid
             else:
-                # Fallback match by Col F Name only if tid missing or unmapped
                 norm_n = name.lower().replace(" ", "")
                 for p in group_participants:
                     p_name = p["name"].lower().replace(" ", "")
@@ -352,21 +352,19 @@ async def process_group(client, group_key: str, chat_id: int,
                         matched_id = p["id"]
                         break
 
+            key = matched_id if matched_id else f"unmapped_{name}"
             if matched_id:
-                in_group_members.append({"id": matched_id, "name": name})
+                member_ids.add(matched_id)
             else:
                 not_in_group_names.append(name)
 
-    members      = in_group_members
-    member_ids   = {m["id"] for m in members}
-    # Total = toàn bộ staff (cả chưa join)
-    member_count = len(staff_list) if group_key != "CONTROL" else len(members)
+            per_person[key] = {
+                "name": name,
+                "id": matched_id,
+                "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0
+            }
 
-    if len(members) == 0:
-        print(f"  ⚠️  No members in group — skip")
-        return None
-
-    print(f"  📋 In group: {len(members)} | Not in group yet: {len(not_in_group_names)}")
+    member_count = len(per_person)
 
     # Get Note messages from last 35 days (to cover the full cycle and rolling 7-day stats)
     since_date = days_ago_utc(35)
@@ -396,9 +394,6 @@ async def process_group(client, group_key: str, chat_id: int,
         end_time = day_start.replace(hour=23, minute=59, second=59, microsecond=0)
         return start_time <= read_mm <= end_time
 
-    # Per-person tracking: {user_id: {d0:0/1, d1:0/1, d2:0/1, d7:count, month:count}}
-    per_person = {m["id"]: {"name": m["name"], "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0}
-                  for m in members}
     today_note_msg = None
 
     for msg, dt_mm in note_msgs:
