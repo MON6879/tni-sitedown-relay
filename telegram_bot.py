@@ -484,7 +484,7 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
 
 
 def is_daily_report(text: str, user=None) -> bool:
-    """Chỉ nhận diện Daily Result/Daily Report do người dùng gửi BẮT BUỘC có ngày tháng (DD/MM/YYYY), loại trừ tin nhắn từ Bot và tin nhắn Note tự động."""
+    """Chỉ nhận diện báo cáo khi tin nhắn chứa từ khóa chuẩn 'Daily result:' đi kèm ngày tháng (DD/MM/YYYY), loại trừ Bot và Note tự động."""
     if not text:
         return False
     if user and getattr(user, "is_bot", False):
@@ -496,12 +496,13 @@ def is_daily_report(text: str, user=None) -> bool:
     if "above are the end-of-day" in text_l or "note:" in text_l or "ft result daily" in text_l or "ref:" in text_l or "đã lưu" in text_l:
         return False
 
-    # ✅ ĐIỀU KIỆN MỚI: Bắt buộc phải có Ngày Tháng (dạng DD/MM/YYYY hoặc DD/MM/YY)
-    has_date = bool(re.search(r'\b\d{1,2}[/\.-]\d{1,2}[/\.-]\d{2,4}\b', text))
-    if not has_date:
+    # ✅ CHÌA KHÓA CHUẨN: Bắt buộc phải có "daily result"
+    if "daily result" not in text_l:
         return False
 
-    return "daily result" in text_l or "daily report" in text_l or "result:" in text_l
+    # ✅ Bắt buộc phải có Ngày Tháng (dạng DD/MM/YYYY hoặc DD/MM/YY)
+    has_date = bool(re.search(r'\b\d{1,2}[/\.-]\d{1,2}[/\.-]\d{2,4}\b', text))
+    return has_date
 
 
 async def cmd_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -525,7 +526,7 @@ async def cmd_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def submit_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """
-    Tự động nhận báo cáo khi tin nhắn chứa chữ 'daily'.
+    Tự động nhận báo cáo khi tin nhắn chứa chữ 'daily result:'.
     Trả về True nếu đã xử lý.
     """
     text = update.message.text or ""
@@ -538,7 +539,6 @@ async def submit_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE
     now_mm  = datetime.now(TZ_MM)
     chat_id = update.effective_chat.id
 
-    # Tự thêm ngày nếu chưa có
     if "Daily result" not in parsed and "Daily report" not in parsed:
         parsed["Daily result"] = now_mm.strftime("%d/%m/%Y")
 
@@ -557,8 +557,12 @@ async def submit_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE
             name = result.get("name") or user.first_name or str(user.id)
             ref  = result.get("ref", "")
             _last_daily[chat_id] = time.time()
-            logger.info(f"✅ Đã lưu Daily Report REF:{ref} cho {name}")
-            # ✅ Đã tắt nhắn tin phản hồi Telegram theo yêu cầu
+            ref_line = f" | REF:{ref}" if ref else ""
+            # ✅ Trả lời xác nhận Đã lưu kèm mã REF khi đúng chìa khóa Daily result:
+            await update.message.reply_text(
+                f"✅ Đã lưu{ref_line} — {html.escape(str(name))}\n"
+                f"📅 {now_mm.strftime('%d/%m/%Y %H:%M')}"
+            )
         else:
             logger.warning(f"❌ Lỗi lưu Daily Report: {result.get('message', '')[:120]}")
     except Exception as ex:
