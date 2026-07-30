@@ -484,7 +484,7 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
 
 
 def is_daily_report(text: str, user=None) -> bool:
-    """Chỉ nhận diện Daily Result/Daily Report do người dùng gửi, loại trừ tin nhắn từ Bot và tin nhắn Note tự động."""
+    """Chỉ nhận diện Daily Result/Daily Report do người dùng gửi BẮT BUỘC có ngày tháng (DD/MM/YYYY), loại trừ tin nhắn từ Bot và tin nhắn Note tự động."""
     if not text:
         return False
     if user and getattr(user, "is_bot", False):
@@ -494,6 +494,11 @@ def is_daily_report(text: str, user=None) -> bool:
     if "daily plan" in text_l or "plan:" in text_l or "kế hoạch" in text_l:
         return False
     if "above are the end-of-day" in text_l or "note:" in text_l or "ft result daily" in text_l or "ref:" in text_l or "đã lưu" in text_l:
+        return False
+
+    # ✅ ĐIỀU KIỆN MỚI: Bắt buộc phải có Ngày Tháng (dạng DD/MM/YYYY hoặc DD/MM/YY)
+    has_date = bool(re.search(r'\b\d{1,2}[/\.-]\d{1,2}[/\.-]\d{2,4}\b', text))
+    if not has_date:
         return False
 
     return "daily result" in text_l or "daily report" in text_l or "result:" in text_l
