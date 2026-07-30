@@ -762,13 +762,14 @@ def parse_daily_report(text: str, fields: list[str]) -> dict:
 
 def is_daily(text: str) -> bool:
     text_l = text.lower()
-    # Loại trừ Daily Plan không cho nộp nhầm vào tab Daily Result
     if "daily plan" in text_l or "plan:" in text_l or "kế hoạch" in text_l:
         return False
-    # Loại trừ tuyệt đối các tin nhắn Note tự động / hệ thống phản hồi
-    if "above are the end-of-day work results" in text_l or "note: above are" in text_l or text_l.startswith("note:"):
+    if "above are the end-of-day" in text_l or "note:" in text_l or "ft result daily" in text_l or "ref:" in text_l or "đã lưu" in text_l:
         return False
-    return "daily result" in text_l or "daily report" in text_l or "result:" in text_l
+    if "daily result" not in text_l:
+        return False
+    has_date = bool(re.search(r'\b\d{1,2}[/\.-]\d{1,2}[/\.-]\d{2,4}\b', text))
+    return has_date
 
 
 def get_copy_markup(chat_id: int, team_arg: str, text_label: str) -> dict:
@@ -1307,7 +1308,7 @@ class handler(BaseHTTPRequestHandler):
             if team_arg == "daily":
                 fields = fetch_daily_fields()
                 now_mm = datetime.now(TZ_MM)
-                lines  = [f"Daily report: {now_mm.strftime('%d/%m/%Y')}"]
+                lines  = [f"Daily result: {now_mm.strftime('%d/%m/%Y')}"]
                 for i, f in enumerate(fields[1:], start=1):
                     lines.append(f"{i}. {f}:")
                 template_text = "\n".join(lines)
