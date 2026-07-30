@@ -37,6 +37,10 @@ function doGet(e) {
     const logs = logSheet.getRange(2, 1, lastRow - 1, 2).getValues();
     return ContentService.createTextOutput(JSON.stringify(logs));
   }
+  if (action === "build_general") {
+    buildGeneralTab();
+    return ContentService.createTextOutput("General tab updated successfully");
+  }
   return ContentService.createTextOutput("Unknown action: " + action);
 }
 
@@ -44,7 +48,7 @@ function doPost(e) {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
   const ssId = props.getProperty("ATTENDANCE_SS_ID") || "18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54";
-  const folderId = props.getProperty("DRIVE_FOLDER_ID") || "1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb";
+  const folderId = getAttendanceFolderId_();
   const geminiApiKey = props.getProperty("GEMINI_API_KEY") || "";
 
   try {
@@ -64,7 +68,6 @@ function doPost(e) {
       }
       cache.put(cacheKey, "1", 21600); // Cache for 6 hours
 
-      // Deduplicate permanently in PropertiesService (keep last 100 update_ids)
       const rawUpds = props.getProperty("PROCESSED_UPDATES") || "[]";
       let processedUpds = [];
       try { processedUpds = JSON.parse(rawUpds); } catch (ex) {}
@@ -85,7 +88,6 @@ function doPost(e) {
       return ContentService.createTextOutput("No message object");
     }
 
-    // Ignore old messages (older than 10 minutes = 600 seconds)
     const nowSec = Math.floor((new Date()).getTime() / 1000);
     if (msg.date && (nowSec - msg.date > 600)) {
       logToSheet_("Message too old (" + (nowSec - msg.date) + "s old), update_id: " + update.update_id + ", ignoring.");
@@ -97,13 +99,11 @@ function doPost(e) {
     const senderId = telegramUser.id.toString();
     const senderName = telegramUser.first_name + (telegramUser.last_name ? " " + telegramUser.last_name : "");
 
-    // 1. Kiểm tra xem tin nhắn có chứa ảnh hay không
     const photoArray = msg.photo;
     if (!photoArray || photoArray.length === 0) {
       return ContentService.createTextOutput("Message does not contain photo");
     }
 
-    // Lấy ảnh kích thước lớn nhất
     const fileId = photoArray[photoArray.length - 1].file_id;
 
     logToSheet_("Photo fileId: " + fileId + ", downloading from Telegram...");
@@ -162,7 +162,6 @@ function doPost(e) {
     }
     logToSheet_("Read " + staffList.length + " staff members from database.");
 
-    // 5. Tiến hành đối chiếu nhận diện bằng Gemini AI
     let geminiMatches = [];
     let extractedImageName = "";
     if (geminiApiKey) {
@@ -177,15 +176,11 @@ function doPost(e) {
       logToSheet_("⚠️ No Gemini API Key configured. Skipping AI face recognition.");
     }
 
-    // Nếu không tìm thấy tên ảnh từ Gemini, sử dụng caption làm dự phòng
     if (!extractedImageName && msg.caption) {
       extractedImageName = String(msg.caption).trim();
     }
 
-    // 6. Xây dựng danh sách người điểm danh cuối cùng
     const finalMatches = [];
-
-    // Luôn ưu tiên đưa người gửi tin nhắn (sender) vào danh sách điểm danh
     const senderStaff = staffList.find(s => s.telegramId === senderId);
     if (senderStaff) {
       finalMatches.push({
@@ -195,7 +190,6 @@ function doPost(e) {
         department: senderStaff.department
       });
     } else {
-      // Nếu người gửi chưa có trong database, vẫn thêm tạm bằng thông tin Telegram của họ
       finalMatches.push({
         name: senderName,
         fullName: senderName,
@@ -204,8 +198,6 @@ function doPost(e) {
       });
     }
 
-    // Nếu là chụp chung (Gemini nhận diện được nhiều người hơn hoặc người khác)
-    // Thêm các nhân viên khác được Gemini nhận diện vào danh sách điểm danh
     for (let i = 0; i < geminiMatches.length; i++) {
       const gMatch = geminiMatches[i];
       const isAlreadyAdded = finalMatches.some(m => 
@@ -225,14 +217,12 @@ function doPost(e) {
       }
     }
 
-    // 7. Ghi nhận điểm danh vào sheet "List Attendance"
     const attendanceSheet = ss.getSheetByName("List Attendance");
     if (!attendanceSheet) {
       sendTelegramMessage_(token, chatId, "❌ Lỗi: Không tìm thấy sheet 'List Attendance'");
       return ContentService.createTextOutput("List Attendance sheet not found");
     }
 
-    // Tính số thứ tự điểm danh (tạo số cho bot trả lời)
     let nextNum = 1;
     const lastRow = attendanceSheet.getLastRow();
     if (lastRow >= 2) {
@@ -255,22 +245,20 @@ function doPost(e) {
       const finalTgId = match.telegramId;
       const finalDep = match.department;
 
-      // Kiểm tra trùng lặp trong cùng khung giờ hôm nay theo Telegram ID và Mã Site
       if (isAlreadyLoggedToday_(attendanceSheet, dateStr, timeStr, finalTgId, extractedImageName)) {
         replyMsg += `- ${finalShortName} (Already logged for this time slot)\n`;
         continue;
       }
 
-      // Thêm dòng mới vào đầu bảng (dưới tiêu đề ở dòng 1)
-      attendanceSheet.insertRowAfter(1); // Chèn dòng trống ở dòng 2
+      attendanceSheet.insertRowAfter(1);
       attendanceSheet.getRange(2, 1, 1, 7).setValues([[
         nextNum,
         dateStr,
         timeStr,
         finalTgId,
-        extractedImageName, // E: Name Trên Hình (Nội dung trích xuất từ hình, vd TNI0295)
-        finalFullName,      // F: Full name
-        driveFileUrl        // G: photo
+        extractedImageName,
+        finalFullName,
+        driveFileUrl
       ]]);
       
       replyMsg += `- ${finalShortName} (${finalDep})\n`;
@@ -279,6 +267,8 @@ function doPost(e) {
 
     if (successCount > 0) {
       sendTelegramMessage_(token, chatId, replyMsg);
+      // ✅ Tự động cập nhật bảng General sau khi nhận ảnh mới thành công
+      try { buildGeneralTab(); } catch(eGeneral) { Logger.log("Lỗi buildGeneralTab: " + eGeneral.message); }
     } else {
       sendTelegramMessage_(token, chatId, "⚠️ Today's attendance for you/your group has already been recorded for this time slot.");
     }
@@ -328,7 +318,7 @@ function getStaffColumns_(sheet) {
   let nameCol = 5;      // Column E (Name / Short name)
   let fullNameCol = 6;  // Column F (Full name)
   let idCol = 1;        // Column A (Telegram ID)
-  let photoCol = 15;    // Column O (photo)
+  let photoCol = 15;    // Column O (Link Photo man power)
   let depCol = 11;      // Column K (Dep)
 
   for (let j = 0; j < headers.length; j++) {
@@ -339,7 +329,7 @@ function getStaffColumns_(sheet) {
       fullNameCol = j + 1;
     } else if (header.indexOf("telegram id") !== -1 || header === "telegram id ") {
       idCol = j + 1;
-    } else if (header.indexOf("photo") !== -1 || header.indexOf("ảnh") !== -1) {
+    } else if (header.indexOf("photo") !== -1 || header.indexOf("ảnh") !== -1 || header.indexOf("link photo") !== -1 || header.indexOf("man power") !== -1) {
       photoCol = j + 1;
     } else if (header.indexOf("dep") !== -1 || header.indexOf("phòng") !== -1 || header.indexOf("bộ phận") !== -1) {
       depCol = j + 1;
@@ -365,7 +355,7 @@ function getAttendanceSlot_(timeVal) {
   }
   const totalMin = h * 60 + m;
 
-  if (totalMin < 8 * 60 + 30) return "slot_morning_1";                       // < 08:30
+  if (totalMin <= 8 * 60 + 30) return "slot_morning_1";                       // <= 08:30
   if (totalMin >= 10 * 60 && totalMin <= 12 * 60) return "slot_morning_2";   // 10:00 - 12:00
   if (totalMin >= 13 * 60 && totalMin <= 14 * 60) return "slot_afternoon_1"; // 13:00 - 14:00
   if (totalMin >= 16 * 60 && totalMin <= 17 * 60) return "slot_afternoon_2"; // 16:00 - 17:00
@@ -380,13 +370,12 @@ function isAlreadyLoggedToday_(sheet, dateStr, currentTimeStr, telegramId, siteC
   
   const currentSlot = getAttendanceSlot_(currentTimeStr);
 
-  // Đọc từ cột B (Date), C (Time), D (Telegram ID), E (Site) -> 4 cột
   const values = sheet.getRange(2, 2, lastRow - 1, 4).getValues(); 
   for (let i = 0; i < values.length; i++) {
     const rowDate = values[i][0];
     const rowTime = values[i][1];
-    const rowTgId = String(values[i][2] || "").trim(); // Cột D (Telegram ID)
-    const rowSite = String(values[i][3] || "").trim(); // Cột E (Site)
+    const rowTgId = String(values[i][2] || "").trim();
+    const rowSite = String(values[i][3] || "").trim();
     
     let formattedRowDate = "";
     if (rowDate instanceof Date) {
@@ -397,7 +386,6 @@ function isAlreadyLoggedToday_(sheet, dateStr, currentTimeStr, telegramId, siteC
     
     if (formattedRowDate.split(" ")[0] === dateStr && rowTgId === telegramId) {
       const rowSlot = getAttendanceSlot_(rowTime);
-      // Chỉ trùng nếu ĐÃ ĐIỂM DANH TRONG CÙNG KHUNG GIỜ
       if (rowSlot === currentSlot) {
         if (siteCode && siteCode.trim() !== "") {
           if (rowSite.toLowerCase() === siteCode.trim().toLowerCase()) {
@@ -412,18 +400,363 @@ function isAlreadyLoggedToday_(sheet, dateStr, currentTimeStr, telegramId, siteC
   return false;
 }
 
-/** Nhận dạng khuôn mặt bằng Gemini AI */
+
+// ============================================================
+// BẢNG BÁO CÁO CÔNG THỨC — TAB GENERAL (XỬ LÝ DỮ LIỆU ĐIỂM DANH)
+// ============================================================
+function buildGeneralTab() {
+  const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+  let genSheet = ss.getSheetByName("General");
+  if (!genSheet) {
+    genSheet = ss.insertSheet("General");
+  }
+
+  const staffSheet = ss.getSheetByName("Staff attendance");
+  const listSheet  = ss.getSheetByName("List Attendance");
+  if (!staffSheet || !listSheet) return;
+
+  const cols = getStaffColumns_(staffSheet);
+  const staffLastRow = staffSheet.getLastRow();
+  if (staffLastRow < 2) return;
+
+  const staffVals = staffSheet.getRange(2, 1, staffLastRow - 1, staffSheet.getLastColumn()).getValues();
+
+  // Đọc dữ liệu từ List Attendance
+  const listLastRow = listSheet.getLastRow();
+  const listData = listLastRow >= 2 ? listSheet.getRange(2, 1, listLastRow - 1, 7).getValues() : [];
+
+  // Xác định mốc ngày Today / Yesterday / Day Before
+  const now = new Date();
+  const todayStr  = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
+
+  const d1 = new Date(now.getTime() - 24 * 3600 * 1000);
+  const yestStr   = Utilities.formatDate(d1, "Asia/Rangoon", "dd/MM/yyyy");
+
+  const d2 = new Date(now.getTime() - 2 * 24 * 3600 * 1000);
+  const day2Before = Utilities.formatDate(d2, "Asia/Rangoon", "dd/MM/yyyy");
+
+  const d7 = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+  const currentMonth = Utilities.formatDate(now, "Asia/Rangoon", "MM/yyyy");
+
+  // Gom nhóm dữ liệu theo Telegram ID
+  const attendanceMap = {};
+
+  for (let i = 0; i < listData.length; i++) {
+    const row = listData[i];
+    const rowDateRaw = row[1];
+    const rowTime    = row[2];
+    const tgId       = String(row[3] || "").trim();
+
+    if (!tgId) continue;
+
+    let dateStr = "";
+    let dateObj = null;
+    if (rowDateRaw instanceof Date) {
+      dateObj = rowDateRaw;
+      dateStr = Utilities.formatDate(rowDateRaw, "Asia/Rangoon", "dd/MM/yyyy");
+    } else {
+      dateStr = String(rowDateRaw || "").trim().split(" ")[0];
+      const parts = dateStr.split("/");
+      if (parts.length === 3) {
+        dateObj = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+    }
+
+    if (!attendanceMap[tgId]) {
+      attendanceMap[tgId] = {
+        todayCount: 0,
+        yestCount: 0,
+        day2BeforeCount: 0,
+        count7D: 0,
+        countMonth: 0,
+        slotsToday: {
+          slot_morning_1: 0,   // < 08:30
+          slot_morning_2: 0,   // 10:00 - 12:00
+          slot_afternoon_1: 0, // 13:00 - 14:00
+          slot_afternoon_2: 0  // 16:00 - 17:00
+        }
+      };
+    }
+
+    const rec = attendanceMap[tgId];
+
+    if (dateStr === todayStr) {
+      rec.todayCount++;
+      const slot = getAttendanceSlot_(rowTime);
+      if (rec.slotsToday[slot] !== undefined) {
+        rec.slotsToday[slot]++;
+      }
+    }
+    if (dateStr === yestStr) rec.yestCount++;
+    if (dateStr === day2Before) rec.day2BeforeCount++;
+
+    if (dateObj && dateObj >= d7) rec.count7D++;
+    if (dateStr.indexOf(currentMonth) !== -1) rec.countMonth++;
+  }
+
+  // Tạo tiêu đề cho tab General
+  const headers = [
+    "STT", "Họ & Tên Nhân Viên", "Bộ Phận / Team", "Telegram ID",
+    "Hôm Nay (" + todayStr + ")", "Hôm Qua (" + yestStr + ")", "Hôm Kia (" + day2Before + ")",
+    "Thống Kê 7 Ngày", "Thống Kê Tháng (" + currentMonth + ")",
+    "Khung 1 (<08:30)", "Khung 2 (10-12h)", "Khung 3 (13-14h)", "Khung 4 (16-17h)", "Trạng Thái Đủ Khung"
+  ];
+
+  const tableData = [headers];
+
+  for (let i = 0; i < staffVals.length; i++) {
+    const row = staffVals[i];
+    const shortName = String(row[cols.nameCol - 1] || "").trim();
+    const fullName  = cols.fullNameCol ? String(row[cols.fullNameCol - 1] || "").trim() : shortName;
+    const tgId      = String(row[cols.idCol - 1] || "").trim();
+    const dep       = cols.depCol ? String(row[cols.depCol - 1] || "").trim() : "";
+
+    if (!shortName) continue;
+
+    const stats = attendanceMap[tgId] || {
+      todayCount: 0, yestCount: 0, day2BeforeCount: 0, count7D: 0, countMonth: 0,
+      slotsToday: { slot_morning_1: 0, slot_morning_2: 0, slot_afternoon_1: 0, slot_afternoon_2: 0 }
+    };
+
+    const isTeamMember = /team\s*[1-5]/i.test(dep) || /t[1-5]/i.test(dep);
+
+    const s1 = stats.slotsToday.slot_morning_1;
+    const s2 = stats.slotsToday.slot_morning_2;
+    const s3 = stats.slotsToday.slot_afternoon_1;
+    const s4 = stats.slotsToday.slot_afternoon_2;
+
+    let status = "";
+    if (isTeamMember) {
+      status = (s1 > 0 && s2 > 0 && s3 > 0 && s4 > 0) ? "✅ Đủ 4 khung" : "⚠️ Thiếu khung";
+    } else {
+      status = (s1 > 0 || s2 > 0) ? "✅ Đã báo sáng" : "❌ Chưa báo sáng";
+    }
+
+    tableData.push([
+      i + 1,
+      fullName || shortName,
+      dep,
+      tgId,
+      stats.todayCount,
+      stats.yestCount,
+      stats.day2BeforeCount,
+      stats.count7D,
+      stats.countMonth,
+      s1 > 0 ? "✅ " + s1 : "❌ 0",
+      s2 > 0 ? "✅ " + s2 : "❌ 0",
+      s3 > 0 ? "✅ " + s3 : "❌ 0",
+      s4 > 0 ? "✅ " + s4 : "❌ 0",
+      status
+    ]);
+  }
+
+  genSheet.clearContents();
+  if (tableData.length > 0) {
+    genSheet.getRange(1, 1, tableData.length, tableData[0].length).setValues(tableData);
+    genSheet.getRange(1, 1, 1, tableData[0].length).setFontWeight("bold").setBackground("#d9ead3");
+  }
+}
+
+
+// ============================================================
+// GỬI BÁO CÁO TELEGRAM 4 KHUNG GIỜ (+15 PHÚT SAU MỖI KHUNG GIỜ)
+// 08:45 | 12:15 | 14:15 | 17:15 Myanmar Time
+// ============================================================
+function sendAttendanceSlotReport(slotKey) {
+  const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+  const staffSheet = ss.getSheetByName("Staff attendance");
+  const listSheet  = ss.getSheetByName("List Attendance");
+  if (!staffSheet || !listSheet) return;
+
+  const cols = getStaffColumns_(staffSheet);
+  const staffLastRow = staffSheet.getLastRow();
+  if (staffLastRow < 2) return;
+
+  const staffVals = staffSheet.getRange(2, 1, staffLastRow - 1, staffSheet.getLastColumn()).getValues();
+
+  const listLastRow = listSheet.getLastRow();
+  const listData = listLastRow >= 2 ? listSheet.getRange(2, 1, listLastRow - 1, 7).getValues() : [];
+
+  const now = new Date();
+  const todayStr  = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
+  const dateShort = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yy");
+
+  const d1 = new Date(now.getTime() - 24 * 3600 * 1000);
+  const yestStr = Utilities.formatDate(d1, "Asia/Rangoon", "dd/MM/yyyy");
+
+  const d2 = new Date(now.getTime() - 2 * 24 * 3600 * 1000);
+  const day2Before = Utilities.formatDate(d2, "Asia/Rangoon", "dd/MM/yyyy");
+
+  const d7 = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+  const currentMonth = Utilities.formatDate(now, "Asia/Rangoon", "MM/yyyy");
+
+  // Tên tiêu đề khung giờ
+  const slotTitleMap = {
+    slot_morning_1:   "Khung 1 (Sáng < 08:30)",
+    slot_morning_2:   "Khung 2 (Trưa 10:00 - 12:00)",
+    slot_afternoon_1: "Khung 3 (Chiều 13:00 - 14:00)",
+    slot_afternoon_2: "Khung 4 (Chiều 16:00 - 17:00)",
+  };
+
+  const currentSlotTitle = slotTitleMap[slotKey] || "Khung điểm danh";
+
+  // Thống kê từng nhân viên
+  const statsMap = {};
+
+  for (let i = 0; i < listData.length; i++) {
+    const row = listData[i];
+    const rowDateRaw = row[1];
+    const rowTime    = row[2];
+    const tgId       = String(row[3] || "").trim();
+
+    if (!tgId) continue;
+
+    let dateStr = "";
+    let dateObj = null;
+    if (rowDateRaw instanceof Date) {
+      dateObj = rowDateRaw;
+      dateStr = Utilities.formatDate(rowDateRaw, "Asia/Rangoon", "dd/MM/yyyy");
+    } else {
+      dateStr = String(rowDateRaw || "").trim().split(" ")[0];
+      const parts = dateStr.split("/");
+      if (parts.length === 3) dateObj = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    }
+
+    if (!statsMap[tgId]) {
+      statsMap[tgId] = {
+        todayCount: 0, yestCount: 0, day2BeforeCount: 0, count7D: 0, countMonth: 0,
+        hasCurrentSlot: false
+      };
+    }
+
+    const rec = statsMap[tgId];
+    if (dateStr === todayStr) {
+      rec.todayCount++;
+      const slot = getAttendanceSlot_(rowTime);
+      if (slot === slotKey) rec.hasCurrentSlot = true;
+    }
+    if (dateStr === yestStr) rec.yestCount++;
+    if (dateStr === day2Before) rec.day2BeforeCount++;
+    if (dateObj && dateObj >= d7) rec.count7D++;
+    if (dateStr.indexOf(currentMonth) !== -1) rec.countMonth++;
+  }
+
+  function getDepOrder(depStr) {
+    const s = String(depStr || "").toLowerCase();
+    if (s.indexOf("team 1") !== -1 || s.indexOf("t1") !== -1) return 1;
+    if (s.indexOf("team 2") !== -1 || s.indexOf("t2") !== -1) return 2;
+    if (s.indexOf("team 3") !== -1 || s.indexOf("t3") !== -1) return 3;
+    if (s.indexOf("team 4") !== -1 || s.indexOf("t4") !== -1) return 4;
+    if (s.indexOf("team 5") !== -1 || s.indexOf("t5") !== -1) return 5;
+    return 0; // Các phòng ban / Office lên đầu
+  }
+
+  const staffProcessed = [];
+
+  for (let i = 0; i < staffVals.length; i++) {
+    const row = staffVals[i];
+    const shortName = String(row[cols.nameCol - 1] || "").trim();
+    const fullName  = cols.fullNameCol ? String(row[cols.fullNameCol - 1] || "").trim() : shortName;
+    const tgId      = String(row[cols.idCol - 1] || "").trim();
+    const dep       = cols.depCol ? String(row[cols.depCol - 1] || "").trim() : "";
+
+    if (!shortName) continue;
+
+    const isTeamMember = /team\s*[1-5]/i.test(dep) || /t[1-5]/i.test(dep);
+
+    // Ngoài Team chỉ cần khung 9:00 (Slot 1)
+    if (!isTeamMember && slotKey !== "slot_morning_1") continue;
+
+    const rec = statsMap[tgId] || { todayCount: 0, yestCount: 0, day2BeforeCount: 0, count7D: 0, countMonth: 0, hasCurrentSlot: false };
+
+    // Format gọn: • Phyo Htet Aung (Team 1) 30/07/26: 1 / 0 / 1 , 7D: 1, 1M: 1
+    const lineText = `• ${fullName || shortName} (${dep || "Office"}) ${dateShort}: ${rec.todayCount} / ${rec.yestCount} / ${rec.day2BeforeCount} , 7D: ${rec.count7D}, 1M: ${rec.countMonth}`;
+
+    staffProcessed.push({
+      depOrder: getDepOrder(dep),
+      depName: dep,
+      name: fullName || shortName,
+      lineText: lineText,
+      hasSlot: rec.hasCurrentSlot
+    });
+  }
+
+  // Sắp xếp: Phòng ban -> Team 1 -> Team 2 -> Team 3 -> Team 4 -> Team 5
+  staffProcessed.sort((a, b) => {
+    if (a.depOrder !== b.depOrder) return a.depOrder - b.depOrder;
+    return a.name.localeCompare(b.name);
+  });
+
+  const reportedList = [];
+  const missingList  = [];
+
+  staffProcessed.forEach(item => {
+    if (item.hasSlot) {
+      reportedList.push(item.lineText);
+    } else {
+      missingList.push(item.lineText);
+    }
+  });
+
+  let msg = `📸 <b>BÁO CÁO HÌNH ẢNH ĐIỂM DANH — ${currentSlotTitle}</b>\n`;
+  msg += `📅 Ngày: <b>${todayStr}</b>\n`;
+  msg += `─────────────────────────\n\n`;
+
+  msg += `✅ <b>ĐÃ BÁO CÁO (${reportedList.length}):</b>\n`;
+  if (reportedList.length > 0) {
+    reportedList.forEach(item => msg += `${item}\n`);
+  } else {
+    msg += `<i>Chưa có ai báo cáo</i>\n`;
+  }
+
+  msg += `\n❌ <b>CHƯA BÁO CÁO (${missingList.length}):</b>\n`;
+  if (missingList.length > 0) {
+    missingList.forEach(item => msg += `${item}\n`);
+  } else {
+    msg += `<i>Tất cả đã báo cáo đầy đủ</i>\n`;
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
+  const targetChatId = props.getProperty("ATTENDANCE_CHAT_ID") || "-1004215695747"; // Default Attendance Chat ID
+
+  sendTelegramMessage_(token, targetChatId, msg);
+}
+
+
+// ============================================================
+// HỆ THỐNG TRIGGER HẸN GIỜ CHO 4 KHUNG (+15 PHÚT SAU MỖI KHUNG)
+// 08:45 | 12:15 | 14:15 | 17:15 Myanmar Time
+// ============================================================
+function triggerSlotReport0845() { sendAttendanceSlotReport("slot_morning_1");   }
+function triggerSlotReport1215() { sendAttendanceSlotReport("slot_morning_2");   }
+function triggerSlotReport1415() { sendAttendanceSlotReport("slot_afternoon_1"); }
+function triggerSlotReport1715() { sendAttendanceSlotReport("slot_afternoon_2"); }
+
+function setupAttendanceReportTriggers() {
+  const handlerNames = ["triggerSlotReport0845", "triggerSlotReport1215", "triggerSlotReport1415", "triggerSlotReport1715"];
+  ScriptApp.getProjectTriggers()
+    .filter(t => handlerNames.indexOf(t.getHandlerFunction()) !== -1)
+    .forEach(t => ScriptApp.deleteTrigger(t));
+
+  ScriptApp.newTrigger("triggerSlotReport0845").timeBased().atHour(8).nearMinute(45).everyDays(1).inTimezone("Asia/Rangoon").create();
+  ScriptApp.newTrigger("triggerSlotReport1215").timeBased().atHour(12).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
+  ScriptApp.newTrigger("triggerSlotReport1415").timeBased().atHour(14).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
+  ScriptApp.newTrigger("triggerSlotReport1715").timeBased().atHour(17).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
+
+  Logger.log("✅ Đã cài đặt thành công 4 trigger hẹn giờ báo cáo (08:45, 12:15, 14:15, 17:15).");
+}
+
+/** Nhận dạng khuôn mặt & đọc mã Site trên hình bằng Gemini AI */
 function identifyFaces_(attendanceBlob, staffList, apiKey) {
-  // Chỉ lọc các nhân viên đã có link ảnh mẫu, giới hạn tối đa 15 người để tránh vượt giới hạn kích thước request
-  const candidates = staffList.filter(s => s.photoUrl && s.photoUrl.trim() !== "").slice(0, 15);
+  // Lấy danh sách các nhân viên có ảnh mẫu mốc đối chiếu (lên đến 30 người)
+  const candidates = staffList.filter(s => s.photoUrl && s.photoUrl.trim() !== "").slice(0, 30);
   if (candidates.length === 0) {
-    Logger.log("⚠️ Không tìm thấy ảnh mẫu đối chiếu nào.");
+    Logger.log("⚠️ Không tìm thấy ảnh mốc đối chiếu nào trong sheet Staff attendance.");
     return { matches: [], imageName: "" };
   }
 
   const parts = [];
-  
-  // 1. Thêm ảnh điểm danh cần kiểm tra
   parts.push({
     inlineData: {
       mimeType: "image/jpeg",
@@ -431,8 +764,9 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
     }
   });
 
-  let promptText = "You are a staff attendance system. Image 1 (first image) is the target attendance photo.\n";
-  promptText += "Here are the reference photos of our staff members:\n";
+  let promptText = "You are an expert AI face recognition and OCR system for staff attendance.\n";
+  promptText += "Image 1 (first image) is the target attendance photo uploaded by a staff member.\n";
+  promptText += "Below are reference face photos of registered staff members:\n";
 
   let imgIndex = 2;
   for (let i = 0; i < candidates.length; i++) {
@@ -447,69 +781,52 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
             data: Utilities.base64Encode(fileBlob.getBytes())
           }
         });
-        promptText += "- Image " + imgIndex + ": Reference photo for staff '" + cand.name + "' (Telegram ID: " + cand.telegramId + ").\n";
+        promptText += `- Image ${imgIndex}: Reference photo for staff '${cand.name}' (Full name: '${cand.fullName}', Telegram ID: '${cand.telegramId}').\n`;
         imgIndex++;
       }
     } catch (e) {
-      Logger.log("⚠️ Lỗi tải ảnh mẫu của " + cand.name + ": " + e.message);
+      Logger.log("⚠️ Không thể đọc ảnh mốc của " + cand.name + ": " + e.message);
     }
   }
 
-  promptText += "\nTask:\n";
-  promptText += "1. Identify which of the reference staff members are clearly present in the target attendance photo (Image 1).\n";
-  promptText += "2. Look at the target attendance photo (Image 1) and find any text watermark, label, or handwritten code starting with 'TNI' followed by numbers or letters (e.g., 'TNI0295', 'TNI0312'). Extract this code completely (exclude labels like 'Name:' or 'TNI: ' prefix if separate, return the code itself like 'TNI0295').\n\n";
-  promptText += "Return the result as a strict JSON object containing:\n";
-  promptText += "- \"matches\": Array of objects, each containing:\n";
-  promptText += "  - \"name\": String, name of matched staff member.\n";
-  promptText += "  - \"telegramId\": String, telegram ID of matched staff member.\n";
-  promptText += "- \"imageName\": String, the extracted code starting with 'TNI' from the photo (e.g., \"TNI0295\"). If not found, return empty string \"\".\n\n";
-  promptText += "Do not write any markdown code block formatting (like ```json), only return the raw JSON.\n";
-  promptText += "Example Output:\n";
-  promptText += '{"matches": [{"name": "Ye Lwin", "telegramId": "123456"}], "imageName": "TNI0295"}';
+  promptText += "\nTASKS TO PERFORM:\n";
+  promptText += "1. FACE MATCHING: Compare the face(s) in Image 1 against all reference photos (Image 2 onwards). Identify which staff member(s) are present in Image 1.\n";
+  promptText += "2. WATERMARK / TEXT OCR: Read the watermark text on Image 1 (especially at the bottom right, top left, or bottom left corners like 'TNI0047', 'TNI0105', 'Branch Office'). Extract:\n";
+  promptText += "   - Any Site Code / Station ID starting with 'TNI' followed by digits (e.g., 'TNI0047', 'TNI0105', 'TNI0295').\n";
+  promptText += "   - Or Location / Office name if no TNI code is present (e.g. 'Branch Office').\n";
 
-  parts.push({
-    text: promptText
-  });
+  promptText += "\nRETURN FORMAT:\n";
+  promptText += "Return a strict raw JSON object without markdown formatting:\n";
+  promptText += "{\n";
+  promptText += "  \"matches\": [{\"name\": \"Staff Name\", \"telegramId\": \"123456\"}],\n";
+  promptText += "  \"imageName\": \"Extracted Site Code or Location (e.g. TNI0047 or Branch Office)\"\n";
+  promptText += "}\n";
+
+  parts.push({ text: promptText });
 
   const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
-  const payload = {
-    contents: [{ parts: parts }],
-    generationConfig: {
-      responseMimeType: "application/json"
-    }
-  };
-
-  const resp = UrlFetchApp.fetch(url, {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  });
-
-  if (resp.getResponseCode() !== 200) {
-    Logger.log("❌ Gemini API failed: " + resp.getContentText());
-    return { matches: [], imageName: "" };
-  }
+  const payload = { contents: [{ parts: parts }], generationConfig: { responseMimeType: "application/json" } };
 
   try {
+    const resp = UrlFetchApp.fetch(url, {
+      method: "post", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true
+    });
+
+    if (resp.getResponseCode() !== 200) {
+      Logger.log("❌ Gemini API Call Error: " + resp.getContentText());
+      return { matches: [], imageName: "" };
+    }
+
     const resData = JSON.parse(resp.getContentText());
     const textResult = resData.candidates[0].content.parts[0].text.trim();
-    Logger.log("Gemini matched result: " + textResult);
-    
-    // Clean markdown blocks if Gemini accidentally included them
-    let cleanJson = textResult;
-    if (cleanJson.indexOf("```") !== -1) {
-      cleanJson = cleanJson.replace(/```json/g, "").replace(/```/g, "").trim();
-    }
-    
+    let cleanJson = textResult.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleanJson);
   } catch (e) {
-    Logger.log("❌ Lỗi parse kết quả Gemini: " + e.message);
+    Logger.log("❌ Lỗi xử lý Gemini AI: " + e.message);
     return { matches: [], imageName: "" };
   }
 }
 
-/** Trích xuất file ID từ link Google Drive */
 function extractFileId_(url) {
   if (!url) return null;
   let match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
@@ -519,63 +836,66 @@ function extractFileId_(url) {
   return null;
 }
 
-/** Gửi tin nhắn phản hồi Telegram */
 function sendTelegramMessage_(token, chatId, text) {
   const url = "https://api.telegram.org/bot" + token + "/sendMessage";
-  const payload = {
-    chat_id: chatId,
-    text: text,
-    parse_mode: "Markdown"
-  };
+  const payload = { chat_id: chatId, text: text, parse_mode: "HTML" };
   const resp = UrlFetchApp.fetch(url, {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
+    method: "post", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true
   });
   return resp.getResponseCode() === 200;
 }
 
-/** Hàm thiết lập Webhook cho Bot */
 function setupAttendanceWebhook() {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
   let webAppUrl = props.getProperty("WEBAPP_URL") || "";
   if (!webAppUrl) {
-    try {
-      webAppUrl = ScriptApp.getService().getUrl() || "";
-    } catch(e) {}
+    try { webAppUrl = ScriptApp.getService().getUrl() || ""; } catch(e) {}
   }
-  
-  if (!webAppUrl) {
-    Logger.log("❌ Thiếu WEBAPP_URL. Hãy Deploy làm Web App (Execute as: Me, Access: Anyone) rồi thử lại.");
-    return;
-  }
+  if (!webAppUrl) return;
   
   const url = "https://api.telegram.org/bot" + token + "/setWebhook";
-  const payload = {
-    url: webAppUrl,
-    allowed_updates: JSON.stringify(["message"])
-  };
-  
-  const resp = UrlFetchApp.fetch(url, {
-    method: "post",
-    payload: payload,
-    muteHttpExceptions: true
-  });
-  Logger.log("Set Webhook Response: " + resp.getContentText());
+  const payload = { url: webAppUrl, allowed_updates: JSON.stringify(["message"]) };
+  UrlFetchApp.fetch(url, { method: "post", payload: payload, muteHttpExceptions: true });
 }
 
-/** Hàm thiết lập các tham số cấu hình ban đầu */
+/** Tìm hoặc lấy Folder ID của thư mục "2.11 Attendance photo" ở bất kỳ vị trí nào trên Google Drive */
+function getAttendanceFolderId_() {
+  const props = PropertiesService.getScriptProperties();
+
+  // 1. Tìm kiếm thư mục có tên "2.11 Attendance photo" trên toàn bộ Google Drive (dù chuyển đi vị trí nào)
+  try {
+    const folders = DriveApp.getFoldersByName("2.11 Attendance photo");
+    if (folders.hasNext()) {
+      const targetFolder = folders.next();
+      const folderId = targetFolder.getId();
+      props.setProperty("DRIVE_FOLDER_ID", folderId);
+      Logger.log("📁 Đã tự động kết nối thư mục '2.11 Attendance photo' mới với ID: " + folderId);
+      return folderId;
+    }
+  } catch(e) {
+    Logger.log("⚠️ Lỗi tìm thư mục 2.11 Attendance photo: " + e.message);
+  }
+
+  // 2. Dự phòng dùng ID đã lưu trong ScriptProperties
+  let savedId = props.getProperty("DRIVE_FOLDER_ID");
+  if (savedId && savedId !== "1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb") {
+    try {
+      if (DriveApp.getFolderById(savedId)) return savedId;
+    } catch(e) {}
+  }
+
+  return "1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb";
+}
+
 function initAttendanceScriptProperties() {
   const props = PropertiesService.getScriptProperties();
   props.setProperty("SEND_BOT_TOKEN", "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw");
   props.setProperty("ATTENDANCE_SS_ID", "18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
-  props.setProperty("DRIVE_FOLDER_ID", "1qT8RxGKgVyUo-EG7PwVvH2MSE5bxPUJb");
-  Logger.log("✅ Khởi tạo Script Properties thành công.");
+  const fId = getAttendanceFolderId_();
+  Logger.log("✅ Khởi tạo Script Properties với Folder '2.11 Attendance photo' ID: " + fId);
 }
 
-/** Ghi log trực tiếp lên sheet Logs để debug */
 function logToSheet_(message) {
   try {
     const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
@@ -585,7 +905,5 @@ function logToSheet_(message) {
       logSheet.appendRow(["Timestamp", "Message"]);
     }
     logSheet.appendRow([new Date(), message]);
-  } catch (e) {
-    // Bỏ qua lỗi ghi log
-  }
+  } catch (e) {}
 }

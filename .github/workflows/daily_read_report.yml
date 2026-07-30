@@ -2,7 +2,11 @@ name: Daily Note Read Report (Report 6)
 
 on:
   schedule:
-    - cron: '0 3,7,14 * * *'  # 09:30, 13:30, 20:30 Myanmar time
+    # 03:30 UTC = 10:00 Myanmar
+    # 07:30 UTC = 14:00 Myanmar
+    # 09:30 UTC = 16:00 Myanmar
+    # 14:30 UTC = 21:00 Myanmar
+    - cron: '30 3,7,9,14 * * *'
   workflow_dispatch:          # Nút chạy tay
 
 jobs:
