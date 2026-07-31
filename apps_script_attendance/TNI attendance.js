@@ -167,11 +167,12 @@ function doPost(e) {
     if (geminiMatches && geminiMatches.length > 0) {
       for (let i = 0; i < geminiMatches.length; i++) {
         const gMatch = geminiMatches[i];
-        if (String(gMatch.name).toLowerCase() === "tni") continue; // Bỏ chữ "TNI"
+        const matchNameRaw = String(gMatch.name || "").trim();
+        if (!matchNameRaw || matchNameRaw.toLowerCase() === "tni" || matchNameRaw.toLowerCase() === "vcm") continue; // Bỏ chữ "TNI" / "VCM"
 
         const dbStaff = staffList.find(s => 
-          (s.name && s.name.toLowerCase() === String(gMatch.name).toLowerCase()) || 
-          (s.fullName && s.fullName.toLowerCase() === String(gMatch.name).toLowerCase()) ||
+          (s.name && s.name.toLowerCase() === matchNameRaw.toLowerCase()) || 
+          (s.fullName && s.fullName.toLowerCase() === matchNameRaw.toLowerCase()) ||
           (s.telegramId && s.telegramId === String(gMatch.telegramId))
         );
         if (dbStaff) {
@@ -186,8 +187,8 @@ function doPost(e) {
           }
         } else {
           finalMatches.push({
-            name: gMatch.name,
-            fullName: gMatch.name,
+            name: matchNameRaw,
+            fullName: matchNameRaw,
             telegramId: senderId,
             department: ""
           });
@@ -197,7 +198,7 @@ function doPost(e) {
 
     // 2) Dự phòng nếu AI chưa nhận diện được ai trên hình: Chỉ lấy thông tin nhân viên thật, BỎ HẲN TÊN "TNI"
     if (finalMatches.length === 0) {
-      const senderStaff = staffList.find(s => s.telegramId === senderId && s.name.toLowerCase() !== "tni");
+      const senderStaff = staffList.find(s => s.telegramId === senderId && s.name.toLowerCase() !== "tni" && s.name.toLowerCase() !== "vcm");
       if (senderStaff) {
         finalMatches.push({
           name: senderStaff.name,
@@ -206,9 +207,10 @@ function doPost(e) {
           department: senderStaff.department
         });
       } else {
+        const safeName = (senderName && senderName.toLowerCase() !== "tni" && senderName.toLowerCase() !== "vcm") ? senderName : "";
         finalMatches.push({
-          name: senderName,
-          fullName: senderName,
+          name: safeName,
+          fullName: safeName,
           telegramId: senderId,
           department: ""
         });
