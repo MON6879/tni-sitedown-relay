@@ -41,6 +41,32 @@ function doGet(e) {
     buildGeneralTab();
     return ContentService.createTextOutput("General tab updated successfully");
   }
+  // Chẩn đoán: kiểm tra GEMINI_API_KEY và ảnh mẫu cột O
+  if (action === "check_props") {
+    const props = PropertiesService.getScriptProperties();
+    const gemKey = props.getProperty("GEMINI_API_KEY") || "";
+    const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+    const staffSheet = ss.getSheetByName("Staff attendance");
+    let photoCount = 0;
+    if (staffSheet && staffSheet.getLastRow() >= 2) {
+      const vals = staffSheet.getRange(2, 15, staffSheet.getLastRow() - 1, 1).getValues();
+      photoCount = vals.filter(r => String(r[0] || "").trim() !== "").length;
+    }
+    return ContentService.createTextOutput(JSON.stringify({
+      gemini_key_set: gemKey.length > 0,
+      gemini_key_length: gemKey.length,
+      staff_photos_in_colO: photoCount
+    }));
+  }
+  // Set GEMINI_API_KEY từ xa: ?action=set_gemini_key&key=AIza...
+  if (action === "set_gemini_key") {
+    const key = e.parameter.key || "";
+    if (key.length > 10) {
+      PropertiesService.getScriptProperties().setProperty("GEMINI_API_KEY", key);
+      return ContentService.createTextOutput("GEMINI_API_KEY set OK. Length: " + key.length);
+    }
+    return ContentService.createTextOutput("ERROR: key param missing or too short");
+  }
   return ContentService.createTextOutput("Unknown action: " + action);
 }
 
