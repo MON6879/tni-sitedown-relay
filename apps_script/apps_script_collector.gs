@@ -308,13 +308,14 @@ function handleAdd(sheet, body) {
   }
 
   const row = ["", dateTime, chatId, content, ""];
-  sheet.appendRow(row);
+  sheet.insertRowBefore(2);
+  sheet.getRange(2, 1, 1, row.length).setValues([row]);
 
-  const rowNum = sheet.getLastRow();
-  const seqId  = rowNum - 1;
+  const rowNum = 2;
+  const seqId  = sheet.getLastRow() - 1;
 
   // Ghi REF vào cột A
-  sheet.getRange(rowNum, 1).setValue(seqId);
+  sheet.getRange(2, 1).setValue(seqId);
 
   // Gắn ảnh pending (nếu user đã gửi ảnh trước khi gửi text)
   const props   = PropertiesService.getScriptProperties();
@@ -323,14 +324,14 @@ function handleAdd(sheet, body) {
   if (pending.length > 0) {
     pending.forEach(function(link, idx) {
       if (idx < 12) {
-        sheet.getRange(rowNum, 6 + idx).setValue(link); // F=6 ... Q=17
+        sheet.getRange(2, 6 + idx).setValue(link); // F=6 ... Q=17
       }
     });
     props.deleteProperty(pKey);
   }
 
   const bg = seqId % 2 === 0 ? "#EBF3FB" : "#FFFFFF";
-  sheet.getRange(rowNum, 1, 1, 17).setBackground(bg); // A–Q
+  sheet.getRange(2, 1, 1, 17).setBackground(bg); // A–Q
 
   // Lưu ACTIVE_REF + reset PHOTO_COUNT cho user này
   // Ảnh gửi sau sẽ tự gắn vào đây, dừng sau 12 ảnh
