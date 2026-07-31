@@ -1291,8 +1291,9 @@ class handler(BaseHTTPRequestHandler):
         ensure_webhook_locked_bg()
         try:
             length = int(self.headers.get("Content-Length", 0))
-            data   = json.loads(self.rfile.read(length))
-            
+            raw    = self.rfile.read(length)
+            data   = json.loads(raw)
+
             action = data.get("action")
             if action == "submit_plan":
                 chat_id = data.get("chat_id")
@@ -1312,25 +1313,40 @@ class handler(BaseHTTPRequestHandler):
                     self.end_headers()
                     self.wfile.write(json.dumps({"status": "error", "message": "Missing chat_id or text"}).encode("utf-8"))
                     return
-            
-            handle(data)
+
+            # ✅ CRITICAL: ACK Telegram ngay lập tức trong 1ms
+            # Nếu không, Telegram sẽ retry liên tục sau 10s → gây trễ 21 phút
             self.send_response(200)
+            self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(b"OK")
+            self.wfile.write(b'{"ok":true}')
+
+            # Xử lý message trong background thread để không block HTTP response
+            def _process():
+                try:
+                    handle(data)
+                except Exception as ex:
+                    logger.error(f"handle() error in background: {ex}")
+                    try:
+                        import traceback
+                        tb = traceback.format_exc()
+                        msg_obj = data.get("message") or data.get("edited_message") or {}
+                        chat_id = msg_obj.get("chat", {}).get("id")
+                        if chat_id:
+                            tg_send(chat_id, f"⚠️ <b>Error:</b>\n<pre>{html.escape(tb[:2000])}</pre>")
+                    except Exception:
+                        pass
+
+            threading.Thread(target=_process, daemon=True).start()
+
         except Exception as ex:
-            logger.error(f"Webhook POST error: {ex}")
+            logger.error(f"Webhook POST parse error: {ex}")
             try:
-                import traceback
-                tb = traceback.format_exc()
-                msg = data.get("message") or data.get("edited_message") or {}
-                chat_id = msg.get("chat", {}).get("id")
-                if chat_id:
-                    tg_send(chat_id, f"⚠️ <b>Webhook Error Traceback:</b>\n<pre>{html.escape(tb[:3500])}</pre>")
+                self.send_response(200)   # Vẫn trả 200 để Telegram không retry
+                self.end_headers()
+                self.wfile.write(b'{"ok":true}')
             except Exception:
                 pass
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(str(ex).encode())
 
     def do_GET(self):
         ensure_webhook_locked_bg()
