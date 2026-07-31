@@ -66,7 +66,8 @@ def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
 def deduplicate_refuel_rows(rows: list[str]) -> list[str]:
     """
     Bỏ trùng các mã trạm / máy phát (ví dụ: TNI0013_1) trong báo cáo tổng hợp Request Refuel.
-    Khi thu thập thì lưu đủ 100%, nhưng khi báo cáo tổng hợp thì tự động lọc bỏ trùng.
+    - Thu thập dữ liệu: Thu thập 100% tất cả yêu cầu gửi về (cho phép dính trùng do yêu cầu chưa thực hiện theo kế hoạch cũ).
+    - Lập báo cáo tổng hợp: Tự động lọc BỎ TRÙNG theo mã trạm/máy phát để so sánh chính xác với Kế hoạch (Plan).
     """
     if not rows:
         return []
