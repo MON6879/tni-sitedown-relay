@@ -701,16 +701,27 @@ def get_info(tni: str) -> dict | None:
     """Tìm TNI trong sheet gid=171059303, trả về Site/Cable/Gpon/DIA."""
     try:
         df = fetch_csv(GID_INFO)
+        if df is None or df.empty:
+            return None
+        tni_upper = tni.upper().strip()
         rows = df.iloc[1:] if len(df) > 1 else df
         for _, row in rows.iterrows():
-            a = safe(row, 0)  # Col A = Name Site (TNI code)
-            if a.upper() == tni.upper():
-                return {
-                    "site":  safe(row, 1),  # Col B
-                    "cable": safe(row, 2),  # Col C
-                    "gpon":  safe(row, 3),  # Col D
-                    "dia":   safe(row, 4),  # Col E
-                }
+            col_a = safe(row, 0).upper().strip()
+            if not col_a:
+                continue
+            code_part = col_a.split(":")[0].strip()
+            if code_part == tni_upper or col_a == tni_upper or col_a.startswith(tni_upper):
+                site_val  = safe(row, 1)
+                cable_val = safe(row, 2)
+                gpon_val  = safe(row, 3)
+                dia_val   = safe(row, 4)
+                if any([site_val, cable_val, gpon_val, dia_val]):
+                    return {
+                        "site":  site_val,
+                        "cable": cable_val,
+                        "gpon":  gpon_val,
+                        "dia":   dia_val,
+                    }
         return None
     except Exception as ex:
         logger.error(f"get_info error: {ex}")
