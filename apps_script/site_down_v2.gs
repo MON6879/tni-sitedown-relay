@@ -717,7 +717,7 @@ function triggerBotlookupRelay() {
   const pat   = props.getProperty("GITHUB_PAT") || "";
   if (!pat) return;
   try {
-    UrlFetchApp.fetch("https://api.github.com/repos/MON6879/tni-sitedown-relay/actions/workflows/botlookup_relay.yml/dispatches", {
+    UrlFetchApp.fetch("https://api.github.com/repos/phonghdpxd-cmd/tni-bot/actions/workflows/botlookup_relay.yml/dispatches", {
       method: "post",
       headers: { "Authorization": "token " + pat, "Accept": "application/vnd.github.v3+json" },
       contentType: "application/json",
