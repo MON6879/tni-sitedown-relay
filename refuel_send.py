@@ -26,6 +26,7 @@ def fetch_refuel_data() -> list[str] | None:
     try:
         resp = requests.get(csv_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
+        resp.encoding = "utf-8"
         reader = list(csv.reader(io.StringIO(resp.text)))
         data = []
         for r in reader[1:5]:  # Rows 2 to 5 (Y2:Y5)
@@ -144,7 +145,18 @@ def format_and_send_report(rows: list[str]) -> list[int]:
     for line in rows:
         line_clean = str(line).strip()
         if line_clean and "Report need refuel" not in line_clean:
-            msg_lines.append(line_clean)
+            # Loại bỏ ký tự hỏng mã hóa ở đầu nếu có và ép hiển thị đúng emoji chấm màu
+            clean = re.sub(r'^[^\w\s🔴🔵🟢🟡]+', '', line_clean).strip()
+            if re.search(r'Team\s*1\b', clean, re.IGNORECASE) and not clean.startswith("🔴"):
+                clean = "🔴 " + re.sub(r'^(?:🔴|ð\s*\')?\s*', '', clean)
+            elif re.search(r'Team\s*2\b', clean, re.IGNORECASE) and not clean.startswith("🔵"):
+                clean = "🔵 " + re.sub(r'^(?:🔵|ðµ)?\s*', '', clean)
+            elif re.search(r'Team\s*3\b', clean, re.IGNORECASE) and not clean.startswith("🟢"):
+                clean = "🟢 " + re.sub(r'^(?:🟢|ð¢)?\s*', '', clean)
+            elif re.search(r'Team\s*4\b', clean, re.IGNORECASE) and not clean.startswith("🟡"):
+                clean = "🟡 " + re.sub(r'^(?:🟡|ð¡)?\s*', '', clean)
+
+            msg_lines.append(clean)
             msg_lines.append("")  # Dòng trống giữa các Team
             
     if not msg_lines:
