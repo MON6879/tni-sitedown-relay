@@ -207,7 +207,13 @@ function doPost(e) {
           department: senderStaff.department
         });
       } else {
-        const safeName = (senderName && senderName.toLowerCase() !== "tni" && senderName.toLowerCase() !== "vcm") ? senderName : "";
+        // Nếu tên Telegram người gửi trùng với watermark (TNI, VCM, Branch, Office...) -> để trống
+        const BLOCKED_NAMES = ["tni", "vcm", "office", "branch"];
+        const senderNameLow = senderName ? senderName.toLowerCase().trim() : "";
+        const isSafe = senderNameLow &&
+          !BLOCKED_NAMES.includes(senderNameLow) &&
+          !/^tni\d+/i.test(senderNameLow);
+        const safeName = isSafe ? senderName : "";
         finalMatches.push({
           name: safeName,
           fullName: safeName,
@@ -242,12 +248,18 @@ function doPost(e) {
       replyMsg += ":\n";
       for (let i = 0; i < finalMatches.length; i++) {
         const match = finalMatches[i];
-        const finalShortName = match.name;
-        const finalFullName = match.fullName;
+        // Lọc final safety: không bao giờ ghi 'TNI', 'VCM', hoặc TNIxxxx vào cột tên
+        const BLOCKED = ["tni", "vcm", "office", "branch"];
+        const rawName = String(match.name || "").trim();
+        const rawNameLow = rawName.toLowerCase();
+        const finalShortName = (rawName && !BLOCKED.includes(rawNameLow) && !/^tni\d+/i.test(rawNameLow)) ? rawName : "";
+        const rawFullName = String(match.fullName || "").trim();
+        const rawFullLow = rawFullName.toLowerCase();
+        const finalFullName = (rawFullName && !BLOCKED.includes(rawFullLow) && !/^tni\d+/i.test(rawFullLow)) ? rawFullName : "";
         const finalTgId = match.telegramId; // ID Telegram người gửi
         const finalDep = match.department;
 
-        if (isAlreadyLoggedToday_(attendanceSheet, dateStr, timeStr, finalShortName, extractedImageName)) {
+        if (finalShortName && isAlreadyLoggedToday_(attendanceSheet, dateStr, timeStr, finalShortName, extractedImageName)) {
           replyMsg += `- ${finalShortName} (Already logged for this time slot)\n`;
           continue;
         }
@@ -258,12 +270,12 @@ function doPost(e) {
           dateStr,          // Col B: Date
           timeStr,          // Col C: Time report
           finalTgId,        // Col D: ID Telegram người gửi
-          finalShortName,   // Col E: Name Trên Hình (Tên ngắn người được nhận diện)
-          finalFullName,    // Col F: Full name (Họ tên người được nhận diện)
+          finalShortName,   // Col E: Name Trên Hình (Tên ngắn người được nhận diện - trống nếu chưa nhận)
+          finalFullName,    // Col F: Full name (Họ tên người được nhận diện - trống nếu chưa nhận)
           driveFileUrl      // Col G: photo (Link ảnh Google Drive)
         ]]);
         
-        replyMsg += `- ${finalShortName}` + (finalDep ? ` (${finalDep})\n` : `\n`);
+        replyMsg += finalShortName ? (`- ${finalShortName}` + (finalDep ? ` (${finalDep})\n` : `\n`)) : `- (Chưa nhận diện được tên)\n`;
         successCount++;
       }
     } else {
