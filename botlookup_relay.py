@@ -76,10 +76,10 @@ def split_message(text: str, max_len: int) -> list[str]:
 
 
 async def main():
-    # ── 0. Kiểm tra khung giờ ────────────────────────────────────
-    if not in_active_window():
-        print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ 04:30–21:30. Kết thúc.")
-        return
+    # ── 0. Kiểm tra khung giờ (Đã mở chạy 24/7 theo yêu cầu) ─────
+    # if not in_active_window():
+    #     print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ. Kết thúc.")
+    #     return
 
     # ── 2. Kết nối Telegram ───────────────────────────────────────
     from telethon.sessions import StringSession
