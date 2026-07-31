@@ -11,8 +11,9 @@ jobs:
     steps:
       - name: Lock & Ensure Webhook 100% Active 24/7 on Vercel Serverless
         run: |
-          echo "🔒 Re-locking Webhook for Bot 3 (@SEARCHTNITASKWOBOT)..."
-          curl -s -f "https://api.telegram.org/bot8606383435:AAEstcN4Om6_9ZAjs4OoFV2uVlRALgae2Ac/setWebhook?url=https://tni-bot.vercel.app/api/search_bot" || true
+          echo "🔒 Re-locking Webhook for Bot 3 (@SEARCHTNITASKWOBOT) → tni-done.vercel.app..."
+          curl -s -f "https://api.telegram.org/bot8606383435:AAEstcN4Om6_9ZAjs4OoFV2uVlRALgae2Ac/setWebhook?url=https://tni-done.vercel.app/api/search_bot" || true
           echo ""
-          echo "⚡ Ping Vercel Serverless endpoint..."
-          curl -s "https://tni-bot.vercel.app/api/search_bot" || true
+          echo "⚡ Ping tni-done.vercel.app endpoint..."
+          curl -s "https://tni-done.vercel.app/api/search_bot" || true
+
