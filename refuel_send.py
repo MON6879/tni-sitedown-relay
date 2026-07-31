@@ -21,7 +21,7 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))  # Múi giờ Myanmar UTC+6:30
 
 
 def fetch_refuel_data() -> list[str] | None:
-    """Tải trực tiếp nội dung 4 ô Y2:Y5 (Column Y) của tab Need Refuel từ Google Sheets CSV Export."""
+    """Tải trực tiếp nội dung các ô Y2 trở đi (Column Y) của tab Need Refuel từ Google Sheets CSV Export."""
     csv_url = "https://docs.google.com/spreadsheets/d/1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM/export?format=csv&gid=0"
     try:
         resp = requests.get(csv_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
@@ -29,7 +29,7 @@ def fetch_refuel_data() -> list[str] | None:
         resp.encoding = "utf-8"
         reader = list(csv.reader(io.StringIO(resp.text)))
         data = []
-        for r in reader[1:5]:  # Rows 2 to 5 (Y2:Y5)
+        for r in reader[1:10]:  # Read rows 2 to 10 (Y2:Y10)
             if len(r) > 24 and r[24].strip():
                 data.append(r[24].strip())
         if data:
@@ -145,6 +145,11 @@ def format_and_send_report(rows: list[str]) -> list[int]:
     for line in rows:
         line_clean = str(line).strip()
         if line_clean and "Report need refuel" not in line_clean:
+            if line_clean.lower().startswith("/note:") or line_clean.lower().startswith("note:"):
+                msg_lines.append(line_clean)
+                msg_lines.append("")
+                continue
+
             # Loại bỏ ký tự hỏng mã hóa ở đầu nếu có và ép hiển thị đúng emoji chấm màu
             clean = re.sub(r'^[^\w\s🔴🔵🟢🟡]+', '', line_clean).strip()
             if re.search(r'Team\s*1\b', clean, re.IGNORECASE) and not clean.startswith("🔴"):
