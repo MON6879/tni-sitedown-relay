@@ -1,0 +1,9 @@
+{
+  "builds": [
+    { "src": "api/site_down_relay.py", "use": "@vercel/python", "config": { "maxDuration": 30 } }
+  ],
+  "routes": [
+    { "src": "/api/site_down_relay", "dest": "api/site_down_relay.py" },
+    { "src": "/(.*)",                "dest": "/$1" }
+  ]
+}
