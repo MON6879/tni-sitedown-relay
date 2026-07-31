@@ -1,0 +1,24 @@
+name: Refuel Report (16:00 & 06:10 MMT)
+
+on:
+  schedule:
+    - cron: '30 9 * * *'   # 16:00 Myanmar Time (09:30 UTC)
+    - cron: '40 23 * * *'  # 06:10 Myanmar Time (23:40 UTC)
+  workflow_dispatch:       # Cho phép kích hoạt thủ công khi cần
+
+jobs:
+  refuel-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install requests python-dotenv
+      - name: Run Refuel Report
+        env:
+          REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}
+          REFUEL_CHAT_ID: ${{ secrets.REFUEL_CHAT_ID }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+        run: python refuel_send.py

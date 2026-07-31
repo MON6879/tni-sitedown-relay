@@ -63,8 +63,44 @@ def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
     return ok, msg_id
 
 
+def deduplicate_refuel_rows(rows: list[str]) -> list[str]:
+    """
+    Bỏ trùng các mã trạm / máy phát (ví dụ: TNI0013_1) trong báo cáo tổng hợp Request Refuel.
+    Khi thu thập thì lưu đủ 100%, nhưng khi báo cáo tổng hợp thì tự động lọc bỏ trùng.
+    """
+    if not rows:
+        return []
+
+    deduped = []
+    seen_sites = set()
+
+    for line in rows:
+        line_clean = str(line).strip()
+        if not line_clean:
+            continue
+
+        # Tìm các mã trạm dạng TNIxxxx hoặc TNIxxxx_1
+        site_matches = re.findall(r'TNI\d+(?:_\d+)?', line_clean, re.IGNORECASE)
+        if site_matches:
+            # Nếu tất cả mã trạm trong dòng này đã từng xuất hiện ở dòng trước -> Bỏ qua dòng trùng
+            all_seen = all(s.upper() in seen_sites for s in site_matches)
+            if all_seen:
+                continue
+
+            # Đánh dấu các mã trạm mới vào danh sách đã thấy
+            for s in site_matches:
+                seen_sites.add(s.upper())
+
+        deduped.append(line_clean)
+
+    return deduped
+
+
 def format_and_send_report(rows: list[str]) -> list[int]:
     """Phân loại dữ liệu theo Team, lập bảng tổng hợp và chia nhỏ tin nếu vượt quá giới hạn 4096 ký tự."""
+    # Lọc bỏ trùng trước khi tổng hợp báo cáo theo yêu cầu
+    rows = deduplicate_refuel_rows(rows)
+
     now = datetime.now(TZ_MM)
     date_str = now.strftime("%d/%m/%Y")
     time_str = now.strftime("%H:%M")
