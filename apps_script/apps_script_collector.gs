@@ -2397,11 +2397,8 @@ function doGetRefuelData_(e) {
     if (!sheet) {
       return json({ status: "error", message: "Sheet Need Refuel not found" });
     }
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) {
-      return json({ status: "ok", data: [] });
-    }
-    const values = sheet.getRange(2, 18, lastRow - 1, 1).getValues();
+    // Đọc chính xác 4 ô Y2:Y5 (Column Y = 25) của sheet Need Refuel
+    const values = sheet.getRange(2, 25, 4, 1).getValues();
     const data = [];
     for (let i = 0; i < values.length; i++) {
       const valTrim = String(values[i][0] || "").trim();

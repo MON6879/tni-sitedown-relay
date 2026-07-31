@@ -474,10 +474,8 @@ function getRefuelData() {
   const sheet = ss.getSheetByName("Need Refuel");
   if (!sheet) return jsonResp({ status: "error", message: "Sheet 'Need Refuel' not found" });
 
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return jsonResp({ status: "ok", data: [] });
-
-  const values = sheet.getRange(2, 18, lastRow - 1, 1).getValues();  // Cột R = 18
+  // Đọc chính xác 4 ô Y2:Y5 (Column Y = 25) của sheet Need Refuel
+  const values = sheet.getRange(2, 25, 4, 1).getValues();
   const data   = [];
   for (let i = 0; i < values.length; i++) {
     const val = String(values[i][0] || "").trim();

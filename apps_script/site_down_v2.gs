@@ -247,8 +247,9 @@ function checkAndSend(isWebhookCall) {
   }
 
   // 🔹 LUỒNG 2: DÀNH RIÊNG CHO AW7 (TIN 2 SUMMARY)
+  // Nếu Tin 1 vừa phát (r1 = true), ép Tin 2 phát lại ngay phía dưới để Tin 2 LUÔN NẰM Ở ĐÁY CHAT DƯỚI TIN 1
   try {
-    r2 = processSummaryAwAz(sheet);
+    r2 = processSummaryAwAz(sheet, r1 === true);
   } catch(e2) {
     Logger.log("❌ Lỗi Luồng 2 (AW7 Summary): " + e2.message);
   }
