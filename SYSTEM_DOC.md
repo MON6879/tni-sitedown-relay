@@ -14,7 +14,7 @@
 | **Bot 2** | **TNI Auto Report Daily Bot**<br>`@TNIREPORTTASK_BOT`<br>(`2. TNI Auto Report Daily`) | **GitHub Actions Cloud 24/7** | Cron Workflows (`daily_plan_report.yml`, `daily_read_report.yml`) | • Báo cáo Kế hoạch (Plan Report 17:30 MMT)<br>• Báo cáo Đọc Note (09:30, 14:00, 16:00, 21:00 MMT)<br>• Báo cáo Công việc ngày (17:00 MMT) |
 | **Bot 5** | **TNI Site Down Cell Alarm Bot**<br>`@TNISITEDOWN_BOT`<br>(`5T TNI_SITE_DOWN_CELL_ALARM`) | **Google Apps Script Cloud** | Project: `site_down_v2.gs` (1-min trigger) | • Tin 1 (Chi tiết Site Down từ Cột C)<br>• Tin 2 (SUMMARY từ AW7:AZ15)<br>• **Quy tắc tuyệt đối**: Tin 2 SUMMARY LUÔN ÉP BẮN NỐI ĐUÔI Ở DƯỚI CÙNG ĐÁY CHAT bên dưới Tin 1 |
 | **Bot Attendance** | **TNI Attendance Bot**<br>`@TNIATTENDANCE_BOT` | **Google Apps Script Cloud** | Project: `TNI attendance.js` (Web App `/exec`) | • Đọc ảnh điểm danh & Nhận diện khuôn mặt Gemini 2.5 Flash<br>• Tự lưu ảnh vào thư mục `2.11 Attendance photo`<br>• Tự cập nhật tab `General`<br>• Tự động phát báo cáo 4 mốc giờ (08:45, 12:15, 14:15, 17:15 MMT) |
-| **Bot 9** | **TNI Request Refuel Bot**<br>`@TNI_FUEL`<br>(`9 TNI REQUEST REFUEL`) | **GitHub Actions Cloud 24/7** | Cron Workflow (`refuel_report.yml`) | • Báo cáo Request Refuel tự động 2 mốc giờ (**06:10 MMT** & **16:00 MMT**)<br>• **Thu thập 100% dữ liệu thô**, tự động **lọc BỎ TRÙNG** mã trạm/máy phát khi lập báo cáo tổng hợp |
+| **Bot 9** | **TNI Request Refuel Bot**<br>`@TNI_FUEL`<br>(`9 TNI REQUEST REFUEL`) | **GitHub Actions Cloud 24/7** | Cron Workflow (`refuel_report.yml`) | • Báo cáo Request Refuel tự động 2 mốc giờ (**06:15 MMT** & **16:20 MMT**)<br>• **Thu thập 100% dữ liệu thô**, tự động **lọc BỎ TRÙNG** mã trạm/máy phát khi lập báo cáo tổng hợp |
 
 ---
 
