@@ -97,44 +97,73 @@ def deduplicate_refuel_rows(rows: list[str]) -> list[str]:
     return deduped
 
 
+def parse_sites_from_row(line_text: str) -> list[tuple[str, str]]:
+    """
+    Tách các trạm và dung tích dầu từ dòng Request Refuel, tự động LỌC BỎ các mốc ngày (DD/MM/YYYY).
+    Trả về list [(site_code, qty_str), ...]
+    Ví dụ: 'TNI0129_1: 660 + TNI0006_1: 660 < + > 01/08/2026: TNI0031_1: 440' -> [('TNI0129_1', '660L'), ('TNI0006_1', '660L'), ('TNI0031_1', '440L')]
+    """
+    if not line_text:
+        return []
+
+    # Loại bỏ phần tiêu đề "Team X request" nếu có
+    clean_line = re.sub(r'^Team\s*\d+\s*request\s*', '', line_text, flags=re.IGNORECASE)
+
+    # Tách chuỗi theo dấu + hoặc < + >
+    raw_segments = re.split(r'\s*\+\s*|\s*<\s*\+\s*>\s*', clean_line)
+    sites = []
+    seen = set()
+
+    for seg in raw_segments:
+        seg_clean = seg.strip()
+        if not seg_clean:
+            continue
+
+        # Tìm mã trạm TNIxxxx_y và dung tích L
+        m = re.search(r'(TNI\d+(?:_\d+)?)\s*:\s*(\d+)', seg_clean, re.IGNORECASE)
+        if m:
+            site_code = m.group(1).upper()
+            qty = m.group(2) + "L"
+            if site_code not in seen:
+                seen.add(site_code)
+                sites.append((site_code, qty))
+
+    return sites
+
+
 def format_and_send_report(rows: list[str]) -> list[int]:
     """Phân loại dữ liệu theo Team, lập bảng tổng hợp và chia nhỏ tin nếu vượt quá giới hạn 4096 ký tự."""
-    # Lọc bỏ trùng trước khi tổng hợp báo cáo theo yêu cầu
-    rows = deduplicate_refuel_rows(rows)
-
     now = datetime.now(TZ_MM)
     date_str = now.strftime("%d/%m/%Y")
     time_str = now.strftime("%H:%M")
     
-    header_line = ""
-    start_idx = 0
-    if rows and "Report need refuel" in rows[0]:
-        header_line = f"📋 <b>{rows[0]}</b>"
-        start_idx = 1
-        
-    team_groups = {
-        1: [],
-        2: [],
-        3: [],
-        4: [],
-        0: []
-    }
-    
-    for i in range(start_idx, len(rows)):
-        line = rows[i]
-        # Tìm mã /T1, /T2, /T3...
-        match = re.search(r'/T([1-9])', line)
-        team_num = int(match.group(1)) if match else 0
-        if team_num in team_groups:
-            team_groups[team_num].append(line)
-        else:
-            team_groups[0].append(line)
-            
-    t1_count = len(team_groups[1])
-    t2_count = len(team_groups[2])
-    t3_count = len(team_groups[3])
-    t4_count = len(team_groups[4])
-    t0_count = len(team_groups[0])
+    team_sites = {1: [], 2: [], 3: [], 4: [], 0: []}
+    team_emojis = {1: "🔴", 2: "🔵", 3: "🟢", 4: "🟡", 0: "⚪"}
+    team_names = {1: "Team 1", 2: "Team 2", 3: "Team 3", 4: "Team 4", 0: "Other/Unknown"}
+
+    for line in rows:
+        line_clean = str(line).strip()
+        if not line_clean or "Report need refuel" in line_clean:
+            continue
+
+        # Xác định Team
+        match = re.search(r'Team[\s\-]*([1-9])', line_clean, re.IGNORECASE)
+        t_num = int(match.group(1)) if match else 0
+        if t_num not in team_sites:
+            t_num = 0
+
+        # Tách danh sách trạm (đã lọc bỏ ngày)
+        parsed = parse_sites_from_row(line_clean)
+        for site_code, qty in parsed:
+            # Bỏ trùng trong cùng 1 Team
+            if not any(s[0] == site_code for s in team_sites[t_num]):
+                team_sites[t_num].append((site_code, qty))
+
+    t1_count = len(team_sites[1])
+    t2_count = len(team_sites[2])
+    t3_count = len(team_sites[3])
+    t4_count = len(team_sites[4])
+    t0_count = len(team_sites[0])
     total_count = t1_count + t2_count + t3_count + t4_count + t0_count
     
     # Xây dựng danh sách dòng thô
@@ -151,21 +180,14 @@ def format_and_send_report(rows: list[str]) -> list[int]:
     msg_lines.append(f"Total: <b>{total_count}</b> sites")
     msg_lines.append("━━━━━━━━━━━━━━━━━━━━━")
     msg_lines.append("")
-    
-    if header_line:
-        msg_lines.append(header_line)
-        msg_lines.append("")
         
-    # 2. Liệt kê chi tiết
-    team_emojis = {1: "🔴", 2: "🔵", 3: "🟢", 4: "🟡", 0: "⚪"}
-    team_names = {1: "Team 1", 2: "Team 2", 3: "Team 3", 4: "Team 4", 0: "Other/Unknown"}
-    
+    # 2. Liệt kê chi tiết theo từng Team (có chấm màu & danh sách trạm gọn gàng)
     for t in [1, 2, 3, 4, 0]:
-        team_rows = team_groups[t]
-        if team_rows:
-            msg_lines.append(f"{team_emojis[t]} <b>{team_names[t]} ({len(team_rows)} sites)</b>")
-            for r in team_rows:
-                msg_lines.append(r)
+        s_list = team_sites[t]
+        if s_list:
+            msg_lines.append(f"{team_emojis[t]} <b>{team_names[t]} ({len(s_list)} sites):</b>")
+            for site_code, qty in s_list:
+                msg_lines.append(f"• {site_code}: {qty}")
             msg_lines.append("") # Dòng trống phân tách giữa các Team
             
     if total_count == 0:

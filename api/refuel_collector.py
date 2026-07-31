@@ -349,8 +349,16 @@ def process_update(update: dict):
                 "REFUELED":"Refueled",
                 "FT_MONITOR": "FT follow monitor",
             }.get(category, category)
+
+            # Thêm chấm màu theo Team nếu có
+            team_dot = ""
+            match_team = re.search(r'Team[\s\-]*([1-9])', text, re.IGNORECASE)
+            if match_team:
+                t_num = int(match_team.group(1))
+                team_dot = {1: "🔴 ", 2: "🔵 ", 3: "🟢 ", 4: "🟡 "}.get(t_num, "")
+
             reply_text = (
-                f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
+                f"{team_dot}<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
                 f"Done 📅 {ts}"
             )
         tg_reply(chat_id, reply_text)
