@@ -1217,7 +1217,7 @@ def handle(update: dict) -> None:
         return
 
     # ── 1. KEY "CLEAR": CLEAR TNIxxxx — tra cứu Lịch sử Clear Site ──────────────
-    clear_match = re.search(r"\bclear[:\s]*\s*(TNI\w+)", text.strip(), re.IGNORECASE)
+    clear_match = re.search(r"\bclear[:\s]+\s*(TNI\w+)", text.strip(), re.IGNORECASE)
     if clear_match:
         tni = clear_match.group(1).upper()
         logger.info(f"Clear site lookup: {tni} | chat={chat_id}")
@@ -1231,12 +1231,24 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
-    # ── 2. KEY "INFO": Info: TNIxxxx — tra cứu Site/Cable/Gpon/DIA ──────────────
-    info_match = re.search(r"\binfo[:\s]*\s*(TNI\w+)", text.strip(), re.IGNORECASE)
-    if info_match:
-        tni = info_match.group(1).upper()
+    # ── 2. KEY "INFO": Info: TNIxxxx — CHÍNH XÁC prefix "info:" hoặc "info " ──
+    # RULE: chỉ khi text BẮT ĐẦU BẰNG "info:" hoặc "info " (không phải TNI search)
+    text_stripped = text.strip()
+    text_stripped_low = text_stripped.lower()
+    info_tni = None
+    if text_stripped_low.startswith("info:") or text_stripped_low.startswith("info "):
+        # Lấy phần sau "info:" hoặc "info "
+        after = text_stripped[5:].strip()  # bỏ "info:" (5 ký tự)
+        if not after and text_stripped_low.startswith("info "):
+            after = text_stripped[5:].strip()
+        tni_m = re.match(r"(TNI\w+)", after, re.IGNORECASE)
+        if tni_m:
+            info_tni = tni_m.group(1).upper()
+
+    if info_tni:
+        tni = info_tni
         logger.info(f"Info lookup: {tni} | chat={chat_id}")
-        tg_send(chat_id, f"⏳ Searching info for <b>{html.escape(tni)}</b>...")
+        log_search_bg(first_name or str(user_id), user_id, f"Info:{tni}")
         try:
             info = get_info(tni)
             if info and any(info.values()):
@@ -1244,13 +1256,14 @@ def handle(update: dict) -> None:
                 for chunk in split_messages(reply):
                     tg_send(chat_id, chunk)
             else:
-                tg_send(chat_id,
-                    f"❌ Info for <b>{html.escape(tni)}</b> not found in Site Info list."
-                )
+                # Không tìm thấy trong GID_INFO → fallback về lookup_tni (Task/WO)
+                tg_send(chat_id, f"⚠️ <b>Info: {html.escape(tni)}</b> not in Site Info sheet.\n🔍 Searching Task/WO instead...")
+                result = lookup_tni(tni)
+                for chunk in split_messages(result):
+                    tg_send(chat_id, chunk)
         except Exception as err:
             logger.error(f"Info error [{tni}]: {err}")
             tg_send(chat_id, f"❌ Lookup error: {html.escape(str(err))}")
-
         return
 
     # ── 3. KEY "TNI": TNIxxxx — tra cứu Task & WO (mặc định) ────────────────────
