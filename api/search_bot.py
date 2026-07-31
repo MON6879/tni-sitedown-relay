@@ -24,7 +24,7 @@ APPS_SCRIPT_URL       = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\uf
 SPREADSHEET_ID        = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
 BASE_URL              = (
     f"https://docs.google.com/spreadsheets/d/"
-    f"{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid="
+    f"{SPREADSHEET_ID}/export?format=csv&gid="
 )
 GID_SITE       = "1095689918"
 GID_TASK       = "1755404595"
@@ -37,6 +37,31 @@ GID_STAFF      = "1684930643"  # Tab: Staff — col A=Telegram ID, row 1=headers
 
 TZ_MM    = timezone(timedelta(hours=6, minutes=30))   # Myanmar UTC+6:30
 MAX_LEN  = 4096
+
+# ── CSV loader with per-GID caching ───────────────────────────────────────────
+_csv_cache = {}
+_csv_cache_ts = {}
+CSV_CACHE_TTL = 120   # 2 phút cache cho mỗi GID
+
+def fetch_csv(gid: str) -> pd.DataFrame:
+    now = time.time()
+    if gid in _csv_cache and (now - _csv_cache_ts.get(gid, 0)) < CSV_CACHE_TTL:
+        return _csv_cache[gid]
+    try:
+        url  = BASE_URL + gid
+        hdrs = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, headers=hdrs, timeout=8, allow_redirects=True)
+        resp.raise_for_status()
+        content = resp.content.decode("utf-8", errors="replace")
+        df = pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
+        _csv_cache[gid] = df
+        _csv_cache_ts[gid] = now
+        return df
+    except Exception as e:
+        logger.error(f"fetch_csv error [gid={gid}]: {e}")
+        if gid in _csv_cache:
+            return _csv_cache[gid]
+        raise e
 
 def get_site_access_template(site_id: str = "TNI0401", date_str: str = None) -> str:
     if not site_id or site_id.startswith("/"):
