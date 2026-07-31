@@ -223,11 +223,18 @@ def tg_get_file(file_id: str) -> str | None:
 # ── CSV loader ────────────────────────────────────────────────────────────────
 def fetch_csv(gid: str) -> pd.DataFrame:
     url  = BASE_URL + gid
-    hdrs = {"User-Agent": "Mozilla/5.0"}
-    resp = requests.get(url, headers=hdrs, timeout=8, allow_redirects=True)
-    resp.raise_for_status()
-    content = resp.content.decode("utf-8", errors="replace")
-    return pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
+    hdrs = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    last_err = None
+    for _ in range(2):
+        try:
+            resp = requests.get(url, headers=hdrs, timeout=25, allow_redirects=True)
+            resp.raise_for_status()
+            content = resp.content.decode("utf-8", errors="replace")
+            return pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
+        except Exception as ex:
+            last_err = ex
+            time.sleep(0.5)
+    raise last_err
 
 def log_search_bg(user_name: str, user_id, tni_code: str) -> None:
     """Ghi log search trong background thread — không block response user."""
