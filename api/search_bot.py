@@ -1180,8 +1180,8 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
-    # ── CLEAR SITE SEARCH (CLEAR TNIxxxx) ────────────────────────
-    clear_match = re.match(r"^clear[:\s]+\s*(TNI\w+)", text.strip(), re.IGNORECASE)
+    # ── 1. KEY "CLEAR": CLEAR TNIxxxx — tra cứu Lịch sử Clear Site ──────────────
+    clear_match = re.search(r"\bclear[:\s]*\s*(TNI\w+)", text.strip(), re.IGNORECASE)
     if clear_match:
         tni = clear_match.group(1).upper()
         logger.info(f"Clear site lookup: {tni} | chat={chat_id}")
@@ -1195,8 +1195,8 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
-    # ── INFO: TNIxxxx — tra cứu Site/Cable/Gpon/DIA ────────────────────────
-    info_match = re.match(r"^info[:\s]+\s*(TNI\w+)", text.strip(), re.IGNORECASE)
+    # ── 2. KEY "INFO": Info: TNIxxxx — tra cứu Site/Cable/Gpon/DIA ──────────────
+    info_match = re.search(r"\binfo[:\s]*\s*(TNI\w+)", text.strip(), re.IGNORECASE)
     if info_match:
         tni = info_match.group(1).upper()
         logger.info(f"Info lookup: {tni} | chat={chat_id}")
@@ -1217,20 +1217,19 @@ def handle(update: dict) -> None:
 
         return
 
-    # ── TNI LOOKUP ──────────────────────────────────────────────────────────
-    # Khóa chặt: Chỉ nhận khi tin nhắn bắt đầu bằng TNIxxxx, /tni TNIxxxx (tránh nhầm với Info: / Clear / tin nhắn dài)
+    # ── 3. KEY "TNI": TNIxxxx — tra cứu Task & WO (mặc định) ────────────────────
     text_clean = text.strip()
     if text_clean.lower().startswith("/tni"):
         parts = text_clean.split(maxsplit=1)
         if len(parts) > 1:
             text_clean = parts[1].strip()
 
-    m = re.match(r"^(TNI\w+)", text_clean, re.IGNORECASE)
-    if not m:
+    tni_match = re.search(r"\b(TNI\w+)", text_clean, re.IGNORECASE)
+    if not tni_match:
         return
 
-    tni = m.group(1).upper()
-    # ── Ghi log tìm kiếm trong background — không block kết quả trả về user ──
+    tni = tni_match.group(1).upper()
+    # Ghi log tìm kiếm trong background — không block kết quả trả về user
     log_search_bg(first_name or str(user_id), user_id, tni)
 
     result = lookup_tni(tni)
