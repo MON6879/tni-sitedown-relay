@@ -99,15 +99,15 @@ function doPost(e) {
     const ss = SpreadsheetApp.openById(ssId);
     const staffSheet = ss.getSheetByName("Staff attendance");
     if (!staffSheet) {
-      logToSheet_("❌ Error: Sheet 'Staff attendance' not found");
-      sendTelegramMessage_(token, chatId, "❌ Lỗi: Không tìm thấy sheet 'Staff attendance'");
+      logToSheet_("Error: Sheet 'Staff attendance' not found");
+      sendTelegramMessage_(token, chatId, "Loi: Khong tim thay sheet 'Staff attendance'");
       return ContentService.createTextOutput("Staff attendance sheet not found");
     }
 
     const staffLastRow = staffSheet.getLastRow();
     if (staffLastRow < 2) {
-      logToSheet_("❌ Error: Staff attendance sheet is empty");
-      sendTelegramMessage_(token, chatId, "❌ Lỗi: Danh sách nhân viên trống");
+      logToSheet_("Error: Staff attendance sheet is empty");
+      sendTelegramMessage_(token, chatId, "Loi: Danh sach nhan vien trong");
       return ContentService.createTextOutput("Staff attendance sheet empty");
     }
 
@@ -130,7 +130,7 @@ function doPost(e) {
         continue;
       }
 
-      if (shortName) {
+      if (shortName && shortName.toLowerCase() !== "tni") {
         staffList.push({
           name: shortName,
           fullName: fullName,
@@ -154,7 +154,7 @@ function doPost(e) {
       }
       logToSheet_("Gemini result: matches=" + JSON.stringify(geminiMatches) + ", extractedImageName=" + extractedImageName);
     } else {
-      logToSheet_("⚠️ No Gemini API Key configured. Skipping AI face recognition.");
+      logToSheet_("No Gemini API Key configured. Skipping AI face recognition.");
     }
 
     if (!extractedImageName && msg.caption) {
@@ -167,6 +167,8 @@ function doPost(e) {
     if (geminiMatches && geminiMatches.length > 0) {
       for (let i = 0; i < geminiMatches.length; i++) {
         const gMatch = geminiMatches[i];
+        if (String(gMatch.name).toLowerCase() === "tni") continue; // Bỏ chữ "TNI"
+
         const dbStaff = staffList.find(s => 
           (s.name && s.name.toLowerCase() === String(gMatch.name).toLowerCase()) || 
           (s.fullName && s.fullName.toLowerCase() === String(gMatch.name).toLowerCase()) ||
@@ -193,9 +195,9 @@ function doPost(e) {
       }
     }
 
-    // 2) Dự phòng nếu AI chưa nhận diện được ai trên hình: Lấy thông tin người gửi
+    // 2) Dự phòng nếu AI chưa nhận diện được ai trên hình: Chỉ lấy thông tin nhân viên thật, BỎ HẲN TÊN "TNI"
     if (finalMatches.length === 0) {
-      const senderStaff = staffList.find(s => s.telegramId === senderId);
+      const senderStaff = staffList.find(s => s.telegramId === senderId && s.name.toLowerCase() !== "tni");
       if (senderStaff) {
         finalMatches.push({
           name: senderStaff.name,
@@ -229,36 +231,52 @@ function doPost(e) {
     }
 
     let successCount = 0;
-    let replyMsg = "✅ **Attendance Recorded #" + nextNum + "**:\n";
+    let replyMsg = "✅ **Recorded #" + nextNum + "**";
     if (extractedImageName) {
-      replyMsg += `📍 Site/Task: *${extractedImageName}*\n`;
+      replyMsg += "\n📍 Site/Task: *" + extractedImageName + "*";
     }
 
-    for (let i = 0; i < finalMatches.length; i++) {
-      const match = finalMatches[i];
-      const finalShortName = match.name;
-      const finalFullName = match.fullName;
-      const finalTgId = match.telegramId; // ID Telegram người gửi
-      const finalDep = match.department;
+    if (finalMatches.length > 0) {
+      replyMsg += ":\n";
+      for (let i = 0; i < finalMatches.length; i++) {
+        const match = finalMatches[i];
+        const finalShortName = match.name;
+        const finalFullName = match.fullName;
+        const finalTgId = match.telegramId; // ID Telegram người gửi
+        const finalDep = match.department;
 
-      if (isAlreadyLoggedToday_(attendanceSheet, dateStr, timeStr, finalShortName, extractedImageName)) {
-        replyMsg += `- ${finalShortName} (Already logged for this time slot)\n`;
-        continue;
+        if (isAlreadyLoggedToday_(attendanceSheet, dateStr, timeStr, finalShortName, extractedImageName)) {
+          replyMsg += `- ${finalShortName} (Already logged for this time slot)\n`;
+          continue;
+        }
+
+        attendanceSheet.insertRowAfter(1);
+        attendanceSheet.getRange(2, 1, 1, 7).setValues([[
+          nextNum,          // Col A: DEF / STT
+          dateStr,          // Col B: Date
+          timeStr,          // Col C: Time report
+          finalTgId,        // Col D: ID Telegram người gửi
+          finalShortName,   // Col E: Name Trên Hình (Tên ngắn người được nhận diện)
+          finalFullName,    // Col F: Full name (Họ tên người được nhận diện)
+          driveFileUrl      // Col G: photo (Link ảnh Google Drive)
+        ]]);
+        
+        replyMsg += `- ${finalShortName}` + (finalDep ? ` (${finalDep})\n` : `\n`);
+        successCount++;
       }
-
-      attendanceSheet.insertRowAfter(1);
-      attendanceSheet.getRange(2, 1, 1, 7).setValues([[
-        nextNum,          // Col A: DEF / STT
-        dateStr,          // Col B: Date
-        timeStr,          // Col C: Time report
-        finalTgId,        // Col D: ID Telegram người gửi
-        finalShortName,   // Col E: Name Trên Hình (Tên ngắn người được nhận diện)
-        finalFullName,    // Col F: Full name (Họ tên người được nhận diện)
-        driveFileUrl      // Col G: photo (Link ảnh Google Drive)
-      ]]);
-      
-      replyMsg += `- ${finalShortName} (${finalDep})\n`;
-      successCount++;
+    } else {
+        // Nếu chưa nhận diện được tên nhân viên, vẫn ghi nhận lượt điểm danh với ảnh Drive, Col E & F để trống
+        attendanceSheet.insertRowAfter(1);
+        attendanceSheet.getRange(2, 1, 1, 7).setValues([[
+          nextNum,          // Col A: DEF / STT
+          dateStr,          // Col B: Date
+          timeStr,          // Col C: Time report
+          senderId,         // Col D: ID Telegram người gửi
+          "",               // Col E: Trống nếu chưa nhận diện tên
+          "",               // Col F: Trống nếu chưa nhận diện tên
+          driveFileUrl      // Col G: photo (Link ảnh Google Drive)
+        ]]);
+        successCount++;
     }
 
     if (successCount > 0) {
@@ -311,8 +329,8 @@ function saveToDrive_(blob, folderId, fileName) {
 /** Định vị động các cột trong sheet Staff attendance */
 function getStaffColumns_(sheet) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  let nameCol = 5;      // Column E (Name / Short name)
-  let fullNameCol = 6;  // Column F (Full name)
+  let nameCol = 3;      // Mặc định Cột C (Name in Sheet / Short name)
+  let fullNameCol = 6;  // Mặc định Cột F (Full name)
   let idCol = 1;        // Column A (Telegram ID)
   let photoCol = 15;    // Column O (Link Photo man power)
   let depCol = 11;      // Column K (Dep)
@@ -320,7 +338,7 @@ function getStaffColumns_(sheet) {
 
   for (let j = 0; j < headers.length; j++) {
     const header = String(headers[j]).trim().toLowerCase();
-    if (header === "name" || header === "tên") {
+    if (header === "name in sheet" || header === "short name" || header === "name" || header === "tên") {
       nameCol = j + 1;
     } else if (header.indexOf("full name") !== -1 || header.indexOf("fullname") !== -1 || header.indexOf("họ tên") !== -1) {
       fullNameCol = j + 1;
@@ -334,6 +352,12 @@ function getStaffColumns_(sheet) {
       statusCol = j + 1;
     }
   }
+
+  // KHÓA AN TOÀN TUYỆT ĐỐI: Cột E chứa chữ "TNI" -> Nếu lỡ nhận diện nhầm Cột E thì ép quay về Cột C (Short Name)
+  if (nameCol === 5) {
+    nameCol = 3;
+  }
+
   return { nameCol: nameCol, fullNameCol: fullNameCol, idCol: idCol, photoCol: photoCol, depCol: depCol, statusCol: statusCol };
 }
 
@@ -679,7 +703,7 @@ function sendAttendanceSlotReport(slotKey) {
     const rec = statsMap[tgId] || { todayCount: 0, yestCount: 0, day2BeforeCount: 0, count7D: 0, countMonth: 0, hasCurrentSlot: false };
 
     // Format gọn: • Phyo Htet Aung (Team 1) 30/07/26: 1 / 0 / 1 , 7D: 1, 1M: 1
-    const lineText = `• ${fullName || shortName} (${dep || "Office"}) ${dateShort}: ${rec.todayCount} / ${rec.yestCount} / ${rec.day2BeforeCount} , 7D: ${rec.count7D}, 1M: ${rec.countMonth}`;
+    const lineText = "• " + (fullName || shortName) + " (" + (dep || "Office") + ") " + dateShort + ": " + rec.todayCount + " / " + rec.yestCount + " / " + rec.day2BeforeCount + " , 7D: " + rec.count7D + ", 1M: " + rec.countMonth;
 
     staffProcessed.push({
       depOrder: getDepOrder(dep),
@@ -691,7 +715,7 @@ function sendAttendanceSlotReport(slotKey) {
   }
 
   // Sắp xếp: Phòng ban -> Team 1 -> Team 2 -> Team 3 -> Team 4 -> Team 5
-  staffProcessed.sort((a, b) => {
+  staffProcessed.sort(function(a, b) {
     if (a.depOrder !== b.depOrder) return a.depOrder - b.depOrder;
     return a.name.localeCompare(b.name);
   });
@@ -699,7 +723,7 @@ function sendAttendanceSlotReport(slotKey) {
   const reportedList = [];
   const missingList  = [];
 
-  staffProcessed.forEach(item => {
+  staffProcessed.forEach(function(item) {
     if (item.hasSlot) {
       reportedList.push(item.lineText);
     } else {
@@ -707,22 +731,22 @@ function sendAttendanceSlotReport(slotKey) {
     }
   });
 
-  let msg = `📸 <b>BÁO CÁO HÌNH ẢNH ĐIỂM DANH — ${currentSlotTitle}</b>\n`;
-  msg += `📅 Ngày: <b>${todayStr}</b>\n`;
-  msg += `─────────────────────────\n\n`;
+  let msg = "📸 <b>BÁO CÁO HÌNH ẢNH ĐIỂM DANH — " + currentSlotTitle + "</b>\n";
+  msg += "📅 Ngày: <b>" + todayStr + "</b>\n";
+  msg += "─────────────────────────\n\n";
 
-  msg += `✅ <b>ĐÃ BÁO CÁO (${reportedList.length}):</b>\n`;
+  msg += "✅ <b>ĐÃ BÁO CÁO (" + reportedList.length + "):</b>\n";
   if (reportedList.length > 0) {
-    reportedList.forEach(item => msg += `${item}\n`);
+    reportedList.forEach(function(item) { msg += item + "\n"; });
   } else {
-    msg += `<i>Chưa có ai báo cáo</i>\n`;
+    msg += "<i>Chưa có ai báo cáo</i>\n";
   }
 
-  msg += `\n❌ <b>CHƯA BÁO CÁO (${missingList.length}):</b>\n`;
+  msg += "\n❌ <b>CHƯA BÁO CÁO (" + missingList.length + "):</b>\n";
   if (missingList.length > 0) {
-    missingList.forEach(item => msg += `${item}\n`);
+    missingList.forEach(function(item) { msg += item + "\n"; });
   } else {
-    msg += `<i>Tất cả đã báo cáo đầy đủ</i>\n`;
+    msg += "<i>Tất cả đã báo cáo đầy đủ</i>\n";
   }
 
   const props = PropertiesService.getScriptProperties();
@@ -800,11 +824,11 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
             data: Utilities.base64Encode(fileBlob.getBytes())
           }
         });
-        promptText += `- Image ${imgIndex}: Reference photo for staff '${cand.name}' (Full name: '${cand.fullName}', Telegram ID: '${cand.telegramId}').\n`;
+        promptText += "- Image " + imgIndex + ": Reference photo for staff '" + cand.name + "' (Full name: '" + cand.fullName + "', Telegram ID: '" + cand.telegramId + "').\n";
         imgIndex++;
       }
     } catch (e) {
-      Logger.log("⚠️ Không thể đọc ảnh mốc của " + cand.name + ": " + e.message);
+      Logger.log("[WARNING] Khong the doc anh moc cua " + cand.name + ": " + e.message);
     }
   }
 
@@ -821,27 +845,47 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
   promptText += "  \"imageName\": \"Extracted Site Code or Location (e.g. TNI0047 or Branch Office)\"\n";
   promptText += "}\n";
 
-  parts.push({ text: promptText });
+  // Đặt mô hình gemini-2.0-flash lên ĐẦU TIÊN để phản hồi cực nhanh trong 2-3 giây (tránh bị chờ 404)
+  const modelNames = [
+    "gemini-2.0-flash",
+    "gemini-1.5-flash"
+  ];
 
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
-  const payload = { contents: [{ parts: parts }], generationConfig: { responseMimeType: "application/json" } };
+  let textResult = "";
+  for (let m = 0; m < modelNames.length; m++) {
+    const modelName = modelNames[m];
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + apiKey;
+    const payload = { contents: [{ parts: parts }], generationConfig: { responseMimeType: "application/json" } };
+
+    try {
+      const resp = UrlFetchApp.fetch(url, {
+        method: "post", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true
+      });
+
+      if (resp.getResponseCode() === 200) {
+        const resData = JSON.parse(resp.getContentText());
+        if (resData.candidates && resData.candidates[0] && resData.candidates[0].content) {
+          textResult = resData.candidates[0].content.parts[0].text.trim();
+          logToSheet_("[SUCCESS] Gemini AI model '" + modelName + "' succeed!");
+          break;
+        }
+      } else {
+        logToSheet_("[ERROR] Gemini model '" + modelName + "' error (" + resp.getResponseCode() + "): " + resp.getContentText());
+      }
+    } catch (e) {
+      logToSheet_("[EXCEPTION] Gemini model '" + modelName + "' exception: " + e.message);
+    }
+  }
+
+  if (!textResult) {
+    return { matches: [], imageName: "" };
+  }
 
   try {
-    const resp = UrlFetchApp.fetch(url, {
-      method: "post", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true
-    });
-
-    if (resp.getResponseCode() !== 200) {
-      Logger.log("❌ Gemini API Call Error: " + resp.getContentText());
-      return { matches: [], imageName: "" };
-    }
-
-    const resData = JSON.parse(resp.getContentText());
-    const textResult = resData.candidates[0].content.parts[0].text.trim();
     let cleanJson = textResult.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleanJson);
   } catch (e) {
-    Logger.log("❌ Lỗi xử lý Gemini AI: " + e.message);
+    Logger.log("[ERROR] Lỗi parse JSON Gemini AI: " + e.message);
     return { matches: [], imageName: "" };
   }
 }
@@ -867,18 +911,13 @@ function sendTelegramMessage_(token, chatId, text) {
 function setupAttendanceWebhook() {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
-  let webAppUrl = props.getProperty("WEBAPP_URL") || "";
-  if (!webAppUrl) {
-    try { webAppUrl = ScriptApp.getService().getUrl() || ""; } catch(e) {}
-  }
-  if (webAppUrl && webAppUrl.indexOf("/dev") !== -1) {
-    webAppUrl = webAppUrl.replace("/dev", "/exec");
-  }
-  if (!webAppUrl) return;
+  const webAppUrl = "https://tni-bot.vercel.app/api/attendance";
+  props.setProperty("WEBAPP_URL", webAppUrl);
   
   const url = "https://api.telegram.org/bot" + token + "/setWebhook";
   const payload = { url: webAppUrl, allowed_updates: JSON.stringify(["message"]) };
-  UrlFetchApp.fetch(url, { method: "post", payload: payload, muteHttpExceptions: true });
+  const resp = UrlFetchApp.fetch(url, { method: "post", payload: payload, muteHttpExceptions: true });
+  Logger.log("✅ Webhook Attendance Bot set to Vercel Proxy: " + webAppUrl + " | Response: " + resp.getContentText());
 }
 
 /** Tìm hoặc lấy Folder ID của thư mục "2.11 Attendance photo" ở bất kỳ vị trí nào trên Google Drive */
