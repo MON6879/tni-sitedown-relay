@@ -835,7 +835,10 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
   }
 
   promptText += "\nTASKS TO PERFORM:\n";
-  promptText += "1. FACE MATCHING: Compare the face(s) in Image 1 against all reference photos (Image 2 onwards). Identify which staff member(s) are present in Image 1.\n";
+  promptText += "1. MULTI-PERSON FACE MATCHING: Compare ALL faces present in Image 1 (which may contain 1 single person or MULTIPLE staff members together in a group photo) against the reference face photos (Image 2 onwards).\n";
+  promptText += "   - For EACH face found in Image 1, find the matching staff member from the reference photos.\n";
+  promptText += "   - DO NOT output watermark text like 'TNI', 'VCM', 'Branch', 'Office' as a staff name! Watermark text is NOT a staff name.\n";
+  promptText += "   - Only return actual staff names from the reference list. If a person in Image 1 does not match any registered reference photo, omit them.\n";
   promptText += "2. WATERMARK / TEXT OCR: Read the watermark text on Image 1 (especially at the bottom right, top left, or bottom left corners like 'TNI0047', 'TNI0105', 'Branch Office'). Extract:\n";
   promptText += "   - Any Site Code / Station ID starting with 'TNI' followed by digits (e.g., 'TNI0047', 'TNI0105', 'TNI0295').\n";
   promptText += "   - Or Location / Office name if no TNI code is present (e.g. 'Branch Office').\n";
@@ -847,7 +850,7 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
   promptText += "  \"imageName\": \"Extracted Site Code or Location (e.g. TNI0047 or Branch Office)\"\n";
   promptText += "}\n";
 
-  // Đặt mô hình gemini-2.0-flash lên ĐẦU TIÊN để phản hồi cực nhanh trong 2-3 giây (tránh bị chờ 404)
+  // Đặt mô hình gemini-2.0-flash lên ĐẦU TIÊN để phản hồi cực nhanh trong 2-3 giây
   const modelNames = [
     "gemini-2.0-flash",
     "gemini-1.5-flash"
@@ -885,10 +888,43 @@ function identifyFaces_(attendanceBlob, staffList, apiKey) {
 
   try {
     let cleanJson = textResult.replace(/```json/g, "").replace(/```/g, "").trim();
-    return JSON.parse(cleanJson);
+    let parsed = JSON.parse(cleanJson);
+    
+    // Khóa an toàn: Lọc bỏ các từ rác 'TNI', 'VCM', 'OFFICE' khỏi danh sách tên nhân viên
+    if (parsed && parsed.matches && Array.isArray(parsed.matches)) {
+      parsed.matches = parsed.matches.filter(function(item) {
+        const nameClean = String(item.name || "").trim().toLowerCase();
+        return nameClean && nameClean !== "tni" && nameClean !== "vcm" && nameClean !== "office" && !/^tni\d+/i.test(nameClean);
+      });
+    }
+    return parsed;
   } catch (e) {
     Logger.log("[ERROR] Lỗi parse JSON Gemini AI: " + e.message);
     return { matches: [], imageName: "" };
+  }
+}
+
+/** Tự động cập nhật Thư viện ảnh mẫu nhân viên vào lúc 12:25 hàng ngày (Myanmar Time) */
+function triggerUpdateMasterLibrary1225() {
+  logToSheet_("🔄 Running daily Master Face Library refresh at 12:25 MMT...");
+  try {
+    const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+    const staffSheet = ss.getSheetByName("Staff attendance");
+    if (staffSheet) {
+      const cols = getStaffColumns_(staffSheet);
+      const lastRow = staffSheet.getLastRow();
+      if (lastRow >= 2) {
+        const staffVals = staffSheet.getRange(2, 1, lastRow - 1, staffSheet.getLastColumn()).getValues();
+        let validCount = 0;
+        for (let i = 0; i < staffVals.length; i++) {
+          const photoUrl = String(staffVals[i][cols.photoCol - 1] || "").trim();
+          if (photoUrl) validCount++;
+        }
+        logToSheet_("✅ Master Face Library updated successfully. Total valid sample face photos: " + validCount);
+      }
+    }
+  } catch(e) {
+    logToSheet_("⚠️ Lỗi triggerUpdateMasterLibrary1225: " + e.message);
   }
 }
 
