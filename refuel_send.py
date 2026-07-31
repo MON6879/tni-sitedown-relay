@@ -2,6 +2,8 @@ import os
 import sys
 import re
 import requests
+import csv
+import io
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
@@ -19,29 +21,30 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))  # Múi giờ Myanmar UTC+6:30
 
 
 def fetch_refuel_data() -> list[str] | None:
-    """Tải dữ liệu cột G của tab Refuel từ Google Sheets qua Apps Script Web App API."""
-    if not REFUEL_APPS_SCRIPT_URL:
-        print("❌ REFUEL_APPS_SCRIPT_URL not set in environment", file=sys.stderr)
-        return None
-    for attempt in range(1, 4):  # Retry tối đa 3 lần
+    """Tải trực tiếp nội dung 4 ô Y2:Y5 (Column Y) của tab Need Refuel từ Google Sheets CSV Export."""
+    csv_url = "https://docs.google.com/spreadsheets/d/1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM/export?format=csv&gid=0"
+    try:
+        resp = requests.get(csv_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+        resp.raise_for_status()
+        reader = list(csv.reader(io.StringIO(resp.text)))
+        data = []
+        for r in reader[1:5]:  # Rows 2 to 5 (Y2:Y5)
+            if len(r) > 24 and r[24].strip():
+                data.append(r[24].strip())
+        if data:
+            return data
+    except Exception as e:
+        print(f"⚠️ Direct CSV fetch warning: {e}", file=sys.stderr)
+
+    # Fallback qua Apps Script API
+    if REFUEL_APPS_SCRIPT_URL:
         try:
-            resp = requests.get(
-                REFUEL_APPS_SCRIPT_URL,
-                params={"action": "get_refuel_data"},
-                timeout=60,
-                headers={"User-Agent": "Mozilla/5.0"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            if data.get("status") == "ok":
-                return data["data"]
-            print(f"⚠️ GAS error: {data.get('message')}", file=sys.stderr)
-            return None
-        except Exception as e:
-            print(f"⚠️ Attempt {attempt}/3 failed: {e}", file=sys.stderr)
-            if attempt == 3:
-                print("❌ All retries failed", file=sys.stderr)
-                return None
+            resp = requests.get(REFUEL_APPS_SCRIPT_URL, params={"action": "get_refuel_data"}, timeout=30)
+            if resp.status_code == 200 and resp.json().get("status") == "ok":
+                return resp.json()["data"]
+        except Exception:
+            pass
+    return None
 
 
 def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
