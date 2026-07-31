@@ -18,6 +18,19 @@
 
 ---
 
+## 🎨 Master Standard Team Color Palette (Quy chuẩn bảng màu Team)
+
+| Team Name | Team Region | Standard Emoji Color | Color Hex Reference |
+|---|---|---|---|
+| **Team 1** | Dawei | 🔴 **Red (Chấm Đỏ)** | `#E53935` |
+| **Team 2** | Myeik | 🔵 **Blue (Chấm Xanh Dương)** | `#1E88E5` |
+| **Team 3** | Bokpyin | 🟢 **Green (Chấm Xanh Lá)** | `#43A047` |
+| **Team 4** | Kawthoung | 🟡 **Yellow (Chấm Vàng)** | `#FDD835` |
+
+> 📌 **Quy tắc tuyệt đối**: Toàn bộ hệ thống Bot (`Bot 1/3`, `Bot 2`, `Bot 5 Site Down`, `Bot 9 Refuel`, Apps Script và Python) đều tuân thủ 100% quy chuẩn bảng màu này. Không thay đổi màu đại diện giữa các Team.
+
+---
+
 ## 🏗️ Architecture Overview
 
 ```

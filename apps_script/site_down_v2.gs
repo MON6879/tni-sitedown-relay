@@ -51,7 +51,7 @@ const AWAZ_LABELS = [
   { emoji: "🔗", name: "Link down"   },
 ];
 
-const TEAM_COLORS = { T1: "🔵", T2: "🟡", T3: "🟢", T4: "🔴" };
+const TEAM_COLORS = { T1: "🔴", T2: "🔵", T3: "🟢", T4: "🟡" };
 
 
 // ============================================================
@@ -495,10 +495,10 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
 
 function buildAwAzControlMessage(ts, awaz) {
   const teamDefs = [
-    { key: "T1", label: "Team 1 Dawei",     emoji: "🔵", col: 0 },
-    { key: "T2", label: "Team 2 Myeik",     emoji: "🟡", col: 1 },
+    { key: "T1", label: "Team 1 Dawei",     emoji: "🔴", col: 0 },
+    { key: "T2", label: "Team 2 Myeik",     emoji: "🔵", col: 1 },
     { key: "T3", label: "Team 3 Bokpyin",   emoji: "🟢", col: 2 },
-    { key: "T4", label: "Team 4 Kawthoung", emoji: "🔴", col: 3 },
+    { key: "T4", label: "Team 4 Kawthoung", emoji: "🟡", col: 3 },
   ];
   const numRows = awaz.length;
   const lines   = [];
