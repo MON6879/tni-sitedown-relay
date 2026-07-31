@@ -1277,13 +1277,10 @@ class handler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"status": "error", "message": "Missing chat_id or text"}).encode("utf-8"))
                     return
             
-            # Phản hồi 200 OK ngay lập tức (1ms) cho Telegram để Telegram KHÔNG BAO GIỜ bị Timeout hay tự nhả Webhook
+            handle(data)
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"OK")
-
-            # Xử lý tra cứu trong background thread
-            threading.Thread(target=handle, args=(data,), daemon=True).start()
         except Exception as ex:
             logger.error(f"Webhook POST error: {ex}")
             try:
