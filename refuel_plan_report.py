@@ -325,6 +325,7 @@ class RefuelData:
             ws = wb["Team request"]
             for r in range(2, ws.max_row + 1):
                 date_val = ws.cell(row=r, column=2).value
+                team_val = ws.cell(row=r, column=4).value  # col D: Name Team
                 site = ws.cell(row=r, column=5).value
                 qty = ws.cell(row=r, column=6).value
                 ts = parse_datetime(ws.cell(row=r, column=7).value) or datetime.now(TZ_MM)
@@ -334,8 +335,9 @@ class RefuelData:
                 if site:
                     self.records.append({
                         "ts": ts,
-                        "date": parse_date_str(date_val),  # fix: dùng parse_date_str thay vì str()
+                        "date": parse_date_str(date_val),
                         "cat": "REQUEST",
+                        "team": str(team_val).strip() if team_val else "",
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
                         "site": str(site).strip() if site else "",
@@ -347,17 +349,19 @@ class RefuelData:
             ws = wb["Refueled"]
             for r in range(2, ws.max_row + 1):
                 date_val = ws.cell(row=r, column=4).value
+                team_val = ws.cell(row=r, column=5).value  # col E: Team
                 site = ws.cell(row=r, column=6).value
-                qty = ws.cell(row=r, column=17).value
-                ts = parse_datetime(ws.cell(row=r, column=20).value) or datetime.now(TZ_MM)
-                sender = ws.cell(row=r, column=21).value
-                sender_id = ws.cell(row=r, column=22).value
+                qty = ws.cell(row=r, column=14).value       # col N: Actual Filled Qty(L)
+                ts = parse_datetime(ws.cell(row=r, column=17).value) or datetime.now(TZ_MM)
+                sender = ws.cell(row=r, column=18).value
+                sender_id = ws.cell(row=r, column=19).value
                 
                 if site:
                     self.records.append({
                         "ts": ts,
-                        "date": parse_date_str(date_val),  # fix: dùng parse_date_str thay vì str()
+                        "date": parse_date_str(date_val),
                         "cat": "REFUELED",
+                        "team": str(team_val).strip() if team_val else "",
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
                         "site": str(site).strip() if site else "",
@@ -473,68 +477,136 @@ def report_3(data: RefuelData):
 
 
 def report_4(data: RefuelData):
-    print("👤 Generating Report 4 — Request Refuel by Person...")
+    print("📊 Generating Report 4 — PLAN vs REFUELED (by Team)...")
     now = datetime.now(TZ_MM)
-    freq = {}
-
-    for r in data.records:
-        if r["cat"] != "REQUEST" or not r["sender_id"]:
-            continue
-        diff = now - r["ts"]
-        sid = r["sender_id"]
-
-        if sid not in freq:
-            freq[sid] = {"d3": 0, "d7": 0, "d30": 0}
-        if diff <= timedelta(days=3):
-            freq[sid]["d3"] += 1
-        if diff <= timedelta(days=7):
-            freq[sid]["d7"] += 1
-        if diff <= timedelta(days=30):
-            freq[sid]["d30"] += 1
-
-    # Phải lấy thông tin request ngày hôm nay để đưa vào tiêu đề
     today_str = now.strftime("%d/%m/%Y")
-    today_reqs = {}
-    for r in data.records:
-        if r["date"] == today_str and r["cat"] == "REQUEST" and r["site"]:
-            today_reqs[r["site"]] = today_reqs.get(r["site"], 0) + r["qty"]
-    
-    req_parts = []
-    for site in sorted(today_reqs.keys()):
-        qty = today_reqs[site]
-        req_parts.append(f"{site} : {qty}L")
-    
-    if req_parts:
-        req_summary = " + ".join(req_parts)
-        title = f"👤 <b>[Report 4] Team request {today_str}: {req_summary}</b>"
-    else:
-        title = f"👤 <b>[Report 4] Team request {today_str}</b>"
 
+    # ── Letter Progress ──
+    submit_line   = f"  📤 The letter was submitted to the Government for approval on: <b>{data.letter_submitted or 'N/A'}</b>"
+    approved_line = f"  ✅ The government approved the oil transport letter on: <b>{data.letter_approved or 'N/A'}</b>"
+
+    # ── FT follow monitor ──
+    ft_today = []
+    for ft in data.ft_monitors:
+        ft_date = ft["date"]
+        try:
+            parts = ft_date.split("/")
+            if len(parts) == 3:
+                ft_date = f"{int(parts[0]):02d}/{int(parts[1]):02d}/{int(parts[2])}"
+        except Exception:
+            pass
+        today_norm = ""
+        try:
+            parts_today = today_str.split("/")
+            if len(parts_today) == 3:
+                today_norm = f"{int(parts_today[0]):02d}/{int(parts_today[1]):02d}/{int(parts_today[2])}"
+        except Exception:
+            today_norm = today_str
+        if ft_date == today_norm:
+            ft_today.append(ft["ft_name"])
+    ft_names_today = sorted(list(set(ft_today)))
+    ft_str = ", ".join(ft_names_today) if ft_names_today else "None"
+
+    # ── Gather data for today by Team ──
+    teams_list = ["Team 1", "Team 2", "Team 3", "Team 4"]
+    team_map: dict[str, dict[str, dict[str, int]]] = {t: {} for t in teams_list}
+
+    # Normalize team name helper
+    def get_team_key(raw_team: str) -> str:
+        s = raw_team.lower()
+        if "team 1" in s or "team1" in s: return "Team 1"
+        if "team 2" in s or "team2" in s: return "Team 2"
+        if "team 3" in s or "team3" in s: return "Team 3"
+        if "team 4" in s or "team4" in s: return "Team 4"
+        return "Team 1"
+
+    for r in data.records:
+        if r["date"] != today_str or not r["site"]:
+            continue
+        team = get_team_key(r.get("team", ""))
+        site = r["site"]
+        if site not in team_map[team]:
+            team_map[team][site] = {"plan": 0, "refueled": 0, "req": 0}
+
+        if r["cat"] == "PLAN":
+            team_map[team][site]["plan"] += r["qty"]
+        elif r["cat"] == "REFUELED":
+            team_map[team][site]["refueled"] += r["qty"]
+        elif r["cat"] == "REQUEST":
+            team_map[team][site]["req"] += r["qty"]
+
+    # Build Header
     lines = [
-        title,
-        f"📅 {now.strftime('%d/%m/%Y %H:%M')} (Myanmar)",
-        fmt_row_freq("Name", "3Days", "7Days", "1Month"),
-        "<code>" + "─────────────┼───────┼───────┼────────" + "</code>"
+        f"📊 <b>[Report 4] PLAN vs REFUELED — {today_str}</b>",
+        f"⏰ {now.strftime('%H:%M')} Myanmar",
+        "",
+        "📝 <b>Letter Progress:</b>",
+        submit_line,
+        approved_line,
+        f"  👥 FT follow monitor: <b>{ft_str}</b>",
+        "",
+        "🟩 Match  🟨 Diff qty  🟥 Not filled  🟦 Extra filled",
+        fmt_row_compare("Site ID", "Plan", "Refueled", "Diff"),
+        "<code>" + "─────────────┼───────┼──────────┼───────" + "</code>",
     ]
 
-    # Hiển thị từng thành viên đã tham gia nhóm (có ID) — có số thứ tự
-    for i, m in enumerate(data.members, 1):
-        f = freq.get(m["id"], {"d3": 0, "d7": 0, "d30": 0})
-        short_name = m["name"][:12]
-        lines.append(f"<code>{i:<3}</code> {fmt_row_freq(short_name, f"{f['d3']}x", f"{f['d7']}x", f"{f['d30']}x")}")
+    green_total = yellow_total = red_total = blue_total = 0
+    diff_by_team: dict[str, list[str]] = {t: [] for t in teams_list}
 
-    lines.append("<code>" + "─────────────┴───────┴───────┴────────" + "</code>")
+    for team in teams_list:
+        sites_data = team_map[team]
+        if not sites_data:
+            continue
 
-    # Hiển thị những người chưa tham gia nhóm
-    if data.not_joined:
-        lines += [
-            "\n⚠️ <b>NOT JOINED GROUP (No Telegram ID)</b>",
-            "<code>" + "─────────────────────────────────" + "</code>"
-        ]
-        for name in sorted(data.not_joined):
-            lines.append(f"• {name}")
+        lines.append(f"\n🏷 <b>{team}</b>")
+        for site in sorted(sites_data.keys()):
+            p = sites_data[site]["plan"]
+            fill = sites_data[site]["refueled"]
+            diff = p - fill
 
+            # Square icons logic
+            if p > 0 and fill > 0 and diff == 0:
+                icon = "🟩"
+                green_total += 1
+            elif p > 0 and fill > 0 and diff != 0:
+                icon = "🟨"
+                yellow_total += 1
+                diff_by_team[team].append(f"{site} ({p}L vs {fill}L)")
+            elif p > 0 and fill == 0:
+                icon = "🟥"
+                red_total += 1
+                diff_by_team[team].append(f"{site} (Chưa đổ {p}L)")
+            elif p == 0 and fill > 0:
+                icon = "🟦"
+                blue_total += 1
+                diff_by_team[team].append(f"{site} (Đổ ngoài plan {fill}L)")
+            else:
+                icon = "⬜"
+
+            diff_str = "=" if diff == 0 else f"{diff:+d}L"
+            lines.append(f"{icon} {fmt_row_compare(site, f'{p}L', f'{fill}L', diff_str)}")
+
+    lines.append("<code>" + "─────────────┴───────┴──────────┴───────" + "</code>")
+
+    # Conclusion / Summary of Diff sites per Team at bottom
+    lines.append("\n📌 <b>KẾT LUẬN CÁC TRẠM DIFF THEO TEAM:</b>")
+    has_diff = False
+    for team in teams_list:
+        diff_list = diff_by_team[team]
+        if diff_list:
+            has_diff = True
+            lines.append(f"  • <b>{team}</b> ({len(diff_list)} trạm): " + ", ".join(diff_list[:5]))
+            if len(diff_list) > 5:
+                lines.append(f"    ... và thêm {len(diff_list)-5} trạm khác")
+        else:
+            lines.append(f"  • <b>{team}</b>: Đã khớp 100% ✅")
+
+    if not has_diff:
+        lines.append("  🎉 Tất cả các trạm hôm nay đều đã khớp 100%!")
+
+    lines.append(f"\n🟩 <b>{green_total}</b>  🟨 <b>{yellow_total}</b>  🟥 <b>{red_total}</b>  🟦 <b>{blue_total}</b>")
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
+
     tg_send("\n".join(lines), "report4")
     print("✅ Report 4 sent.")
 
