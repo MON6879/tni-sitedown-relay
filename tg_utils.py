@@ -151,11 +151,22 @@ def tg_send_fresh(chat_id: str, text: str, state_key: str = None,
     # Bước 1: xóa tin cũ
     if title_prefix:
         tg_delete_by_title(chat_id, title_prefix)  # Telethon xóa tất cả cùng tiêu đề
-    elif state_key:
+
+    if state_key:
         old_id = get_msg_id(state_key)
         if old_id:
             tg_delete(chat_id, old_id)             # Fallback: xóa 1 tin theo GAS msg_id
             logger.info(f"Deleted old msg {old_id} for key={state_key}")
+
+        # Xóa cả tin cũ từ legacy keys nếu có (report3 -> report1, report4 -> report2)
+        if "report1_" in state_key:
+            legacy_id = get_msg_id(state_key.replace("report1_", "report3_"))
+            if legacy_id:
+                tg_delete(chat_id, legacy_id)
+        elif "report2_" in state_key:
+            legacy_id = get_msg_id(state_key.replace("report2_", "report4_"))
+            if legacy_id:
+                tg_delete(chat_id, legacy_id)
 
     # Bước 2: gửi tin mới
     try:
