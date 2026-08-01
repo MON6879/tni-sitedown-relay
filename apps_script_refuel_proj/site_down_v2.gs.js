@@ -198,6 +198,36 @@ function doGet(e) {
       return _json({ ok: true, msgids: msgids });
     }
 
+    // ── Repair: re-setup 1-phút GAS trigger ──────────────────
+    if (action === "setup_trigger") {
+      setupSdTrigger();
+      const triggers = ScriptApp.getProjectTriggers()
+        .filter(t => t.getHandlerFunction() === "checkAndSend")
+        .map(t => ({ id: t.getUniqueId() }));
+      return _json({ ok: true, msg: "Trigger re-installed", count: triggers.length });
+    }
+
+    // ── Repair: kiểm tra PAT và dispatch botlookup relay ─────
+    if (action === "check_pat_dispatch") {
+      const props = PropertiesService.getScriptProperties();
+      const pat = props.getProperty("GITHUB_PAT") || "";
+      if (!pat) return _json({ ok: false, msg: "GITHUB_PAT not set" });
+      const url  = "https://api.github.com/repos/MON6879/tni-sitedown-relay/actions/workflows/botlookup_relay.yml/dispatches";
+      const resp = UrlFetchApp.fetch(url, {
+        method: "post",
+        headers: { "Authorization": "token " + pat, "Accept": "application/vnd.github.v3+json" },
+        contentType: "application/json",
+        payload: JSON.stringify({ ref: "main" }),
+        muteHttpExceptions: true,
+      });
+      const code = resp.getResponseCode();
+      if (code === 204) {
+        props.setProperty("SD_LAST_DISPATCH_TS", Date.now().toString());
+        return _json({ ok: true, msg: "Dispatch OK 204 — relay triggered", pat_ok: true });
+      }
+      return _json({ ok: false, msg: "Dispatch HTTP " + code, pat_ok: false, body: resp.getContentText().substring(0, 150) });
+    }
+
     return _json({ ok: false, msg: "Unknown GET action: " + action });
   } catch (err) {
     return _json({ ok: false, msg: err.message });
@@ -328,7 +358,7 @@ function triggerBotlookupRelay() {
         "Accept":        "application/vnd.github.v3+json",
       },
       contentType:        "application/json",
-      payload:            JSON.stringify({ ref: "main", inputs: { skip_delay: "1" } }),
+      payload:            JSON.stringify({ ref: "main" }),
       muteHttpExceptions: true,
     });
     const code = resp.getResponseCode();
