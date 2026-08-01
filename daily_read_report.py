@@ -31,9 +31,9 @@ from telethon.tl.functions.messages import (
 )
 
 # ── Config ──────────────────────────────────────────────────────
-API_ID         = int(os.environ["TELEGRAM_API_ID"])
-API_HASH       = os.environ["TELEGRAM_API_HASH"]
-SESSION_STRING = os.environ["TELEGRAM_SESSION"]
+API_ID         = int(os.environ.get("TELEGRAM_API_ID", "0"))
+API_HASH       = os.environ.get("TELEGRAM_API_HASH", "")
+SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
 GAS_URL        = os.environ.get("APPS_SCRIPT_URL", "")
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))

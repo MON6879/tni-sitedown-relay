@@ -80,10 +80,8 @@ def myanmar_now() -> datetime:
     return datetime.now(MYANMAR_TZ)
 
 
-def is_daily_plan_msg(text: str) -> bool:
-    """
 def normalize_date_str(s: str) -> str:
-    """Normalize any date string ('24.07.2026', '24/07/2026', '24.7.26', '2026-07-24') to DD/MM/YYYY."""
+    """Normalize any date string to DD/MM/YYYY."""
     if not s:
         return ""
     s = str(s).strip().replace(".", "/")
@@ -237,13 +235,7 @@ CATEGORY_SQUARES = {
 
 
 def colorize_bullets(text: str) -> str:
-    """
-    Thay dấu '•' bằng vuông màu theo category.
-    Input:  • [Admin] repair CCTV: TNI0006
-    Output: 🟦 [Admin] repair CCTV: TNI0006
-
-    Cùng category = cùng màu vuông (ví dụ: [Asset] luôn là 🟧).
-    """
+    """Thay dau bullet bang vuong mau theo category."""
     if not text:
         return text
 
@@ -305,9 +297,7 @@ def get_report_data() -> dict:
 
 
 def get_team_leaders() -> dict:
-    """
-    Reads GID 133591305 and returns a dict mapping team key ("T1", "T2", "T3", "T4") -> list of leader's telegram IDs (str).
-    """
+    """Reads GID 133591305 and returns dict mapping team key to leader IDs."""
     fallback = {
         "T1": "6859790680",
         "T2": "6555381983",
@@ -415,13 +405,7 @@ def get_unified_employees() -> list:
 
 
 def build_emp_compact_line(emp: dict, daily_counts: dict | None = None) -> str:
-    """
-    Format gọn 1 dòng cho nhân viên:
-      🟢 Tin Maung Win-myt_tinmaung.win: rank:13 | Close:4% <0/1/0> | WO remain:24 | Task:0:0/0/0 | Daily:0/1/0 7D:1 M:5
-      🔴 Khant Chaw Nyo-myt_khantchaw.nyo: rank:21 | Close:0% <0/0/0> | WO remain:15 | Task:0:0/0/0 | Daily:0/0/0 7D:0 M:0
-    🟢 = có WO close trong 3 ngày qua, 🔴 = 0/0/0
-    daily_counts: { tg_id: {d0,d1,d2,d7,month} } — số lần nộp daily result
-    """
+    """Format single line stats for employee."""
     name      = emp.get("name", "?")
     sys_name  = emp.get("sys_name", "")
     tg_id     = str(emp.get("telegram_id", emp.get("tg_id", ""))).replace(".0", "")
@@ -455,9 +439,7 @@ def build_emp_compact_line(emp: dict, daily_counts: dict | None = None) -> str:
 
 
 def parse_assigned_tni_per_person(plan_text: str, team_emps: list) -> dict:
-    """
-    Parses a plan text and maps each employee's tg_id to their assigned TNI codes.
-    """
+    """Parses plan text and maps employee tg_id to assigned TNI codes."""
     assigned = {}
     emp_patterns = []
     for emp in team_emps:
@@ -499,11 +481,7 @@ def parse_assigned_tni_per_person(plan_text: str, team_emps: list) -> dict:
 
 
 def get_employee_completed_tni_today_detailed(df_report, target_date: str, employees: list) -> dict:
-    """
-    Given the df_report dataframe, extracts all completed TNI codes today per employee,
-    supporting both Telegram ID matching and fuzzy name/username matching.
-    Returns: { tg_id: { TNI_code: header_name } }
-    """
+    """Extracts all completed TNI codes today per employee."""
     completed = {}
     if df_report is None or df_report.empty:
         return completed
@@ -594,10 +572,7 @@ def get_employee_completed_tni_today_detailed(df_report, target_date: str, emplo
 # ── Daily Report data from Sheet ────────────────────────────────
 
 def get_team_member_mapping() -> dict:
-    """
-    Read Team All Find sheet to map telegram_id → team group key.
-    Returns: { "telegram_id_str": "T1" | "T2" | "T3" | "T4" }
-    """
+    """Read Team All Find sheet to map telegram_id to team group key."""
     mapping = {}
     try:
         resp = requests.get(TEAM_SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
@@ -951,10 +926,7 @@ def parse_plan_date(date_str: str) -> datetime | None:
 
 
 def build_plan_stats(plans: list, team_filter: str = None) -> dict:
-    """
-    Build 3Day/7Day/Month stats from plan list.
-    3Day format: d2/d1/d0 (day-before-yesterday/yesterday/today)
-    """
+    """Build plan stats from plan list."""
     now = myanmar_now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     d1_start = today_start - timedelta(days=1)
@@ -1194,12 +1166,7 @@ async def send_msg(bot, cid, text, label="", reply_markup=None):
 # ── Main ────────────────────────────────────────────────────────
 
 async def run_eod_or_update(mode: str):
-    """
-    Mode 'eod' (17:00) or 'update' (21:00):
-    - Scan today's plans → store → compare vs daily report
-    - Build per-team + CONTROL report
-    - Append "Plan Tomorrow" section at the bottom
-    """
+    """Run EOD or update report mode."""
     now = myanmar_now()
     now_str = now.strftime("%d/%m/%Y %H:%M")
     date_str = now.strftime("%d/%m/%Y")
@@ -1615,12 +1582,7 @@ async def run_eod_or_update(mode: str):
 
 
 async def run_morning():
-    """
-    Mode 'morning' (07:00):
-    - Forward TL's plan for today (plan_date == today)
-    - Show 3Day/7Day/1Month submission stats
-    - Show 3-day completion rate
-    """
+    """Run morning report mode."""
     now = myanmar_now()
     now_str = now.strftime("%d/%m/%Y %H:%M")
     date_str = now.strftime("%d/%m/%Y")
