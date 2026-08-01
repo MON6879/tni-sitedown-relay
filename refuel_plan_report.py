@@ -47,7 +47,7 @@ REFUEL_GAS_URL = (
 # Map report_key → title prefix dòng đầu tiên (dùng cho Telethon delete-by-title)
 REPORT_TITLE_PREFIX = {
     "report1": "🔄 [Report 1]",
-    "report4": "👤 [Report 4]",
+    "report2": "📊 [Report 2]",
     "report5": "📋 [Report 5]",
 }
 
@@ -60,6 +60,11 @@ def tg_send(text: str, report_key: str = "") -> bool:
         print("❌ Telegram send failed", file=sys.stderr)
         return False
     return True
+
+
+def fmt_row_compare_5(col_team: str, col_site: str, col_b: str, col_c: str, col_d: str) -> str:
+    """Format dòng so sánh 5 cột (Team | Site ID | Req/Plan | Plan/Ref | Diff) dạng monospace."""
+    return f"<code>{col_team:<6} | {col_site:<10} | {col_b:>5} | {col_c:>5} | {col_d:>5}</code>"
 
 
 
@@ -405,10 +410,13 @@ def report_1(data: RefuelData):
     # ── PLAN vs REQUEST data ──
     plan    = {}
     request = {}
+    site_team_map = {}
 
     for r in data.records:
         if r["date"] != today_str or not r["site"]:
             continue
+        if r.get("team"):
+            site_team_map[r["site"]] = r["team"]
         if r["cat"] == "PLAN":
             plan[r["site"]]    = plan.get(r["site"], 0)    + r["qty"]
         elif r["cat"] == "REQUEST":
@@ -451,15 +459,21 @@ def report_1(data: RefuelData):
         else:
             icon = "🔵"; gray_count   += 1   # Plan có, Request không có
 
-        diff_str = "=" if diff == 0 else f"{diff:+d}L"
-        rows.append(f"{icon} {fmt_row_compare(site, f'{q}L', f'{p}L', diff_str)}")
+        team_raw = site_team_map.get(site, "Team 1")
+        if "team 2" in team_raw.lower(): team_short = "Team 2"
+        elif "team 3" in team_raw.lower(): team_short = "Team 3"
+        elif "team 4" in team_raw.lower(): team_short = "Team 4"
+        else: team_short = "Team 1"
 
-    header_bar = "<code>" + "─────────────┼───────┼────────┼────────" + "</code>"
-    footer_bar = "<code>" + "─────────────┴───────┴────────┴────────" + "</code>"
+        diff_str = "=" if diff == 0 else f"{diff:+d}L"
+        rows.append(f"{icon} {fmt_row_compare_5(team_short, site, f'{q}L', f'{p}L', diff_str)}")
+
+    header_bar = "<code>" + "───────┼───────────┼───────┼───────┼──────" + "</code>"
+    footer_bar = "<code>" + "───────┴───────────┴───────┴───────┴──────" + "</code>"
 
     lines = header_lines + [
         "🟢 Match  🟡 Diff qty  🟣 Req only  🔵 Plan only",
-        fmt_row_compare("Site ID", "Request", "Plan", "Diff"),
+        fmt_row_compare_5("Team", "Site ID", "Request", "Plan", "Diff"),
         header_bar,
     ] + rows + [
         footer_bar,
@@ -475,9 +489,8 @@ def report_3(data: RefuelData):
     report_1(data)
 
 
-
-def report_4(data: RefuelData):
-    print("📊 Generating Report 4 — PLAN vs REFUELED (by Team)...")
+def report_2(data: RefuelData):
+    print("📊 Generating Report 2 — PLAN vs REFUELED (by Team)...")
     now = datetime.now(TZ_MM)
     today_str = now.strftime("%d/%m/%Y")
 
@@ -537,7 +550,7 @@ def report_4(data: RefuelData):
 
     # Build Header
     lines = [
-        f"📊 <b>[Report 4] PLAN vs REFUELED — {today_str}</b>",
+        f"📊 <b>[Report 2] PLAN vs REFUELED — {today_str}</b>",
         f"⏰ {now.strftime('%H:%M')} Myanmar",
         "",
         "📝 <b>Letter Progress:</b>",
@@ -546,8 +559,8 @@ def report_4(data: RefuelData):
         f"  👥 FT follow monitor: <b>{ft_str}</b>",
         "",
         "🟩 Match  🟨 Diff qty  🟥 Not filled  🟦 Extra filled",
-        fmt_row_compare("Site ID", "Plan", "Refueled", "Diff"),
-        "<code>" + "─────────────┼───────┼──────────┼───────" + "</code>",
+        fmt_row_compare_5("Team", "Site ID", "Plan", "Refueled", "Diff"),
+        "<code>" + "───────┼───────────┼───────┼───────┼──────" + "</code>",
     ]
 
     green_total = yellow_total = red_total = blue_total = 0
@@ -584,9 +597,9 @@ def report_4(data: RefuelData):
                 icon = "⬜"
 
             diff_str = "=" if diff == 0 else f"{diff:+d}L"
-            lines.append(f"{icon} {fmt_row_compare(site, f'{p}L', f'{fill}L', diff_str)}")
+            lines.append(f"{icon} {fmt_row_compare_5(team, site, f'{p}L', f'{fill}L', diff_str)}")
 
-    lines.append("<code>" + "─────────────┴───────┴──────────┴───────" + "</code>")
+    lines.append("<code>" + "───────┴───────────┴───────┴───────┴──────" + "</code>")
 
     # Conclusion / Summary of Diff sites per Team at bottom
     lines.append("\n📌 <b>KẾT LUẬN CÁC TRẠM DIFF THEO TEAM:</b>")
@@ -607,8 +620,13 @@ def report_4(data: RefuelData):
     lines.append(f"\n🟩 <b>{green_total}</b>  🟨 <b>{yellow_total}</b>  🟥 <b>{red_total}</b>  🟦 <b>{blue_total}</b>")
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
 
-    tg_send("\n".join(lines), "report4")
-    print("✅ Report 4 sent.")
+    tg_send("\n".join(lines), "report2")
+    print("✅ Report 2 sent.")
+
+
+def report_4(data: RefuelData):
+    """Alias cho report_2 để tương thích với các script cũ."""
+    report_2(data)
 
 
 def report_5(data: RefuelData):
@@ -653,20 +671,20 @@ def report_5(data: RefuelData):
 
 def main():
     parser = argparse.ArgumentParser(description="TNI Refuel Plan Reports")
-    parser.add_argument("--report", type=int, choices=[1, 3, 4, 5], nargs="+",
-                        help="Report numbers (1, 4, 5). Omit to run all.")
+    parser.add_argument("--report", type=int, choices=[1, 2, 3, 4, 5], nargs="+",
+                        help="Report numbers (1, 2, 5). Omit to run default.")
     args = parser.parse_args()
 
     # Tải và parse dữ liệu trước khi chạy báo cáo
     download_spreadsheet()
     data = RefuelData()
 
-    reports_to_run = args.report if args.report else [1, 4]
+    reports_to_run = args.report if args.report else [1, 2]
 
     if 1 in reports_to_run or 3 in reports_to_run:
         report_1(data)
-    if 4 in reports_to_run:
-        report_4(data)
+    if 2 in reports_to_run or 4 in reports_to_run:
+        report_2(data)
     if 5 in reports_to_run:
         report_5(data)
 
