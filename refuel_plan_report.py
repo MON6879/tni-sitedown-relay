@@ -377,9 +377,35 @@ class RefuelData:
 # ── Reports implementation ──────────────────────────────────────────────────
 
 def report_1(data: RefuelData):
-    print("🔄 Generating Report 1 — PLAN vs TEAM REQUEST...")
+    print("🔄 Generating Report 1 — PLAN vs TEAM REQUEST (with Letter Progress)...")
     now = datetime.now(TZ_MM)
     today_str = now.strftime("%d/%m/%Y")
+
+    # ── Letter Progress ──
+    submit_line   = f"  📤 The letter was submitted to the Government for approval on: <b>{data.letter_submitted or 'N/A'}</b>"
+    approved_line = f"  ✅ The government approved the oil transport letter on: <b>{data.letter_approved or 'N/A'}</b>"
+
+    # ── FT follow monitor ──
+    ft_today = []
+    for ft in data.ft_monitors:
+        ft_date = ft["date"]
+        try:
+            parts = ft_date.split("/")
+            if len(parts) == 3:
+                ft_date = f"{int(parts[0]):02d}/{int(parts[1]):02d}/{int(parts[2])}"
+        except Exception:
+            pass
+        today_norm = ""
+        try:
+            parts_today = today_str.split("/")
+            if len(parts_today) == 3:
+                today_norm = f"{int(parts_today[0]):02d}/{int(parts_today[1]):02d}/{int(parts_today[2])}"
+        except Exception:
+            today_norm = today_str
+        if ft_date == today_norm:
+            ft_today.append(ft["ft_name"])
+    ft_names_today = sorted(list(set(ft_today)))
+    ft_str = ", ".join(ft_names_today) if ft_names_today else "None"
 
     # ── PLAN vs REQUEST data ──
     plan    = {}
@@ -401,6 +427,11 @@ def report_1(data: RefuelData):
     header_lines = [
         f"🔄 <b>[Report 1] PLAN vs TEAM REQUEST — {today_str}</b>",
         f"⏰ {now.strftime('%H:%M')} Myanmar",
+        "",
+        "📝 <b>Letter Progress:</b>",
+        submit_line,
+        approved_line,
+        f"  👥 FT follow monitor: <b>{ft_str}</b>",
         "",
     ]
 
