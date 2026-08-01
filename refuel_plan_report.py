@@ -588,11 +588,11 @@ def report_2(data: RefuelData):
             elif p > 0 and fill == 0:
                 icon = "🟥"
                 red_total += 1
-                diff_by_team[team].append(f"{site} (Chưa đổ {p}L)")
+                diff_by_team[team].append(f"{site} (Unfilled {p}L)")
             elif p == 0 and fill > 0:
                 icon = "🟦"
                 blue_total += 1
-                diff_by_team[team].append(f"{site} (Đổ ngoài plan {fill}L)")
+                diff_by_team[team].append(f"{site} (Unplanned {fill}L)")
             else:
                 icon = "⬜"
 
@@ -602,20 +602,20 @@ def report_2(data: RefuelData):
     lines.append("<code>" + "───────┴───────────┴───────┴───────┴──────" + "</code>")
 
     # Conclusion / Summary of Diff sites per Team at bottom
-    lines.append("\n📌 <b>KẾT LUẬN CÁC TRẠM DIFF THEO TEAM:</b>")
+    lines.append("\n📌 <b>DIFF SITES SUMMARY BY TEAM:</b>")
     has_diff = False
     for team in teams_list:
         diff_list = diff_by_team[team]
         if diff_list:
             has_diff = True
-            lines.append(f"  • <b>{team}</b> ({len(diff_list)} trạm): " + ", ".join(diff_list[:5]))
+            lines.append(f"  • <b>{team}</b> ({len(diff_list)} sites): " + ", ".join(diff_list[:5]))
             if len(diff_list) > 5:
-                lines.append(f"    ... và thêm {len(diff_list)-5} trạm khác")
+                lines.append(f"    ... +{len(diff_list)-5} more sites")
         else:
-            lines.append(f"  • <b>{team}</b>: Đã khớp 100% ✅")
+            lines.append(f"  • <b>{team}</b>: 100% Matched ✅")
 
     if not has_diff:
-        lines.append("  🎉 Tất cả các trạm hôm nay đều đã khớp 100%!")
+        lines.append("  🎉 All sites today are 100% matched!")
 
     lines.append(f"\n🟩 <b>{green_total}</b>  🟨 <b>{yellow_total}</b>  🟥 <b>{red_total}</b>  🟦 <b>{blue_total}</b>")
     lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
