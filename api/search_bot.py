@@ -1305,7 +1305,7 @@ def ensure_webhook_locked_bg():
 # ── Vercel entry point (redeploy triggered) ──────────────────────────────────
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        ensure_webhook_locked_bg()
+        # KHÔNG gọi ensure_webhook_locked_bg ở đây — không cần thiết, overhead
         try:
             length = int(self.headers.get("Content-Length", 0))
             raw    = self.rfile.read(length)
@@ -1331,30 +1331,28 @@ class handler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"status": "error", "message": "Missing chat_id or text"}).encode("utf-8"))
                     return
 
-            # ✅ CRITICAL: ACK Telegram ngay lập tức trong 1ms
-            # Nếu không, Telegram sẽ retry liên tục sau 10s → gây trễ 21 phút
+            # ✅ ACK Telegram TRƯỚC — gửi 200 ngay lập tức
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(b'{"ok":true}')
 
-            # Xử lý message trong background thread để không block HTTP response
-            def _process():
+            # ✅ FIX: Xử lý SYNCHRONOUS — KHÔNG dùng daemon thread!
+            # Daemon thread bị Vercel kill ngay sau khi do_POST return → handle() không chạy được
+            # Synchronous: handle() chạy trong cùng Vercel execution window (max 30s)
+            try:
+                handle(data)
+            except Exception as ex:
+                logger.error(f"handle() error: {ex}")
                 try:
-                    handle(data)
-                except Exception as ex:
-                    logger.error(f"handle() error in background: {ex}")
-                    try:
-                        import traceback
-                        tb = traceback.format_exc()
-                        msg_obj = data.get("message") or data.get("edited_message") or {}
-                        chat_id = msg_obj.get("chat", {}).get("id")
-                        if chat_id:
-                            tg_send(chat_id, f"⚠️ <b>Error:</b>\n<pre>{html.escape(tb[:2000])}</pre>")
-                    except Exception:
-                        pass
-
-            threading.Thread(target=_process, daemon=True).start()
+                    import traceback
+                    tb = traceback.format_exc()
+                    msg_obj = data.get("message") or data.get("edited_message") or {}
+                    chat_id = msg_obj.get("chat", {}).get("id")
+                    if chat_id:
+                        tg_send(chat_id, f"⚠️ <b>Error:</b>\n<pre>{html.escape(tb[:2000])}</pre>")
+                except Exception:
+                    pass
 
         except Exception as ex:
             logger.error(f"Webhook POST parse error: {ex}")
@@ -1366,7 +1364,7 @@ class handler(BaseHTTPRequestHandler):
                 pass
 
     def do_GET(self):
-        ensure_webhook_locked_bg()
+        # Không gọi ensure_webhook_locked_bg — daemon thread chết ngay trên Vercel
         from urllib.parse import urlparse, parse_qs
         parsed_url = urlparse(self.path)
         query = parse_qs(parsed_url.query)
