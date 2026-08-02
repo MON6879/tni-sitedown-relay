@@ -16,6 +16,7 @@ from datetime import datetime, timezone, timedelta
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+BOT_VERSION = "v3.2"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
@@ -1303,7 +1304,6 @@ def ensure_webhook_locked_bg():
 # ── Vercel entry point (redeploy triggered) ──────────────────────────────────
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        # KHÔNG gọi ensure_webhook_locked_bg ở đây — không cần thiết, overhead
         try:
             length = int(self.headers.get("Content-Length", 0))
             raw    = self.rfile.read(length)
@@ -1329,15 +1329,10 @@ class handler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"status": "error", "message": "Missing chat_id or text"}).encode("utf-8"))
                     return
 
-            # ✅ ACK Telegram TRƯỚC — gửi 200 ngay lập tức
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"ok":true}')
-
-            # ✅ FIX: Xử lý SYNCHRONOUS — KHÔNG dùng daemon thread!
-            # Daemon thread bị Vercel kill ngay sau khi do_POST return → handle() không chạy được
-            # Synchronous: handle() chạy trong cùng Vercel execution window (max 30s)
+            # ✅ FIX v3.2: Chạy handle() TRƯỚC khi gửi response
+            # Vercel CÓ THỂ terminate process sau khi response flush
+            # → handle() phải hoàn thành TRƯỚC khi gửi 200 OK
+            # Telegram webhook timeout = 60s, Vercel maxDuration = 30s → an toàn
             try:
                 handle(data)
             except Exception as ex:
@@ -1352,10 +1347,16 @@ class handler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
 
+            # SAU KHI handle() xong → gửi 200 OK cho Telegram
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+
         except Exception as ex:
             logger.error(f"Webhook POST parse error: {ex}")
             try:
-                self.send_response(200)   # Vẫn trả 200 để Telegram không retry
+                self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b'{"ok":true}')
             except Exception:
@@ -1395,7 +1396,7 @@ class handler(BaseHTTPRequestHandler):
         gas_ok  = "SET" if DAILY_APPS_SCRIPT_URL else "MISSING"
         log_val = APPS_SCRIPT_URL if APPS_SCRIPT_URL else "MISSING"
         log_ok  = f"SET (...{log_val[-15:]})" if APPS_SCRIPT_URL else "MISSING"
-        msg = f"TNI Search Bot OK | TOKEN:{tok_ok} | DAILY_GAS:{gas_ok} | APPS_SCRIPT_URL:{log_ok}"
+        msg = f"TNI Search Bot {BOT_VERSION} | TOKEN:{tok_ok} | DAILY_GAS:{gas_ok} | APPS_SCRIPT_URL:{log_ok}"
         self.send_response(200)
         self.end_headers()
         self.wfile.write(msg.encode())
