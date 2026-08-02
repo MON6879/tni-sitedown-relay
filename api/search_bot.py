@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-BOT_VERSION = "v3.3"
+BOT_VERSION = "v3.4"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
@@ -1047,6 +1047,10 @@ def handle(update: dict) -> None:
         first_word = parts[0][1:].lower().split("@")[0]  # e.g. "/t4notclose@bot" -> "t4notclose"
         rest = parts[1] if len(parts) > 1 else ""
         
+        # 🔧 DEBUG v3.4: xác nhận bot NHẬN được slash command
+        logger.info(f"CMD received: /{first_word} | chat={chat_id} | user={user_id}")
+        tg_send(chat_id, f"🔧 v3.4 CMD: /{first_word}")
+
         # Xử lý các hệ thống lệnh chính
         if first_word in ("request_enter_site", "request_site_enter", "site_access", "siteaccess", "site_enter", "request_site"):
             passed_site = rest.upper().strip() if rest else "TNI0401"
@@ -1080,6 +1084,7 @@ def handle(update: dict) -> None:
             return
 
         elif first_word in ("plan", "dailyplan"):
+            tg_send(chat_id, "🔧 plan: step1 - getting team")  # DEBUG
             team_num = None
             if rest:
                 team_arg = rest.upper()
@@ -1114,7 +1119,9 @@ def handle(update: dict) -> None:
             if not team_num:
                 team_num = 1
             
+            tg_send(chat_id, f"🔧 plan: step2 - team={team_num}, calling template")  # DEBUG
             send_daily_plan_template(chat_id, team_num)
+            tg_send(chat_id, "🔧 plan: step3 - done")  # DEBUG
             return
 
         elif first_word in ("id", "myid"):
