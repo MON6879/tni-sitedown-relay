@@ -48,6 +48,14 @@ AI phai tuan thu TUYET DOI - khong co ngoai le:
 
 ## 📅 CHANGELOG
 
+### 03/08/2026 — ĐÓNG BĂNG: Gộp hết Reports + Thu thập vào MON6879
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `phonghdpxd-cmd/tni-bot` `.github/workflows/` | **XÓA 7 workflows trùng lặp**: `keepalive_search_bot.yml` (4,320 phút/tháng), `botlookup_relay.yml` (2,160 phút/tháng), `refuel_report.yml` (trùng), `refuel_plan_report_1.yml`, `refuel_plan_report_2.yml`, `daily_plan_report.yml`, `daily_read_report.yml`. Giữ `telegram_send.yml` (manual) + `tni_search_bot.yml` (disabled) | Tất cả reports đã chạy trên MON6879 `daily_reports.yml`. Workflows trên phonghdpxd-cmd là **trùng lặp**, ngốn ~7,200 phút/tháng vượt quota 360% |
+| `MON6879/tni-sitedown-relay` `.github/workflows/` | **XÓA 2 workflows trùng**: `sitedown_keepalive.yml` (4,320 phút/tháng), `botlookup_relay.yml` (2,160 phút/tháng trùng với `daily_reports.yml`) | Tiết kiệm ~6,480 phút/tháng. Botlookup đã chạy trong `botlookup_relay.yml` riêng (mỗi 30 phút) |
+| `MON6879/tni-sitedown-relay` | Chuyển repo sang **PUBLIC** → GitHub Actions **MIỄN PHÍ KHÔNG GIỚI HẠN** | Quota 2,000 phút/tháng cho PRIVATE repos không đủ (tổng ~12,270 phút/tháng). PUBLIC = 0 chi phí |
+| Kiến trúc | **phonghdpxd-cmd**: chỉ Vercel (Collector + Search Bot). **MON6879**: tất cả GitHub Actions (Reports 1-6, Refuel, Cable, Botlookup, Search Logger) | Quy tắc: 1 nơi chạy reports duy nhất, không trùng lặp |
+
 ### 22/07/2026
 | File | Thay đổi | Lý do |
 |---|---|---|
@@ -273,7 +281,7 @@ Trong `apps_script_collector.js`:
   - `TELEGRAM_SESSION` *(dùng cho botlookup_relay)*
 
 ### Apps Script
-- **URL:** `https://script.google.com/macros/s/AKfycbwQ4N44xZ92HyiYEOxHgA0VHMrCzKXYSCY32nh0pFgFuFavcUkjxp3h1Z1VkvvO94a9cw/exec`
+- **URL:** `https://script.google.com/macros/s/AKfycbwHyzulEMVGjslfjN_m38HzpFZHRfk2qwbQmdwb6MMqBM8xNm20JJxxzW_4zTNzp3n24Q/exec`
 - **Actions:** `collect`, `done`, `get_asset_stats`, `get_report_data`, `refresh_general`
 
 ---
