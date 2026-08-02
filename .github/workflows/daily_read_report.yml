@@ -1,0 +1,42 @@
+name: Daily Note Read Report (Report 6)
+
+on:
+  schedule:
+    # 03:00 UTC = 09:30 Myanmar
+    # 07:30 UTC = 14:00 Myanmar
+    # 09:40 UTC = 16:10 Myanmar (+10m)
+    # 12:15 UTC = 18:45 Myanmar
+    # 14:30 UTC = 21:00 Myanmar
+    - cron: '0 3 * * *'
+    - cron: '30 7,14 * * *'
+    - cron: '40 9 * * *'
+    - cron: '15 12 * * *'
+  workflow_dispatch:          # Nút chạy tay
+
+jobs:
+  read-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run daily_read_report.py
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+          REPORT_TASK_BOT_TOKEN: ${{ secrets.REPORT_TASK_BOT_TOKEN }}
+          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+        run: |
+          python daily_read_report.py
