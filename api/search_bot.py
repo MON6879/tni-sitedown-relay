@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-BOT_VERSION = "v3.2"
+BOT_VERSION = "v3.3"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
@@ -202,11 +202,13 @@ def tg_send(chat_id: int, text: str, parse_mode: str = "HTML", reply_markup: dic
         if markup:
             payload["reply_markup"] = markup
         try:
-            requests.post(
+            r = requests.post(
                 f"{TG_API}/sendMessage",
                 json=payload,
-                timeout=10,   # 10s — giảm từ 60s, tránh block Vercel window
+                timeout=10,
             )
+            if r.status_code != 200:
+                logger.error(f"tg_send API error: {r.status_code} {r.text[:200]}")
         except Exception as ex:
             logger.error(f"tg_send error: {ex}")
 
@@ -365,7 +367,7 @@ def lookup_clear_site(tni: str) -> str:
 
     try:
         hdrs = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(url, headers=hdrs, timeout=30, allow_redirects=True)
+        resp = requests.get(url, headers=hdrs, timeout=10, allow_redirects=True)
         resp.raise_for_status()
         content = resp.content.decode("utf-8", errors="replace")
         df = pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
@@ -751,7 +753,7 @@ def fetch_daily_fields() -> list[str]:
     if not DAILY_APPS_SCRIPT_URL:
         return DAILY_FIELDS_DEFAULT
     try:
-        resp = requests.get(DAILY_APPS_SCRIPT_URL + "?action=get_fields", timeout=60)
+        resp = requests.get(DAILY_APPS_SCRIPT_URL + "?action=get_fields", timeout=10)
         data = resp.json()
         if data.get("status") == "ok" and data.get("fields"):
             _daily_fields    = data["fields"]
@@ -956,7 +958,7 @@ def submit_photo(chat_id: int, user_id: int, file_id: str) -> None:
                                json={"action": "daily_photo",
                                      "telegram_id": str(user_id),
                                      "tg_url": tg_url},
-                               timeout=60)
+                               timeout=10)
         result = resp.json()
         tg_send(chat_id, "📷 ✅" if result.get("status") == "ok" else "📷 ❌")
     except Exception as ex:
@@ -1052,6 +1054,11 @@ def handle(update: dict) -> None:
             tg_send(chat_id, reply)
             return
 
+        # /ping — diagnostic command, phản hồi tức thì
+        if first_word == "ping":
+            tg_send(chat_id, f"🏓 pong {BOT_VERSION} | chat={chat_id} | user={user_id}")
+            return
+
         elif first_word in ("start", "help"):
             if rest.upper().startswith("PLAN_T"):
                 team_num_str = rest[6:]
@@ -1124,7 +1131,7 @@ def handle(update: dict) -> None:
                         "reg_by":     first_name,
                         "user_id":    str(user_id),
                         "user_name":  first_name,
-                    }, timeout=60)
+                    }, timeout=10)
                     res = r.json()
                     if res.get("status") == "ok":
                         msg_extra = "\n✅ Saved"
