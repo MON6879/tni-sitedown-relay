@@ -22,7 +22,7 @@ BOT_VERSION = "v3.6"
 TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
 DAILY_APPS_SCRIPT_URL = os.environ.get("DAILY_APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 APPS_SCRIPT_URL       = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
-SPREADSHEET_ID        = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
+SPREADSHEET_ID        = os.environ.get("SPREADSHEET_ID", "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8").strip().strip("\ufeff")
 BASE_URL              = (
     f"https://docs.google.com/spreadsheets/d/"
     f"{SPREADSHEET_ID}/export?format=csv&gid="
@@ -366,7 +366,7 @@ def lookup_clear_site(tni: str) -> str:
     tni_upper = tni.upper()
 
     # Sử dụng Spreadsheet ID riêng biệt của Site Down
-    sd_sheet_id = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow"
+    sd_sheet_id = os.environ.get("SD_SPREADSHEET_ID", "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow").strip()
     url = f"https://docs.google.com/spreadsheets/d/{sd_sheet_id}/export?format=csv&gid={GID_SITE_CLEAR}"
 
     try:
