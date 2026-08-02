@@ -2,7 +2,7 @@
   "builds": [
     { "src": "api/index.py",           "use": "@vercel/python", "config": { "maxDuration": 60 } },
     { "src": "api/collector.py",       "use": "@vercel/python", "config": { "maxDuration": 30 } },
-    { "src": "api/search_bot.py",      "use": "@vercel/python", "config": { "maxDuration": 30 } },
+    { "src": "api/search_bot.py",      "use": "@vercel/python", "config": { "maxDuration": 60 } },
     { "src": "api/attendance.py",      "use": "@vercel/python", "config": { "maxDuration": 30 } },
     { "src": "api/refuel_collector.py","use": "@vercel/python", "config": { "maxDuration": 30 } },
     { "src": "api/site_down_relay.py", "use": "@vercel/python", "config": { "maxDuration": 30 } }
