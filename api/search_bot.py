@@ -240,10 +240,8 @@ def log_search_bg(user_name: str, user_id, tni_code: str) -> None:
             }, timeout=3)
         except Exception as e:
             logger.error(f"log_search_bg failed: {e}")
-    # NON-daemon: join(3s) đảm bảo log ghi được trước khi Vercel terminate
-    t = threading.Thread(target=_do, daemon=False)
-    t.start()
-    t.join(timeout=3)
+    # Daemon=True: log analytics không critical — chấp nhận mất trên Vercel
+    threading.Thread(target=_do, daemon=True).start()
 
 def load_all_sheets():
     """Load 3 sheet SONG SONG — giảm 3×8s → 8s."""
@@ -931,7 +929,7 @@ def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None
                                      "telegram_id": str(user_id),
                                      "user_name": first_name or str(user_id),
                                      "fields": parsed},
-                               timeout=45)
+                               timeout=12)
         result = resp.json()
         if result.get("status") == "ok":
             name = result.get("name") or first_name or str(user_id)
@@ -1088,7 +1086,12 @@ def handle(update: dict) -> None:
                     team_num = int(m_title.group(1))
 
             if not team_num:
-                from tni_config import TELEGRAM_GROUPS
+                TELEGRAM_GROUPS = {
+                    "T1": -1004215695747,
+                    "T2": -1004480845549,
+                    "T3": -1004369170658,
+                    "T4": -1004293741999,
+                }
                 def norm_id(cid):
                     return str(cid).replace("-100", "").replace("-", "")
                 for k, gid in TELEGRAM_GROUPS.items():
