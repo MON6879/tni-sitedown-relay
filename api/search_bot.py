@@ -1383,6 +1383,34 @@ class handler(BaseHTTPRequestHandler):
         query = parse_qs(parsed_url.query)
         
         action = query.get("action", [None])[0]
+        
+        # Reset webhook: xóa pending updates bị kẹt, set lại webhook
+        if action == "reset":
+            try:
+                expected = "https://tni-bot.vercel.app/api/search_bot"
+                r1 = requests.post(f"{TG_API}/deleteWebhook",
+                    json={"drop_pending_updates": True}, timeout=10).json()
+                r2 = requests.post(f"{TG_API}/setWebhook",
+                    json={
+                        "url": expected,
+                        "allowed_updates": ["message", "edited_message", "channel_post"],
+                        "drop_pending_updates": True
+                    }, timeout=10).json()
+                r3 = requests.get(f"{TG_API}/getWebhookInfo", timeout=10).json()
+                result = {
+                    "delete": r1,
+                    "set": r2, 
+                    "info": r3.get("result", {}),
+                    "version": BOT_VERSION
+                }
+            except Exception as ex:
+                result = {"error": str(ex), "version": BOT_VERSION}
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(result, indent=2).encode("utf-8"))
+            return
+
         if action == "template":
             team_arg = query.get("team", ["1"])[0]
             if team_arg == "daily":
