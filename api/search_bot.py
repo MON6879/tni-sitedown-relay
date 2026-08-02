@@ -204,7 +204,7 @@ def tg_send(chat_id: int, text: str, parse_mode: str = "HTML", reply_markup: dic
             requests.post(
                 f"{TG_API}/sendMessage",
                 json=payload,
-                timeout=60,
+                timeout=10,   # 10s — giảm từ 60s, tránh block Vercel window
             )
         except Exception as ex:
             logger.error(f"tg_send error: {ex}")
@@ -220,24 +220,10 @@ def tg_get_file(file_id: str) -> str | None:
         logger.error(f"tg_get_file: {ex}")
     return None
 
-# ── CSV loader ────────────────────────────────────────────────────────────────
-def fetch_csv(gid: str) -> pd.DataFrame:
-    url  = BASE_URL + gid
-    hdrs = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    last_err = None
-    for _ in range(2):
-        try:
-            resp = requests.get(url, headers=hdrs, timeout=25, allow_redirects=True)
-            resp.raise_for_status()
-            content = resp.content.decode("utf-8", errors="replace")
-            return pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
-        except Exception as ex:
-            last_err = ex
-            time.sleep(0.5)
-    raise last_err
+# ── CSV loader: duplicate def đã xóa — dùng cached version ở trên ──────────
 
 def log_search_bg(user_name: str, user_id, tni_code: str) -> None:
-    """Ghi log search trong background thread — không block response user."""
+    """Ghi log search — non-daemon, join(3s) để chạy trong Vercel window."""
     if not APPS_SCRIPT_URL:
         return
     def _do():
@@ -251,22 +237,31 @@ def log_search_bg(user_name: str, user_id, tni_code: str) -> None:
                 "date":      now_mm.strftime("%d/%m/%Y"),
                 "time":      now_mm.strftime("%H:%M"),
                 "date_iso":  now_mm.strftime("%d/%m/%Y"),
-            }, timeout=5)
+            }, timeout=3)
         except Exception as e:
             logger.error(f"log_search_bg failed: {e}")
-    threading.Thread(target=_do, daemon=True).start()
+    # NON-daemon: join(3s) đảm bảo log ghi được trước khi Vercel terminate
+    t = threading.Thread(target=_do, daemon=False)
+    t.start()
+    t.join(timeout=3)
 
 def load_all_sheets():
+    """Load 3 sheet SONG SONG — giảm 3×8s → 8s."""
     global _df_site, _df_task, _df_wo, _cache_ts
     if time.time() - _cache_ts < CACHE_TTL and _df_site is not None:
         return
+    import concurrent.futures
     try:
-        logger.info("Loading sheets...")
-        _df_site  = fetch_csv(GID_SITE)
-        _df_task  = fetch_csv(GID_TASK)
-        _df_wo    = fetch_csv(GID_WO)
+        logger.info("Loading sheets (parallel)...")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            f_site = executor.submit(fetch_csv, GID_SITE)
+            f_task = executor.submit(fetch_csv, GID_TASK)
+            f_wo   = executor.submit(fetch_csv, GID_WO)
+            _df_site = f_site.result(timeout=12)
+            _df_task = f_task.result(timeout=12)
+            _df_wo   = f_wo.result(timeout=12)
         _cache_ts = time.time()
-        logger.info(f"Loaded — Site:{len(_df_site)} Task:{len(_df_task)} WO:{len(_df_wo)}")
+        logger.info(f"Loaded OK — Site:{len(_df_site)} Task:{len(_df_task)} WO:{len(_df_wo)}")
     except Exception as ex:
         logger.error(f"load_all_sheets: {ex}")
 

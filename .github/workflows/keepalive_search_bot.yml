@@ -1,0 +1,30 @@
+name: Keep-Alive Ping (every 5 min)
+
+# Ping Vercel search bot mỗi 5 phút để:
+# 1. Giữ Python container ấm → giảm cold start
+# 2. Module-level cache (_df_site, _df_task, _df_wo) sống lâu hơn
+# 3. Phát hiện sớm nếu bot down
+
+on:
+  schedule:
+    # Mỗi 5 phút (GitHub Actions min = 5 phút)
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # Trigger thủ công khi cần test
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping Search Bot
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+            "https://tni-bot.vercel.app/api/search_bot")
+          echo "HTTP Status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "⚠️ Bot returned $STATUS — may be cold or down"
+            exit 1
+          else
+            echo "✅ Bot alive (200 OK)"
+          fi
