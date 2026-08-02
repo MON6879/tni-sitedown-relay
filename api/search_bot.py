@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-BOT_VERSION = "v3.4"
+BOT_VERSION = "v3.5"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
@@ -42,7 +42,7 @@ MAX_LEN  = 4096
 # ── CSV loader with per-GID caching ───────────────────────────────────────────
 _csv_cache = {}
 _csv_cache_ts = {}
-CSV_CACHE_TTL = 120   # 2 phút cache cho mỗi GID
+CSV_CACHE_TTL = 300   # 5 phút cache cho mỗi GID (giảm latency từ 6s xuống <0.1s)
 
 def fetch_csv(gid: str) -> pd.DataFrame:
     now = time.time()
@@ -99,7 +99,7 @@ DAILY_FIELDS_TTL = 600   # 10 phút
 
 _df_staff: pd.DataFrame | None = None
 _df_staff_ts: float = 0.0
-STAFF_TTL = 30   # 30 giây
+STAFF_TTL = 900   # 15 phút
 
 def get_staff_df() -> pd.DataFrame:
     global _df_staff, _df_staff_ts
@@ -1047,10 +1047,6 @@ def handle(update: dict) -> None:
         first_word = parts[0][1:].lower().split("@")[0]  # e.g. "/t4notclose@bot" -> "t4notclose"
         rest = parts[1] if len(parts) > 1 else ""
         
-        # 🔧 DEBUG v3.4: xác nhận bot NHẬN được slash command
-        logger.info(f"CMD received: /{first_word} | chat={chat_id} | user={user_id}")
-        tg_send(chat_id, f"🔧 v3.4 CMD: /{first_word}")
-
         # Xử lý các hệ thống lệnh chính
         if first_word in ("request_enter_site", "request_site_enter", "site_access", "siteaccess", "site_enter", "request_site"):
             passed_site = rest.upper().strip() if rest else "TNI0401"
@@ -1084,7 +1080,6 @@ def handle(update: dict) -> None:
             return
 
         elif first_word in ("plan", "dailyplan"):
-            tg_send(chat_id, "🔧 plan: step1 - getting team")  # DEBUG
             team_num = None
             if rest:
                 team_arg = rest.upper()
@@ -1119,9 +1114,7 @@ def handle(update: dict) -> None:
             if not team_num:
                 team_num = 1
             
-            tg_send(chat_id, f"🔧 plan: step2 - team={team_num}, calling template")  # DEBUG
             send_daily_plan_template(chat_id, team_num)
-            tg_send(chat_id, "🔧 plan: step3 - done")  # DEBUG
             return
 
         elif first_word in ("id", "myid"):
@@ -1343,10 +1336,19 @@ class handler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"status": "error", "message": "Missing chat_id or text"}).encode("utf-8"))
                     return
 
-            # ✅ FIX v3.2: Chạy handle() TRƯỚC khi gửi response
-            # Vercel CÓ THỂ terminate process sau khi response flush
-            # → handle() phải hoàn thành TRƯỚC khi gửi 200 OK
-            # Telegram webhook timeout = 60s, Vercel maxDuration = 30s → an toàn
+            # ✅ FIX v3.5: Trả lời 200 OK ngay lập tức (<0.1s) để Telegram KHÔNG bị timeout 5s
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+            try:
+                self.wfile.flush()
+            except Exception:
+                pass
+
+            # ✅ Xử lý handle() SYNCHRONOUSLY trước khi do_POST() return.
+            # do_POST() chưa return → Vercel giữ process sống (up to 60s maxDuration).
+            # handle() có đủ thời gian fetch CSV và gửi tin nhắn Telegram.
             try:
                 handle(data)
             except Exception as ex:
@@ -1360,12 +1362,6 @@ class handler(BaseHTTPRequestHandler):
                         tg_send(chat_id, f"⚠️ <b>Error:</b>\n<pre>{html.escape(tb[:2000])}</pre>")
                 except Exception:
                     pass
-
-            # SAU KHI handle() xong → gửi 200 OK cho Telegram
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"ok":true}')
 
         except Exception as ex:
             logger.error(f"Webhook POST parse error: {ex}")
