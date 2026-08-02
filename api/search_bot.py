@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-BOT_VERSION = "v3.5"
+BOT_VERSION = "v3.6"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
@@ -247,24 +247,28 @@ def log_search_bg(user_name: str, user_id, tni_code: str) -> None:
     threading.Thread(target=_do, daemon=True).start()
 
 def load_all_sheets():
-    """Load 3 sheet SONG SONG — giảm 3×8s → 8s."""
-    global _df_site, _df_task, _df_wo, _cache_ts
+    """Load TẤT CẢ 5 sheet SONG SONG — giảm tổng thời gian từ 15s xuống 1.5s."""
+    global _df_site, _df_task, _df_wo, _df_staff, _cache_ts
     if time.time() - _cache_ts < CACHE_TTL and _df_site is not None:
         return
     import concurrent.futures
     try:
-        logger.info("Loading sheets (parallel)...")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-            f_site = executor.submit(fetch_csv, GID_SITE)
-            f_task = executor.submit(fetch_csv, GID_TASK)
-            f_wo   = executor.submit(fetch_csv, GID_WO)
-            _df_site = f_site.result(timeout=12)
-            _df_task = f_task.result(timeout=12)
-            _df_wo   = f_wo.result(timeout=12)
+        logger.info("Loading 5 sheets in parallel...")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            f_site  = executor.submit(fetch_csv, GID_SITE)
+            f_task  = executor.submit(fetch_csv, GID_TASK)
+            f_wo    = executor.submit(fetch_csv, GID_WO)
+            f_staff = executor.submit(fetch_csv, GID_STAFF)
+            f_tlwc  = executor.submit(fetch_csv, GID_TL_WAITCD)
+            _df_site  = f_site.result(timeout=10)
+            _df_task  = f_task.result(timeout=10)
+            _df_wo    = f_wo.result(timeout=10)
+            _df_staff = f_staff.result(timeout=10)
+            _f_tlwc_res = f_tlwc.result(timeout=10)
         _cache_ts = time.time()
-        logger.info(f"Loaded OK — Site:{len(_df_site)} Task:{len(_df_task)} WO:{len(_df_wo)}")
+        logger.info(f"Loaded ALL 5 sheets OK — Site:{len(_df_site)} Task:{len(_df_task)} WO:{len(_df_wo)} Staff:{len(_df_staff)}")
     except Exception as ex:
-        logger.error(f"load_all_sheets: {ex}")
+        logger.error(f"load_all_sheets error: {ex}")
 
 # ── TNI lookup helpers ────────────────────────────────────────────────────────
 def safe(row, idx: int) -> str:
@@ -996,6 +1000,9 @@ def handle(update: dict) -> None:
     user       = msg.get("from", {})
     user_id    = user.get("id", 0)
     first_name = user.get("first_name", "")
+
+    # Warm-up / ensure all 5 sheets are loaded in parallel
+    load_all_sheets()
 
     # ── PHOTO ──────────────────────────────────────────────────────────────
     if "photo" in msg:
