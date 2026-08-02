@@ -1,0 +1,18 @@
+name: Site Down Relay 24/7 Webhook Keepalive
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # Chạy tự động mỗi 5 phút từ GitHub Actions Cloud 24/7
+  workflow_dispatch:         # Cho phép kích hoạt thủ công khi cần
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lock & Ensure Site Down Webhook 100% Active on tni-sitedown.vercel.app
+        run: |
+          echo "🔒 Re-locking Webhook for Bot 5 (@TNISITEDOWN_BOT) → tni-sitedown.vercel.app..."
+          curl -s -f "https://api.telegram.org/bot8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI/setWebhook?url=https://tni-sitedown.vercel.app/api/site_down_relay" || true
+          echo ""
+          echo "⚡ Ping tni-sitedown.vercel.app endpoint..."
+          curl -s "https://tni-sitedown.vercel.app/api/site_down_relay" || true
