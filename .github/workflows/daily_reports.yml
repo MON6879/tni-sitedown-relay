@@ -7,6 +7,9 @@ on:
     - cron: '55 22 * * *'  # 05:25 Myanmar / 22:55 UTC → 5.1 Morning
     - cron: '55 1 * * *'   # 08:25 Myanmar / 01:55 UTC → 5.1 Morning
     - cron: '20 3 * * *'   # 09:50 Myanmar / 03:20 UTC → 5.1 Morning
+    - cron: '50 8 * * *'   # 15:20 Myanmar / 08:50 UTC → 5.1 Evening
+    - cron: '30 12 * * *'  # 19:00 Myanmar / 12:30 UTC → 5.1 Evening & read_report
+    - cron: '30 15 * * *'  # 22:00 Myanmar / 15:30 UTC → 5.1 Evening & refuel_plan_report
     - cron: '30 6 * * *'   # 13:00 Myanmar / 06:30 UTC → refuel_report
     - cron: '30 14 * * *'  # 21:00 Myanmar / 14:30 UTC → plan_update (5B)
     - cron: '30 7 * * *'   # 14:00 Myanmar / 07:30 UTC → read_report (6)
@@ -116,12 +119,15 @@ jobs:
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
         run: python daily_plan_report.py --mode update
 
-      - name: Report 5C — Morning Plan (5.1) — 05:25, 08:25, 09:50 AM Myanmar
+      - name: Report 5C — Morning/Evening Plan (5.1) — 05:25, 08:25, 09:50 AM & 15:20, 19:00, 22:00 PM Myanmar
         if: |
           (github.event_name == 'schedule' && (
             github.event.schedule == '55 22 * * *' ||
             github.event.schedule == '55 1 * * *'  ||
-            github.event.schedule == '20 3 * * *'
+            github.event.schedule == '20 3 * * *'  ||
+            github.event.schedule == '50 8 * * *'  ||
+            github.event.schedule == '30 12 * * *' ||
+            github.event.schedule == '30 15 * * *'
           )) ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 5C - Plan Morning')
         env:
