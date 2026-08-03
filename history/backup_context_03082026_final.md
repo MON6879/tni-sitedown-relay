@@ -4,6 +4,14 @@
 
 ---
 
+## 🛠️ Tách Biệt Nhiều Mã TNI Khi Nhập Liền Nhau Tránh Dính Chuỗi (`TNI Code` Splitting Fix)
+- **Phát hiện nguyên nhân**: Trong `api/search_bot.py`, biểu thức chính quy cũ `re.search(r"\b(TNI\w+)")` gom toàn bộ ký tự dính liền nhau đằng sau chữ TNI. Khi nhân viên `Khant Chaw Nyo` nhập liền 4 mã trạm liên tiếp `TNI0080TNI0057TNI0249TNI0243` (hoặc gửi danh sách mã dính liền), regex cũ đã bắt nguyên cả chuỗi dính liền 4 mã này làm 1 ➔ Ghi chuỗi dính `TNI0080TNI0057TNI0249TNI0243` vào tab `Search Log` của Google Sheets `Team All Find - Sum WO and Task`.
+- **Khắc phục triệt để**:
+  1. **Dùng `re.findall(r"TNI\d{4}|TNI[A-Z0-9]{4,5}")`**: Tự động nhận diện và tách từng mã trạm TNI chuẩn (4-5 ký tự) ngay cả khi người dùng gõ dính liền nhau không có dấu cách!
+  2. **Tự động phân tách và ghi log riêng từng dòng**: Hệ thống tự động phân tách thành 4 dòng log riêng biệt (`TNI0080`, `TNI0057`, `TNI0249`, `TNI0243`) trong `Search Log` và tra cứu trả kết quả chính xác 100% cho từng trạm!
+
+---
+
 ## 🛠️ Triệt Tiêu 100% Lỗi Trùng Lặp 2 Bot & Lỗi Ghi Nhiều Dòng Giống Nhau (`Daily Result` Single Bot Fix)
 - **Phát hiện nguyên nhân cốt lõi**:
   1. Trong `api/collector.py` (Asset Bot `@TNIASSETorderREQUEST_BOT`), từ khóa `Daily Result:` nằm trong danh sách từ khóa thu thập ➔ Làm cho CẢ 2 BOT (`@TNIASSETorderREQUEST_BOT` và `@SEARCHTNITASKWOBOT`) cùng tham gia xử lý khi nhân viên gửi tin `Daily Result:`. Dẫn tới việc 2 Bot cùng trả lời và tạo ra 2 bản tin ghi trùng lặp nhau!
