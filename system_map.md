@@ -5,15 +5,16 @@
 
 ---
 
-## QUAT TAC LAM VIEC BAT BUOC
+## QUY TẮC LÀM VIỆC BẮT BUỘC & KHI NÓI "LƯU ĐI"
 
 > [!CAUTION]
-> **Sau moi lan sua code - PHAI thuc hien du 3 buoc sau:**
-> 1. **Luu du phong** - tao file backup_context_DDMMYYYY.md ghi lai noi dung thay doi
-> 2. **Cap nhat system_map.md** - ghi vao Changelog ben duoi
-> 3. **Dong bang (commit + push)** - git add ... ; git commit -m ... ; git push
+> **Khi người dùng nói "LƯU ĐI" hoặc sau mỗi lần sửa code — AI BẮT BUỘC thực hiện đủ 4 bước dứt điểm:**
+> 1. **Lưu dự phòng**: Tạo/cập nhật file `history/backup_context_DDMMYYYY_final.md` ghi nhận toàn bộ cấu hình, lịch cron và commit hash.
+> 2. **Đồng bộ trên máy**: Đồng bộ 100% tất cả các file Python (`search_bot.py`, `collector.py`, `cron_send.py`, `daily_read_report.py`, `daily_plan_report.py`, `daily_bod_assign.py`, `botlookup_relay.py`, `cable_report.py`, `tni_config.py`, `tg_utils.py`) giữa tất cả các thư mục cục bộ (`Task and WO`, `tni-search`, `tni-sitedown`, `tni_site_down_repo`).
+> 3. **Đồng bộ trên mây**: Commit & Push 100% tất cả các repository lên GitHub & Vercel (`phonghdpxd-cmd/tni-bot`, `MON6879/TNI-DONE`, `MON6879/tni-sitedown-relay`).
+> 4. **Dọn dẹp rác**: Xóa các file `.bak` tạm và bộ nhớ đệm `__pycache__` trên máy để tránh nạp lầm code cũ.
 >
-> Khong duoc dung lai o buoc nao. Bot tren GitHub Actions chi chay file da push len!
+> Không được dừng lại ở bất kỳ bước nào để tránh trôi code hay lặp lại lỗi!
 
 ---
 
