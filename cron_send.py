@@ -1059,19 +1059,24 @@ def parse_tl_metrics(text: str) -> dict:
     task_assign = _num(r'All Assign:\s*/?([\d]+)')
     task_close  = _num(r'All task Close:\s*/?([\d]+)')
 
-    # Phân loại màu sắc và icon trạng thái chuẩn theo đúng Chú thích (Legend):
-    # 🟢 >=50%Hit (chỉ từ 50% trở lên mới hiện 🟢 và ✅)
-    # 🟡 >=30%   (từ 30% đến <50% hiện 🟡)
-    # 🔴 <30%Lost (dưới 30% hiện 🔴 và 🛑)
+    # Extract Target % from sheet text (e.g. /Target25%, /Target50%, /Target75%)
+    m_target = re.search(r'/Target\s*(\d+)%', text, re.IGNORECASE)
+    target_pct = float(m_target.group(1)) if m_target else 50.0
+    warn_pct = round(target_pct * 0.6) if target_pct != 50 else 30.0
+
+    # Phân loại màu sắc và icon trạng thái chuẩn theo đúng Target đọc được từ Sheet:
+    # 🟢 >=Target%Hit (đạt target)
+    # 🟡 >=Warn%     (gần đạt target)
+    # 🔴 <Warn%Lost  (lost target)
     try:
         pct_val = float(close_pct)
     except Exception:
         pct_val = 0.0
 
-    if pct_val >= 50.0:
+    if pct_val >= target_pct:
         color = "🟢"
         tgt_icon = "✅"
-    elif pct_val >= 30.0:
+    elif pct_val >= warn_pct:
         color = "🟡"
         tgt_icon = "🟡"
     else:
@@ -1082,6 +1087,8 @@ def parse_tl_metrics(text: str) -> dict:
         "team_num":   team_num,
         "rank":       rank,
         "close_pct":  close_pct,
+        "target_pct": target_pct,
+        "warn_pct":   warn_pct,
         "color":      color,
         "tgt_icon":   tgt_icon,
         "hit_target": hit_target,
@@ -1104,9 +1111,18 @@ def build_tl_comparison(metrics_list: list, now_str: str) -> str:
     if not metrics_list:
         return ""
 
+    # Lấy Target % động từ dữ liệu Sheet (VD: 50%, 75%...)
+    target_val = 50
+    warn_val = 30
+    for m in metrics_list:
+        if m.get("target_pct"):
+            target_val = int(m["target_pct"])
+            warn_val = int(m.get("warn_pct", 30))
+            break
+
     lines = [
         f"📋 4. Report — TL Comparison — {now_str}",
-        f"📌 Target: 50% WO Close",
+        f"📌 Target: {target_val}% WO Close",
         "━" * 22,
         # Header bảng
         f"{'T':<3} {'Rk':<4} {'Close%':<9} {'Mo':>4} {'7D':>4} {'3Day':>7} {'Rem':>5} {'OVD':>5} {'Task A/C':>9}",
@@ -1128,7 +1144,7 @@ def build_tl_comparison(metrics_list: list, now_str: str) -> str:
         )
 
     lines.append("─" * 52)
-    lines.append("🟢 >=50%Hit 🟡 >=30% 🔴 <30%Lost")
+    lines.append(f"🟢 >={target_val}%Hit 🟡 >={warn_val}% 🔴 <{warn_val}%Lost")
     lines.append("━" * 22)
 
     # Chi tiết đầy đủ cột D từng TL

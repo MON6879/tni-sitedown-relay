@@ -35,11 +35,13 @@
 
 ---
 
-## 🛠️ Sửa biểu tượng Trạng thái Báo cáo 4 (`cron_send.py`)
-- **Khớp chuẩn với Chú thích Legend (`🟢 >=50%Hit  🟡 >=30%  🔴 <30%Lost`)**:
-  - Chỉ khi Close% đạt **$\ge 50\%$** mới hiển thị icon `🟢` và dấu `✅`.
-  * Từ **$30\%$ đến $<50\%$** (ví dụ $39.6\%$): Hiển thị icon **`🟡`** (Yellow) ở cả 2 phía, KHÔNG hiển thị nhầm dấu `✅` xanh lá.
-  * Dưới **$30\%$**: Hiển thị icon `🔴` và dấu `🛑`.
+## 🛠️ Tự động biến đổi Target động cho Báo cáo 4 (`cron_send.py`)
+- **Nhận diện Target % Động từ Sheet (`/Target25%`, `/Target50%`, `/Target75%`)**:
+  - Tiêu đề Target, Legend chú thích và icon đánh giá kết quả tự động thay đổi linh hoạt theo số % Target thiết lập trong Sheet.
+  - Khi Target tuần sau nâng lên **75%**:
+    * Tiêu đề tự nhảy: `📌 Target: 75% WO Close`
+    * Dòng chú thích tự nhảy: `🟢 >=75%Hit  🟡 >=50%  🔴 <50%Lost`
+    * Icon tự động đánh giá chuẩn theo mốc 75%.
 
 ---
 
