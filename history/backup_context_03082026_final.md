@@ -4,6 +4,12 @@
 
 ---
 
+## 🛠️ Nâng cấp Regex Tra cứu Info (`Info: TNIxxxx` vs `TNIxxxx`)
+- **Phát hiện lỗi**: Trước đó việc lấy chuỗi sau `Info:` dùng `text_stripped[5:]` cắt chuỗi cứng theo 5 vị trí. Khi người dùng gõ `Info: TNIxxxx` (có khoảng trắng sau dấu hai chấm), index bị lệch khiến chuỗi trích xuất mất chữ 'T' (`NIxxxx`), làm regex thất bại và bị nhảy nhầm xuống handler tra cứu `TNIxxxx` (Task & WO).
+- **Khắc phục**: Thay thế bằng Regex linh hoạt `re.search(r"^\s*info[:\s]+\s*(TNI\w+)", text, re.IGNORECASE)`. Từ nay dù gõ `Info: TNI0351`, `Info:TNI0351`, `info TNI0351` hay `INFO: TNI0351`, bot đều trích xuất chuẩn xác 100% mã `TNI0351` và trả về đúng dữ liệu **Site Info (Site / Cable / Gpon / DIA)** mà KHÔNG BAO GIỜ bị nhảy trùng sang Task/WO!
+
+---
+
 ## 🛡️ NGUYÊN TẮC BẮT BUỘC (STRICT RULE ADDED)
 - **Tuyệt đối không được tiện tay hay đoán đường dẫn Webhook / Endpoint**.
 - Trước khi can thiệp bất kỳ kết nối nào, **bắt buộc phải đọc lại `SYSTEM_DOC.md` và `backup_context_03082026_final.md`**.
@@ -23,7 +29,7 @@
 | Repository / Service | Chế độ | Remote URL | Vai trò chính |
 |---|---|---|---|
 | **`MON6879/tni-sitedown-relay`** | 🟢 **PUBLIC** | `https://github.com/MON6879/tni-sitedown-relay.git` | **Nơi duy nhất gánh 100% tự động 24/7 Báo cáo 1, 2, 3, 4, 5, 6, Refuel, Cable, Site Down & Keepalive 5 min cho TOÀN BỘ BOT & Auto Copy Paste GAS (Miễn phí 100% không giới hạn)** |
-| **`MON6879/TNI-DONE`** | 🔒 **PRIVATE** | `https://github.com/MON6879/TNI-DONE.git` | Codebase Search Bot v3.6 |
+| **`MON6879/TNI-DONE`** | 🔒 **PRIVATE** | `https://github.com/MON6879/TNI-DONE.git` | Codebase Search Bot v3.6 (Secondary deployment `tni-done.vercel.app`) |
 | **`phonghdpxd-cmd/tni-bot`** | 🔒 **PRIVATE** | `https://github.com/phonghdpxd-cmd/tni-bot.git` | Webhook handler trên Vercel (`api/collector.py`, `api/search_bot.py`) |
 | **Vercel Project** | Cloud Serverless | `tni-bot.vercel.app` & `tni-done.vercel.app` | Xử lý Webhook tức thì < 0.2s cho Search Bot & Asset Bot |
 | **Google Apps Script** | Google Cloud | Live Web Apps | Backend dữ liệu & Keepalive 5 min |
