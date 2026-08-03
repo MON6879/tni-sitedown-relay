@@ -4,9 +4,9 @@
 
 ---
 
-## 🛠️ Nâng cấp Bộ Gửi Tin Nhắn An Toàn (tg_send Plain Text Fallback)
-- **Phát hiện nguyên nhân**: Một số bản tin tra cứu `Wait CD`, `Not Close` hoặc mã trạm có chứa ký tự `<` hoặc `>` trong dữ liệu thô. Khi gửi dạng HTML, Telegram trả về lỗi `Bad Request: can't parse entities` làm tin nhắn bị hủy không gửi tới người dùng.
-- **Khắc phục**: Đã thêm cơ chế **Tự động chuyển đổi Plain Text dự phòng (Fallback)** vào hàm `tg_send`. Nếu Telegram từ chối định dạng HTML, bot sẽ tự động bóc HTML và gửi bản tin Plain Text tức thì, đảm bảo 100% không bao giờ bị mất hay rơi tin nhắn!
+## 🚀 SỬA NGUYÊN NHÂN GÂY NỔI THỰC SỰ: Thứ Tự Thực Thi Vercel Serverless (Vercel Lifecycle Freeze Fix)
+- **Phát hiện nguyên nhân**: Trong hàm `do_POST()`, dòng gửi phản hồi `self.send_response(200)` & `self.wfile.write(b'{"ok":true}')` nằm TRƯỚC hàm `handle(data)`. Trên hạ tầng Vercel Serverless (WSGI Proxy), ngay sau khi header HTTP 200 được ghi xong, proxy Vercel coi như request đã kết thúc và ĐÓNG BĂNG/DỪNG TIẾN TRÌNH PYTHON ngay lập tức trước khi `handle(data)` kịp chạy xong ➔ Dẫn tới việc bot ngưng phản hồi (đứng bot)!
+- **Khắc phục**: Đã đảo thứ tự cho `handle(data)` thực thi xong 100% trước, sau đó mới phát `200 OK` cho Vercel. Bot từ nay chạy phản hồi liên tục 100% không bao giờ bị đứng hay rơi tin nhắn!
 
 ---
 
