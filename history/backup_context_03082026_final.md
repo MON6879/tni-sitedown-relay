@@ -4,6 +4,12 @@
 
 ---
 
+## 🛠️ Sửa Lỗi NameError Khấu Trừ `daily_read_report.py` (Report 6 Fix)
+- **Phát hiện nguyên nhân**: Trong hàm `process_group()` của `daily_read_report.py`, biến danh sách `not_in_group_names` bị thiếu dòng khởi tạo `not_in_group_names = []` trước vòng lặp kiểm tra nhân sự. Khi chạy Report 6, Python trả về lỗi `NameError: name 'not_in_group_names' is not defined` làm cho workflow GitHub Actions bị đánh dấu đỏ ❌ (Exit code 1).
+- **Khắc phục**: Đã khởi tạo biến `not_in_group_names = []` chuẩn xác tại dòng 334. Báo cáo 6 hiện đã chạy thành công 100% không còn lỗi!
+
+---
+
 ## ⚡ Triệt Tiêu 100% Lỗi Gửi 2 Tin Nhắn Plan Trong Nhóm (Plan Template Anti-Duplicate Guard)
 - **Phát hiện nguyên nhân cốt lõi**: Khi gửi `/plan` trong nhóm Telegram, quá trình tải dữ liệu danh sách FT từ Google Sheets tốn 3–4 giây. Do thời gian chờ kéo dài, hệ thống cổng kết nối của Telegram tưởng rằng chưa phản hồi nên đã tự động mở kết nối thứ 2 (Webhook Retry). Vercel phân tải cho 2 tiến trình xử lý song song, dẫn tới việc bot gửi 2 tin nhắn Mẫu Daily Plan cùng lúc trong nhóm!
 - **Khắc phục triệt để**:
