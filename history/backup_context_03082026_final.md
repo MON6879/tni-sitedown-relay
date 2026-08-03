@@ -35,9 +35,11 @@
 
 ---
 
-## 🛠️ Cập nhật Asset Bot (`collector.py`)
-- **Tự động đặt lại Webhook (`ensure_collector_webhook_active`)**: Đảm bảo Telegram Webhook cho Asset Bot luôn kết nối đúng `https://tni-bot.vercel.app/api/collector`.
-- **Hỗ trợ Slash Commands nâng cao**: Nhận diện chuẩn xác các lệnh dạng `/order@TNIASSETOrderREQUEST_BOT`, `/revoke`, `/move`, `/export` khi gõ trên Telegram app.
+## 🛠️ Sửa biểu tượng Trạng thái Báo cáo 4 (`cron_send.py`)
+- **Khớp chuẩn với Chú thích Legend (`🟢 >=50%Hit  🟡 >=30%  🔴 <30%Lost`)**:
+  - Chỉ khi Close% đạt **$\ge 50\%$** mới hiển thị icon `🟢` và dấu `✅`.
+  * Từ **$30\%$ đến $<50\%$** (ví dụ $39.6\%$): Hiển thị icon **`🟡`** (Yellow) ở cả 2 phía, KHÔNG hiển thị nhầm dấu `✅` xanh lá.
+  * Dưới **$30\%$**: Hiển thị icon `🔴` và dấu `🛑`.
 
 ---
 

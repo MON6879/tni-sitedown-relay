@@ -1059,24 +1059,31 @@ def parse_tl_metrics(text: str) -> dict:
     task_assign = _num(r'All Assign:\s*/?([\d]+)')
     task_close  = _num(r'All task Close:\s*/?([\d]+)')
 
-    # Màu: dùng LostTARGET flag từ sheet (sheet đã tính theo tuần)
-    if "/LostTARGET" in text:
-        color = "🔴"   # Sheet xác nhận lost target
-    elif "/HitTARGET" in text:
-        color = "🟢"   # Hit target
-    else:
-        # Fallback theo % nếu flag không có trong text
-        try:
-            color = "🟢" if float(close_pct) >= 50 else "🟡"
-        except Exception:
-            color = "⚫"
+    # Phân loại màu sắc và icon trạng thái chuẩn theo đúng Chú thích (Legend):
+    # 🟢 >=50%Hit (chỉ từ 50% trở lên mới hiện 🟢 và ✅)
+    # 🟡 >=30%   (từ 30% đến <50% hiện 🟡)
+    # 🔴 <30%Lost (dưới 30% hiện 🔴 và 🛑)
+    try:
+        pct_val = float(close_pct)
+    except Exception:
+        pct_val = 0.0
 
+    if pct_val >= 50.0:
+        color = "🟢"
+        tgt_icon = "✅"
+    elif pct_val >= 30.0:
+        color = "🟡"
+        tgt_icon = "🟡"
+    else:
+        color = "🔴"
+        tgt_icon = "🛑"
 
     return {
         "team_num":   team_num,
         "rank":       rank,
         "close_pct":  close_pct,
         "color":      color,
+        "tgt_icon":   tgt_icon,
         "hit_target": hit_target,
         "wo_month":   wo_month,
         "wo_7day":    wo_7day,
@@ -1107,7 +1114,7 @@ def build_tl_comparison(metrics_list: list, now_str: str) -> str:
     ]
 
     for m in metrics_list:
-        tgt = "✅" if m["hit_target"] else "🛑"
+        tgt = m.get("tgt_icon", "✅" if m["hit_target"] else "🛑")
         lines.append(
             f"{m['color']}T{m['team_num']:<2} "
             f"#{m['rank']:<3} "
