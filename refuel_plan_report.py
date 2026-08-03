@@ -584,12 +584,12 @@ def report_2(data: RefuelData):
             if len(diff_list) > 5:
                 lines.append(f"    ... +{len(diff_list)-5} more sites")
         elif not sites_data:
-            lines.append(f"  • <b>{team}</b>: 0% (Chưa có dữ liệu) ⚠️")
+            lines.append(f"  • <b>{team}</b>: 0% (No data today) ⚠️")
         else:
             lines.append(f"  • <b>{team}</b>: 100% Matched ✅")
 
     if total_sites_count == 0:
-        lines.append("  ⚠️ Chưa có dữ liệu kế hoạch / đổ dầu hôm nay! (0% Matched)")
+        lines.append("  ⚠️ No plan or refuel data today! (0% Matched)")
     elif not has_diff:
         lines.append("  🎉 All sites today are 100% matched!")
 
