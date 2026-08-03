@@ -65,7 +65,11 @@ jobs:
 
       - name: Report 2 — BOD-assigned Tasks Stats
         if: |
-          (github.event_name == 'schedule' && (github.event.schedule == '50 9 * * *' || github.event.schedule == '30 9 * * *')) ||
+          (github.event_name == 'schedule' && (
+            github.event.schedule == '15 23 * * *' ||
+            github.event.schedule == '50 9 * * *'  ||
+            github.event.schedule == '30 9 * * *'
+          )) ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 2 (BOD) - BOD Assign')
         env:
           SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
