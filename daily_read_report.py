@@ -331,6 +331,7 @@ async def process_group(client, group_key: str, chat_id: int,
     # Build per_person tracking for ALL staff members in the team
     per_person = {}
     member_ids = set()
+    not_in_group_names = []
 
     if group_key == "CONTROL":
         for p in group_participants:
