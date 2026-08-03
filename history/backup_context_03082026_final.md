@@ -18,9 +18,9 @@
 
 ## ⏰ Cấu hình Lịch chạy Báo cáo Chuẩn (`daily_reports.yml`)
 
-### 1. Báo cáo 1, 2, 3, 4 (Backlog & Daily Task) & Cable Report:
+### 1. Báo cáo 1, 2, 3, 4 (Backlog & Daily Task), Refuel Request & Cable Report:
 - 🌅 **Ca Sáng**: **05:45 SÁNG** (23:15 UTC ngày hôm trước)
-- 🌆 **Ca Chiều**: **16:20 CHIỀU** (09:50 UTC) — Tập trung gửi đồng loạt Báo cáo 1, 2, 3, 4, 5A, 6 & Cable Report
+- 🌆 **Ca Chiều**: **16:20 CHIỀU** (09:50 UTC) — Tập trung gửi đồng loạt Báo cáo 1, 2, 3, 4, 5A, 6, Refuel Request & Cable Report
 
 ### 2. Báo cáo 5.1 (Nhắc nộp Kế hoạch sáng & tối):
 - 🌅 **Ca Sáng**: **05:25, 08:25, 09:50 SÁNG** (Giờ Myanmar)
