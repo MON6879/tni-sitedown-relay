@@ -71,7 +71,7 @@ const AWAZ_LABELS = [
 ];
 
 // ── Team colors ─────────────────────────────────────────────
-const TEAM_COLORS = { T1: "🔴", T2: "🔵", T3: "🟢", T4: "🟡" };
+const TEAM_COLORS = { T1: "🟠", T2: "🔵", T3: "🟢", T4: "🟡" };
 
 
 
@@ -113,7 +113,11 @@ function doPost(e) {
       sheet.getRange(1, 1, maxRow, 1).clearContent();
 
       // Ghi từng dòng vào Col A (A1, A2, A3, ...) — ép kiểu chuỗi an toàn không bị lỗi công thức
-      const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+      const rawLines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+      // Dedup: bot đôi khi gửi 2 response giống nhau → loại bỏ dòng trùng lặp
+      const seen = new Set();
+      const lines = rawLines.filter(l => { if (seen.has(l)) return false; seen.add(l); return true; });
+      if (rawLines.length !== lines.length) Logger.log("[doPost] ⚠️ Dedup: " + rawLines.length + " → " + lines.length + " dòng");
       if (lines.length > 0) {
         const values = lines.map(l => {
           const str = String(l);
@@ -321,7 +325,7 @@ function checkAndSend(isWebhookCall) {
     if (!sheet) { Logger.log("❌ Không tìm thấy sheet GID=" + SD_SHEET_GID); return { sent_tin1: false, sent_tin2: false }; }
 
     const sentTin1 = checkColC(sheet);   // Tin 1: Col A → Col C → gửi nhóm
-    const sentTin2 = checkAwAz(sheet, sentTin1);   // Tin 2: AW7 → gửi SUMMARY (force nếu sentTin1=true)
+    const sentTin2 = checkAwAz(sheet);   // Tin 2: AW7 → gửi SUMMARY (chỉ gửi khi timestamp AW7 thực sự thay đổi)
 
     return { sent_tin1: sentTin1, sent_tin2: sentTin2 };
   } catch(e) {
@@ -519,7 +523,16 @@ function checkColC(sheet) {
     T4: colC[6] || ""    // C7
   };
   const teams = ["T1", "T2", "T3", "T4"];
-  const allC10 = colC.slice(9).filter(l => l.length > 0 && l !== "...");
+  // Dedup: loại dòng trùng lặp (bot relay đôi khi gửi 2 response → Col A có duplicates)
+  const allC10Raw = colC.slice(9).filter(l => l.length > 0 && l !== "...");
+  const _seenC10 = new Set();
+  const allC10 = allC10Raw.filter(l => {
+    const norm = l.replace(/^\d+:\s*/, "").trim();  // bỏ prefix "N: " trước khi so sánh
+    if (_seenC10.has(norm)) return false;
+    _seenC10.add(norm);
+    return true;
+  });
+  if (allC10Raw.length !== allC10.length) Logger.log("[Tin1] ⚠️ Dedup Col C: " + allC10Raw.length + " → " + allC10.length + " dòng");
 
   // Nếu C4-C7 rỗng (format sheet thay đổi), tìm summary trong C10+
   for (const team of teams) {
@@ -633,16 +646,16 @@ function addKeywordIcons(text, teamKey) {
   if (!text) return "";
   let s = text;
 
-  // 1. Team Header Emoji Prefix (🔴 T1, 🔵 T2, 🟢 T3, 🟡 T4)
-  const teamColors = { T1: "🔴", T2: "🔵", T3: "🟢", T4: "🟡" };
+  // 1. Team Header Emoji Prefix (🟠 T1, 🔵 T2, 🟢 T3, 🟡 T4)
+  const teamColors = { T1: "🟠", T2: "🔵", T3: "🟢", T4: "🟡" };
   const teamEmoji = teamColors[teamKey] || (teamColors["T" + ((text.match(/Team\s+([1-4])/i) || [])[1] || "")] || "");
 
-  s = s.replace(/^(?:[🔴🔵🟢🟡]\s*)?(Team\s+([1-4]))\s*:/gmi, function(match, fullTeam, num) {
+  s = s.replace(/^(?:[🟠🔵🟢🟡]\s*)?(Team\s+([1-4]))\s*:/gmi, function(match, fullTeam, num) {
     const k = "T" + num;
-    return (teamColors[k] || "🔴") + " " + fullTeam + ":";
+    return (teamColors[k] || "🟠") + " " + fullTeam + ":";
   });
 
-  if (teamEmoji && !/^[🔴🔵🟢🟡]/.test(s) && /^Team\s+[1-4]:/i.test(s)) {
+  if (teamEmoji && !/^[🟠🔵🟢🟡]/.test(s) && /^Team\s+[1-4]:/i.test(s)) {
     s = teamEmoji + " " + s;
   }
 
@@ -677,7 +690,7 @@ function addKeywordIcons(text, teamKey) {
 
 // ============================================================
 // TIN 2 — SUMMARY (AW7:AZ15)
-// Gửi khi AW7 timestamp (ngày/giờ) thay đổi
+// Gửi khi AW7 timestamp (ngày/giờ) thay đổi VÀ là timestamp HÔM NAY
 // ============================================================
 function checkAwAz(sheet, force) {
   let rawTs = sheet.getRange("AW7").getValue().toString().trim();
@@ -686,13 +699,30 @@ function checkAwAz(sheet, force) {
   }
   if (!rawTs) { Logger.log("[Tin2] Timestamp rỗng — bỏ qua"); return false; }
 
-  // Lấy riêng mốc Ngày/Giờ (ví dụ: "22/07/2026 15:16") để làm key so sánh ổn định
+  // Lấy riêng mốc Ngày/Giờ (ví dụ: "01/08/2026 11:01") để làm key so sánh ổn định
   const tsKey = formatTsHeader(rawTs);
 
+  // Chỉ gửi khi timestamp là hôm nay (Myanmar)
+  if (!force) {
+    const todayStr = Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy");
+    if (tsKey && !tsKey.startsWith(todayStr)) {
+      Logger.log("[Tin2] AW7 ngày cũ (" + tsKey + ") - bỏ qua.");
+      return false;
+    }
+  }
+
+  // Dedup: chỉ gửi khi AW7 timestamp thay đổi so với lần trước
   const props  = PropertiesService.getScriptProperties();
   const lastTs = props.getProperty(TS_KEY_AW7) || "";
-  if (!force && tsKey && tsKey === lastTs) { Logger.log("[Tin2] AW7 không đổi (" + tsKey + ") — bỏ qua"); return false; }
-  Logger.log("[Tin2] 🆕 " + tsKey + " (force=" + !!force + ") → gửi summary...");
+
+  if (tsKey && tsKey === lastTs) {
+    Logger.log("[Tin2] AW7 không đổi (" + tsKey + ") - bỏ qua.");
+    return false;
+  }
+  Logger.log("[Tin2] AW7 mới: " + tsKey + " (cũ: " + (lastTs || "None") + ") -> gửi...");
+
+  // Lưu TRƯỚC khi gửi - tránh re-send nếu GAS timeout giữa chừng
+  props.setProperty(TS_KEY_AW7, tsKey);
 
   const awaz  = readAwAz(sheet);
   const teams = ["T1", "T2", "T3", "T4"];
@@ -732,7 +762,7 @@ function checkAwAz(sheet, force) {
     Utilities.sleep(300);
   }
 
-  props.setProperty(TS_KEY_AW7, tsKey);
+  props.setProperty("SD_LAST_SENT_SLOT", Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyyMMddHH") + (new Date().getMinutes() < 30 ? "_00" : "_30"));
   Logger.log("[Tin2] ✅ Xong — tsKey: " + tsKey);
   return true;
 }
