@@ -23,7 +23,7 @@
 
 ### 2. Báo cáo 1, 2, 3, 4 (Backlog & Daily Task), Refuel Request & Cable Report:
 - 🌅 **Ca Sáng**: **05:45 SÁNG** (23:15 UTC ngày hôm trước)
-- 🌆 **Ca Chiều**: **16:20 CHIỀU** (09:50 UTC) — Tập trung gửi đồng loạt Báo cáo 1, 2, 3, 4, 5A, 6, Refuel Request & Cable Report
+- <ctrl42> **Ca Chiều**: **16:20 CHIỀU** (09:50 UTC) — Tập trung gửi đồng loạt Báo cáo 1, 2, 3, 4, 5A, 6, Refuel Request & Cable Report
 
 ### 3. Báo cáo 5.1 (Nhắc nộp Kế hoạch sáng & tối):
 - 🌅 **Ca Sáng**: **05:25, 08:25, 09:50 SÁNG** (Giờ Myanmar)
@@ -32,6 +32,12 @@
 ### 4. Báo cáo 5B (Plan Update) & Báo cáo 6 (Read Status):
 - 📌 **Report 5B**: **21:00 TỐI** (14:30 UTC)
 - 📌 **Report 6**: **14:00, 17:15, 19:00, 20:30** (Giờ Myanmar)
+
+---
+
+## 🛠️ Cập nhật Thu thập Daily Plan (`daily_plan_report.py` & `collector.py`)
+- **Mở rộng nhận diện tiêu đề Plan**: Kiểm tra từ khóa `"plan"` trong **3 dòng đầu tiên** của tin nhắn (thay vì chỉ dòng đầu 1), giúp thu thập chính xác các tin nhắn có tiêu đề chữ ký/tên Manager phía trước.
+- **Bỏ giới hạn người gửi (Unlock Sender Restriction)**: Thu thập 100% tất cả các tin nhắn chứa `"Daily Plan"` trong nhóm từ bất kỳ thành viên nào (Manager, Team Leader, Staff...), KHÔNG giới hạn cứng ID Team Leader nữa!
 
 ---
 

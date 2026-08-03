@@ -254,11 +254,12 @@ def parse_cable_fields(text: str) -> dict:
 
 # ── Daily Plan detection ──────────────────────────────────────────────────
 def is_daily_plan(text: str) -> bool:
-    """Detect plan message: first line has 'plan', text has date d/m/yyyy."""
+    """Detect plan message: first 3 lines have 'plan', text has date d/m/yyyy."""
     if not text:
         return False
-    first_line = text.strip().split("\n")[0].lower()
-    has_plan = "plan" in first_line
+    lines = [line.strip().lower() for line in text.split("\n") if line.strip()]
+    first_few_lines = " ".join(lines[:3]) if lines else ""
+    has_plan = "plan" in first_few_lines
     has_date = bool(re.search(r'\d{1,2}/\d{1,2}/\d{2,4}', text))
     return has_plan and has_date
 
