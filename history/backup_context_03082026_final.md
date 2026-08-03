@@ -4,12 +4,24 @@
 
 ---
 
+## 🎯 Chỉ Nhận Tra Cứu Khi Tin Nhắn BẮT ĐẦU Bằng TNI/Lệnh Search (`Strict Start-of-Message TNI Lookup`)
+- **Phát hiện nguyên nhân cốt lõi**:
+  1. Trong `api/search_bot.py`, cơ chế bắt mã trạm `re.findall(r"TNI\d{4}|TNI[A-Z0-9]{4,5}")` cũ tìm mã TNI ở BẤT KỲ ĐÂU trong đoạn văn bản.
+  2. Khi nhân viên gửi tin nhắn trao đổi/thảo luận công việc thường ngày trong nhóm (ví dụ: *"V Hot task: TNI0067 need to cover pvc pipe.TNI0060 need to cover pvc pipe..."* như trong ảnh lúc 20:31), bot đã tự động kích hoạt tra cứu 3 trạm liên tiếp và gửi các bản tin tra cứu dài làm trôi tin nhắn trao đổi của nhóm!
+- **Khắc phục triệt để**:
+  1. **Bắt buộc câu lệnh phải BẮT ĐẦU bằng `TNI` (hoặc `/tni`, `/find`)**: `if not (text_l.startswith("tni") or text_l.startswith("/tni") or text_l.startswith("/find")): return`.
+  2. **Phân biệt rạch ròi giữa Lệnh Tra Cứu và Đoạn Chat Thảo Luận**:
+     * ✅ **Tra cứu hợp lệ**: Người dùng gõ `TNI0067`, `tni0067`, `TNI0067 TNI0060`, `/tni TNI0067`, `/find TNI0067` ➔ Bot thực hiện tra cứu bình thường.
+     * 🚫 **Đoạn Chat Thảo Luận**: Người dùng gõ *"V Hot task: TNI0067..."*, *"Please check site TNI0067..."*, *"Note TNI0060..."* ➔ Bot tự động bỏ qua 100%, tuyệt đối KHÔNG tra cứu để nhóm thoải mái trao đổi công việc!
+
+---
+
 ## ⚡ Khắc Phục Triệt Để Lỗi Phản Hồi 2 Lần Trên Vercel (`Fast 200 OK & update_id Deduplication`)
 - **Phát hiện nguyên nhân cốt lõi**:
   1. Khi nhân viên gõ `/plan`, quá trình tải dữ liệu FT từ Google Sheets tốn 3-4 giây. Nếu Vercel chạy `handle(data)` xong rồi mới phát HTTP 200 OK, kết nối của Telegram bị quá thời gian chờ (5 giây) ➔ Telegram lầm tưởng Vercel chưa nhận được tin nhắn nên ngay lập tức gửi lại kết nối thứ 2 (Webhook Retry).
-  2. Do Vercel là hạ tầng Serverless, request 1 và request 2 được Vercel phân tải cho 2 container độc lập cùng chạy ➔ Dẫn tới việc CẢ 2 CONTAINER CÙNG GỬI 2 BẢN TIN `Daily Plan Template` VÀO NHÓM CÙNG LÚC 20:25 (như trong ảnh màn hình)!
-- **Khắc phục triệt để (2 Cơ chế Bảo vệ vĩnh viễn)**:
-  1. **Phát 200 OK Tức Thì (< 10ms)**: Đưa dòng `self.send_response(200)` & `self.wfile.flush()` lên ngay đầu hàm `do_POST()`. Telegram nhận được HTTP 200 OK ngay trong **10ms** ➔ Telegram xác nhận tin nhắn đã được nhận thành công và **KHÔNG BAO GIỜ GỬI LẠI REQUEST THỨ 2!**
+  2. Do Vercel là hạ tầng Serverless, request 1 và request 2 được Vercel phân tải cho 2 container độc lập cùng chạy ➔ Dẫn tới việc CẢ 2 CONTAINER CÙNG GỬI 2 BẢN TIN `Daily Plan Template` VÀO NHÓM CÙNG LÚC 20:25!
+- **Khắc phục triệt để**:
+  1. **Phát 200 OK Tức Thời (< 10ms)**: Đưa dòng `self.send_response(200)` & `self.wfile.flush()` lên ngay đầu hàm `do_POST()`. Telegram nhận được HTTP 200 OK ngay trong **10ms** ➔ Telegram xác nhận tin nhắn đã được nhận thành công và **KHÔNG BAO GIỜ GỬI LẠI REQUEST THỨ 2!**
   2. **Bộ lọc trùng `update_id` (`_processed_updates`)**: Lưu danh sách `update_id` duy nhất của từng tin nhắn Telegram. Nếu có bất kỳ request trùng lặp nào trôi tới, hệ thống sẽ bỏ qua ngay lập tức!
 - **Kết quả**: Triệt tiêu 100% lỗi phản hồi trùng lặp 2 tin nhắn đối với tất cả các lệnh (`/plan`, `/daily`, `/help`, tra cứu trạm)!
 
