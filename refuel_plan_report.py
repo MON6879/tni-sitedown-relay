@@ -573,17 +573,24 @@ def report_2(data: RefuelData):
     # Conclusion / Summary of Diff sites per Team at bottom
     lines.append("\n📌 <b>DIFF SITES SUMMARY BY TEAM:</b>")
     has_diff = False
+    total_sites_count = green_total + yellow_total + red_total + blue_total
+
     for team in teams_list:
         diff_list = diff_by_team[team]
+        sites_data = team_map[team]
         if diff_list:
             has_diff = True
             lines.append(f"  • <b>{team}</b> ({len(diff_list)} sites): " + ", ".join(diff_list[:5]))
             if len(diff_list) > 5:
                 lines.append(f"    ... +{len(diff_list)-5} more sites")
+        elif not sites_data:
+            lines.append(f"  • <b>{team}</b>: 0% (Chưa có dữ liệu) ⚠️")
         else:
             lines.append(f"  • <b>{team}</b>: 100% Matched ✅")
 
-    if not has_diff:
+    if total_sites_count == 0:
+        lines.append("  ⚠️ Chưa có dữ liệu kế hoạch / đổ dầu hôm nay! (0% Matched)")
+    elif not has_diff:
         lines.append("  🎉 All sites today are 100% matched!")
 
     lines.append(f"\n🟩 <b>{green_total}</b>  🟨 <b>{yellow_total}</b>  🟥 <b>{red_total}</b>  🟦 <b>{blue_total}</b>")
