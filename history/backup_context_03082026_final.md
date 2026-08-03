@@ -4,6 +4,12 @@
 
 ---
 
+## 🛠️ Nâng cấp Bộ Gửi Tin Nhắn An Toàn (tg_send Plain Text Fallback)
+- **Phát hiện nguyên nhân**: Một số bản tin tra cứu `Wait CD`, `Not Close` hoặc mã trạm có chứa ký tự `<` hoặc `>` trong dữ liệu thô. Khi gửi dạng HTML, Telegram trả về lỗi `Bad Request: can't parse entities` làm tin nhắn bị hủy không gửi tới người dùng.
+- **Khắc phục**: Đã thêm cơ chế **Tự động chuyển đổi Plain Text dự phòng (Fallback)** vào hàm `tg_send`. Nếu Telegram từ chối định dạng HTML, bot sẽ tự động bóc HTML và gửi bản tin Plain Text tức thì, đảm bảo 100% không bao giờ bị mất hay rơi tin nhắn!
+
+---
+
 ## ⚡ ĐƠN GIẢN HÓA HỆ THỐNG: CHỈ DÙNG 1 SERVER CHÍNH DUY NHẤT
 - **Không còn chạy song song 2 server mây gây xung đột**.
 - Tất cả bot và webhook đã quy về **1 Server Chính Duy Nhất (`https://tni-bot.vercel.app`)**:
