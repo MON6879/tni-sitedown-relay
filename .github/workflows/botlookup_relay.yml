@@ -1,4 +1,4 @@
-name: Botlookup Relay (Site Down)
+name: 📡 2. Site Down Tin 1 Relay (Every 20 Min)
 
 on:
   schedule:
