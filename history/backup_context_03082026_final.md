@@ -4,6 +4,16 @@
 
 ---
 
+## 🛠️ Khắc Phục Lỗi Tự Phát Tin Nhắn Help Lặp Lại 2 Lần (`Help Menu` Rate-Limit & Exact Match Fix)
+- **Phát hiện nguyên nhân cốt lõi**:
+  1. Trong `api/search_bot.py`, điều kiện bắt lệnh help cũ dùng `elif "help" in text_l or "❓" in text:`. Khi bất kỳ tin nhắn báo cáo nào (ví dụ Báo cáo 6 `Daily Note Read Report` hoặc tin nhắn hỏi hỗ trợ) được gửi vào nhóm có chứa từ `"help"` hoặc biểu tượng `"❓"`, bot Search Bot sẽ nhầm tưởng người dùng vừa bấm lệnh trợ giúp `/help` ➔ Tự động phát menu hướng dẫn `👋 TNI Search Bot` vào nhóm!
+  2. Do Webhook của Telegram phân tải trùng lặp hoặc retries, bản tin hướng dẫn bị phát ra liên tiếp 2 lần cùng 1 phút (như trong ảnh màn hình lúc 19:29)!
+- **Khắc phục triệt để**:
+  1. **Thắt chặt điều kiện khớp chính xác (`text_l in ("help", "❓ help", "help ❓", "/help") or text_l == "❓"`)**: Chỉ khi người dùng gõ đúng lệnh `/help`, `help` hoặc bấm nút biểu tượng `❓ Help` thì bot mới hiển thị menu. Không bao giờ phát nhầm khi tin nhắn báo cáo chứa từ `help` nữa!
+  2. **Thêm bộ chặn lặp lại 6 giây (`_recent_help_sends`)**: Trong vòng 6 giây, mỗi nhóm chỉ nhận DUY NHẤT 1 bản tin Hướng dẫn. Mọi tin nhắn trùng lặp phát sinh đều bị hủy ngay từ đầu!
+
+---
+
 ## 🛠️ Tách Biệt Nhiều Mã TNI Khi Nhập Liền Nhau Tránh Dính Chuỗi (`TNI Code` Splitting Fix)
 - **Phát hiện nguyên nhân**: Trong `api/search_bot.py`, biểu thức chính quy cũ `re.search(r"\b(TNI\w+)")` gom toàn bộ ký tự dính liền nhau đằng sau chữ TNI. Khi nhân viên `Khant Chaw Nyo` nhập liền 4 mã trạm liên tiếp `TNI0080TNI0057TNI0249TNI0243` (hoặc gửi danh sách mã dính liền), regex cũ đã bắt nguyên cả chuỗi dính liền 4 mã này làm 1 ➔ Ghi chuỗi dính `TNI0080TNI0057TNI0249TNI0243` vào tab `Search Log` của Google Sheets `Team All Find - Sum WO and Task`.
 - **Khắc phục triệt để**:
