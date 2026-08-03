@@ -111,54 +111,45 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 3.5. PRE-CHECK BẢO VỆ NHÓM (Circuit Breaker 100% Bulletproof) ──
-        # Quét lịch sử 60 tin nhắn gần nhất trong nhóm BOT LOOKUP.
-        # Nếu trong vòng 60 phút qua đã có >= 3 lệnh /down_ (của bất kỳ ai hoặc của mình)
-        # mà bot công ty (@auto_nocpro_bot) KHÔNG HỀ có phản hồi nào -> XÁC NHẬN BOT ĐANG LỖI!
-        # TẠM DỪNG GỬI MỚI để không làm loãng nhóm!
+        # ── 3.5. PRE-CHECK BẢO VỆ NHÓM (Circuit Breaker 100% Exact) ───────
+        # Kể từ 3 tin nhắn gửi lệnh /down_ gần nhất của bất kỳ ai trong nhóm:
+        # Nếu cả 3 lệnh gần nhất đều KHÔNG CÓ BẤT KỲ tin trả lời nào chứa "Auto Report NocPro",
+        # và từ thời điểm đó đến nay chưa có tin "Auto Report NocPro" xuất hiện -> TẠM DỪNG GỬI MỚI!
+        # Chỉ khi quét thấy có tin "Auto Report NocPro" xuất hiện trở lại -> Mới gửi lệnh cào dữ liệu!
         try:
             pre_history = await client(GetHistoryRequest(
                 peer=source, limit=60,
                 offset_date=None, offset_id=0, max_id=0, min_id=0, add_offset=0, hash=0
             ))
             
-            cutoff_60m = datetime.now(timezone.utc) - timedelta(minutes=60)
-            down_cmds_60m = []
-            bot_msgs_60m = []
+            # Lấy tất cả tin nhắn dạng lệnh /down_ và tất cả tin nhắn chứa Auto Report NocPro (xếp từ cũ -> mới)
+            messages = list(reversed(pre_history.messages))
+            
+            down_cmds = []
+            auto_reports = []
 
-            for msg in pre_history.messages:
-                m_date = msg.date.replace(tzinfo=timezone.utc) if msg.date.tzinfo is None else msg.date
-                if m_date < cutoff_60m:
-                    continue
-
+            for msg in messages:
                 txt = (msg.message or "").lower()
-                # 1. Mọi lệnh /down_tni, /down_kyn, /down_ayy... trong nhóm
                 if "/down_" in txt or "auto_nocpro_bot" in txt:
-                    down_cmds_60m.append(msg)
-
-                # 2. Nhận diện tin từ bot công ty: qua tiêu đề 'Auto Report NocPro' hoặc username @auto_nocpro_bot
-                is_bot_msg = False
+                    down_cmds.append(msg)
                 if "auto report nocpro" in txt or "site down (not include" in txt:
-                    is_bot_msg = True
-                elif msg.sender_id:
-                    try:
-                        s_ent = await client.get_entity(msg.sender_id)
-                        if getattr(s_ent, "username", "").lower() == BOT_USERNAME.lower():
-                            is_bot_msg = True
-                    except Exception:
-                        pass
+                    auto_reports.append(msg)
+
+            # Lấy 3 lệnh /down_ gần đây nhất trong nhóm
+            if len(down_cmds) >= 3:
+                last_3_cmds = down_cmds[-3:]
+                third_last_cmd_date = last_3_cmds[0].date
                 
-                if is_bot_msg:
-                    bot_msgs_60m.append(msg)
+                # Có bất kỳ tin "Auto Report NocPro" nào xuất hiện từ sau lệnh thứ 3 gần nhất không?
+                has_nocpro_reply_after = any(r.date >= third_last_cmd_date for r in auto_reports)
 
-            print(f"[{myanmar_now()}] 🔍 Pre-check (60m): {len(down_cmds_60m)} lệnh /down_ | {len(bot_msgs_60m)} phản hồi từ bot công ty")
+                print(f"[{myanmar_now()}] 🔍 Pre-check: Lấy 3 lệnh /down_ gần nhất ({len(down_cmds)} tổng cộng) | Phản hồi 'Auto Report NocPro' sau lệnh thứ 3: {'Có' if has_nocpro_reply_after else 'Không'}")
 
-            # Nếu trong 60m qua có >= 3 lệnh /down_ gửi lên mà bot công ty có 0 phản hồi:
-            if len(down_cmds_60m) >= 3 and len(bot_msgs_60m) == 0:
-                print(f"[{myanmar_now()}] ⚠️ Bot @{BOT_USERNAME} đang bị LỖI/DOWN (0 phản hồi cho {len(down_cmds_60m)} lệnh trong 60p qua). BỎ QUA GỬI MỚI để không làm loãng nhóm!")
-                return
-            elif len(bot_msgs_60m) > 0:
-                print(f"[{myanmar_now()}] 🟢 Bot @{BOT_USERNAME} đang hoạt động bình thường! Tiếp tục gửi lệnh...")
+                if not has_nocpro_reply_after:
+                    print(f"[{myanmar_now()}] ⚠️ Bot công ty đang LỖI (kể từ 3 lệnh /down_ gần nhất chưa có tin 'Auto Report NocPro' xuất hiện). BỎ QUA GỬI MỚI để không làm loãng nhóm!")
+                    return
+                else:
+                    print(f"[{myanmar_now()}] 🟢 Đã có tin 'Auto Report NocPro'! Bot công ty đã sửa xong. Tiếp tục gửi lệnh cào dữ liệu...")
         except Exception as pre_ex:
             print(f"[{myanmar_now()}] ⚠️ Pre-check error (vẫn tiếp tục): {pre_ex}")
 
