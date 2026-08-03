@@ -2,7 +2,7 @@ name: Unified Daily Reports  # last-updated: 2026-07-23
 
 on:
   schedule:
-    - cron: '30 9 * * *'   # 16:00 Myanmar / 09:30 UTC → daily_task + plan_eod + bod_assign + cable_report
+    - cron: '31 9 * * *'   # 16:01 Myanmar / 09:31 UTC → daily_task + plan_eod + bod_assign + cable_report
     - cron: '0 22 * * *'   # 04:30 Myanmar / 22:00 UTC → 5.1
     - cron: '30 22 * * *'  # 05:00 Myanmar / 22:30 UTC → refuel_report + 5.1
     - cron: '0 23 * * *'   # 05:30 Myanmar / 23:00 UTC → 5.1
@@ -81,7 +81,7 @@ jobs:
       - name: Reports 1, 2, 3, 4 — Daily Backlog & Task Reminders
         if: |
           (github.event_name == 'schedule' && (
-            github.event.schedule == '30 9 * * *' ||
+            github.event.schedule == '31 9 * * *' ||
             github.event.schedule == '30 0 * * *'
           )) ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Reports 1, 2, 3, 4 - Daily Task & Backlog')
