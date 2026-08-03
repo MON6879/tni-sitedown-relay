@@ -23,7 +23,7 @@
 
 ### 2. Báo cáo 1, 2, 3, 4 (Backlog & Daily Task), Refuel Request & Cable Report:
 - 🌅 **Ca Sáng**: **05:45 SÁNG** (23:15 UTC ngày hôm trước)
-- <ctrl42> **Ca Chiều**: **16:20 CHIỀU** (09:50 UTC) — Tập trung gửi đồng loạt Báo cáo 1, 2, 3, 4, 5A, 6, Refuel Request & Cable Report
+- 🌆 **Ca Chiều**: **16:20 CHIỀU** (09:50 UTC) — Tập trung gửi đồng loạt Báo cáo 1, 2, 3, 4, 5A, 6, Refuel Request & Cable Report
 
 ### 3. Báo cáo 5.1 (Nhắc nộp Kế hoạch sáng & tối):
 - 🌅 **Ca Sáng**: **05:25, 08:25, 09:50 SÁNG** (Giờ Myanmar)
@@ -35,9 +35,10 @@
 
 ---
 
-## 🛠️ Cập nhật Thu thập Daily Plan (`daily_plan_report.py` & `collector.py`)
-- **Mở rộng nhận diện tiêu đề Plan**: Kiểm tra từ khóa `"plan"` trong **3 dòng đầu tiên** của tin nhắn (thay vì chỉ dòng đầu 1), giúp thu thập chính xác các tin nhắn có tiêu đề chữ ký/tên Manager phía trước.
-- **Bỏ giới hạn người gửi (Unlock Sender Restriction)**: Thu thập 100% tất cả các tin nhắn chứa `"Daily Plan"` trong nhóm từ bất kỳ thành viên nào (Manager, Team Leader, Staff...), KHÔNG giới hạn cứng ID Team Leader nữa!
+## 🛠️ Cập nhật Thu thập & Nối Plan trùng (`handleStoreDailyPlan` & `daily_plan_report.py`)
+- **Thu thập nối tiếp (Append Both)**: Khi có 2 hay nhiều tin Plan cùng Team và Ngày (ví dụ Main Plan + Subteam Plan), hệ thống **nối nội dung cả hai Plan vào Cột D (Daily Plan)** thay vì ghi đè. Cột F (Comparison) tự động tổng hợp trạm của cả 2 Plan để so sánh đầy đủ đối chiếu!
+- **Nhận diện tiêu đề 3 dòng đầu**: Soi từ khóa `"plan"` trong 3 dòng đầu để bắt trúng các tin nhắn có tên Manager/Leader ở Dòng 1.
+- **Mở khóa thu thập**: Cho phép thu thập tin Plan từ tất cả các thành viên trong nhóm.
 
 ---
 

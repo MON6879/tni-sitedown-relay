@@ -458,8 +458,15 @@ function handleStoreDailyPlan(body) {
           // Update existing row E and F with latest data
           if (report)     sheet.getRange(i + 2, 5).setValue(report);
           if (comparison) sheet.getRange(i + 2, 6).setValue(comparison);
-          // Also update plan content (col D) in case it changed
-          if (content)    sheet.getRange(i + 2, 4).setValue(content);
+          // Also update plan content (col D): nếu đã có plan cũ, NỐI THÊM NỘI DUNG MỚI (Append) cả hai để so sánh
+          if (content) {
+            const existingPlan = sheet.getRange(i + 2, 4).getValue().toString().trim();
+            if (existingPlan && existingPlan.indexOf(content) === -1) {
+              sheet.getRange(i + 2, 4).setValue(existingPlan + "\n\n" + content);
+            } else if (!existingPlan) {
+              sheet.getRange(i + 2, 4).setValue(content);
+            }
+          }
           // Normalize the stored date to DD/MM/YYYY format
           sheet.getRange(i + 2, 2).setValue(date);
           return jsonOut({ status: "ok", message: "Updated existing", ref: sheet.getRange(i + 2, 1).getValue(), duplicate: true });
