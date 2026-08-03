@@ -4,8 +4,20 @@
 
 ---
 
+## 🎯 Phân Định 100% Rõ Ràng Các Quy Tắc Tra Cứu (Clear & Info & TNI Lookup Rules)
+- **Quy tắc 1: Tra cứu Task & WO (Mặc định)**:
+  * Khi tin nhắn BẮT ĐẦU bằng `TNIxxxx` hoặc `TNIxxxx_0x` (hoặc `/tni`, `/find`) ➔ Bot tra cứu Task & WO của mã trạm đó. Hỗ trợ cả các hậu tố mở rộng trạm (vd: `TNI0007_01`, `TNI0007_1`).
+  * Chỉ nhận tra cứu 1 mã TNI duy nhất đầu tiên. Nếu nằm ở giữa câu trò chuyện ➔ Bỏ qua không tra cứu.
+- **Quy tắc 2: Tra cứu Thông Tin Trạm (Info)**:
+  * Khi tin nhắn BẮT ĐẦU bằng `Info: TNIxxxx`, `Info TNIxxxx` hoặc `/info TNIxxxx` ➔ Bot tra cứu thông tin chi tiết Site, Cable, Gpon, DIA trong tab `Site Info` (GID: 171059303).
+  * Đã mở rộng biểu thức chính quy `re.search(r"^\s*(?:/info|info)[:\s]+\s*(TNI[A-Z0-9_]+)")` hỗ trợ cả mã trạm mở rộng và lệnh `/info`.
+- **Quy tắc 3: Tra cứu Lịch Sử Clear Site (Clear)**:
+  * Khi tin nhắn BẮT ĐẦU bằng `Clear: TNIxxxx`, `Clear TNIxxxx` hoặc `/clear TNIxxxx` ➔ Bot tra cứu lịch sử Clear site.
+
+---
+
 ## 🚀 Khắc Phục Lỗi Đứng Bot / Ngưng Phản Hồi Trên Vercel Serverless (`Execution Order Fix`)
-- **Phát hiện nguyên nhân cốt lõi trong Ảnh mới (21:36)**:
+- **Phát hiện nguyên nhân cốt lõi trong Ảnh 21:36**:
   1. Trong hàm `do_POST()` của `api/search_bot.py`, dòng gửi phản hồi `self.send_response(200)` & `self.wfile.write(b'{"ok":true}')` trước đó bị đặt lên **TRƯỚC** hàm `handle(data)`.
   2. Trên hạ tầng Vercel Serverless (WSGI Proxy), ngay sau khi header HTTP 200 được gửi đi, proxy Vercel coi như request đã hoàn tất ➔ Vercel tự động **ĐÓNG BĂNG/DỪNG TIẾN TRÌNH PYTHON LAMBDA NGAY LẬP TỨC** trước khi `handle(data)` kịp gửi bản tin Telegram về cho người dùng! Dẫn đến việc khi gõ `/plan` hay `/t2notclose` lúc 21:36, bot bị ngưng phản hồi (đứng bot)!
 - **Khắc phục triệt để**:
@@ -19,7 +31,7 @@
 - **Phát hiện nguyên nhân cốt lõi trong Ảnh 21:06**:
   1. Trong tab `Team leader assign Plan` (GID: 1934147618) của Google Sheets, Dòng 2 cột D (`Daily Plan`) bị ghi đè bởi bản tin **Báo Cáo Tóm Tắt Tự Động Do Bot Phát Ra** (`📅 03/08/2026 17:28 📌 Shows detailed site assignments and tasks grouped by department...`).
   2. Do trong bản tin Báo cáo Tóm tắt tự động của Bot có dòng chữ `...from today/recent plans.` và có ngày `03/08/2026`, hàm quét nhận diện Plan `is_daily_plan_msg()` đã bị nhầm lẫn và thu thập nhầm bản tin Tổng hợp Báo cáo của Bot vào tab làm Plan gốc của Team Leader!
-- **Khắc phục triệt để**:
+- **Khắc phục triệt me**:
   1. **Bổ sung danh sách loại trừ từ khóa bản tin Tổng hợp của Bot**: Bổ sung `shows detailed site assignments`, `tasks grouped by department`, `recent plans`, `plans for ` vào danh sách loại trừ bắt buộc trong `daily_plan_report.py` và `api/collector.py`.
   2. **Quy trình thu thập 2 bước chuẩn xác**:
      * **Bước 1 (Thu thập)**: Hệ thống chỉ thu thập DUY NHẤT bản tin Kế hoạch thực tế do các Team Leader gửi trong nhóm vào tab `Team leader assign Plan` (Cột D).
@@ -31,28 +43,9 @@
 - **Phát hiện nguyên nhân cốt lõi trong Ảnh 3**:
   1. Trong file `api/search_bot.py`, hàm bóc tách dữ liệu `parse_daily_report()` cũ so sánh trực tiếp chuỗi nhãn cột `3. Detail WO:` với tiêu đề cột trên Google Sheets `VII. Detail WO`.
   2. Do tiền tố số thứ tự khác nhau (`3.` vs `VII.`), hệ thống cũ không khớp được nhãn `3. Detail WO:` ➔ Làm cho toàn bộ nội dung WO bị nuốt dính vào cột `Full Name` (tạo thành chuỗi dính `Phyo Htet Aung 3. Detail WO: TNI0198...` trong cột D của ảnh 3), đồng thời làm cột B (`Tên nhân viên`) bị để trống!
-  3. Khi Báo cáo 5 (`cron_send.py`) chạy để kiểm tra ai đã gửi báo cáo, do tên trong Google Sheets bị dính thành `Phyo Htet Aung 3. Detail WO...` thay vì `Phyo Htet Aung`, Báo cáo 5 đã không khớp được tên ➔ Báo `Report: Not sent`!
 - **Khắc phục triệt để**:
   1. **Tự động làm sạch tiền tố số thứ tự (`clean_field_name`)**: Tự động loại bỏ các số thứ tự `1.`, `3.`, `VII.`, `I.` trước khi khớp cột.
   2. `3. Detail WO` và `VII. Detail WO` được làm sạch thành `"detail wo"` ➔ **Khớp chính xác 100%!**
-  3. `Full Name` tách riêng thành `"Phyo Htet Aung"`, `Detail WO` nạp đúng vào cột WO. Báo cáo 5 từ nay sẽ ghi nhận đúng `✅ Report: Sent` cho nhân viên!
-
----
-
-## 🎯 Giới Hạn Mỗi Lần Chỉ Tra Cứu Duy Nhất 1 Mã TNI (`Single TNI Lookup Per Request`)
-- **Khắc phục**: Đã giới hạn trong `api/search_bot.py`: Mỗi tin nhắn chỉ tra cứu duy nhất **1 mã TNI đầu tiên** (`tni = tni_list[0].upper()`). Không còn tra cứu nối tiếp nhiều trạm trong cùng 1 lần để đảm bảo ngắn gọn, không tràn nhóm!
-
----
-
-## 🎯 Chỉ Nhận Tra Cứu Khi Tin Nhắn BẮT ĐẦU Bằng TNI/Lệnh Search (`Strict Start-of-Message TNI Lookup`)
-- **Phát hiện nguyên nhân cốt lõi**:
-  1. Trong `api/search_bot.py`, cơ chế bắt mã trạm `re.findall(r"TNI\d{4}|TNI[A-Z0-9]{4,5}")` cũ tìm mã TNI ở BẤT KỲ ĐÂU trong đoạn văn bản.
-  2. Khi nhân viên gửi tin nhắn trao đổi/thảo luận công việc thường ngày trong nhóm (ví dụ: *"V Hot task: TNI0067 need to cover pvc pipe.TNI0060 need to cover pvc pipe..."* như trong ảnh lúc 20:31), bot đã tự động kích hoạt tra cứu 3 trạm liên tiếp và gửi các bản tin tra cứu dài làm trôi tin nhắn trao đổi của nhóm!
-- **Khắc phục triệt để**:
-  1. **Bắt buộc câu lệnh phải BẮT ĐẦU bằng `TNI` (hoặc `/tni`, `/find`)**: `if not (text_l.startswith("tni") or text_l.startswith("/tni") or text_l.startswith("/find")): return`.
-  2. **Phân biệt rạch ròi giữa Lệnh Tra Cứu và Đoạn Chat Thảo Luận**:
-     * ✅ **Tra cứu hợp lệ**: Người dùng gõ `TNI0067`, `tni0067`, `/tni TNI0067`, `/find TNI0067` ➔ Bot thực hiện tra cứu 1 mã TNI duy nhất.
-     * 🚫 **Đoạn Chat Thảo Luận**: Người dùng gõ *"V Hot task: TNI0067..."*, *"Please check site TNI0067..."*, *"Note TNI0060..."* ➔ Bot tự động bỏ qua 100%, tuyệt đối KHÔNG tra cứu để nhóm thoải mái trao đổi công việc!
 
 ---
 
