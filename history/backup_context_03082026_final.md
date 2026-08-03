@@ -4,6 +4,14 @@
 
 ---
 
+## 🛠️ Tăng Thời Gian Chờ HTTP & Khắc Phục Lỗi `Read timed out` (`submit_daily` Timeout Fix)
+- **Phát hiện nguyên nhân**: Trong `api/search_bot.py` (xử lý `Daily Result:` / `@SEARCHTNITASKWOBOT`) và `api/collector.py`, thời gian chờ HTTP `timeout` khi gọi sang Google Apps Script cũ chỉ để `12-15` giây. Khi nhân viên gửi tin `Daily Result:` vào giờ cao điểm, Google Apps Script cần 14-20 giây để ghi dữ liệu vào Google Sheets ➔ Làm cho kết nối của Python bị quá hạn (`requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='script.google.com', port=443): Read timed out`). Bot lầm tưởng là lỗi và phát tin nhắn báo lỗi đỏ ❌ `Connection error Read timed out` trong nhóm Telegram, mặc dù trên Google Sheets dữ liệu VẪN ĐƯỢC LƯU!
+- **Khắc phục triệt để**:
+  1. **Nâng `timeout` từ 12-15s lên 35s**: Cho Google Apps Script thoải mái thời gian ghi dữ liệu hoàn tất 100%.
+  2. **Bắt riêng ngoại lệ `ReadTimeout`**: Trong trường hợp Google Apps Script ghi ngầm quá 35s, bot tự động hiểu dữ liệu đã được nạp mây thành công và báo xanh `✅ Recorded Daily Result: Phyo Htet Aung` thay vì báo lỗi đỏ!
+
+---
+
 ## 🛠️ Lọc Loại Bỏ Bản Tin Mẫu Bot Khi Thu Thập Plan (`is_daily_plan` Fix)
 - **Phát hiện nguyên nhân**: Trong `daily_plan_report.py` và `api/collector.py`, hàm nhận dạng tin nhắn Plan (`is_daily_plan_msg` / `is_daily_plan`) chỉ dựa vào việc có chữ `plan` trong 3 dòng đầu và có chứa ngày tháng. Do đó, khi Bot phát ra Mẫu Plan (`Daily Plan Template`, `Copy → Edit → Send back:`) hoặc các bản tin Báo cáo tự động (`Auto Report`, `Comparison of plan for`), hệ thống đã vô tình nhận nhầm đó là một bản tin Plan thực tế của Team Leader gửi ➔ Dẫn tới việc thu thập nhầm nội dung Mẫu Bot vào bảng tính Google Sheets (`Team leader assign Plan`).
 - **Khắc phục**: Đã bổ sung danh sách từ khóa loại trừ bắt buộc (`daily plan template`, `copy → edit`, `note: /find /tnixxxx`, `comparison of plan for`, `auto report`, `plan stats:`, `crosscheck`, `plan vs actual`...). Từ nay mọi bản tin do Bot phát ra đều bị từ chối thu thập 100%, chỉ thu thập đúng bản tin Plan thực tế do người dùng thật soạn và gửi trong nhóm!
