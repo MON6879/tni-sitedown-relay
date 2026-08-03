@@ -1,4 +1,4 @@
-# 📌 System Snapshot Backup — 03/08/2026 (FINAL FREEZE)
+# 📌 System Snapshot Backup — 03/08/2026 (FINAL FREEZE & SAVE)
 
 > **Lưu trữ cấu hình toàn bộ hệ thống TNI Bot đã tối ưu và đóng băng ngày 03/08/2026.**
 
@@ -16,7 +16,7 @@
 
 ---
 
-## ⏰ Cấu hình Lịch chạy Báo cáo Chuẩn (`daily_reports.yml`)
+## ⏰ Cấu hình Lịch chạy Báo cáo Chuẩn đã khóa (`daily_reports.yml`)
 
 ### 1. Báo cáo 1, 2, 3, 4 (Backlog & Daily Task), Refuel Request & Cable Report:
 - 🌅 **Ca Sáng**: **05:45 SÁNG** (23:15 UTC ngày hôm trước)
@@ -38,7 +38,7 @@
 
 ---
 
-## 🔒 Cam kết bảo mật
+## 🔒 Cam kết bảo mật & Lọc Bot
 - Mọi Google Spreadsheet ID đều được nạp qua biến môi trường `SPREADSHEET_ID`.
 - Mọi Telegram Bot Token nằm trong GitHub Encrypted Secrets và Vercel Environment Variables.
 - Bot Search & Collector tự động lọc bỏ `is_bot`, chỉ thu thập khi người dùng thật gửi tiêu đề `Daily result:`.
