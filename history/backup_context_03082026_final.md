@@ -4,6 +4,11 @@
 
 ---
 
+## 🎯 Giới Hạn Mỗi Lần Chỉ Tra Cứu Duy Nhất 1 Mã TNI (`Single TNI Lookup Per Request`)
+- **Khắc phục**: Đã giới hạn trong `api/search_bot.py`: Mỗi tin nhắn chỉ tra cứu duy nhất **1 mã TNI đầu tiên** (`tni = tni_list[0].upper()`). Không còn tra cứu nối tiếp nhiều trạm trong cùng 1 lần để đảm bảo ngắn gọn, không tràn nhóm!
+
+---
+
 ## 🎯 Chỉ Nhận Tra Cứu Khi Tin Nhắn BẮT ĐẦU Bằng TNI/Lệnh Search (`Strict Start-of-Message TNI Lookup`)
 - **Phát hiện nguyên nhân cốt lõi**:
   1. Trong `api/search_bot.py`, cơ chế bắt mã trạm `re.findall(r"TNI\d{4}|TNI[A-Z0-9]{4,5}")` cũ tìm mã TNI ở BẤT KỲ ĐÂU trong đoạn văn bản.
@@ -11,7 +16,7 @@
 - **Khắc phục triệt để**:
   1. **Bắt buộc câu lệnh phải BẮT ĐẦU bằng `TNI` (hoặc `/tni`, `/find`)**: `if not (text_l.startswith("tni") or text_l.startswith("/tni") or text_l.startswith("/find")): return`.
   2. **Phân biệt rạch ròi giữa Lệnh Tra Cứu và Đoạn Chat Thảo Luận**:
-     * ✅ **Tra cứu hợp lệ**: Người dùng gõ `TNI0067`, `tni0067`, `TNI0067 TNI0060`, `/tni TNI0067`, `/find TNI0067` ➔ Bot thực hiện tra cứu bình thường.
+     * ✅ **Tra cứu hợp lệ**: Người dùng gõ `TNI0067`, `tni0067`, `/tni TNI0067`, `/find TNI0067` ➔ Bot thực hiện tra cứu 1 mã TNI duy nhất.
      * 🚫 **Đoạn Chat Thảo Luận**: Người dùng gõ *"V Hot task: TNI0067..."*, *"Please check site TNI0067..."*, *"Note TNI0060..."* ➔ Bot tự động bỏ qua 100%, tuyệt đối KHÔNG tra cứu để nhóm thoải mái trao đổi công việc!
 
 ---
@@ -48,14 +53,6 @@
 - **Khắc phục triệt để**:
   1. **Thắt chặt điều kiện khớp chính xác (`text_l in ("help", "❓ help", "help ❓", "/help") or text_l == "❓"`)**: Chỉ khi người dùng gõ đúng lệnh `/help`, `help` hoặc bấm nút biểu tượng `❓ Help` thì bot mới hiển thị menu. Không bao giờ phát nhầm khi tin nhắn báo cáo chứa từ `help` nữa!
   2. **Thêm bộ chặn lặp lại 6 giây (`_recent_help_sends`)**: Trong vòng 6 giây, mỗi nhóm chỉ nhận DUY NHẤT 1 bản tin Hướng dẫn. Mọi tin nhắn trùng lặp phát sinh đều bị hủy ngay từ đầu!
-
----
-
-## 🛠️ Tách Biệt Nhiều Mã TNI Khi Nhập Liền Nhau Tránh Dính Chuỗi (`TNI Code` Splitting Fix)
-- **Phát hiện nguyên nhân**: Trong `api/search_bot.py`, biểu thức chính quy cũ `re.search(r"\b(TNI\w+)")` gom toàn bộ ký tự dính liền nhau đằng sau chữ TNI. Khi nhân viên `Khant Chaw Nyo` nhập liền 4 mã trạm liên tiếp `TNI0080TNI0057TNI0249TNI0243` (hoặc gửi danh sách mã dính liền), regex cũ đã bắt nguyên cả chuỗi dính liền 4 mã này làm 1 ➔ Ghi chuỗi dính `TNI0080TNI0057TNI0249TNI0243` vào tab `Search Log` của Google Sheets `Team All Find - Sum WO and Task`.
-- **Khắc phục triệt để**:
-  1. **Dùng `re.findall(r"TNI\d{4}|TNI[A-Z0-9]{4,5}")`**: Tự động nhận diện và tách từng mã trạm TNI chuẩn (4-5 ký tự) ngay cả khi người dùng gõ dính liền nhau không có dấu cách!
-  2. **Tự động phân tách và ghi log riêng từng dòng**: Hệ thống tự động phân tách thành 4 dòng log riêng biệt (`TNI0080`, `TNI0057`, `TNI0249`, `TNI0243`) trong `Search Log` và tra cứu trả kết quả chính xác 100% cho từng trạm!
 
 ---
 
