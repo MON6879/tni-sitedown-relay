@@ -97,13 +97,14 @@ def normalize_date_str(s: str) -> str:
 def is_daily_plan_msg(text: str) -> bool:
     """
     Nhận dạng tin plan linh hoạt:
-    - Dòng đầu có chữ 'plan' (bất kỳ vị trí, case-insensitive)
+    - Trong 3 dòng đầu có chữ 'plan' (bất kỳ vị trí, case-insensitive)
     - Và có ngày tháng (dạng d/m/yyyy, dd/mm/yyyy hoặc dd.mm.yyyy) ở BẤT KỲ chỗ trong tin
     """
     if not text:
         return False
-    first_line = text.strip().split("\n")[0].lower()
-    has_plan_word = "plan" in first_line
+    lines = [line.strip().lower() for line in text.split("\n") if line.strip()]
+    first_few_lines = " ".join(lines[:3]) if lines else ""
+    has_plan_word = "plan" in first_few_lines
     has_date = bool(re.search(r'\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}', text))
     return has_plan_word and has_date
 
@@ -849,15 +850,7 @@ async def scan_group_for_plans(client, chat_id: int, since_utc: datetime, leader
         for msg in history.messages:
             if msg.date < since_utc:
                 break
-            # Filter by sender if leader_id is provided
-            if leader_id:
-                sender_id_str = str(msg.sender_id) if msg.sender_id else ""
-                if isinstance(leader_id, list):
-                    if sender_id_str not in [str(x).strip() for x in leader_id]:
-                        continue
-                else:
-                    if sender_id_str != str(leader_id).strip():
-                        continue
+            # Collect any daily plan in group (not restricted to specific leader IDs)
             if msg.message and is_daily_plan_msg(msg.message):
                 parsed = parse_daily_plan(msg.message)
                 if parsed:
@@ -1007,14 +1000,7 @@ async def scan_plan_tomorrow(client, group_key: str, chat_id: int,
         for msg in history.messages:
             if msg.date < since_utc:
                 break
-            # Filter by leader
-            sender_id_str = str(msg.sender_id) if msg.sender_id else ""
-            if isinstance(leader_id, list):
-                if sender_id_str not in [str(x).strip() for x in leader_id]:
-                    continue
-            else:
-                if sender_id_str != str(leader_id).strip():
-                    continue
+            # Collect any daily plan in group (not restricted to specific leader IDs)
             if msg.message and is_daily_plan_msg(msg.message):
                 parsed = parse_daily_plan(msg.message)
                 if parsed:
