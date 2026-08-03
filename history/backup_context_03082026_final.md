@@ -32,6 +32,11 @@
 
 ---
 
+## 🛠️ Cập nhật Logic Báo cáo (`refuel_plan_report.py`)
+- Sửa lỗi hiển thị `0000 = 100% Matched`: Khi số lượng trạm = 0 (chưa có kế hoạch/dữ liệu hôm nay), báo cáo hiển thị chuẩn `0% (Chưa có dữ liệu) ⚠️` thay vì báo nhầm `100% Matched`.
+
+---
+
 ## 🔗 Đường link Live Google Apps Script
 - **Main Apps Script URL**: `https://script.google.com/macros/s/AKfycbwHyzulEMVGjslfjN_m38HzpFZHRfk2qwbQmdwb6MMqBM8xNm20JJxxzW_4zTNzp3n24Q/exec`
 - **Search GAS Keepalive**: `search_bot.gs` (`pingSearchBot()` trigger 5 min)
