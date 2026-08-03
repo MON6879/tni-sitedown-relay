@@ -111,6 +111,52 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
+        # ── 3.5. PRE-CHECK BẢO VỆ NHÓM (Circuit Breaker) ───────────
+        # Quét lịch sử nhóm trước khi gửi. Nếu 3 lần gửi gần nhất bot công ty đều im lặng,
+        # và chưa có phản hồi nào mới từ bot công ty -> TẠM DỪNG GỬI để không làm loãng nhóm!
+        try:
+            pre_history = await client(GetHistoryRequest(
+                peer=source, limit=60,
+                offset_date=None, offset_id=0, max_id=0, min_id=0, add_offset=0, hash=0
+            ))
+            
+            recent_my_cmds = []
+            bot_responses = []
+            for msg in pre_history.messages:
+                txt = (msg.message or "").lower()
+                is_mine = (msg.sender_id == me.id) or getattr(msg, 'out', False)
+                if is_mine and "/down_tni" in txt:
+                    recent_my_cmds.append(msg)
+                
+                s_uname = ""
+                if msg.sender_id:
+                    try:
+                        s = await client.get_entity(msg.sender_id)
+                        s_uname = getattr(s, "username", "") or ""
+                    except Exception:
+                        pass
+                if s_uname.lower() == BOT_USERNAME.lower() and msg.message:
+                    bot_responses.append(msg)
+
+            if len(recent_my_cmds) >= 3:
+                # Kiểm tra 3 lần gửi gần nhất của mình
+                unanswered_streak = 0
+                for cmd_msg in recent_my_cmds[:3]:
+                    has_reply = any(r.date > cmd_msg.date for r in bot_responses)
+                    if not has_reply:
+                        unanswered_streak += 1
+
+                if unanswered_streak >= 3:
+                    latest_my_cmd_date = recent_my_cmds[0].date
+                    bot_revived = any(r.date > latest_my_cmd_date for r in bot_responses)
+                    if not bot_revived:
+                        print(f"[{myanmar_now()}] ⚠️ Bot @{BOT_USERNAME} đã không phản hồi {unanswered_streak} lần liên tiếp và chưa khôi phục. BỎ QUA GỬI MỚI để tránh làm loãng nhóm!")
+                        return
+                    else:
+                        print(f"[{myanmar_now()}] 🟢 Bot @{BOT_USERNAME} đã phản hồi trở lại! Tiếp tục gửi lệnh...")
+        except Exception as pre_ex:
+            print(f"[{myanmar_now()}] ⚠️ Pre-check error (vẫn tiếp tục): {pre_ex}")
+
         # ── 4+5. Gui lenh va ghi nho thoi diem SAU khi gui ─────
         print(f"[{myanmar_now()}] 📤 Gửi: {COMMAND}")
         await client.send_message(source, COMMAND)

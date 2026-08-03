@@ -19,10 +19,11 @@
 ## ⏰ Cấu hình 3 Workflows Chuẩn đã khóa gọn gàng trên Public Repo (`MON6879/tni-sitedown-relay`)
 
 ### 1. `🔄 1. Master Keepalive 24/7 (All Bots)` (`keepalive_all_bots.yml`):
-- 🔄 Ping tự động mỗi 5 phút (`cron: '*/5 * * * *'`): Gộp chung ping Search Bot 1 (`tni-bot`), Search Bot 2 (`tni-done`), Asset Bot (`collector`), Site Down Bot (`tni-sitedown`), Google Apps Script Main Backend và **Auto Copy Paste GAS Backend (`AKfycbwi3J0V...`)**. **Đảm bảo tất cả Bot & Tác vụ Copy Paste hoạt động 24/7 vĩnh viễn 100% miễn phí!**
+- 🔄 Ping tự động mỗi 5 phút (`cron: '*/5 * * * *'`): Gộp chung ping Search Bot 1 (`tni-bot`), Search Bot 2 (`tni-done`), Asset Bot (`collector`), Site Down Bot (`tni-sitedown`), Google Apps Script Main Backend và Auto Copy Paste GAS Backend (`AKfycbwi3J0V...`). **Đảm bảo tất cả Bot & Tác vụ Copy Paste hoạt động 24/7 vĩnh viễn 100% miễn phí!**
 
 ### 2. `📡 2. Site Down Tin 1 Relay (Every 20 Min)` (`botlookup_relay.yml`):
 - 📡 Quét tự động đếm trạm Site Down tin 1 mỗi 20 phút (`cron: '*/20 * * * *'`).
+- 🛡️ **Cơ chế Ngắt Mạch Thông Minh (Circuit Breaker Pre-check)**: Quét trước lịch sử nhóm `BOT LOOKUP`. Nếu Bot Công Ty (`@auto_nocpro_bot`) **không trả lời 3 lần liên tiếp** và chưa có dấu hiệu khôi phục, script sẽ **BỎ QUA KHÔNG GỬI REQUEST MỚI** để tránh gây loãng nhóm!
 
 ### 3. `📊 3. Unified Daily Reports (Reports 1-6, Refuel, Cable)` (`daily_reports.yml`):
 - 📋 Tập trung toàn bộ lịch phát các Báo cáo:
