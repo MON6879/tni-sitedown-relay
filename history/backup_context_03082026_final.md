@@ -27,10 +27,16 @@
 
 ### 3. `📊 3. Unified Daily Reports (Reports 1-6, Refuel, Cable)` (`daily_reports.yml`):
 - 📋 Tập trung toàn bộ lịch phát các Báo cáo:
-  * **05:45 SÁNG & 16:20 CHIỀU**: Báo cáo 1, 2, 3, 4, 5A, 6, Refuel Request & Cable Report.
+  * **05:45 SÁNG & 16:20 CHIỀU**: Báo cáo 1, 2, 3, 4 (kèm Report 2 BOD Assign), 5A, 6, Refuel Request & Cable Report.
   * **05:25, 08:25, 09:50 AM & 15:20, 19:00, 22:00 PM**: Báo cáo 5.1 (Plan Reminder).
   * **21:00 TỐI**: Báo cáo 5B (Plan Update).
   * **14:00, 17:15, 19:00, 20:30 PM**: Báo cáo 6 (Check Read Status).
+
+---
+
+## 🛠️ Nâng cấp Thông báo BOD Assign Realtime (`daily_bod_assign_notify.gs` & `daily_bod_assign.py`)
+- **Khắc phục lỗi trôi ngày và định dạng**: Chuẩn hóa tự động tất cả các định dạng ngày (`dd/MM/yyyy`, `d/m/yyyy`, `dd.mm.yyyy`, `yyyy-mm-dd`) khi Admin/BOD nhập task mới.
+- **Tự động trích xuất nội dung dự phòng (Fallback Notification Text)**: Ngay cả khi Cột R chưa kịp nhảy công thức, script tự động lấy thông tin từ Cột A (Role), Cột B (PIC) và Cột C (Nội dung Task) để tạo thông báo gửi ngay tới nhóm `5 TNI TECHNICA DEP CONTROL SITE`!
 
 ---
 

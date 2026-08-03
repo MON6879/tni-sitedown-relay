@@ -45,19 +45,41 @@ function checkBodAssign() {
         dateStr = String(dateVal || "").trim();
       }
       
-      // Chỉ quét các dòng được giao trong ngày hôm nay
-      const datePart = dateStr.split(" ")[0].trim();
-      if (datePart !== todayStr) {
+      // Chuẩn hóa ngày để so sánh linh hoạt (hỗ trợ dd/mm/yyyy, d/m/yyyy, dd.mm.yyyy, yyyy-mm-dd)
+      let isToday = false;
+      if (dateVal instanceof Date) {
+        isToday = (Utilities.formatDate(dateVal, "Asia/Rangoon", "dd/MM/yyyy") === todayStr);
+      } else if (dateStr) {
+        const m = dateStr.match(/(\d{1,2})[\/\.](\d{1,2})[\/\.](\d{2,4})/);
+        if (m) {
+          const d = m[1].padStart(2, "0");
+          const mo = m[2].padStart(2, "0");
+          const y = m[3].length === 2 ? "20" + m[3] : m[3];
+          isToday = (`${d}/${mo}/${y}` === todayStr);
+        } else {
+          isToday = (dateStr.indexOf(todayStr) !== -1);
+        }
+      }
+      // Nếu có nội dung task mà ngày trống -> mặc định coi là công việc hôm nay
+      if (!dateStr && (row[0] || row[1] || row[2])) {
+        isToday = true;
+      }
+      if (!isToday) {
         continue;
       }
 
+      const colA = String(row[0] || "").trim(); // Cột A (Role/Dep)
+      const colB = String(row[1] || "").trim(); // Cột B (PIC)
+      const colC = String(row[2] || "").trim(); // Cột C (Task Content)
       const colR = String(row[17] || "").trim(); // Cột R (index 17)
       const colT = String(row[19] || "").trim(); // Cột T (index 19)
       const colU = String(row[20] || "").trim(); // Cột U (index 20)
 
+      const notifyContent = colR || (`${colA} - ${colB}: ${colC}`.trim());
+
       // 1. Quét gửi Control
-      if (colR && sentControlRows.indexOf(rowNum) === -1) {
-        const msgText = "BOD assing New task for : " + colR;
+      if (notifyContent && sentControlRows.indexOf(rowNum) === -1) {
+        const msgText = "📋 BOD assign New task: " + notifyContent;
         
         // Tự động tìm và xóa tin cũ cùng nội dung trên Control
         const oldMsgKey = "BOD_MSG_ID_CONTROL_" + colR.toUpperCase().replace(/\s+/g, "");
