@@ -807,7 +807,7 @@ def is_daily(text: str) -> bool:
     text_l = text.lower()
     if "daily plan" in text_l or "plan:" in text_l or "kế hoạch" in text_l:
         return False
-    if "above are the end-of-day" in text_l or "note:" in text_l or "ft result daily" in text_l or "ref:" in text_l or "đã lưu" in text_l:
+    if "above are the end-of-day" in text_l or "note:" in text_l or "ft result daily" in text_l or "find task" in text_l or "auto report" in text_l or "ref:" in text_l or "đã lưu" in text_l:
         return False
     if "daily result" not in text_l:
         return False
@@ -1000,6 +1000,10 @@ def handle(update: dict) -> None:
     user       = msg.get("from", {})
     user_id    = user.get("id", 0)
     first_name = user.get("first_name", "")
+
+    # 🛑 BỎ QUA TIN NHẮN TỪ BOT KHÁC HOẶC BẢN THÂN BOT
+    if user.get("is_bot"):
+        return
 
     # Warm-up / ensure all 5 sheets are loaded in parallel
     load_all_sheets()
