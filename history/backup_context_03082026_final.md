@@ -4,7 +4,13 @@
 
 ---
 
-## 🚀 SỬA NGUYÊN NHÂN GÂY NỔI THỰC SỰ: Thứ Tự Thực Thi Vercel Serverless (Vercel Lifecycle Freeze Fix)
+## 🛠️ Lọc Trùng Lập Lệnh Telegram (Telegram Update Deduplication Cache)
+- **Phát hiện nguyên nhân**: Khi gửi lệnh `/plan` trong nhóm, nếu thời gian đọc Google Sheets kéo dài > 3-4 giây, Telegram tự động gửi lại bản tin Webhook Retry lần 2. Do không lọc `update_id`, bot xử lý cả 2 bản tin dẫn đến gửi 2 phản hồi trùng lặp trong nhóm!
+- **Khắc phục**: Đã thêm bộ nhớ đệm lọc trùng `_processed_updates = set()`. Mỗi `update_id` từ Telegram chỉ được xử lý DUY NHẤT 1 LẦN. Mọi yêu cầu gửi lại từ Telegram sẽ bị từ chối tức thì, đảm bảo 100% chỉ xuất hiện **ĐÚNG 1 TIN NHẮN PHẢN HỒI NGUYÊN BẢN**.
+
+---
+
+## 🚀 thứ Tự Thực Thi Vercel Serverless (Vercel Lifecycle Freeze Fix)
 - **Phát hiện nguyên nhân**: Trong hàm `do_POST()`, dòng gửi phản hồi `self.send_response(200)` & `self.wfile.write(b'{"ok":true}')` nằm TRƯỚC hàm `handle(data)`. Trên hạ tầng Vercel Serverless (WSGI Proxy), ngay sau khi header HTTP 200 được ghi xong, proxy Vercel coi như request đã kết thúc và ĐÓNG BĂNG/DỪNG TIẾN TRÌNH PYTHON ngay lập tức trước khi `handle(data)` kịp chạy xong ➔ Dẫn tới việc bot ngưng phản hồi (đứng bot)!
 - **Khắc phục**: Đã đảo thứ tự cho `handle(data)` thực thi xong 100% trước, sau đó mới phát `200 OK` cho Vercel. Bot từ nay chạy phản hồi liên tục 100% không bao giờ bị đứng hay rơi tin nhắn!
 
