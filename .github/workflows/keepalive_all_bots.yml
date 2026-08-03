@@ -24,7 +24,10 @@ jobs:
           curl -s -f "https://tni-sitedown.vercel.app/api/site_down_relay" || true
           curl -s -f "https://api.telegram.org/bot8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI/setWebhook?url=https://tni-sitedown.vercel.app/api/site_down_relay" || true
           
-          echo "5️⃣ Pinging Apps Script Backend..."
+          echo "5️⃣ Pinging Apps Script Main Backend..."
           curl -s -L "https://script.google.com/macros/s/AKfycbwHyzulEMVGjslfjN_m38HzpFZHRfk2qwbQmdwb6MMqBM8xNm20JJxxzW_4zTNzp3n24Q/exec?action=ping" || true
+          
+          echo "6️⃣ Pinging Auto Copy Paste GAS Backend (Update Copy and Paste All)..."
+          curl -s -L "https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec?action=ping" || true
           
           echo "✅ All bot keepalive pings completed successfully!"
