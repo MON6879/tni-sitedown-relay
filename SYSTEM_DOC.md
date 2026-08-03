@@ -22,7 +22,7 @@
 
 | Team Name | Team Region | Standard Emoji Color | Color Hex Reference |
 |---|---|---|---|
-| **Team 1** | Dawei | 🔴 **Red (Chấm Đỏ)** | `#E53935` |
+| **Team 1** | Dawei | 🟠 **Orange (Chấm Cam)** | `#FB8C00` |
 | **Team 2** | Myeik | 🔵 **Blue (Chấm Xanh Dương)** | `#1E88E5` |
 | **Team 3** | Bokpyin | 🟢 **Green (Chấm Xanh Lá)** | `#43A047` |
 | **Team 4** | Kawthoung | 🟡 **Yellow (Chấm Vàng)** | `#FDD835` |

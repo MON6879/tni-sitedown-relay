@@ -51,7 +51,7 @@ const AWAZ_LABELS = [
   { emoji: "🔗", name: "Link down"   },
 ];
 
-const TEAM_COLORS = { T1: "🔴", T2: "🔵", T3: "🟢", T4: "🟡" };
+const TEAM_COLORS = { T1: "🟠", T2: "🔵", T3: "🟢", T4: "🟡" };
 
 
 // ============================================================
@@ -298,7 +298,7 @@ function processSiteDownColC(sheet) {
       const rawSites = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !isTeamSummaryLine(l));
 
       const teamDefs = [
-        { key: "T1", regex: /Team\s*1\b/i, label: "🔴 Team 1 Dawei" },
+        { key: "T1", regex: /Team\s*1\b/i, label: "🟠 Team 1 Dawei" },
         { key: "T2", regex: /Team\s*2\b/i, label: "🔵 Team 2 Myeik" },
         { key: "T3", regex: /Team\s*3\b/i, label: "🟢 Team 3 Bokpyin" },
         { key: "T4", regex: /Team\s*4\b/i, label: "🟡 Team 4 Kawthoung" },
@@ -539,7 +539,7 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
 
 function buildAwAzControlMessage(ts, awaz) {
   const teamDefs = [
-    { key: "T1", label: "Team 1 Dawei",     emoji: "🔴", col: 0 },
+    { key: "T1", label: "Team 1 Dawei",     emoji: "🟠", col: 0 },
     { key: "T2", label: "Team 2 Myeik",     emoji: "🔵", col: 1 },
     { key: "T3", label: "Team 3 Bokpyin",   emoji: "🟢", col: 2 },
     { key: "T4", label: "Team 4 Kawthoung", emoji: "🟡", col: 3 },
@@ -706,7 +706,7 @@ function colorizeTeams(text) {
     return "| " + emoji + team + (sub || "") + " |";
   });
   s = s.replace(/(?:[🔴🔵🟢🟡🟠🟣⚪⚫]\s*)?Team\s*1(?:\s*[\—\-]?\s*Dawei)?(\s*:)?/gi, (match, colon) => {
-    return "🔴 Team 1 Dawei" + (colon || "");
+    return "🟠 Team 1 Dawei" + (colon || "");
   });
   s = s.replace(/(?:[🔴🔵🟢🟡🟠🟣⚪⚫]\s*)?Team\s*2(?:\s*[\—\-]?\s*Myeik)?(\s*:)?/gi, (match, colon) => {
     return "🔵 Team 2 Myeik" + (colon || "");
