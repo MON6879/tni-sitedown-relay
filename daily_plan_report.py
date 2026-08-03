@@ -96,12 +96,19 @@ def normalize_date_str(s: str) -> str:
 
 def is_daily_plan_msg(text: str) -> bool:
     """
-    Nhận dạng tin plan linh hoạt:
-    - Trong 3 dòng đầu có chữ 'plan' (bất kỳ vị trí, case-insensitive)
-    - Và có ngày tháng (dạng d/m/yyyy, dd/mm/yyyy hoặc dd.mm.yyyy) ở BẤT KỲ chỗ trong tin
+    Nhận dạng tin plan linh hoạt, LOẠI BỎ tuyệt đối các bản tin Mẫu Bot / Báo cáo tự động:
     """
     if not text:
         return False
+    text_l = text.lower()
+    # 🛑 LOẠI BỎ TẤT CẢ CÁC BẢN TIN MẪU CỦA BOT HOẶC BÁO CÁO TỰ ĐỘNG
+    if any(kw in text_l for kw in (
+        "daily plan template", "copy → edit", "copy -> edit", "note: /find /tnixxxx",
+        "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
+        "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary"
+    )):
+        return False
+
     lines = [line.strip().lower() for line in text.split("\n") if line.strip()]
     first_few_lines = " ".join(lines[:3]) if lines else ""
     has_plan_word = "plan" in first_few_lines

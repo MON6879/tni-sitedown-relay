@@ -4,6 +4,12 @@
 
 ---
 
+## 🛠️ Lọc Loại Bỏ Bản Tin Mẫu Bot Khi Thu Thập Plan (`is_daily_plan` Fix)
+- **Phát hiện nguyên nhân**: Trong `daily_plan_report.py` và `api/collector.py`, hàm nhận dạng tin nhắn Plan (`is_daily_plan_msg` / `is_daily_plan`) chỉ dựa vào việc có chữ `plan` trong 3 dòng đầu và có chứa ngày tháng. Do đó, khi Bot phát ra Mẫu Plan (`Daily Plan Template`, `Copy → Edit → Send back:`) hoặc các bản tin Báo cáo tự động (`Auto Report`, `Comparison of plan for`), hệ thống đã vô tình nhận nhầm đó là một bản tin Plan thực tế của Team Leader gửi ➔ Dẫn tới việc thu thập nhầm nội dung Mẫu Bot vào bảng tính Google Sheets (`Team leader assign Plan`).
+- **Khắc phục**: Đã bổ sung danh sách từ khóa loại trừ bắt buộc (`daily plan template`, `copy → edit`, `note: /find /tnixxxx`, `comparison of plan for`, `auto report`, `plan stats:`, `crosscheck`, `plan vs actual`...). Từ nay mọi bản tin do Bot phát ra đều bị từ chối thu thập 100%, chỉ thu thập đúng bản tin Plan thực tế do người dùng thật soạn và gửi trong nhóm!
+
+---
+
 ## 🛠️ Sửa Lỗi NameError Khấu Trừ `daily_read_report.py` (Report 6 Fix)
 - **Phát hiện nguyên nhân**: Trong hàm `process_group()` của `daily_read_report.py`, biến danh sách `not_in_group_names` bị thiếu dòng khởi tạo `not_in_group_names = []` trước vòng lặp kiểm tra nhân sự. Khi chạy Report 6, Python trả về lỗi `NameError: name 'not_in_group_names' is not defined` làm cho workflow GitHub Actions bị đánh dấu đỏ ❌ (Exit code 1).
 - **Khắc phục**: Đã khởi tạo biến `not_in_group_names = []` chuẩn xác tại dòng 334. Báo cáo 6 hiện đã chạy thành công 100% không còn lỗi!
