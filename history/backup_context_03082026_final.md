@@ -16,16 +16,19 @@
 
 ---
 
-## ⏰ Cấu hình Lịch chạy Báo cáo 16:20 Myanmar Time (`daily_reports.yml`)
+## ⏰ Cấu hình Lịch chạy Báo cáo Chuẩn (`daily_reports.yml`)
 
-- **Cron Expression**: `50 9 * * *` (09:50 UTC = **16:20 CHIỀU Giờ Myanmar**)
-- **Thứ tự xếp hàng thực thi**:
-  1. `daily_bod_assign.py` ➔ Report 2 BOD Assign
-  2. `backlog_send.py --now` ➔ Reports 1, 2, 3 lần lượt tới từng Team & CONTROL
-  3. `cron_send.py` ➔ Report 4 (Daily Task & Stats) lần lượt tới từng Team & CONTROL
-  4. `daily_plan_report.py --mode eod` ➔ Report 5A (Daily Plan EOD)
-  5. `daily_read_report.py` ➔ Report 6 (Note Read Status)
-  6. `cable_report.py` ➔ Cable Daily Report
+### 1. Báo cáo 1, 2, 3, 4 (Backlog & Daily Task) & Cable Report:
+- 🌅 **Ca Sáng**: **05:45 SÁNG** (23:15 UTC ngày hôm trước)
+- 🌆 **Ca Chiều**: **16:20 CHIỀU** (09:50 UTC) — Tập trung gửi đồng loạt Báo cáo 1, 2, 3, 4, 5A, 6 & Cable Report
+
+### 2. Báo cáo 5.1 (Nhắc nộp Kế hoạch sáng & tối):
+- 🌅 **Ca Sáng**: **05:25, 08:25, 09:50 SÁNG** (Giờ Myanmar)
+- 🌆 **Ca Tối**: **15:20, 19:00, 22:00 TỐI** (Giờ Myanmar)
+
+### 3. Báo cáo 5B (Plan Update) & Báo cáo 6 (Read Status):
+- 📌 **Report 5B**: **21:00 TỐI** (14:30 UTC)
+- 📌 **Report 6**: **14:00, 17:15, 19:00, 20:30** (Giờ Myanmar)
 
 ---
 
@@ -38,3 +41,4 @@
 ## 🔒 Cam kết bảo mật
 - Mọi Google Spreadsheet ID đều được nạp qua biến môi trường `SPREADSHEET_ID`.
 - Mọi Telegram Bot Token nằm trong GitHub Encrypted Secrets và Vercel Environment Variables.
+- Bot Search & Collector tự động lọc bỏ `is_bot`, chỉ thu thập khi người dùng thật gửi tiêu đề `Daily result:`.
