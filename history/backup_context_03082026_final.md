@@ -4,6 +4,20 @@
 
 ---
 
+## 🛡️ NGUYÊN TẮC BẮT BUỘC (STRICT RULE ADDED)
+- **Tuyệt đối không được tiện tay hay đoán đường dẫn Webhook / Endpoint**.
+- Trước khi can thiệp bất kỳ kết nối nào, **bắt buộc phải đọc lại `SYSTEM_DOC.md` và `backup_context_03082026_final.md`**.
+- Mọi quy tắc và bản đồ đường dẫn đã được lưu chặt chẽ tại [`AGENTS.md`](file:///d:/6.%20AI/1.%20QLTC/AGENTS.md) và [`.agents/rules/strict_doc_and_endpoint_verification.md`](file:///d:/6.%20AI/1.%20QLTC/.agents/rules/strict_doc_and_endpoint_verification.md).
+
+---
+
+## 🔒 Khóa Tự Động Webhook 24/7 (Master Keepalive Enforcement)
+- Trong workflow **`🔄 1. Master Keepalive 24/7 (All Bots)`** (`keepalive_all_bots.yml`), mỗi 5 phút hệ thống tự động khóa & khôi phục Webhook Search Bot về đúng địa chỉ:
+  `https://api.telegram.org/bot8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A/setWebhook?url=https://tni-bot.vercel.app/api/search_bot`
+- Đảm bảo Webhook không thể bị trôi, mất kết nối hay trỏ sai đường dẫn vĩnh viễn 100%!
+
+---
+
 ## 🗺️ Bản đồ phân bổ Repository & Service
 
 | Repository / Service | Chế độ | Remote URL | Vai trò chính |
@@ -11,14 +25,8 @@
 | **`MON6879/tni-sitedown-relay`** | 🟢 **PUBLIC** | `https://github.com/MON6879/tni-sitedown-relay.git` | **Nơi duy nhất gánh 100% tự động 24/7 Báo cáo 1, 2, 3, 4, 5, 6, Refuel, Cable, Site Down & Keepalive 5 min cho TOÀN BỘ BOT & Auto Copy Paste GAS (Miễn phí 100% không giới hạn)** |
 | **`MON6879/TNI-DONE`** | 🔒 **PRIVATE** | `https://github.com/MON6879/TNI-DONE.git` | Codebase Search Bot v3.6 |
 | **`phonghdpxd-cmd/tni-bot`** | 🔒 **PRIVATE** | `https://github.com/phonghdpxd-cmd/tni-bot.git` | Webhook handler trên Vercel (`api/collector.py`, `api/search_bot.py`) |
-| **Vercel Project** | Cloud Serverless | `tni-bot.vercel.app` & `tni-done.vercel.app` | Xử lý Webhook tức thì < 0.2s cho Search & Asset Bot |
+| **Vercel Project** | Cloud Serverless | `tni-bot.vercel.app` & `tni-done.vercel.app` | Xử lý Webhook tức thì < 0.2s cho Search Bot & Asset Bot |
 | **Google Apps Script** | Google Cloud | Live Web Apps | Backend dữ liệu & Keepalive 5 min |
-
----
-
-## 🛠️ Sửa lỗi Webhook Search Bot (`@SEARCHTNITASKWOBOT`)
-- **Phát hiện nguyên nhân**: Webhook URL của Search Bot bị trỏ nhầm về `/api/site_down_relay` làm cho bot đứng không trả lời khi tra cứu `TNI0058`, `TNI0009`...
-- **Khắc phục**: Đã cài đặt lại và khóa Webhook chuẩn về `https://tni-bot.vercel.app/api/search_bot`. Search Bot đã khôi phục hoạt động tức thì!
 
 ---
 
