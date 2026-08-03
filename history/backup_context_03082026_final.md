@@ -8,7 +8,7 @@
 
 | Repository / Service | Chế độ | Remote URL | Vai trò chính |
 |---|---|---|---|
-| **`MON6879/tni-sitedown-relay`** | 🟢 **PUBLIC** | `https://github.com/MON6879/tni-sitedown-relay.git` | **Nơi duy nhất gánh 100% tự động 24/7 Báo cáo 1, 2, 3, 4, 5, 6, Refuel, Cable, Site Down & Keepalive 5 min cho TOÀN BỘ BOT (Miễn phí 100% không giới hạn)** |
+| **`MON6879/tni-sitedown-relay`** | 🟢 **PUBLIC** | `https://github.com/MON6879/tni-sitedown-relay.git` | **Nơi duy nhất gánh 100% tự động 24/7 Báo cáo 1, 2, 3, 4, 5, 6, Refuel, Cable, Site Down & Keepalive 5 min cho TOÀN BỘ BOT & Auto Copy Paste GAS (Miễn phí 100% không giới hạn)** |
 | **`MON6879/TNI-DONE`** | 🔒 **PRIVATE** | `https://github.com/MON6879/TNI-DONE.git` | Codebase Search Bot v3.6 |
 | **`phonghdpxd-cmd/tni-bot`** | 🔒 **PRIVATE** | `https://github.com/phonghdpxd-cmd/tni-bot.git` | Webhook handler trên Vercel (`api/collector.py`, `api/search_bot.py`) |
 | **Vercel Project** | Cloud Serverless | `tni-bot.vercel.app` & `tni-done.vercel.app` | Xử lý Webhook tức thì < 0.2s cho Search & Asset Bot |
@@ -19,7 +19,7 @@
 ## ⏰ Cấu hình 3 Workflows Chuẩn đã khóa gọn gàng trên Public Repo (`MON6879/tni-sitedown-relay`)
 
 ### 1. `🔄 1. Master Keepalive 24/7 (All Bots)` (`keepalive_all_bots.yml`):
-- 🔄 Ping tự động mỗi 5 phút (`cron: '*/5 * * * *'`): Gộp chung ping Search Bot 1 (`tni-bot`), Search Bot 2 (`tni-done`), Asset Bot (`collector`), Site Down Bot (`tni-sitedown`) và Google Apps Script Backend. **Đảm bảo tất cả Bot hoạt động 24/7 vĩnh viễn 100% miễn phí!**
+- 🔄 Ping tự động mỗi 5 phút (`cron: '*/5 * * * *'`): Gộp chung ping Search Bot 1 (`tni-bot`), Search Bot 2 (`tni-done`), Asset Bot (`collector`), Site Down Bot (`tni-sitedown`), Google Apps Script Main Backend và **Auto Copy Paste GAS Backend (`AKfycbwi3J0V...`)**. **Đảm bảo tất cả Bot & Tác vụ Copy Paste hoạt động 24/7 vĩnh viễn 100% miễn phí!**
 
 ### 2. `📡 2. Site Down Tin 1 Relay (Every 20 Min)` (`botlookup_relay.yml`):
 - 📡 Quét tự động đếm trạm Site Down tin 1 mỗi 20 phút (`cron: '*/20 * * * *'`).
@@ -40,7 +40,7 @@
 
 ## 🔗 Đường link Live Google Apps Script
 - **Main Apps Script URL**: `https://script.google.com/macros/s/AKfycbwHyzulEMVGjslfjN_m38HzpFZHRfk2qwbQmdwb6MMqBM8xNm20JJxxzW_4zTNzp3n24Q/exec`
-- **Search GAS Keepalive**: `search_bot.gs` (`pingSearchBot()` trigger 5 min ping cả `tni-bot` & `tni-done`)
+- **Auto Copy-Paste Apps Script URL**: `https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec`
 
 ---
 
