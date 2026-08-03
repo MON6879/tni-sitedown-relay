@@ -136,9 +136,11 @@ async def main():
                 if "/down_" in txt or "auto_nocpro_bot" in txt:
                     down_cmds_60m.append(msg)
 
-                # 2. Nhận diện tin từ bot công ty: qua sender_id hoặc username
+                # 2. Nhận diện tin từ bot công ty: qua tiêu đề 'Auto Report NocPro' hoặc username @auto_nocpro_bot
                 is_bot_msg = False
-                if msg.sender_id:
+                if "auto report nocpro" in txt or "site down (not include" in txt:
+                    is_bot_msg = True
+                elif msg.sender_id:
                     try:
                         s_ent = await client.get_entity(msg.sender_id)
                         if getattr(s_ent, "username", "").lower() == BOT_USERNAME.lower():

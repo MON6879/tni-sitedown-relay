@@ -23,7 +23,10 @@
 
 ### 2. `📡 2. Site Down Tin 1 Relay (Every 20 Min)` (`botlookup_relay.yml`):
 - 📡 Quét tự động đếm trạm Site Down tin 1 mỗi 20 phút (`cron: '*/20 * * * *'`).
-- 🛡️ **Cơ chế Ngắt Mạch Toàn Nhóm 100% Chuẩn Xác (Group-Wide Circuit Breaker)**: Quét toàn bộ lệnh `/down_` của bất kỳ ai trong nhóm `BOT LOOKUP`. Nếu trong 60 phút qua có **$\ge 3$ lệnh `/down_`** mà Bot Công Ty (`@auto_nocpro_bot`) **0 phản hồi**, script sẽ **BỎ QUA KHÔNG GỬI REQUEST MỚI** để tuyệt đối không gây loãng nhóm!
+- 🛡️ **Nhận diện Khôi Phục Bot Công Ty qua Tiêu đề `Auto Report NocPro`**:
+  * Quét toàn bộ lịch sử nhóm `BOT LOOKUP`.
+  * Nếu trong 60 phút qua có $\ge 3$ lệnh `/down_` mà KHÔNG CÓ BẤT KỲ tin nhắn trả lời nào chứa tiêu đề **`Auto Report NocPro`** ➔ XÁC NHẬN BOT CÔNG TY ĐANG LỖI/DOWN ➔ BỎ QUA KHÔNG GỬI REQUEST MỚI để không làm loãng nhóm!
+  * Chỉ khi quét thấy tin nhắn mới có tiêu đề **`Auto Report NocPro`** xuất hiện ➔ Hệ thống mới xác nhận Bot Công Ty đã sửa xong và tự động phát lệnh lại bình thường!
 
 ### 3. `📊 3. Unified Daily Reports (Reports 1-6, Refuel, Cable)` (`daily_reports.yml`):
 - 📋 Tập trung toàn bộ lịch phát các Báo cáo:
