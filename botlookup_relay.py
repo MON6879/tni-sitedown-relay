@@ -111,49 +111,52 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 3.5. PRE-CHECK BẢO VỆ NHÓM (Circuit Breaker) ───────────
-        # Quét lịch sử nhóm trước khi gửi. Nếu 3 lần gửi gần nhất bot công ty đều im lặng,
-        # và chưa có phản hồi nào mới từ bot công ty -> TẠM DỪNG GỬI để không làm loãng nhóm!
+        # ── 3.5. PRE-CHECK BẢO VỆ NHÓM (Circuit Breaker 100% Bulletproof) ──
+        # Quét lịch sử 60 tin nhắn gần nhất trong nhóm BOT LOOKUP.
+        # Nếu trong vòng 60 phút qua đã có >= 3 lệnh /down_ (của bất kỳ ai hoặc của mình)
+        # mà bot công ty (@auto_nocpro_bot) KHÔNG HỀ có phản hồi nào -> XÁC NHẬN BOT ĐANG LỖI!
+        # TẠM DỪNG GỬI MỚI để không làm loãng nhóm!
         try:
             pre_history = await client(GetHistoryRequest(
                 peer=source, limit=60,
                 offset_date=None, offset_id=0, max_id=0, min_id=0, add_offset=0, hash=0
             ))
             
-            recent_my_cmds = []
-            bot_responses = []
+            cutoff_60m = datetime.now(timezone.utc) - timedelta(minutes=60)
+            down_cmds_60m = []
+            bot_msgs_60m = []
+
             for msg in pre_history.messages:
+                m_date = msg.date.replace(tzinfo=timezone.utc) if msg.date.tzinfo is None else msg.date
+                if m_date < cutoff_60m:
+                    continue
+
                 txt = (msg.message or "").lower()
-                is_mine = (msg.sender_id == me.id) or getattr(msg, 'out', False)
-                if is_mine and "/down_tni" in txt:
-                    recent_my_cmds.append(msg)
-                
-                s_uname = ""
+                # 1. Mọi lệnh /down_tni, /down_kyn, /down_ayy... trong nhóm
+                if "/down_" in txt or "auto_nocpro_bot" in txt:
+                    down_cmds_60m.append(msg)
+
+                # 2. Nhận diện tin từ bot công ty: qua sender_id hoặc username
+                is_bot_msg = False
                 if msg.sender_id:
                     try:
-                        s = await client.get_entity(msg.sender_id)
-                        s_uname = getattr(s, "username", "") or ""
+                        s_ent = await client.get_entity(msg.sender_id)
+                        if getattr(s_ent, "username", "").lower() == BOT_USERNAME.lower():
+                            is_bot_msg = True
                     except Exception:
                         pass
-                if s_uname.lower() == BOT_USERNAME.lower() and msg.message:
-                    bot_responses.append(msg)
+                
+                if is_bot_msg:
+                    bot_msgs_60m.append(msg)
 
-            if len(recent_my_cmds) >= 3:
-                # Kiểm tra 3 lần gửi gần nhất của mình
-                unanswered_streak = 0
-                for cmd_msg in recent_my_cmds[:3]:
-                    has_reply = any(r.date > cmd_msg.date for r in bot_responses)
-                    if not has_reply:
-                        unanswered_streak += 1
+            print(f"[{myanmar_now()}] 🔍 Pre-check (60m): {len(down_cmds_60m)} lệnh /down_ | {len(bot_msgs_60m)} phản hồi từ bot công ty")
 
-                if unanswered_streak >= 3:
-                    latest_my_cmd_date = recent_my_cmds[0].date
-                    bot_revived = any(r.date > latest_my_cmd_date for r in bot_responses)
-                    if not bot_revived:
-                        print(f"[{myanmar_now()}] ⚠️ Bot @{BOT_USERNAME} đã không phản hồi {unanswered_streak} lần liên tiếp và chưa khôi phục. BỎ QUA GỬI MỚI để tránh làm loãng nhóm!")
-                        return
-                    else:
-                        print(f"[{myanmar_now()}] 🟢 Bot @{BOT_USERNAME} đã phản hồi trở lại! Tiếp tục gửi lệnh...")
+            # Nếu trong 60m qua có >= 3 lệnh /down_ gửi lên mà bot công ty có 0 phản hồi:
+            if len(down_cmds_60m) >= 3 and len(bot_msgs_60m) == 0:
+                print(f"[{myanmar_now()}] ⚠️ Bot @{BOT_USERNAME} đang bị LỖI/DOWN (0 phản hồi cho {len(down_cmds_60m)} lệnh trong 60p qua). BỎ QUA GỬI MỚI để không làm loãng nhóm!")
+                return
+            elif len(bot_msgs_60m) > 0:
+                print(f"[{myanmar_now()}] 🟢 Bot @{BOT_USERNAME} đang hoạt động bình thường! Tiếp tục gửi lệnh...")
         except Exception as pre_ex:
             print(f"[{myanmar_now()}] ⚠️ Pre-check error (vẫn tiếp tục): {pre_ex}")
 

@@ -23,7 +23,7 @@
 
 ### 2. `📡 2. Site Down Tin 1 Relay (Every 20 Min)` (`botlookup_relay.yml`):
 - 📡 Quét tự động đếm trạm Site Down tin 1 mỗi 20 phút (`cron: '*/20 * * * *'`).
-- 🛡️ **Cơ chế Ngắt Mạch Thông Minh (Circuit Breaker Pre-check)**: Quét trước lịch sử nhóm `BOT LOOKUP`. Nếu Bot Công Ty (`@auto_nocpro_bot`) **không trả lời 3 lần liên tiếp** và chưa có dấu hiệu khôi phục, script sẽ **BỎ QUA KHÔNG GỬI REQUEST MỚI** để tránh gây loãng nhóm!
+- 🛡️ **Cơ chế Ngắt Mạch Toàn Nhóm 100% Chuẩn Xác (Group-Wide Circuit Breaker)**: Quét toàn bộ lệnh `/down_` của bất kỳ ai trong nhóm `BOT LOOKUP`. Nếu trong 60 phút qua có **$\ge 3$ lệnh `/down_`** mà Bot Công Ty (`@auto_nocpro_bot`) **0 phản hồi**, script sẽ **BỎ QUA KHÔNG GỬI REQUEST MỚI** để tuyệt đối không gây loãng nhóm!
 
 ### 3. `📊 3. Unified Daily Reports (Reports 1-6, Refuel, Cable)` (`daily_reports.yml`):
 - 📋 Tập trung toàn bộ lịch phát các Báo cáo:
@@ -31,12 +31,6 @@
   * **05:25, 08:25, 09:50 AM & 15:20, 19:00, 22:00 PM**: Báo cáo 5.1 (Plan Reminder).
   * **21:00 TỐI**: Báo cáo 5B (Plan Update).
   * **14:00, 17:15, 19:00, 20:30 PM**: Báo cáo 6 (Check Read Status).
-
----
-
-## 🛠️ Nâng cấp Thông báo BOD Assign Realtime (`daily_bod_assign_notify.gs` & `daily_bod_assign.py`)
-- **Khắc phục lỗi trôi ngày và định dạng**: Chuẩn hóa tự động tất cả các định dạng ngày (`dd/MM/yyyy`, `d/m/yyyy`, `dd.mm.yyyy`, `yyyy-mm-dd`) khi Admin/BOD nhập task mới.
-- **Tự động trích xuất nội dung dự phòng (Fallback Notification Text)**: Ngay cả khi Cột R chưa kịp nhảy công thức, script tự động lấy thông tin từ Cột A (Role), Cột B (PIC) và Cột C (Nội dung Task) để tạo thông báo gửi ngay tới nhóm `5 TNI TECHNICA DEP CONTROL SITE`!
 
 ---
 
