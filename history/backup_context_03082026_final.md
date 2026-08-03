@@ -35,13 +35,9 @@
 
 ---
 
-## 🛠️ Tự động biến đổi Target động cho Báo cáo 4 (`cron_send.py`)
-- **Nhận diện Target % Động từ Sheet (`/Target25%`, `/Target50%`, `/Target75%`)**:
-  - Tiêu đề Target, Legend chú thích và icon đánh giá kết quả tự động thay đổi linh hoạt theo số % Target thiết lập trong Sheet.
-  - Khi Target tuần sau nâng lên **75%**:
-    * Tiêu đề tự nhảy: `📌 Target: 75% WO Close`
-    * Dòng chú thích tự nhảy: `🟢 >=75%Hit  🟡 >=50%  🔴 <50%Lost`
-    * Icon tự động đánh giá chuẩn theo mốc 75%.
+## 🛠️ Khắc phục dứt điểm Webhook Asset Bot (`@TNIASSETorderREQUEST_BOT`)
+- **Fix lỗi trỏ nhầm Webhook**: Webhook Telegram của Asset Bot trước đó trỏ lầm sang `/api/search_bot` nên không xử lý các lệnh Order/Revoke. Đã chuyển chính xác về `https://tni-bot.vercel.app/api/collector` và khóa cứng tự động.
+- **Tự động biến đổi Target động Báo cáo 4**: Tự động đọc `/Target75%` từ Sheet để nhảy tiêu đề, chú thích và icon tự động.
 
 ---
 
