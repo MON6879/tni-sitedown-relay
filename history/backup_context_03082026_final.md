@@ -4,6 +4,20 @@
 
 ---
 
+## 🌐 Chuyển Đổi 100% Bản Tin Hướng Dẫn Sang Tiếng Anh (English Help Menu)
+- **Cập nhật**: Đã chuyển đổi toàn bộ thông báo hướng dẫn của Search Bot (`send_help_menu` và `send_daily_template`) từ Tiếng Việt sang Tiếng Anh chuẩn (English Only) theo đúng quy định thiết kế hệ thống.
+  ```html
+  👋 <b>TNI Search Bot</b>
+
+  • Lookup Task/WO: Type <code>TNI0001</code> or <code>/tni TNI0001</code>
+  • Lookup Not Close: Type <code>t1notclose</code>, <code>t2notclose</code>...
+  • Lookup Wait CD: Type <code>t1waitcd</code>, <code>t2waitcd</code>...
+  • Personal Lookup: Type <code>mysite</code>, <code>mycable</code>, <code>mydata</code>...
+  • Get Report Templates: Type <code>/daily</code> or <code>/plan</code>
+  ```
+
+---
+
 ## 🛠️ Khắc Phục Lỗi Tự Phát Tin Nhắn Help Lặp Lại 2 Lần (`Help Menu` Rate-Limit & Exact Match Fix)
 - **Phát hiện nguyên nhân cốt lõi**:
   1. Trong `api/search_bot.py`, điều kiện bắt lệnh help cũ dùng `elif "help" in text_l or "❓" in text:`. Khi bất kỳ tin nhắn báo cáo nào (ví dụ Báo cáo 6 `Daily Note Read Report` hoặc tin nhắn hỏi hỗ trợ) được gửi vào nhóm có chứa từ `"help"` hoặc biểu tượng `"❓"`, bot Search Bot sẽ nhầm tưởng người dùng vừa bấm lệnh trợ giúp `/help` ➔ Tự động phát menu hướng dẫn `👋 TNI Search Bot` vào nhóm!
