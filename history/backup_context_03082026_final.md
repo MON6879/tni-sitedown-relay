@@ -32,8 +32,8 @@
 
 ---
 
-## 🛠️ Cập nhật Logic Báo cáo (`refuel_plan_report.py`)
-- Sửa lỗi hiển thị `0000 = 100% Matched`: Khi số lượng trạm = 0 (chưa có kế hoạch/dữ liệu hôm nay), báo cáo hiển thị chuẩn `0% (Chưa có dữ liệu) ⚠️` thay vì báo nhầm `100% Matched`.
+## 🌐 Quy định ngôn ngữ Báo cáo
+- **100% TIẾNG ANH (ENGLISH ONLY)**: Tất cả thông báo, tiêu đề, trạng thái trong các báo cáo tự động đều phải dùng Tiếng Anh chuẩn.
 
 ---
 
