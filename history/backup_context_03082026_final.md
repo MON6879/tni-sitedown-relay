@@ -16,6 +16,12 @@
 
 ---
 
+## 🛠️ Sửa lỗi Webhook Search Bot (`@SEARCHTNITASKWOBOT`)
+- **Phát hiện nguyên nhân**: Webhook URL của Search Bot bị trỏ nhầm về `/api/site_down_relay` làm cho bot đứng không trả lời khi tra cứu `TNI0058`, `TNI0009`...
+- **Khắc phục**: Đã cài đặt lại và khóa Webhook chuẩn về `https://tni-bot.vercel.app/api/search_bot`. Search Bot đã khôi phục hoạt động tức thì!
+
+---
+
 ## ⏰ Cấu hình 3 Workflows Chuẩn đã khóa gọn gàng trên Public Repo (`MON6879/tni-sitedown-relay`)
 
 ### 1. `🔄 1. Master Keepalive 24/7 (All Bots)` (`keepalive_all_bots.yml`):
