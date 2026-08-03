@@ -295,8 +295,52 @@ function processSiteDownColC(sheet) {
   if (controlId) {
     try {
       const header = [colC[0]||"", colC[1]||"", colC[2]||""].filter(l => l.length > 0);
-      const sites  = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !isTeamSummaryLine(l));
-      const msg    = [...header, ...sites].join("\n");
+      const rawSites = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !isTeamSummaryLine(l));
+
+      const teamDefs = [
+        { key: "T1", regex: /Team\s*1\b/i, label: "🔴 Team 1 Dawei" },
+        { key: "T2", regex: /Team\s*2\b/i, label: "🔵 Team 2 Myeik" },
+        { key: "T3", regex: /Team\s*3\b/i, label: "🟢 Team 3 Bokpyin" },
+        { key: "T4", regex: /Team\s*4\b/i, label: "🟡 Team 4 Kawthoung" },
+      ];
+
+      const teamBlocks = { T1: [], T2: [], T3: [], T4: [] };
+      let currentTeam = null;
+
+      for (const line of rawSites) {
+        let matched = false;
+        for (const td of teamDefs) {
+          if (td.regex.test(line)) {
+            currentTeam = td.key;
+            matched = true;
+            break;
+          }
+        }
+        if (matched) continue;
+        if (currentTeam && teamBlocks[currentTeam]) {
+          if (/^_{5,}$/.test(line.trim())) continue;
+          teamBlocks[currentTeam].push(line);
+        }
+      }
+
+      const bodyLines = [];
+      for (const td of teamDefs) {
+        bodyLines.push("");
+        bodyLines.push(td.label);
+        bodyLines.push("__________________________");
+        
+        const lines = teamBlocks[td.key];
+        while (lines.length > 0 && !lines[0].trim()) lines.shift();
+        while (lines.length > 0 && !lines[lines.length - 1].trim()) lines.pop();
+
+        if (lines.length > 0) {
+          bodyLines.push(...lines);
+        } else {
+          bodyLines.push("✅ No incident");
+        }
+      }
+
+      const msg = [...header, ...bodyLines].join("\n");
       if (msg) {
         sendOrEditTelegramPre(controlId, addKeywordIcons(colorizeTeams(msg)), "TIN1_CONTROL", "[Tin1][CONTROL]");
       }
@@ -661,10 +705,17 @@ function colorizeTeams(text) {
     const emoji = TEAM_COLORS[team.toUpperCase()] || "";
     return "| " + emoji + team + (sub || "") + " |";
   });
-  s = s.replace(/(Team\s+([1-4])\s*:)/gi, function(match, fullTeam, teamNum) {
-    const teamKey = "T" + teamNum;
-    const emoji = TEAM_COLORS[teamKey] || "";
-    return emoji + " " + fullTeam + ":";
+  s = s.replace(/(?:[🔴🔵🟢🟡🟠🟣⚪⚫]\s*)?Team\s*1(?:\s*[\—\-]?\s*Dawei)?(\s*:)?/gi, (match, colon) => {
+    return "🔴 Team 1 Dawei" + (colon || "");
+  });
+  s = s.replace(/(?:[🔴🔵🟢🟡🟠🟣⚪⚫]\s*)?Team\s*2(?:\s*[\—\-]?\s*Myeik)?(\s*:)?/gi, (match, colon) => {
+    return "🔵 Team 2 Myeik" + (colon || "");
+  });
+  s = s.replace(/(?:[🔴🔵🟢🟡🟠🟣⚪⚫]\s*)?Team\s*3(?:\s*[\—\-]?\s*Bokpyin)?(\s*:)?/gi, (match, colon) => {
+    return "🟢 Team 3 Bokpyin" + (colon || "");
+  });
+  s = s.replace(/(?:[🔴🔵🟢🟡🟠🟣⚪⚫]\s*)?Team\s*4(?:\s*[\—\-]?\s*Kawthoung)?(\s*:)?/gi, (match, colon) => {
+    return "🟡 Team 4 Kawthoung" + (colon || "");
   });
   return s;
 }
