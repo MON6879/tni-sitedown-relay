@@ -76,7 +76,7 @@ def split_message(text: str, max_len: int) -> list[str]:
 
 
 async def main():
-    # ── 0. Kiểm tra khung giờ (04:00 đến 22:10 Myanmar) ──────────
+    # ── 0. Kiểm tra khung giờ ────────────────────────────────────
     if not in_active_window():
         print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ 04:30–21:30. Kết thúc.")
         return
@@ -159,8 +159,9 @@ async def main():
                     break
 
         if not found_command:
-            print(f"[{myanmar_now()}] Khong tim thay lenh /down_tni -> fallback: lay toan bo tin bot sau send_time")
-            for msg in all_after:
+            print(f"[{myanmar_now()}] Khong tim thay lenh /down_tni -> fallback: lay tin bot MOI NHAT sau send_time")
+            # Fallback: chi lay 1 tin MOI NHAT cua bot (tranh lay nhieu tin tu cac lan relay truoc)
+            for msg in reversed(all_after):  # newest-first
                 is_mine = (msg.sender_id == me.id) or getattr(msg, 'out', False)
                 if is_mine:
                     continue
@@ -173,6 +174,8 @@ async def main():
                         pass
                 if s_name.lower() == BOT_USERNAME.lower() and msg.message:
                     bot_messages.append(msg.message)
+                    print(f"[{myanmar_now()}] Fallback: lay tin moi nhat ({len(msg.message)} ky tu) - dung lai")
+                    break  # Chi lay 1 tin moi nhat, khong lay them
 
         gas_url = os.environ.get("SD_APPS_SCRIPT_URL") or os.environ.get("APPS_SCRIPT_URL") or ""
 

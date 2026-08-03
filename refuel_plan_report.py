@@ -26,7 +26,7 @@ from tg_utils import tg_send_fresh
 load_dotenv()  # Load .env local (GitHub Actions đã có env vars sẵn)
 
 # Cấu hình bot và chat ID mặc định của group 9 TNI REQUEST REFUEL
-REFUEL_BOT_TOKEN    = os.getenv("REFUEL_BOT_TOKEN", "")  # Set in GitHub Secrets / .env
+REFUEL_BOT_TOKEN    = os.getenv("REFUEL_BOT_TOKEN", "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME")
 REFUEL_CHAT_ID      = "-5469544739"   # Group 9 TNI REQUEST REFUEL
 SPREADSHEET_ID      = "1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM"
 XLSX_DOWNLOAD_URL   = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=xlsx"
@@ -46,10 +46,8 @@ REFUEL_GAS_URL = (
 
 # Map report_key → title prefix dòng đầu tiên (dùng cho Telethon delete-by-title)
 REPORT_TITLE_PREFIX = {
-    "report1": "📋 [Report 1]",
+    "report1": "🔄 [Report 1]",
     "report2": "📊 [Report 2]",
-    "report3": "🔄 [Report 3]",
-    "report4": "👤 [Report 4]",
     "report5": "📋 [Report 5]",
 }
 
@@ -62,6 +60,11 @@ def tg_send(text: str, report_key: str = "") -> bool:
         print("❌ Telegram send failed", file=sys.stderr)
         return False
     return True
+
+
+def fmt_row_compare_5(col_team: str, col_site: str, col_b: str, col_c: str, col_d: str) -> str:
+    """Format dòng so sánh 5 cột (Team | Site ID | Req/Plan | Plan/Ref | Diff) dạng monospace."""
+    return f"<code>{col_team:<6} | {col_site:<10} | {col_b:>5} | {col_c:>5} | {col_d:>5}</code>"
 
 
 
@@ -327,6 +330,7 @@ class RefuelData:
             ws = wb["Team request"]
             for r in range(2, ws.max_row + 1):
                 date_val = ws.cell(row=r, column=2).value
+                team_val = ws.cell(row=r, column=4).value  # col D: Name Team
                 site = ws.cell(row=r, column=5).value
                 qty = ws.cell(row=r, column=6).value
                 ts = parse_datetime(ws.cell(row=r, column=7).value) or datetime.now(TZ_MM)
@@ -336,8 +340,9 @@ class RefuelData:
                 if site:
                     self.records.append({
                         "ts": ts,
-                        "date": parse_date_str(date_val),  # fix: dùng parse_date_str thay vì str()
+                        "date": parse_date_str(date_val),
                         "cat": "REQUEST",
+                        "team": str(team_val).strip() if team_val else "",
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
                         "site": str(site).strip() if site else "",
@@ -349,17 +354,19 @@ class RefuelData:
             ws = wb["Refueled"]
             for r in range(2, ws.max_row + 1):
                 date_val = ws.cell(row=r, column=4).value
+                team_val = ws.cell(row=r, column=5).value  # col E: Team
                 site = ws.cell(row=r, column=6).value
-                qty = ws.cell(row=r, column=17).value
-                ts = parse_datetime(ws.cell(row=r, column=20).value) or datetime.now(TZ_MM)
-                sender = ws.cell(row=r, column=21).value
-                sender_id = ws.cell(row=r, column=22).value
+                qty = ws.cell(row=r, column=14).value       # col N: Actual Filled Qty(L)
+                ts = parse_datetime(ws.cell(row=r, column=17).value) or datetime.now(TZ_MM)
+                sender = ws.cell(row=r, column=18).value
+                sender_id = ws.cell(row=r, column=19).value
                 
                 if site:
                     self.records.append({
                         "ts": ts,
-                        "date": parse_date_str(date_val),  # fix: dùng parse_date_str thay vì str()
+                        "date": parse_date_str(date_val),
                         "cat": "REFUELED",
+                        "team": str(team_val).strip() if team_val else "",
                         "sender": str(sender).strip() if sender else "",
                         "sender_id": str(sender_id).strip() if sender_id else "",
                         "site": str(site).strip() if site else "",
@@ -370,115 +377,13 @@ class RefuelData:
 # ── Reports implementation ──────────────────────────────────────────────────
 
 def report_1(data: RefuelData):
-    print("📋 Generating Report 1 — Plan - Request - Refueled...")
-    now = datetime.now(TZ_MM)
-    today_str = now.strftime("%d/%m/%Y")
-
-    # ── Lọc tất cả records có date == hôm nay ──
-    plan_today     = [r for r in data.records if r["cat"] == "PLAN"     and r["date"] == today_str]
-    refueled_today = [r for r in data.records if r["cat"] == "REFUELED" and r["date"] == today_str]
-    request_today  = [r for r in data.records if r["cat"] == "REQUEST"  and r["date"] == today_str]
-
-    # ── Build lookup: site → qty cho Refueled & Request ──
-    refueled_by_site: dict[str, int] = {}
-    for r in refueled_today:
-        refueled_by_site[r["site"]] = refueled_by_site.get(r["site"], 0) + r["qty"]
-
-    request_by_site: dict[str, int] = {}
-    for r in request_today:
-        request_by_site[r["site"]] = request_by_site.get(r["site"], 0) + r["qty"]
-
-    # ── Infer team từ lịch sử toàn bộ PLAN records ──
-    sender_team_map: dict[str, str] = {}
-    for r in sorted(
-        [r for r in data.records if r["cat"] == "PLAN" and r.get("team")],
-        key=lambda x: x["ts"], reverse=True
-    ):
-        sid = r["sender_id"]
-        if sid not in sender_team_map:
-            sender_team_map[sid] = r["team"]
-
-    # ── Group: Team → Sender → list of sites ──
-    team_order: list[str] = []
-    # team → { sender_order: [], senders: { name: [sites] } }
-    team_data: dict = {}
-
-    for r in sorted(plan_today, key=lambda x: x["ts"]):
-        sid   = r["sender_id"]
-        name  = r["sender"] or sid or "Unknown"
-        team  = r.get("team") or sender_team_map.get(sid, "") or "No Team"
-        site  = r["site"]
-        qty   = r["qty"]
-
-        if team not in team_data:
-            team_order.append(team)
-            team_data[team] = {"sender_order": [], "senders": {}}
-
-        td = team_data[team]
-        if name not in td["senders"]:
-            td["sender_order"].append(name)
-            td["senders"][name] = []
-        td["senders"][name].append({"site": site, "plan": qty})
-
-    # ── Build message ──
-    lines = [
-        f"📋 <b>[Report 1] Plan - Request - Refueled</b>",
-        f"📅 {today_str} | ⏰ {now.strftime('%H:%M')} Myanmar",
-    ]
-
-    total_plan = total_filled = total_req = 0
-
-    if not team_order:
-        lines.append("📭 No Plan submitted for today.")
-    else:
-        for team in team_order:
-            lines.append(f"\n🏷 <b>{team}</b>")
-            td = team_data[team]
-
-            for sender_name in td["sender_order"]:
-                lines.append(f"  👤 <b>{sender_name}</b>")
-                lines.append(f"  <code>{'Site ID':<12} | {'Plan':>5} | {'Refueled':>8} | {'Req':>5}</code>")
-                lines.append("  <code>" + "─────────────┼───────┼──────────┼───────" + "</code>")
-
-                for item in td["senders"][sender_name]:
-                    site   = item["site"]
-                    plan_q = item["plan"]
-                    fill_q = refueled_by_site.get(site, 0)
-                    req_q  = request_by_site.get(site, 0)
-
-                    if fill_q == 0 and plan_q > 0:
-                        icon = "❌"
-                    elif fill_q >= plan_q or abs(fill_q - plan_q) <= 50:
-                        icon = "✅"
-                    else:
-                        icon = "⚠️"
-
-                    lines.append(
-                        f"  {icon} <code>{site:<12} | {plan_q:>4}L | {fill_q:>7}L | {req_q:>4}L</code>"
-                    )
-                    total_plan  += plan_q
-                    total_filled += fill_q
-                    total_req   += req_q
-
-        lines += [
-            "\n<code>" + "─────────────┴───────┴──────────┴───────" + "</code>",
-            f"<code>{'Total':<12} | {total_plan:>4}L | {total_filled:>7}L | {total_req:>4}L</code>",
-        ]
-
-    lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
-
-    tg_send("\n".join(lines), "report1")
-    print("✅ Report 1 sent.")
-
-
-def report_2(data: RefuelData):
-    print("📊 Generating Report 2 — Progress Sent Plan...")
+    print("🔄 Generating Report 1 — PLAN vs TEAM REQUEST (with Letter Progress)...")
     now = datetime.now(TZ_MM)
     today_str = now.strftime("%d/%m/%Y")
 
     # ── Letter Progress ──
-    submit_line   = f"📤 The letter was submitted to the Government for approval on: <b>{data.letter_submitted or 'N/A'}</b>"
-    approved_line = f"✅ The government approved the oil transport letter on: <b>{data.letter_approved or 'N/A'}</b>"
+    submit_line   = f"  📤 The letter was submitted to the Government for approval on: <b>{data.letter_submitted or 'N/A'}</b>"
+    approved_line = f"  ✅ The government approved the oil transport letter on: <b>{data.letter_approved or 'N/A'}</b>"
 
     # ── FT follow monitor ──
     ft_today = []
@@ -502,182 +407,39 @@ def report_2(data: RefuelData):
     ft_names_today = sorted(list(set(ft_today)))
     ft_str = ", ".join(ft_names_today) if ft_names_today else "None"
 
-    # ── Tần suất gửi Plan per person ──────────────────────────────────────────
-    # Ưu tiên: target_members (Template col G/H) — danh sách người phụ trách chính thức
-    # Fallback: data.members (sheet "Telegram ID") — cùng nguồn với Report 1
-    # Bổ sung:  người đã từng gửi PLAN trong 30 ngày dù không có trong danh sách trên
-    effective_members = data.target_members if data.target_members else data.members
-
-    # Tập hợp tất cả Telegram ID đã từng gửi PLAN trong 30 ngày qua
-    ids_in_records: set[str] = set()
-    names_in_records: dict[str, str] = {}
-    for r in data.records:
-        if r["cat"] == "PLAN":
-            sid = r["sender_id"]
-            ids_in_records.add(sid)
-            if sid not in names_in_records:
-                names_in_records[sid] = r["sender"] or sid
-
-    # Merge: effective_members + người gửi thực tế (tránh bỏ sót)
-    existing_ids = {m["id"] for m in effective_members}
-    merged_members = list(effective_members)
-    for sid, sname in names_in_records.items():
-        if sid not in existing_ids:
-            merged_members.append({"id": sid, "name": sname})
-
-    if not merged_members:
-        merged_members = data.members  # Last resort: tất cả thành viên group
-
-    allowed_ids = {m["id"] for m in merged_members}
-    id_to_name  = {m["id"]: m["name"] for m in merged_members}
-
-    # Khởi tạo freq cho TẤT CẢ merged_members (kể cả người chưa submit)
-    freq: dict[str, dict] = {m["name"]: {"d3": 0, "d7": 0, "d30": 0} for m in merged_members}
-
-    for r in data.records:
-        if r["cat"] != "PLAN":
-            continue
-        sid = r["sender_id"]
-        if sid not in allowed_ids:
-            continue
-        diff_time = now - r["ts"]
-        name = id_to_name[sid]
-        if diff_time <= timedelta(days=3):  freq[name]["d3"]  += 1
-        if diff_time <= timedelta(days=7):  freq[name]["d7"]  += 1
-        if diff_time <= timedelta(days=30): freq[name]["d30"] += 1
-
-    total_today = sum(
-        1 for r in data.records
-        if r["cat"] == "PLAN" and r["date"] == today_str and r["sender_id"] in allowed_ids
-    )
-
-    # ── Build message ──
-    lines = [
-        f"📊 <b>[Report 2] Progress Sent Plan</b>",
-        f"📅 {today_str} | ⏰ {now.strftime('%H:%M')} Myanmar",
-        "",
-        "📝 <b>Letter Progress:</b>",
-        f"  {submit_line}",
-        f"  {approved_line}",
-        f"  👥 FT follow monitor: <b>{ft_str}</b>",
-        "",
-        f"📋 <b>Plan Sent Today: {total_today}</b>",
-        f"<code>{'Name':<15} | {'3D':>3} | {'7D':>3} | {'1M':>4}</code>",
-        "<code>" + "────────────────┼─────┼─────┼──────" + "</code>",
-    ]
-
-    for name in sorted(freq.keys()):
-        f = freq[name]
-        # Chỉ hiển thị người có ít nhất 1 plan trong 1M — bỏ qua người chưa nộp
-        if f["d3"] == 0 and f["d7"] == 0 and f["d30"] == 0:
-            continue
-        short = name[:15]
-        # Icon: ✅ có gửi 3D, 🟡 có gửi 7D, ❌ không gửi
-        if f["d3"] > 0:
-            icon = "✅"
-        elif f["d7"] > 0:
-            icon = "🟡"
-        else:
-            icon = "❌"
-        lines.append(f"{icon} <code>{short:<15} | {f['d3']:>3} | {f['d7']:>3} | {f['d30']:>4}</code>")
-
-    lines += [
-        "<code>" + "────────────────┴─────┴─────┴──────" + "</code>",
-        "\n🤖 <i>Auto report — Refuel Plan System</i>"
-    ]
-
-    tg_send("\n".join(lines), "report2")
-    print("✅ Report 2 sent.")
-
-
-def report_2_1(data: RefuelData):
-    """
-    Report 2.1 — Nhân viên giám sát.
-    Dữ liệu: sheet 'FT follow monitor' (col B=Date, C=ft_name, D=site, E=qty).
-    Hiển thị: mỗi người → số NGÀY unique đi thực địa trong 3D / 7D / 1M.
-    Không đếm số trạm, chỉ đếm ngày.
-    """
-    import datetime as _dt
-    print("📊 Generating Report 2.1 — FT Monitor Days...")
-    now       = datetime.now(TZ_MM)
-    today     = now.date()
-    today_str = now.strftime("%d/%m/%Y")
-
-    # ── Build: { ft_name: set of date } ──
-    name_dates: dict[str, set] = {}
-    for entry in data.ft_monitors:
-        ft_name  = (entry.get("ft_name") or "").strip()
-        date_str = (entry.get("date")    or "").strip()
-        if not ft_name or not date_str:
-            continue
-        try:
-            parts = date_str.split("/")
-            entry_date = _dt.date(int(parts[2]), int(parts[1]), int(parts[0]))
-        except Exception:
-            continue
-        if ft_name not in name_dates:
-            name_dates[ft_name] = set()
-        name_dates[ft_name].add(entry_date)
-
-    # ── Đếm số ngày unique theo window ──
-    freq: dict[str, dict] = {}
-    for ft_name, dates in name_dates.items():
-        freq[ft_name] = {
-            "d3":  sum(1 for d in dates if (today - d).days <= 3),
-            "d7":  sum(1 for d in dates if (today - d).days <= 7),
-            "d30": sum(1 for d in dates if (today - d).days <= 30),
-        }
-
-    # ── Build message ──
-    lines = [
-        f"👷 <b>[Report 2.1] Nhân viên giám sát — Số ngày đi thực địa</b>",
-        f"📅 {today_str} | ⏰ {now.strftime('%H:%M')} Myanmar",
-        "",
-        "<i>ℹ️ Đếm số ngày đi (không tính số trạm)</i>",
-        f"<code>{'Name':<18} | {'3D':>3} | {'7D':>3} | {'1M':>4}</code>",
-        "<code>" + "─" * 19 + "┼" + "─" * 5 + "┼" + "─" * 5 + "┼" + "─" * 6 + "</code>",
-    ]
-
-    if not freq:
-        lines.append("<code>Không có dữ liệu giám sát</code>")
-    else:
-        for name in sorted(freq.keys()):
-            f     = freq[name]
-            short = name[:18]
-            icon  = "✅" if f["d3"] > 0 else ("🟡" if f["d7"] > 0 else "❌")
-            lines.append(
-                f"{icon} <code>{short:<18} | {f['d3']:>3} | {f['d7']:>3} | {f['d30']:>4}</code>"
-            )
-
-    lines += [
-        "<code>" + "─" * 19 + "┴" + "─" * 5 + "┴" + "─" * 5 + "┴" + "─" * 6 + "</code>",
-        f"<code>Tổng: {len(freq)} nhân viên giám sát</code>",
-        "\n🤖 <i>Auto report — Refuel Plan System</i>"
-    ]
-
-    tg_send("\n".join(lines), "report21")
-    print("✅ Report 2.1 sent.")
-
-
-def report_3(data: RefuelData):
-    print("🔄 Generating Report 3 — Plan vs Request...")
-    now = datetime.now(TZ_MM)
-    today_str = now.strftime("%d/%m/%Y")
-
+    # ── PLAN vs REQUEST data ──
     plan    = {}
     request = {}
+    site_team_map = {}
 
     for r in data.records:
         if r["date"] != today_str or not r["site"]:
             continue
+        if r.get("team"):
+            site_team_map[r["site"]] = r["team"]
         if r["cat"] == "PLAN":
             plan[r["site"]]    = plan.get(r["site"], 0)    + r["qty"]
         elif r["cat"] == "REQUEST":
             request[r["site"]] = request.get(r["site"], 0) + r["qty"]
 
     all_sites = sorted(set(list(plan.keys()) + list(request.keys())))
+
+    header_lines = [
+        f"🔄 <b>[Report 1] PLAN vs TEAM REQUEST — {today_str}</b>",
+        f"⏰ {now.strftime('%H:%M')} Myanmar",
+        "",
+        "📝 <b>Letter Progress:</b>",
+        submit_line,
+        approved_line,
+        f"  👥 FT follow monitor: <b>{ft_str}</b>",
+        "",
+    ]
+
     if not all_sites:
-        tg_send(f"🔄 <b>[Report 3] Plan vs Request</b>\n📅 {today_str}\n📭 No records today.", "report3")
+        header_lines.append("📭 No records today.")
+        header_lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
+        tg_send("\n".join(header_lines), "report1")
+        print("✅ Report 1 sent (no records).")
         return
 
     green_count = yellow_count = gray_count = purple_count = 0
@@ -697,100 +459,143 @@ def report_3(data: RefuelData):
         else:
             icon = "🔵"; gray_count   += 1   # Plan có, Request không có
 
+        team_raw = site_team_map.get(site, "Team 1")
+        if "team 2" in team_raw.lower(): team_short = "Team 2"
+        elif "team 3" in team_raw.lower(): team_short = "Team 3"
+        elif "team 4" in team_raw.lower(): team_short = "Team 4"
+        else: team_short = "Team 1"
+
         diff_str = "=" if diff == 0 else f"{diff:+d}L"
-        rows.append(f"{icon} {fmt_row_compare(site, f'{q}L', f'{p}L', diff_str)}")
+        rows.append(f"{icon} {fmt_row_compare_5(team_short, site, f'{q}L', f'{p}L', diff_str)}")
 
+    header_bar = "<code>" + "───────┼───────────┼───────┼───────┼──────" + "</code>"
+    footer_bar = "<code>" + "───────┴───────────┴───────┴───────┴──────" + "</code>"
 
-    header_bar = "<code>" + "─────────────┼───────┼────────┼────────" + "</code>"
-    footer_bar = "<code>" + "─────────────┴───────┴────────┴────────" + "</code>"
-
-    lines = [
-        f"🔄 <b>[Report 3] PLAN vs TEAM REQUEST — {today_str}</b>",
-        f"⏰ {now.strftime('%H:%M')} Myanmar",
-        f"\n🟢 Match  🟡 Diff qty  🟣 Req only  🔵 Plan only",
-        fmt_row_compare("Site ID", "Request", "Plan", "Diff"),
+    lines = header_lines + [
+        "🟢 Match  🟡 Diff qty  🟣 Req only  🔵 Plan only",
+        fmt_row_compare_5("Team", "Site ID", "Request", "Plan", "Diff"),
         header_bar,
     ] + rows + [
         footer_bar,
         f"\n🟢 <b>{green_count}</b>  🟡 <b>{yellow_count}</b>  🟣 <b>{purple_count}</b>  🔵 <b>{gray_count}</b>",
         "\n🤖 <i>Auto report — Refuel Plan System</i>"
     ]
-    tg_send("\n".join(lines), "report3")
-    print("✅ Report 3 sent.")
+    tg_send("\n".join(lines), "report1")
+    print("✅ Report 1 sent.")
 
+
+def report_3(data: RefuelData):
+    """Alias cho report_1 để tương thích với các script cũ."""
+    report_1(data)
+
+
+def report_2(data: RefuelData):
+    print("📊 Generating Report 2 — PLAN vs REFUELED (by Team)...")
+    now = datetime.now(TZ_MM)
+    today_str = now.strftime("%d/%m/%Y")
+
+    # ── Gather data for today by Team ──
+    teams_list = ["Team 1", "Team 2", "Team 3", "Team 4"]
+    team_map: dict[str, dict[str, dict[str, int]]] = {t: {} for t in teams_list}
+
+    # Normalize team name helper
+    def get_team_key(raw_team: str) -> str:
+        s = raw_team.lower()
+        if "team 1" in s or "team1" in s: return "Team 1"
+        if "team 2" in s or "team2" in s: return "Team 2"
+        if "team 3" in s or "team3" in s: return "Team 3"
+        if "team 4" in s or "team4" in s: return "Team 4"
+        return "Team 1"
+
+    for r in data.records:
+        if r["date"] != today_str or not r["site"]:
+            continue
+        team = get_team_key(r.get("team", ""))
+        site = r["site"]
+        if site not in team_map[team]:
+            team_map[team][site] = {"plan": 0, "refueled": 0, "req": 0}
+
+        if r["cat"] == "PLAN":
+            team_map[team][site]["plan"] += r["qty"]
+        elif r["cat"] == "REFUELED":
+            team_map[team][site]["refueled"] += r["qty"]
+        elif r["cat"] == "REQUEST":
+            team_map[team][site]["req"] += r["qty"]
+
+    # Build Header
+    lines = [
+        f"📊 <b>[Report 2] PLAN vs REFUELED — {today_str}</b>",
+        f"⏰ {now.strftime('%H:%M')} Myanmar",
+        "",
+        "🟩 Match  🟨 Diff qty  🟥 Not filled  🟦 Extra filled",
+        fmt_row_compare_5("Team", "Site ID", "Plan", "Refueled", "Diff"),
+        "<code>" + "───────┼───────────┼───────┼───────┼──────" + "</code>",
+    ]
+
+    green_total = yellow_total = red_total = blue_total = 0
+    diff_by_team: dict[str, list[str]] = {t: [] for t in teams_list}
+
+    for team in teams_list:
+        sites_data = team_map[team]
+        if not sites_data:
+            continue
+
+        lines.append(f"\n🏷 <b>{team}</b>")
+        for site in sorted(sites_data.keys()):
+            p = sites_data[site]["plan"]
+            fill = sites_data[site]["refueled"]
+            diff = p - fill
+
+            # Square icons logic
+            if p > 0 and fill > 0 and diff == 0:
+                icon = "🟩"
+                green_total += 1
+            elif p > 0 and fill > 0 and diff != 0:
+                icon = "🟨"
+                yellow_total += 1
+                diff_by_team[team].append(f"{site} ({p}L vs {fill}L)")
+            elif p > 0 and fill == 0:
+                icon = "🟥"
+                red_total += 1
+                diff_by_team[team].append(f"{site} (Unfilled {p}L)")
+            elif p == 0 and fill > 0:
+                icon = "🟦"
+                blue_total += 1
+                diff_by_team[team].append(f"{site} (Unplanned {fill}L)")
+            else:
+                icon = "⬜"
+
+            diff_str = "=" if diff == 0 else f"{diff:+d}L"
+            lines.append(f"{icon} {fmt_row_compare_5(team, site, f'{p}L', f'{fill}L', diff_str)}")
+
+    lines.append("<code>" + "───────┴───────────┴───────┴───────┴──────" + "</code>")
+
+    # Conclusion / Summary of Diff sites per Team at bottom
+    lines.append("\n📌 <b>DIFF SITES SUMMARY BY TEAM:</b>")
+    has_diff = False
+    for team in teams_list:
+        diff_list = diff_by_team[team]
+        if diff_list:
+            has_diff = True
+            lines.append(f"  • <b>{team}</b> ({len(diff_list)} sites): " + ", ".join(diff_list[:5]))
+            if len(diff_list) > 5:
+                lines.append(f"    ... +{len(diff_list)-5} more sites")
+        else:
+            lines.append(f"  • <b>{team}</b>: 100% Matched ✅")
+
+    if not has_diff:
+        lines.append("  🎉 All sites today are 100% matched!")
+
+    lines.append(f"\n🟩 <b>{green_total}</b>  🟨 <b>{yellow_total}</b>  🟥 <b>{red_total}</b>  🟦 <b>{blue_total}</b>")
+    lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
+
+    tg_send("\n".join(lines), "report2")
+    print("✅ Report 2 sent.")
 
 
 def report_4(data: RefuelData):
-    print("👤 Generating Report 4 — Request + Plan by Person (unique days)...")
-    now       = datetime.now(TZ_MM)
-    today_str = now.strftime("%d/%m/%Y")
-
-    # ── Tập hợp unique DATES theo sender_id ────────────────────────────────
-    freq        = {}
-    allowed_ids = {m["id"] for m in data.members}
-
-    for r in data.records:
-        sid = r["sender_id"]
-        if not sid or sid not in allowed_ids:
-            continue
-        if r["cat"] not in ("REQUEST", "PLAN"):
-            continue
-        diff = now - r["ts"]
-        key  = "req" if r["cat"] == "REQUEST" else "pln"
-        date = r["date"]
-        if sid not in freq:
-            freq[sid] = {
-                "req": {"d3": set(), "d7": set(), "d30": set()},
-                "pln": {"d3": set(), "d7": set(), "d30": set()},
-            }
-        if diff <= timedelta(days=3):  freq[sid][key]["d3"].add(date)
-        if diff <= timedelta(days=7):  freq[sid][key]["d7"].add(date)
-        if diff <= timedelta(days=30): freq[sid][key]["d30"].add(date)
-
-    # ── Tiêu đề ───────────────────────────────────────────────────
-    today_reqs = {}
-    for r in data.records:
-        if r["date"] == today_str and r["cat"] == "REQUEST" and r["site"]:
-            today_reqs[r["site"]] = today_reqs.get(r["site"], 0) + r["qty"]
-    req_summary = " + ".join(f"{s}:{q}L" for s, q in sorted(today_reqs.items())) if today_reqs else "–"
-
-    lines = [
-        f"👤 <b>[Report 4] Staff Activity — {today_str}</b>",
-        f"📅 {now.strftime('%d/%m/%Y %H:%M')} Myanmar | Today request: {req_summary}",
-        f"<i>📊 Đếm theo số ngày unique (không đếm lại cùng ngày)</i>",
-        "",
-        f"<code>{'Name':<13}|{'REQUEST':^11}|{'PLAN':^11}</code>",
-        f"<code>{'':13}|{'3D':>3}|{'7D':>3}|{'1M':>4}|{'3D':>3}|{'7D':>3}|{'1M':>4}</code>",
-        "<code>" + "─────────────┼───┼───┼────┼───┼───┼────" + "</code>",
-    ]
-
-    active_shown = 0
-    for m in data.members:
-        sid = m["id"]
-        f   = freq.get(sid, {"req": {"d3": set(), "d7": set(), "d30": set()},
-                             "pln": {"d3": set(), "d7": set(), "d30": set()}})
-        r3  = len(f["req"]["d3"]);  r7  = len(f["req"]["d7"]);  r30 = len(f["req"]["d30"])
-        p3  = len(f["pln"]["d3"]);  p7  = len(f["pln"]["d7"]);  p30 = len(f["pln"]["d30"])
-        if r30 == 0 and p30 == 0:
-            continue  # bỏ qua người không hoạt động trong 30 ngày
-        short = m["name"][:13]
-        lines.append(f"<code>{short:<13}|{r3:>3}|{r7:>3}|{r30:>4}|{p3:>3}|{p7:>3}|{p30:>4}</code>")
-        active_shown += 1
-
-    lines.append("<code>" + "─────────────┴───┴───┴────┴───┴───┴────" + "</code>")
-    lines.append(f"<i>Hiển thị {active_shown}/{len(data.members)} thành viên có hoạt động trong 30 ngày</i>")
-
-    if data.not_joined:
-        lines += [
-            "\n⚠️ <b>NOT JOINED GROUP (No Telegram ID)</b>",
-            "<code>" + "─────────────────────────────────" + "</code>"
-        ]
-        for name in sorted(data.not_joined):
-            lines.append(f"• {name}")
-
-    lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
-    tg_send("\n".join(lines), "report4")
-    print("✅ Report 4 sent.")
+    """Alias cho report_2 để tương thích với các script cũ."""
+    report_2(data)
 
 
 def report_5(data: RefuelData):
@@ -835,22 +640,22 @@ def report_5(data: RefuelData):
 
 def main():
     parser = argparse.ArgumentParser(description="TNI Refuel Plan Reports")
-    parser.add_argument("--report", type=str, choices=["1", "2", "21", "3", "4", "5"], nargs="+",
-                        help="Report numbers: 1 2 21 3 4 5. Omit to run default (1 2 21 4).")
+    parser.add_argument("--report", type=int, choices=[1, 2, 3, 4, 5], nargs="+",
+                        help="Report numbers (1, 2, 5). Omit to run default.")
     args = parser.parse_args()
 
     # Tải và parse dữ liệu trước khi chạy báo cáo
     download_spreadsheet()
     data = RefuelData()
 
-    reports_to_run = args.report if args.report else ["1", "2", "21", "4"]
+    reports_to_run = args.report if args.report else [1, 2]
 
-    if "1"  in reports_to_run: report_1(data)
-    if "2"  in reports_to_run: report_2(data)
-    if "21" in reports_to_run: report_2_1(data)
-    if "3"  in reports_to_run: report_3(data)
-    if "4"  in reports_to_run: report_4(data)
-    if "5"  in reports_to_run: report_5(data)
+    if 1 in reports_to_run or 3 in reports_to_run:
+        report_1(data)
+    if 2 in reports_to_run or 4 in reports_to_run:
+        report_2(data)
+    if 5 in reports_to_run:
+        report_5(data)
 
     print("🎉 All tasks finished successfully.")
 

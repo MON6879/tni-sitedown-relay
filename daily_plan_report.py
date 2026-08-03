@@ -38,7 +38,7 @@ from telethon.tl.functions.messages import GetHistoryRequest
 from telegram import Bot
 from dotenv import load_dotenv
 load_dotenv()
-from delete_old_helper import delete_old_messages_bot, save_msgids, clear_msgids
+from delete_old_helper import delete_old_messages_bot, save_msgids
 
 # ── Logging ─────────────────────────────────────────────────────
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -80,50 +80,37 @@ def myanmar_now() -> datetime:
     return datetime.now(MYANMAR_TZ)
 
 
+def normalize_date_str(s: str) -> str:
+    """Normalize any date string to DD/MM/YYYY."""
+    if not s:
+        return ""
+    s = str(s).strip().replace(".", "/")
+    m = re.search(r'(\d{1,2})/(\d{1,2})/(\d{2,4})', s)
+    if m:
+        d, mon, y = int(m.group(1)), int(m.group(2)), m.group(3)
+        if len(y) == 2:
+            y = "20" + y
+        return f"{d:02d}/{mon:02d}/{y}"
+    return s
+
+
 def is_daily_plan_msg(text: str) -> bool:
     """
     Nhận dạng tin plan linh hoạt:
     - Dòng đầu có chữ 'plan' (bất kỳ vị trí, case-insensitive)
-    - Và có ngày tháng (dạng d/m/yyyy hoặc dd/mm/yyyy) ở BẤT KỲ chỗ trong tin
-    - KHÔNG PHẢI tin báo cáo tự động của Bot (5.1 report, submission history...)
-    - KHÔNG PHẢI tin mẫu trống của Bot 3D (nhận biết qua dòng "Copy → Edit → Send back")
+    - Và có ngày tháng (dạng d/m/yyyy, dd/mm/yyyy hoặc dd.mm.yyyy) ở BẤT KỲ chỗ trong tin
     """
     if not text:
         return False
-
-    # Chỉ kiểm tra 5 dòng đầu
-    first_lines = "\n".join(text.strip().split("\n")[:5]).lower()
-
-    # Lọc tin báo cáo tự động của Bot
-    bot_report_keywords = (
-        "5.1 report", "5. report", "submission history",
-        "3-day completion rate", "completion rate",
-        "team leader: submitted", "plan content:",
-        "mẫu daily",
-        # Nhận biết tin mẫu TRỐNG của Bot 3D (có dòng "Copy → Edit → Send back")
-        # Tin thật của đội trưởng có "Daily Plan Template (Team X)" ở dòng 1
-        # nhưng KHÔNG có "copy → edit" ở dòng 2
-        "copy -> edit",       # ASCII arrow
-        "copy → edit",        # Unicode arrow → (U+2192)
-        "copy → edit",        # Alternate Unicode
-    )
-    if any(kw in first_lines for kw in bot_report_keywords):
-        return False
-
     first_line = text.strip().split("\n")[0].lower()
     has_plan_word = "plan" in first_line
-    has_date = bool(re.search(r'\d{1,2}/\d{1,2}/\d{2,4}', text))
+    has_date = bool(re.search(r'\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}', text))
     return has_plan_word and has_date
 
 
 def parse_daily_plan(text: str) -> dict | None:
     """
     Parse một tin plan (liệt linh hoạt) thành {date, team, content}.
-
-    Các định dạng được hỗ trợ:
-      Daily Plan: 26/06/2026          (cú pháp cũ)
-      Team04 Plan ( 27/6/2026 )       (cú pháp mới)
-      Plan Team4 27/6/2026            (bất kỳ thứ tự nào)
     """
     if not text:
         return None
@@ -132,18 +119,11 @@ def parse_daily_plan(text: str) -> dict | None:
     if not lines:
         return None
 
-    # Extract date: tìm ngày trong toàn bộ tin (flexible)
+    # Extract date: tìm ngày trong toàn bộ tin (hỗ trợ cả / và .)
     date_str = ""
-    date_match = re.search(r'(\d{1,2}/\d{1,2}/\d{2,4})', text)
+    date_match = re.search(r'(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text)
     if date_match:
-        date_str = date_match.group(1)
-        # Chuẩn hoá thành dd/mm/yyyy nếu thiếu zero-padding
-        parts = date_str.split("/")
-        if len(parts) == 3:
-            d, m, y = parts
-            if len(y) == 2:
-                y = "20" + y
-            date_str = f"{d.zfill(2)}/{m.zfill(2)}/{y}"
+        date_str = normalize_date_str(date_match.group(1))
     else:
         date_str = myanmar_now().strftime("%d/%m/%Y")
 
@@ -181,24 +161,7 @@ def parse_daily_plan(text: str) -> dict | None:
             continue
         content_lines.append(lines[i])
 
-    # Loại bỏ các dòng header template khỏi content trước khi hiển thị
-    # Ví dụ: "Copy → Edit → Send back:", "📋 Daily Plan Template (Team X)"
-    TEMPLATE_HEADER_PATTERNS = [
-        r'copy\s*[→\-]+\s*edit',          # Copy → Edit / Copy -> Edit
-        r'daily\s+plan\s+template',        # Daily Plan Template (Team X)
-        r'^\s*📋',                         # Clipboard emoji header
-        r'^\s*mẫu\s+daily',               # Mẫu Daily Plan
-    ]
-    cleaned_content_lines = []
-    for line in content_lines:
-        line_lower = line.strip().lower()
-        is_template = any(
-            re.search(p, line_lower, re.IGNORECASE) for p in TEMPLATE_HEADER_PATTERNS
-        )
-        if not is_template:
-            cleaned_content_lines.append(line)
-
-    content = "\n".join(cleaned_content_lines).strip()
+    content = "\n".join(content_lines).strip()
 
     if not date_str and not team_str:
         return None
@@ -272,13 +235,7 @@ CATEGORY_SQUARES = {
 
 
 def colorize_bullets(text: str) -> str:
-    """
-    Thay dấu '•' bằng vuông màu theo category.
-    Input:  • [Admin] repair CCTV: TNI0006
-    Output: 🟦 [Admin] repair CCTV: TNI0006
-
-    Cùng category = cùng màu vuông (ví dụ: [Asset] luôn là 🟧).
-    """
+    """Thay dau bullet bang vuong mau theo category."""
     if not text:
         return text
 
@@ -340,9 +297,7 @@ def get_report_data() -> dict:
 
 
 def get_team_leaders() -> dict:
-    """
-    Reads GID 133591305 and returns a dict mapping team key ("T1", "T2", "T3", "T4") -> list of leader's telegram IDs (str).
-    """
+    """Reads GID 133591305 and returns dict mapping team key to leader IDs."""
     fallback = {
         "T1": "6859790680",
         "T2": "6555381983",
@@ -450,13 +405,7 @@ def get_unified_employees() -> list:
 
 
 def build_emp_compact_line(emp: dict, daily_counts: dict | None = None) -> str:
-    """
-    Format gọn 1 dòng cho nhân viên:
-      🟢 Tin Maung Win-myt_tinmaung.win: rank:13 | Close:4% <0/1/0> | WO remain:24 | Task:0:0/0/0 | Daily:0/1/0 7D:1 M:5
-      🔴 Khant Chaw Nyo-myt_khantchaw.nyo: rank:21 | Close:0% <0/0/0> | WO remain:15 | Task:0:0/0/0 | Daily:0/0/0 7D:0 M:0
-    🟢 = có WO close trong 3 ngày qua, 🔴 = 0/0/0
-    daily_counts: { tg_id: {d0,d1,d2,d7,month} } — số lần nộp daily result
-    """
+    """Format single line stats for employee."""
     name      = emp.get("name", "?")
     sys_name  = emp.get("sys_name", "")
     tg_id     = str(emp.get("telegram_id", emp.get("tg_id", ""))).replace(".0", "")
@@ -490,9 +439,7 @@ def build_emp_compact_line(emp: dict, daily_counts: dict | None = None) -> str:
 
 
 def parse_assigned_tni_per_person(plan_text: str, team_emps: list) -> dict:
-    """
-    Parses a plan text and maps each employee's tg_id to their assigned TNI codes.
-    """
+    """Parses plan text and maps employee tg_id to assigned TNI codes."""
     assigned = {}
     emp_patterns = []
     for emp in team_emps:
@@ -534,11 +481,7 @@ def parse_assigned_tni_per_person(plan_text: str, team_emps: list) -> dict:
 
 
 def get_employee_completed_tni_today_detailed(df_report, target_date: str, employees: list) -> dict:
-    """
-    Given the df_report dataframe, extracts all completed TNI codes today per employee,
-    supporting both Telegram ID matching and fuzzy name/username matching.
-    Returns: { tg_id: { TNI_code: header_name } }
-    """
+    """Extracts all completed TNI codes today per employee."""
     completed = {}
     if df_report is None or df_report.empty:
         return completed
@@ -629,10 +572,7 @@ def get_employee_completed_tni_today_detailed(df_report, target_date: str, emplo
 # ── Daily Report data from Sheet ────────────────────────────────
 
 def get_team_member_mapping() -> dict:
-    """
-    Read Team All Find sheet to map telegram_id → team group key.
-    Returns: { "telegram_id_str": "T1" | "T2" | "T3" | "T4" }
-    """
+    """Read Team All Find sheet to map telegram_id to team group key."""
     mapping = {}
     try:
         resp = requests.get(TEAM_SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
@@ -909,9 +849,15 @@ async def scan_group_for_plans(client, chat_id: int, since_utc: datetime, leader
         for msg in history.messages:
             if msg.date < since_utc:
                 break
-            # Skip messages sent by bots or by self
-            if getattr(msg, 'out', False) or (msg.sender and getattr(msg.sender, 'bot', False)):
-                continue
+            # Filter by sender if leader_id is provided
+            if leader_id:
+                sender_id_str = str(msg.sender_id) if msg.sender_id else ""
+                if isinstance(leader_id, list):
+                    if sender_id_str not in [str(x).strip() for x in leader_id]:
+                        continue
+                else:
+                    if sender_id_str != str(leader_id).strip():
+                        continue
             if msg.message and is_daily_plan_msg(msg.message):
                 parsed = parse_daily_plan(msg.message)
                 if parsed:
@@ -980,10 +926,7 @@ def parse_plan_date(date_str: str) -> datetime | None:
 
 
 def build_plan_stats(plans: list, team_filter: str = None) -> dict:
-    """
-    Build 3Day/7Day/Month stats from plan list.
-    3Day format: d2/d1/d0 (day-before-yesterday/yesterday/today)
-    """
+    """Build plan stats from plan list."""
     now = myanmar_now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     d1_start = today_start - timedelta(days=1)
@@ -1064,29 +1007,14 @@ async def scan_plan_tomorrow(client, group_key: str, chat_id: int,
         for msg in history.messages:
             if msg.date < since_utc:
                 break
-
-            # Bỏ qua tin do chính mình gửi
-            if getattr(msg, 'out', False):
-                continue
-
-            # Bỏ qua tin từ Telegram Bot (bot API flag)
-            if msg.sender and getattr(msg.sender, 'bot', False):
-                continue
-
-            # Bỏ qua tin từ các tài khoản tự động trong hệ thống:
-            # Tên bắt đầu bằng số + dấu chấm, ví dụ: "2. TNI Auto Report Daily"
-            sender = msg.sender
-            if sender:
-                full_name = (
-                    (getattr(sender, 'first_name', '') or '') + ' ' +
-                    (getattr(sender, 'last_name', '') or '')
-                ).strip()
-                # Pattern: tên bắt đầu bằng chữ số (1., 2., 3., 4., 5., ...)
-                import re as _re
-                if _re.match(r'^\d+[\.\s]', full_name):
-                    logger.debug(f"  skip automated account: {full_name!r}")
+            # Filter by leader
+            sender_id_str = str(msg.sender_id) if msg.sender_id else ""
+            if isinstance(leader_id, list):
+                if sender_id_str not in [str(x).strip() for x in leader_id]:
                     continue
-
+            else:
+                if sender_id_str != str(leader_id).strip():
+                    continue
             if msg.message and is_daily_plan_msg(msg.message):
                 parsed = parse_daily_plan(msg.message)
                 if parsed:
@@ -1141,23 +1069,7 @@ def calc_3day_completion_rate(all_plans: list, team_comparisons: dict,
 
             sent_at_str = ""
             for p in day_plans:
-                m_at = (
-                    p.get("msg_date")
-                    or p.get("sent_time")
-                    or p.get("sent_at")
-                    or p.get("created_at")
-                    or p.get("timestamp")
-                    or p.get("time")
-                    or p.get("date_sent")
-                )
-                if not m_at and p.get("date"):
-                    time_match = re.search(r'\d{2}:\d{2}', str(p.get("date")))
-                    if time_match:
-                        m_at = str(p.get("date"))
-                if not m_at and p.get("content"):
-                    time_match = re.search(r'(\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2})|(\d{2}:\d{2})', str(p.get("content")))
-                    if time_match:
-                        m_at = time_match.group(0)
+                m_at = p.get("msg_date") or p.get("sent_time") or p.get("sent_at")
                 if m_at:
                     sent_at_str = fmt_sent_at(m_at)
                     if sent_at_str:
@@ -1209,14 +1121,7 @@ def calc_3day_completion_rate(all_plans: list, team_comparisons: dict,
 # ── Send message helper ────────────────────────────────────────
 
 async def send_msg(bot, cid, text, label="", reply_markup=None):
-    """Send message with auto-split for >4096 chars. Returns (ok, msg_ids).
-
-    ok values:
-        True  – gửi thành công toàn bộ
-        False – lỗi tạm thời (partial: 1 số chunk đã gửi)
-        None  – chat not found (bot bị kick / chưa có trong nhóm)
-    msg_ids: list[int] – các message_id đã gửi thành công
-    """
+    """Send message with auto-split for >4096 chars. Returns (ok, msg_ids)."""
     MAX = 4000
     sent_ids = []  # collect message_id from each sent message
 
@@ -1254,10 +1159,6 @@ async def send_msg(bot, cid, text, label="", reply_markup=None):
         logger.info(f"✅ {label} → {cid}")
         return True, sent_ids
     except Exception as e:
-        err_str = str(e).lower()
-        if "chat not found" in err_str or "bot is not a member" in err_str or "bot was kicked" in err_str:
-            logger.error(f"❌ {label} → {cid}: Bot không có trong nhóm — cần add bot vào nhóm")
-            return None, sent_ids   # None = chat_not_found, không phải lỗi tạm thời
         logger.error(f"❌ {label} → {cid}: {e}")
         return False, sent_ids
 
@@ -1265,12 +1166,7 @@ async def send_msg(bot, cid, text, label="", reply_markup=None):
 # ── Main ────────────────────────────────────────────────────────
 
 async def run_eod_or_update(mode: str):
-    """
-    Mode 'eod' (17:00) or 'update' (21:00):
-    - Scan today's plans → store → compare vs daily report
-    - Build per-team + CONTROL report
-    - Append "Plan Tomorrow" section at the bottom
-    """
+    """Run EOD or update report mode."""
     now = myanmar_now()
     now_str = now.strftime("%d/%m/%Y %H:%M")
     date_str = now.strftime("%d/%m/%Y")
@@ -1583,11 +1479,7 @@ async def run_eod_or_update(mode: str):
             delete_key = f"{delete_prefix}_{group_key}"
             delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, delete_key)
             ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-{mode_label}-{group_key}")
-            if ok is True and msg_ids:
-                save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
-            elif ok is None:
-                clear_msgids(APPS_SCRIPT_URL, delete_key)
-            elif ok is False and msg_ids:
+            if ok and msg_ids:
                 save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
             await asyncio.sleep(0.5)
 
@@ -1683,43 +1575,18 @@ async def run_eod_or_update(mode: str):
         ctrl_delete_key = f"{delete_prefix}_CONTROL"
         delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, ctrl_delete_key)
         ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, ctrl_msg, f"PLAN-{mode_label}-CONTROL")
-        if ok is True and msg_ids:
-            save_msgids(APPS_SCRIPT_URL, ctrl_delete_key, msg_ids)
-        elif ok is None:
-            clear_msgids(APPS_SCRIPT_URL, ctrl_delete_key)
-        elif ok is False and msg_ids:
+        if ok and msg_ids:
             save_msgids(APPS_SCRIPT_URL, ctrl_delete_key, msg_ids)
 
     logger.info(f"🎉 Daily Plan Report ({mode_label}) complete – {myanmar_now().strftime('%H:%M')}")
 
 
 async def run_morning():
-    """
-    Mode 'morning' (07:00):
-    - Forward TL's plan for today (plan_date == today)
-    - Show 3Day/7Day/1Month submission stats
-    - Show 3-day completion rate
-    """
+    """Run morning report mode."""
     now = myanmar_now()
     now_str = now.strftime("%d/%m/%Y %H:%M")
     date_str = now.strftime("%d/%m/%Y")
     delete_prefix = "PLAN_MRN"
-
-    # ── Time-gate: chỉ chạy trong các khung giờ lịch ──
-    # Buổi sáng:  04:30, 05:00, 05:30, 06:00, 06:30, 07:00, 07:30, 08:00, 08:30, 09:00, 09:30, 10:00 → 04:25–10:35
-    # Buổi chiều: 17:20                                                                     → 17:10–17:35
-    # Buổi tối:   20:00, 22:00                                                              → 19:50–22:10
-    # Nếu trigger thủ công ngoài khung giờ này → bỏ qua
-    h, m = now.hour, now.minute
-    in_morning   = (4, 25) <= (h, m) <= (10, 35)
-    in_afternoon = (17, 10) <= (h, m) <= (17, 35)
-    in_evening   = (19, 50) <= (h, m) <= (22, 10)
-    if not (in_morning or in_afternoon or in_evening):
-        logger.info(
-            f"⏰ Morning mode time-gate: current time {now.strftime('%H:%M')} MMT "
-            f"is outside scheduled windows (04:25–10:35 / 17:10–17:35 / 19:50–22:10). Skipping."
-        )
-        return
 
     logger.info(f"🚀 Daily Plan Report (Morning) start – {now_str}")
 
@@ -1851,13 +1718,7 @@ async def run_morning():
             delete_key = f"{delete_prefix}_{group_key}"
             delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, delete_key)
             ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-MRN-{group_key}")
-            if ok is True and msg_ids:
-                save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
-            elif ok is None:
-                # chat not found — bot chưa có trong nhóm, clear state cũ
-                clear_msgids(APPS_SCRIPT_URL, delete_key)
-            elif ok is False and msg_ids:
-                # partial send — lưu msg_ids đã gửi để cleanup lần sau
+            if ok and msg_ids:
                 save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
             await asyncio.sleep(0.5)
 
@@ -1926,11 +1787,7 @@ async def run_morning():
         ctrl_delete_key = f"{delete_prefix}_CONTROL"
         delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, ctrl_delete_key)
         ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, ctrl_msg, "PLAN-MRN-CONTROL")
-        if ok is True and msg_ids:
-            save_msgids(APPS_SCRIPT_URL, ctrl_delete_key, msg_ids)
-        elif ok is None:
-            clear_msgids(APPS_SCRIPT_URL, ctrl_delete_key)
-        elif ok is False and msg_ids:
+        if ok and msg_ids:
             save_msgids(APPS_SCRIPT_URL, ctrl_delete_key, msg_ids)
 
     logger.info(f"🎉 Daily Plan Report (Morning) complete – {myanmar_now().strftime('%H:%M')}")

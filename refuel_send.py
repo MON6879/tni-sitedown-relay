@@ -2,6 +2,8 @@ import os
 import sys
 import re
 import requests
+import csv
+import io
 from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
@@ -10,7 +12,7 @@ load_dotenv()
 from tg_utils import get_msg_id, set_msg_id, tg_delete, tg_delete_by_title
 
 # Cấu hình bot và chat ID mặc định của group 9 TNI REQUEST REFUEL
-REFUEL_BOT_TOKEN = os.getenv("REFUEL_BOT_TOKEN", "")  # Set in GitHub Secrets
+REFUEL_BOT_TOKEN = os.getenv("REFUEL_BOT_TOKEN", "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME")
 REFUEL_CHAT_ID   = os.getenv("REFUEL_CHAT_ID", "-5469544739")
 # URL Apps Script của bảng tính Refuel riêng, nếu không có sẽ tự động dùng chung APPS_SCRIPT_URL
 REFUEL_APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL", os.getenv("REFUEL_APPS_SCRIPT_URL", ""))
@@ -19,29 +21,31 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))  # Múi giờ Myanmar UTC+6:30
 
 
 def fetch_refuel_data() -> list[str] | None:
-    """Tải dữ liệu cột G của tab Refuel từ Google Sheets qua Apps Script Web App API."""
-    if not REFUEL_APPS_SCRIPT_URL:
-        print("❌ REFUEL_APPS_SCRIPT_URL not set in environment", file=sys.stderr)
-        return None
-    for attempt in range(1, 4):  # Retry tối đa 3 lần
+    """Tải trực tiếp nội dung các ô Y2 trở đi (Column Y) của tab Need Refuel từ Google Sheets CSV Export."""
+    csv_url = "https://docs.google.com/spreadsheets/d/1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM/export?format=csv&gid=0"
+    try:
+        resp = requests.get(csv_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+        resp.raise_for_status()
+        resp.encoding = "utf-8"
+        reader = list(csv.reader(io.StringIO(resp.text)))
+        data = []
+        for r in reader[1:10]:  # Read rows 2 to 10 (Y2:Y10)
+            if len(r) > 24 and r[24].strip():
+                data.append(r[24].strip())
+        if data:
+            return data
+    except Exception as e:
+        print(f"⚠️ Direct CSV fetch warning: {e}", file=sys.stderr)
+
+    # Fallback qua Apps Script API
+    if REFUEL_APPS_SCRIPT_URL:
         try:
-            resp = requests.get(
-                REFUEL_APPS_SCRIPT_URL,
-                params={"action": "get_refuel_data"},
-                timeout=60,
-                headers={"User-Agent": "Mozilla/5.0"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            if data.get("status") == "ok":
-                return data["data"]
-            print(f"⚠️ GAS error: {data.get('message')}", file=sys.stderr)
-            return None
-        except Exception as e:
-            print(f"⚠️ Attempt {attempt}/3 failed: {e}", file=sys.stderr)
-            if attempt == 3:
-                print("❌ All retries failed", file=sys.stderr)
-                return None
+            resp = requests.get(REFUEL_APPS_SCRIPT_URL, params={"action": "get_refuel_data"}, timeout=30)
+            if resp.status_code == 200 and resp.json().get("status") == "ok":
+                return resp.json()["data"]
+        except Exception:
+            pass
+    return None
 
 
 def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
@@ -63,75 +67,104 @@ def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
     return ok, msg_id
 
 
+def deduplicate_refuel_rows(rows: list[str]) -> list[str]:
+    """
+    Bỏ trùng các mã trạm / máy phát (ví dụ: TNI0013_1) trong báo cáo tổng hợp Request Refuel.
+    - Thu thập dữ liệu: Thu thập 100% tất cả yêu cầu gửi về (cho phép dính trùng do yêu cầu chưa thực hiện theo kế hoạch cũ).
+    - Lập báo cáo tổng hợp: Tự động lọc BỎ TRÙNG theo mã trạm/máy phát để so sánh chính xác với Kế hoạch (Plan).
+    """
+    if not rows:
+        return []
+
+    deduped = []
+    seen_sites = set()
+
+    for line in rows:
+        line_clean = str(line).strip()
+        if not line_clean:
+            continue
+
+        # Tìm các mã trạm dạng TNIxxxx hoặc TNIxxxx_1
+        site_matches = re.findall(r'TNI\d+(?:_\d+)?', line_clean, re.IGNORECASE)
+        if site_matches:
+            # Nếu tất cả mã trạm trong dòng này đã từng xuất hiện ở dòng trước -> Bỏ qua dòng trùng
+            all_seen = all(s.upper() in seen_sites for s in site_matches)
+            if all_seen:
+                continue
+
+            # Đánh dấu các mã trạm mới vào danh sách đã thấy
+            for s in site_matches:
+                seen_sites.add(s.upper())
+
+        deduped.append(line_clean)
+
+    return deduped
+
+
+def parse_sites_from_row(line_text: str) -> list[tuple[str, str]]:
+    """
+    Tách các trạm và dung tích dầu từ dòng Request Refuel, tự động LỌC BỎ các mốc ngày (DD/MM/YYYY).
+    Trả về list [(site_code, qty_str), ...]
+    Ví dụ: 'TNI0129_1: 660 + TNI0006_1: 660 < + > 01/08/2026: TNI0031_1: 440' -> [('TNI0129_1', '660L'), ('TNI0006_1', '660L'), ('TNI0031_1', '440L')]
+    """
+    if not line_text:
+        return []
+
+    # Loại bỏ phần tiêu đề "Team X request" nếu có
+    clean_line = re.sub(r'^Team\s*\d+\s*request\s*', '', line_text, flags=re.IGNORECASE)
+
+    # Tách chuỗi theo dấu + hoặc < + >
+    raw_segments = re.split(r'\s*\+\s*|\s*<\s*\+\s*>\s*', clean_line)
+    sites = []
+    seen = set()
+
+    for seg in raw_segments:
+        seg_clean = seg.strip()
+        if not seg_clean:
+            continue
+
+        # Tìm mã trạm TNIxxxx_y và dung tích L
+        m = re.search(r'(TNI\d+(?:_\d+)?)\s*:\s*(\d+)', seg_clean, re.IGNORECASE)
+        if m:
+            site_code = m.group(1).upper()
+            qty = m.group(2) + "L"
+            if site_code not in seen:
+                seen.add(site_code)
+                sites.append((site_code, qty))
+
+    return sites
+
+
 def format_and_send_report(rows: list[str]) -> list[int]:
-    """Phân loại dữ liệu theo Team, lập bảng tổng hợp và chia nhỏ tin nếu vượt quá giới hạn 4096 ký tự."""
+    """Gửi nguyên văn nội dung các ô Y2:Y5 (đã có sẵn chấm màu 🔴 🔵 🟢 🟡) giữ đúng mẫu ngắn gọn."""
     now = datetime.now(TZ_MM)
     date_str = now.strftime("%d/%m/%Y")
     time_str = now.strftime("%H:%M")
     
-    header_line = ""
-    start_idx = 0
-    if rows and "Report need refuel" in rows[0]:
-        header_line = f"📋 <b>{rows[0]}</b>"
-        start_idx = 1
-        
-    team_groups = {
-        1: [],
-        2: [],
-        3: [],
-        4: [],
-        0: []
-    }
-    
-    for i in range(start_idx, len(rows)):
-        line = rows[i]
-        # Tìm mã /T1, /T2, /T3...
-        match = re.search(r'/T([1-9])', line)
-        team_num = int(match.group(1)) if match else 0
-        if team_num in team_groups:
-            team_groups[team_num].append(line)
-        else:
-            team_groups[0].append(line)
-            
-    t1_count = len(team_groups[1])
-    t2_count = len(team_groups[2])
-    t3_count = len(team_groups[3])
-    t4_count = len(team_groups[4])
-    t0_count = len(team_groups[0])
-    total_count = t1_count + t2_count + t3_count + t4_count + t0_count
-    
-    # Xây dựng danh sách dòng thô
     msg_lines = []
-    
-    # 1. Khung tổng hợp (Summary) ở đầu tin nhắn
-    msg_lines.append("📊 <b>Summary by Team:</b>")
-    msg_lines.append(f"🔴 Team 1: <b>{t1_count}</b> sites")
-    msg_lines.append(f"🔵 Team 2: <b>{t2_count}</b> sites")
-    msg_lines.append(f"🟢 Team 3: <b>{t3_count}</b> sites")
-    msg_lines.append(f"🟡 Team 4: <b>{t4_count}</b> sites")
-    if t0_count > 0:
-        msg_lines.append(f"⚪ Other: <b>{t0_count}</b> sites")
-    msg_lines.append(f"Total: <b>{total_count}</b> sites")
-    msg_lines.append("━━━━━━━━━━━━━━━━━━━━━")
-    msg_lines.append("")
-    
-    if header_line:
-        msg_lines.append(header_line)
-        msg_lines.append("")
-        
-    # 2. Liệt kê chi tiết
-    team_emojis = {1: "🔴", 2: "🔵", 3: "🟢", 4: "🟡", 0: "⚪"}
-    team_names = {1: "Team 1", 2: "Team 2", 3: "Team 3", 4: "Team 4", 0: "Other/Unknown"}
-    
-    for t in [1, 2, 3, 4, 0]:
-        team_rows = team_groups[t]
-        if team_rows:
-            msg_lines.append(f"{team_emojis[t]} <b>{team_names[t]} ({len(team_rows)} sites)</b>")
-            for r in team_rows:
-                msg_lines.append(r)
-            msg_lines.append("") # Dòng trống phân tách giữa các Team
+    for line in rows:
+        line_clean = str(line).strip()
+        if line_clean and "Report need refuel" not in line_clean:
+            if line_clean.lower().startswith("/note:") or line_clean.lower().startswith("note:"):
+                msg_lines.append(line_clean)
+                msg_lines.append("")
+                continue
+
+            # Loại bỏ ký tự hỏng mã hóa ở đầu nếu có và ép hiển thị đúng emoji chấm màu
+            clean = re.sub(r'^[^\w\s🔴🔵🟢🟡]+', '', line_clean).strip()
+            if re.search(r'Team\s*1\b', clean, re.IGNORECASE) and not clean.startswith("🔴"):
+                clean = "🔴 " + re.sub(r'^(?:🔴|ð\s*\')?\s*', '', clean)
+            elif re.search(r'Team\s*2\b', clean, re.IGNORECASE) and not clean.startswith("🔵"):
+                clean = "🔵 " + re.sub(r'^(?:🔵|ðµ)?\s*', '', clean)
+            elif re.search(r'Team\s*3\b', clean, re.IGNORECASE) and not clean.startswith("🟢"):
+                clean = "🟢 " + re.sub(r'^(?:🟢|ð¢)?\s*', '', clean)
+            elif re.search(r'Team\s*4\b', clean, re.IGNORECASE) and not clean.startswith("🟡"):
+                clean = "🟡 " + re.sub(r'^(?:🟡|ð¡)?\s*', '', clean)
+
+            msg_lines.append(clean)
+            msg_lines.append("")  # Dòng trống giữa các Team
             
-    if total_count == 0:
+    if not msg_lines:
         msg_lines.append("📭 No refuel requests today.")
         msg_lines.append("")
         

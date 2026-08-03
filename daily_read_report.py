@@ -31,7 +31,7 @@ from telethon.tl.functions.messages import (
 )
 
 # ── Config ──────────────────────────────────────────────────────
-API_ID         = int(os.environ.get("TELEGRAM_API_ID", "0") or "0")
+API_ID         = int(os.environ.get("TELEGRAM_API_ID", "0"))
 API_HASH       = os.environ.get("TELEGRAM_API_HASH", "")
 SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
 GAS_URL        = os.environ.get("APPS_SCRIPT_URL", "")
@@ -63,6 +63,7 @@ STAFF_SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
     "/export?format=csv&gid=1684930643"
 )
+# Col indices trong Staff sheet (0-based)
 S_COL_ID   = 0   # A: Employee ID / Telegram ID (số không đổi)
 S_COL_NAME = 5   # F: Tên nhân viên (hiển thị chính thức)
 S_COL_TEAM = 12  # M: Team (Team 1/2/3/4)
@@ -103,7 +104,6 @@ def is_note_msg(text: str) -> bool:
     if any(ex in t for ex in EXCLUDE_KEYWORDS):
         return False
     return any(kw in t for kw in NOTE_KEYWORDS)
-
 
 
 def get_team_members_from_sheet() -> dict:
@@ -297,10 +297,7 @@ async def get_note_msgs_period(client, chat_id: int,
 
 
 async def get_reader_ids_with_time(client, chat_id: int, msg_id: int) -> dict:
-    """Get {user_id: read_datetime_utc} for msg_id.
-    GetMessageReadParticipantsRequest yêu cầu peer phải được resolve
-    thành InputPeer (không dùng raw int).
-    """
+    """Get {user_id: read_datetime_utc} for msg_id."""
     try:
         peer = await client.get_input_entity(chat_id)
         readers = await client(GetMessageReadParticipantsRequest(
@@ -331,23 +328,23 @@ async def process_group(client, group_key: str, chat_id: int,
     participant_ids = {p["id"] for p in group_participants}
     print(f"  👥 Group participants: {len(participant_ids)}")
 
-    # Phân loại: in_group (có Telegram ID và đã join) vs not_in_group (chưa join)
-    in_group_members   = []
-    not_in_group_names = []
+    # Build per_person tracking for ALL staff members in the team
+    per_person = {}
+    member_ids = set()
 
     if group_key == "CONTROL":
-        # CONTROL: dùng toàn bộ participants, không giới hạn theo staff list
-        in_group_members = [{"id": p["id"], "name": p["name"]} for p in group_participants]
+        for p in group_participants:
+            uid = p["id"]
+            member_ids.add(uid)
+            per_person[uid] = {"name": p["name"], "id": uid, "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0}
     else:
         for s in staff_list:
-            tid  = s.get("chat_id") or s.get("telegram_id")
             name = s["name"]
-
+            tid  = s.get("telegram_id")
             matched_id = None
             if tid and tid in participant_ids:
                 matched_id = tid
             else:
-                # Fallback match by Col F Name only if tid missing or unmapped
                 norm_n = name.lower().replace(" ", "")
                 for p in group_participants:
                     p_name = p["name"].lower().replace(" ", "")
@@ -355,21 +352,19 @@ async def process_group(client, group_key: str, chat_id: int,
                         matched_id = p["id"]
                         break
 
+            key = matched_id if matched_id else f"unmapped_{name}"
             if matched_id:
-                in_group_members.append({"id": matched_id, "name": name})
+                member_ids.add(matched_id)
             else:
                 not_in_group_names.append(name)
 
-    members      = in_group_members
-    member_ids   = {m["id"] for m in members}
-    # Total = toàn bộ staff (cả chưa join)
-    member_count = len(staff_list) if group_key != "CONTROL" else len(members)
+            per_person[key] = {
+                "name": name,
+                "id": matched_id,
+                "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0
+            }
 
-    if len(members) == 0:
-        print(f"  ⚠️  No members in group — skip")
-        return None
-
-    print(f"  📋 In group: {len(members)} | Not in group yet: {len(not_in_group_names)}")
+    member_count = len(per_person)
 
     # Get Note messages from last 35 days (to cover the full cycle and rolling 7-day stats)
     since_date = days_ago_utc(35)
@@ -399,9 +394,6 @@ async def process_group(client, group_key: str, chat_id: int,
         end_time = day_start.replace(hour=23, minute=59, second=59, microsecond=0)
         return start_time <= read_mm <= end_time
 
-    # Per-person tracking: {user_id: {d0:0/1, d1:0/1, d2:0/1, d7:count, month:count}}
-    per_person = {m["id"]: {"name": m["name"], "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0}
-                  for m in members}
     today_note_msg = None
 
     for msg, dt_mm in note_msgs:
@@ -495,10 +487,9 @@ def get_cycle_range(now_mm: datetime) -> tuple[datetime, datetime]:
 async def main():
     print(f"[{myanmar_now()}] 🚀 Daily Note Read Report starting...")
 
-    # Dùng task sheet (GID 133591305) — cột E có chat_id Telegram thực tế
-    # (Staff sheet cột C thường trống nên không dùng)
-    print(f"[{myanmar_now()}] 📋 Reading member list from Task sheet (col E = chat_id)...")
-    staff_by_team = get_team_members_from_sheet()
+    # Read staff from Staff sheet (nguồn chính xác danh sách nhân viên)
+    print(f"[{myanmar_now()}] 📋 Reading staff list from Staff sheet...")
+    staff_by_team = get_staff_from_staff_sheet()
 
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 
@@ -526,11 +517,16 @@ async def main():
         now_str  = myanmar_now()
         divider  = "━" * 30
 
-        # Helper: build per-member lines
+        # Helper: build per-member lines with ❓ for members not joined/mapped yet
         def member_lines(per_member):
             lines = []
             for p in per_member:
-                icon = "✅" if p["d0"] else "❌"
+                if p["d0"]:
+                    icon = "✅"
+                elif not p.get("id"):
+                    icon = "❓"  # Chưa tham gia / Chưa khớp ID Telegram
+                else:
+                    icon = "❌"  # Đã vào nhóm nhưng chưa đọc bài
                 lines.append(
                     f"  {icon} {p['name']}: "
                     f"3Day:{p['d0']}/{p['d1']}/{p['d2']}  "
@@ -544,6 +540,9 @@ async def main():
             if not r:
                 continue
 
+            cnt_unread = sum(1 for p in r["per_member"] if not p["d0"] and p.get("id"))
+            cnt_not_joined = sum(1 for p in r["per_member"] if not p.get("id"))
+
             note_line = f"📝 Note: {r['note_preview']}...\n" if r["note_preview"] else ""
             tl = [
                 f"📋 6. Report — Daily Note Read Report — {gk}",
@@ -556,17 +555,10 @@ async def main():
                 tl.append(f"📝 Note: {r['note_preview']}...")
             tl.append(divider)
             tl.append(f"👥 Team Members: {r['member_count']}  |  "
-                       f"✅ Read: {r['cnt_d0']}  |  ❌ Unread: {len(r['today_unread'])}")
+                       f"✅ Read: {r['cnt_d0']}  |  ❌ Unread: {cnt_unread}  |  ❓ Not Joined: {cnt_not_joined}")
             tl.append(divider)
             tl.extend(member_lines(r["per_member"]))
             tl.append(divider)
-
-            # Phần "Chưa có trong nhóm" — highlight cuối report
-            if r.get("not_in_group"):
-                tl.append(f"⚠️ Not in Group yet ({len(r['not_in_group'])} members):")
-                for name in r["not_in_group"]:
-                    tl.append(f"  • {name}")
-                tl.append("")
 
             chat_id = GROUPS[gk]
             await delete_old_messages_telethon(client, chat_id, GAS_URL, f"READREPORT_{gk}")
@@ -594,9 +586,11 @@ async def main():
 
         # Per-group with per-person details
         for gk, r in all_results.items():
+            cnt_unread = sum(1 for p in r["per_member"] if not p["d0"] and p.get("id"))
+            cnt_not_joined = sum(1 for p in r["per_member"] if not p.get("id"))
             lines.append(
                 f"🏷️ {gk}  |  👥 {r['member_count']}  |  "
-                f"✅ {r['cnt_d0']}  ❌ {len(r['today_unread'])}"
+                f"✅ {r['cnt_d0']}  ❌ {cnt_unread}  ❓ {cnt_not_joined}"
             )
             lines.extend(member_lines(r["per_member"]))
 

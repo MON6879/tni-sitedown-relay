@@ -22,14 +22,11 @@ def _tg_session()  -> str: return os.environ.get("TELEGRAM_SESSION", "")
 
 
 def _bot_token():
-    token = (
+    return (
         os.environ.get("REFUEL_BOT_TOKEN") or
         os.environ.get("SEND_BOT_TOKEN") or
-        ""  # Set REFUEL_BOT_TOKEN or SEND_BOT_TOKEN in GitHub Secrets / .env
+        "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME"
     ).strip()
-    if not token:
-        raise RuntimeError("[tg_utils] Bot token not set. Add REFUEL_BOT_TOKEN to env/secrets.")
-    return token
 
 def _gas_url():
     return (
@@ -108,38 +105,46 @@ def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300)
             logger.warning(f"tg_delete_by_title: getMe lỗi: {ex}")
             return 0
 
-        async with TelegramClient(StringSession(session), api_id, api_hash) as client:
-            async for msg in client.iter_messages(int(chat_id), limit=search_limit):
-                # Lọc tin nhắn từ bot theo sender_id (không cần cache entity)
-                if msg.sender_id != bot_id:
-                    continue
-                if not msg.text:
-                    continue
-                first_line = msg.text.split("\n")[0].strip()
-                # Telethon render <b>text</b> thành **text** — cần strip trước khi so sánh
-                first_line_clean = first_line.replace("**", "").replace("__", "").strip()
-                if not first_line_clean.startswith(title_prefix):
-                    continue
-                try:
-                    resp = requests.post(
-                        f"https://api.telegram.org/bot{token}/deleteMessage",
-                        json={"chat_id": int(chat_id), "message_id": msg.id},
-                        timeout=10,
-                    )
-                    result = resp.json()
-                    if result.get("ok") or "not found" in result.get("description", "").lower():
-                        deleted += 1
-                        logger.info(f"[del_title] Xóa msg_id={msg.id} ('{title_prefix[:30]}'...)")
-                    else:
-                        logger.warning(f"[del_title] ⚠️ msg_id={msg.id}: {result.get('description')}")
-                except Exception as ex:
-                    logger.warning(f"[del_title] ❌ msg_id={msg.id}: {ex}")
+        try:
+            async with TelegramClient(StringSession(session), api_id, api_hash) as client:
+                async for msg in client.iter_messages(int(chat_id), limit=search_limit):
+                    # Lọc tin nhắn từ bot theo sender_id (không cần cache entity)
+                    if msg.sender_id != bot_id:
+                        continue
+                    if not msg.text:
+                        continue
+                    first_line = msg.text.split("\n")[0].strip()
+                    # Telethon render <b>text</b> thành **text** — cần strip trước khi so sánh
+                    first_line_clean = first_line.replace("**", "").replace("__", "").strip()
+                    if not first_line_clean.startswith(title_prefix):
+                        continue
+                    try:
+                        resp = requests.post(
+                            f"https://api.telegram.org/bot{token}/deleteMessage",
+                            json={"chat_id": int(chat_id), "message_id": msg.id},
+                            timeout=10,
+                        )
+                        result = resp.json()
+                        if result.get("ok") or "not found" in result.get("description", "").lower():
+                            deleted += 1
+                            logger.info(f"[del_title] Xóa msg_id={msg.id} ('{title_prefix[:30]}'...)")
+                        else:
+                            logger.warning(f"[del_title] ⚠️ msg_id={msg.id}: {result.get('description')}")
+                    except Exception as ex:
+                        logger.warning(f"[del_title] ❌ msg_id={msg.id}: {ex}")
+        except Exception as telethon_ex:
+            # FloodWait hoặc lỗi session → bỏ qua xóa, không block bước gửi tin
+            logger.warning(f"[del_title] ⚠️ Telethon lỗi (bỏ qua xóa): {telethon_ex}")
         return deleted
 
     try:
-        deleted = asyncio.run(_run())
+        # Timeout 60s — tránh hang vô thời hạn nếu Telegram FloodWait
+        deleted = asyncio.run(asyncio.wait_for(_run(), timeout=60))
         logger.info(f"[del_title] Tổng xóa {deleted} tin '{title_prefix[:40]}' tại {chat_id}")
         return deleted
+    except asyncio.TimeoutError:
+        logger.warning(f"tg_delete_by_title: timeout 60s — bỏ qua xóa, tiếp tục gửi tin mới")
+        return 0
     except Exception as ex:
         logger.warning(f"tg_delete_by_title exception: {ex}")
         return 0
@@ -154,11 +159,22 @@ def tg_send_fresh(chat_id: str, text: str, state_key: str = None,
     # Bước 1: xóa tin cũ
     if title_prefix:
         tg_delete_by_title(chat_id, title_prefix)  # Telethon xóa tất cả cùng tiêu đề
-    elif state_key:
+
+    if state_key:
         old_id = get_msg_id(state_key)
         if old_id:
             tg_delete(chat_id, old_id)             # Fallback: xóa 1 tin theo GAS msg_id
             logger.info(f"Deleted old msg {old_id} for key={state_key}")
+
+        # Xóa cả tin cũ từ legacy keys nếu có (report3 -> report1, report4 -> report2)
+        if "report1_" in state_key:
+            legacy_id = get_msg_id(state_key.replace("report1_", "report3_"))
+            if legacy_id:
+                tg_delete(chat_id, legacy_id)
+        elif "report2_" in state_key:
+            legacy_id = get_msg_id(state_key.replace("report2_", "report4_"))
+            if legacy_id:
+                tg_delete(chat_id, legacy_id)
 
     # Bước 2: gửi tin mới
     try:

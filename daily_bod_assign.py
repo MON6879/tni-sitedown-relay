@@ -42,7 +42,7 @@ DEP_SQUARES = {
 def parse_date(val):
     if pd.isna(val):
         return None
-    val_str = str(val).strip()
+    val_str = str(val).strip().replace(".", "/")
     if not val_str:
         return None
     for fmt in ("%d/%m/%Y %H:%M", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):

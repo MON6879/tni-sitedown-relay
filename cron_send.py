@@ -377,9 +377,8 @@ def build_tl_search_section(team_key: str, report_data: dict, no_id_members: dic
     if not leaders:
         return ""
 
-    raw_search_stats  = report_data.get("searchStats", {})
-    raw_by_name        = report_data.get("searchStatsByName", {})
-    raw_unique_stats   = report_data.get("searchUniqueStats", {})
+    raw_search_stats = report_data.get("searchStats", {})
+    raw_by_name = report_data.get("searchStatsByName", {})
 
     # Sort A-Z theo tên
     leaders_sorted = sorted(leaders, key=lambda x: x.get("name", ""))
@@ -397,20 +396,13 @@ def build_tl_search_section(team_key: str, report_data: dict, no_id_members: dic
         d2 = s.get("d2", 0)
         w  = s.get("week", 0)
         m  = s.get("month", 0)
-        # Unique counts
-        u  = raw_unique_stats.get(uid, {})
-        u0 = u.get("todayU", 0)
-        u1 = u.get("d1U", 0)
-        u2 = u.get("d2U", 0)
-        uw = u.get("weekU", 0)
-        um = u.get("monthU", 0)
         if d0 > 0:
             icon = "✅"   # search hôm nay
         elif d1 > 0 or d2 > 0:
             icon = "🟡"   # có search gần đây nhưng không phải hôm nay
         else:
             icon = "❌"   # 3 ngày không search
-        lines.append(f"  {icon} {name}: 3Day: {d0} /{d1} /{d2}  7Day: /{w}  Month: /{m}")
+        lines.append(f"  {icon} {name}: 3Day: {d2} /{d1} /{d0}  7Day: /{w}  Month: /{m}")
 
     return "\n".join(lines)
 
@@ -430,7 +422,6 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
     # ══ PHẦN 1: Search Stats — match Search Log UserID → Staff Sheet UserID → tên col F ══
     # searchStats từ GAS: { "userId": {today, d1, d2, week, month}, ... }
     raw_search_stats = report_data.get("searchStats", {})
-    raw_unique_stats = report_data.get("searchUniqueStats", {})
 
     # Lấy danh sách NV có ID từ Staff sheet (col F) — list of {name, uid}
     staff_has_id: list = []
@@ -471,8 +462,6 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
                 short = full_name.strip().split()[0].lower()
                 s = raw_by_name.get(short, {})
             return s
-        def _lookup_unique(uid: str) -> dict:
-            return raw_unique_stats.get(uid, {})
         seen_names = set()
         for item in sorted(staff_has_id, key=lambda x: _get_name(x)):
             name = _get_name(item)
@@ -484,19 +473,12 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
             if name in exclude_names:
                 continue
             # Match trực tiếp bằng UserID từ GAS searchStats, fallback theo tên
-            s  = _lookup_search(uid, name)
+            s = _lookup_search(uid, name)
             d0 = s.get("today", 0)
             d1 = s.get("d1", 0)
             d2 = s.get("d2", 0)
             w  = s.get("week", 0)
             m  = s.get("month", 0)
-            # Unique counts (không tính trùng cùng ngày)
-            u  = _lookup_unique(uid)
-            u0 = u.get("todayU", 0)
-            u1 = u.get("d1U", 0)
-            u2 = u.get("d2U", 0)
-            uw = u.get("weekU", 0)
-            um = u.get("monthU", 0)
             if d0 > 0:
                 icon = "✅"   # xanh: search hôm nay
             elif d1 > 0 or d2 > 0:
@@ -505,10 +487,7 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
                 icon = "❌"   # đỏ: 3 ngày không search
             if d0 == 0:
                 not_searched_count += 1
-            search_lines.append(
-                f"  {icon} {name}: 3Day: {d0} /{d1} /{d2}  7Day: /{w}  Month: /{m}"
-            )
-
+            search_lines.append(f"  {icon} {name}: 3Day: {d2} /{d1} /{d0}  7Day: /{w}  Month: /{m}")
 
         result_lines.append(
             f"🔍 Part 1 — Search Stats ({not_searched_count} not searched today):"
@@ -1853,13 +1832,11 @@ async def main():
         for del_cid in CHATID_TO_KEY.keys():
             delete_tasks.append((del_cid, "📋 4. Report — Daily EOD Task & Stats"))
             delete_tasks.append((del_cid, "📓 4b. Full Report"))
-            delete_tasks.append((del_cid, "Note: Above are the end-of-day work results"))
         delete_tasks += [
             (str(CONTROL_CHAT_ID), "📋 1. Report — Technical Dept Task Progress"),
             (str(CONTROL_CHAT_ID), "📋 8. Report — Technical Dep Assign to Team"),
             (str(CONTROL_CHAT_ID), "📋 4. Report — TL Comparison"),
             (str(CONTROL_CHAT_ID), "📋 1. BOD"),   # BOD report nếu có
-            (str(CONTROL_CHAT_ID), "Note: Above are the end-of-day work results"),
         ]
         try:
             async with TelegramClient(
@@ -1921,61 +1898,6 @@ async def main():
     if APPS_SCRIPT_URL:
         for gas_key, ids in collected_msgids.items():
             save_msgids(APPS_SCRIPT_URL, gas_key, ids)
-
-    # ── Auto-send Note message after Report 4/8 to Team & CONTROL groups (under @phongha79 if available) ──
-    NOTE_AUTO_TEXT = "Note: Above are the end-of-day work results, checks, and feedback."
-    ctrl_note_text = f"{control_note}\n{NOTE_AUTO_TEXT}" if control_note else NOTE_AUTO_TEXT
-    note_msg_map = {
-        "T1": NOTE_AUTO_TEXT,
-        "T2": NOTE_AUTO_TEXT,
-        "T3": NOTE_AUTO_TEXT,
-        "T4": NOTE_AUTO_TEXT,
-        "CONTROL": ctrl_note_text,
-    }
-
-    if TELEGRAM_SESSION and TELEGRAM_API_ID:
-        try:
-            logger.info("📝 Auto-sending Note message to Team & CONTROL groups via Telethon (@phongha79)...")
-            async with TelegramClient(
-                StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH
-            ) as tg_client:
-                for gk in ("T1", "T2", "T3", "T4", "CONTROL"):
-                    team_cid = TELEGRAM_GROUPS.get(gk)
-                    send_text = note_msg_map.get(gk, NOTE_AUTO_TEXT)
-                    if team_cid:
-                        try:
-                            await tg_client.send_message(team_cid, send_text)
-                            logger.info(f"  ✅ Auto-sent Note to {gk} (@phongha79)")
-                        except Exception as ne:
-                            logger.warning(f"  ❌ Auto-send Note to {gk} failed: {ne}")
-                        await asyncio.sleep(0.5)
-        except Exception as tg_err:
-            logger.warning(f"Telethon Note send failed, fallback bot: {tg_err}")
-            if SEND_BOT_TOKEN:
-                async with Bot(token=SEND_BOT_TOKEN) as note_bot:
-                    for gk in ("T1", "T2", "T3", "T4", "CONTROL"):
-                        team_cid = TELEGRAM_GROUPS.get(gk)
-                        send_text = note_msg_map.get(gk, NOTE_AUTO_TEXT)
-                        if team_cid:
-                            try:
-                                await note_bot.send_message(chat_id=team_cid, text=send_text)
-                                logger.info(f"  ✅ Auto-sent Note to {gk} (Bot)")
-                            except Exception as ne:
-                                logger.warning(f"  ❌ Auto-send Note to {gk} failed: {ne}")
-                            await asyncio.sleep(0.5)
-    elif SEND_BOT_TOKEN:
-        logger.info("📝 Auto-sending Note message to Team & CONTROL groups via Bot...")
-        async with Bot(token=SEND_BOT_TOKEN) as note_bot:
-            for gk in ("T1", "T2", "T3", "T4", "CONTROL"):
-                team_cid = TELEGRAM_GROUPS.get(gk)
-                send_text = note_msg_map.get(gk, NOTE_AUTO_TEXT)
-                if team_cid:
-                    try:
-                        await note_bot.send_message(chat_id=team_cid, text=send_text)
-                        logger.info(f"  ✅ Auto-sent Note to {gk}")
-                    except Exception as ne:
-                        logger.warning(f"  ❌ Auto-send Note to {gk} failed: {ne}")
-                    await asyncio.sleep(0.5)
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
 
