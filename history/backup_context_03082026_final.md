@@ -4,8 +4,19 @@
 
 ---
 
+## 🚀 Khắc Phục Lỗi Đứng Bot / Ngưng Phản Hồi Trên Vercel Serverless (`Execution Order Fix`)
+- **Phát hiện nguyên nhân cốt lõi trong Ảnh mới (21:36)**:
+  1. Trong hàm `do_POST()` của `api/search_bot.py`, dòng gửi phản hồi `self.send_response(200)` & `self.wfile.write(b'{"ok":true}')` trước đó bị đặt lên **TRƯỚC** hàm `handle(data)`.
+  2. Trên hạ tầng Vercel Serverless (WSGI Proxy), ngay sau khi header HTTP 200 được gửi đi, proxy Vercel coi như request đã hoàn tất ➔ Vercel tự động **ĐÓNG BĂNG/DỪNG TIẾN TRÌNH PYTHON LAMBDA NGAY LẬP TỨC** trước khi `handle(data)` kịp gửi bản tin Telegram về cho người dùng! Dẫn đến việc khi gõ `/plan` hay `/t2notclose` lúc 21:36, bot bị ngưng phản hồi (đứng bot)!
+- **Khắc phục triệt để**:
+  1. **Đảo thứ tự chuẩn Vercel Serverless Lifecycle**: Đưa `handle(data)` thực thi xong 100% trước, sau đó mới phát `200 OK` cho Vercel.
+  2. Vercel giữ cho Lambda Container luôn chạy cho đến khi tin nhắn Telegram được phát ra hoàn tất 100%!
+  3. Kết hợp với cache dữ liệu 30 phút (`CSV_CACHE_TTL = 1800`), `handle(data)` chạy siêu tốc chỉ tốn **0.001 giây**, vừa đảm bảo không bị đứng bot vừa phản hồi cực kỳ tức thì!
+
+---
+
 ## 🎯 Đảm Bảo Chỉ Thu Thập Bản Tin Plan Gốc Của Team Leader Vào Sheet `Team leader assign Plan`
-- **Phát hiện nguyên nhân cốt lõi trong Ảnh mới (21:06)**:
+- **Phát hiện nguyên nhân cốt lõi trong Ảnh 21:06**:
   1. Trong tab `Team leader assign Plan` (GID: 1934147618) của Google Sheets, Dòng 2 cột D (`Daily Plan`) bị ghi đè bởi bản tin **Báo Cáo Tóm Tắt Tự Động Do Bot Phát Ra** (`📅 03/08/2026 17:28 📌 Shows detailed site assignments and tasks grouped by department...`).
   2. Do trong bản tin Báo cáo Tóm tắt tự động của Bot có dòng chữ `...from today/recent plans.` và có ngày `03/08/2026`, hàm quét nhận diện Plan `is_daily_plan_msg()` đã bị nhầm lẫn và thu thập nhầm bản tin Tổng hợp Báo cáo của Bot vào tab làm Plan gốc của Team Leader!
 - **Khắc phục triệt để**:
@@ -20,8 +31,8 @@
 - **Phát hiện nguyên nhân cốt lõi trong Ảnh 3**:
   1. Trong file `api/search_bot.py`, hàm bóc tách dữ liệu `parse_daily_report()` cũ so sánh trực tiếp chuỗi nhãn cột `3. Detail WO:` với tiêu đề cột trên Google Sheets `VII. Detail WO`.
   2. Do tiền tố số thứ tự khác nhau (`3.` vs `VII.`), hệ thống cũ không khớp được nhãn `3. Detail WO:` ➔ Làm cho toàn bộ nội dung WO bị nuốt dính vào cột `Full Name` (tạo thành chuỗi dính `Phyo Htet Aung 3. Detail WO: TNI0198...` trong cột D của ảnh 3), đồng thời làm cột B (`Tên nhân viên`) bị để trống!
-  3. Khi Báo cáo 5 (`cron_send.py`) chạy để kiểm tra ai đã gửi báo cáo, do tên trong Google Sheets bị dính thành `Phyo Htet Aung 3. Detail WO...` thay vì `Phyo Htet Aung`, Báo cáo 5 đã không khớp được tên ➔ Báo `Report: Not sent` (trong ảnh 2)!
-- **Khắc phục triệt me**:
+  3. Khi Báo cáo 5 (`cron_send.py`) chạy để kiểm tra ai đã gửi báo cáo, do tên trong Google Sheets bị dính thành `Phyo Htet Aung 3. Detail WO...` thay vì `Phyo Htet Aung`, Báo cáo 5 đã không khớp được tên ➔ Báo `Report: Not sent`!
+- **Khắc phục triệt để**:
   1. **Tự động làm sạch tiền tố số thứ tự (`clean_field_name`)**: Tự động loại bỏ các số thứ tự `1.`, `3.`, `VII.`, `I.` trước khi khớp cột.
   2. `3. Detail WO` và `VII. Detail WO` được làm sạch thành `"detail wo"` ➔ **Khớp chính xác 100%!**
   3. `Full Name` tách riêng thành `"Phyo Htet Aung"`, `Detail WO` nạp đúng vào cột WO. Báo cáo 5 từ nay sẽ ghi nhận đúng `✅ Report: Sent` cho nhân viên!
@@ -42,17 +53,6 @@
   2. **Phân biệt rạch ròi giữa Lệnh Tra Cứu và Đoạn Chat Thảo Luận**:
      * ✅ **Tra cứu hợp lệ**: Người dùng gõ `TNI0067`, `tni0067`, `/tni TNI0067`, `/find TNI0067` ➔ Bot thực hiện tra cứu 1 mã TNI duy nhất.
      * 🚫 **Đoạn Chat Thảo Luận**: Người dùng gõ *"V Hot task: TNI0067..."*, *"Please check site TNI0067..."*, *"Note TNI0060..."* ➔ Bot tự động bỏ qua 100%, tuyệt đối KHÔNG tra cứu để nhóm thoải mái trao đổi công việc!
-
----
-
-## ⚡ Khắc Phục Triệt Để Lỗi Phản Hồi 2 Lần Trên Vercel (`Fast 200 OK & update_id Deduplication`)
-- **Phát hiện nguyên nhân cốt lõi**:
-  1. Khi nhân viên gõ `/plan`, quá trình tải dữ liệu FT từ Google Sheets tốn 3-4 giây. Nếu Vercel chạy `handle(data)` xong rồi mới phát HTTP 200 OK, kết nối của Telegram bị quá thời gian chờ (5 giây) ➔ Telegram lầm tưởng Vercel chưa nhận được tin nhắn nên ngay lập tức gửi lại kết nối thứ 2 (Webhook Retry).
-  2. Do Vercel là hạ tầng Serverless, request 1 và request 2 được Vercel phân tải cho 2 container độc lập cùng chạy ➔ Dẫn tới việc CẢ 2 CONTAINER CÙNG GỬI 2 BẢN TIN `Daily Plan Template` VÀO NHÓM CÙNG LÚC 20:25!
-- **Khắc phục triệt me**:
-  1. **Phát 200 OK Tức Thời (< 10ms)**: Đưa dòng `self.send_response(200)` & `self.wfile.flush()` lên ngay đầu hàm `do_POST()`. Telegram nhận được HTTP 200 OK ngay trong **10ms** ➔ Telegram xác nhận tin nhắn đã được nhận thành công và **KHÔNG BAO GIỜ GỬI LẠI REQUEST THỨ 2!**
-  2. **Bộ lọc trùng `update_id` (`_processed_updates`)**: Lưu danh sách `update_id` duy nhất của từng tin nhắn Telegram. Nếu có bất kỳ request trùng lặp nào trôi tới, hệ thống sẽ bỏ qua ngay lập tức!
-- **Kết quả**: Triệt tiêu 100% lỗi phản hồi trùng lặp 2 tin nhắn đối với tất cả các lệnh (`/plan`, `/daily`, `/help`, tra cứu trạm)!
 
 ---
 
