@@ -8,7 +8,7 @@
 
 | Repository / Service | Chế độ | Remote URL | Vai trò chính |
 |---|---|---|---|
-| **`MON6879/tni-sitedown-relay`** | 🟢 **PUBLIC** | `https://github.com/MON6879/tni-sitedown-relay.git` | **Nơi duy nhất chạy tự động 24/7 Báo cáo 1, 2, 3, 4, 5, 6, Refuel, Cable, Site Down & Search Bot Keepalive 5 min** (Miễn phí 100% không giới hạn) |
+| **`MON6879/tni-sitedown-relay`** | 🟢 **PUBLIC** | `https://github.com/MON6879/tni-sitedown-relay.git` | **Nơi duy nhất chạy tự động 24/7 Báo cáo 1, 2, 3, 4, 5, 6, Refuel, Cable, Site Down & Keepalive 5 min cho Search & Asset Bot** (Miễn phí 100% không giới hạn) |
 | **`MON6879/TNI-DONE`** | 🔒 **PRIVATE** | `https://github.com/MON6879/TNI-DONE.git` | Codebase Search Bot v3.6 |
 | **`phonghdpxd-cmd/tni-bot`** | 🔒 **PRIVATE** | `https://github.com/phonghdpxd-cmd/tni-bot.git` | Webhook handler trên Vercel (`api/collector.py`, `api/search_bot.py`) |
 | **Vercel Project** | Cloud Serverless | `tni-bot.vercel.app` & `tni-done.vercel.app` | Xử lý Webhook tức thì < 0.2s cho Search & Asset Bot |
@@ -18,8 +18,8 @@
 
 ## ⏰ Cấu hình Lịch chạy Báo cáo Chuẩn đã khóa (`daily_reports.yml` & `keepalive_search_bot.yml`)
 
-### 1. Search Bot Keepalive 24/7 (5 phút / lần):
-- 🔄 **`keepalive_search_bot.yml`** chạy trên repo **PUBLIC** `MON6879/tni-sitedown-relay` (`cron: '*/5 * * * *'`): Ping tự động cả 2 server Vercel (`tni-bot.vercel.app` & `tni-done.vercel.app`) mỗi 5 phút **MIỄN PHÍ 100% KHÔNG GIỚI HẠN**, đảm bảo Search Bot không bao giờ ngủ quên và Webhook Telegram luôn hoạt động 24/7!
+### 1. Search & Asset Bot Keepalive 24/7 (5 phút / lần):
+- 🔄 **`keepalive_search_bot.yml`** chạy trên repo **PUBLIC** `MON6879/tni-sitedown-relay` (`cron: '*/5 * * * *'`): Ping tự động 3 server Vercel (`search_bot` & `collector`) mỗi 5 phút **MIỄN PHÍ 100% KHÔNG GIỚI HẠN**, đảm bảo cả Search Bot và Asset Bot không bao giờ ngủ quên và Webhook Telegram luôn hoạt động 24/7!
 
 ### 2. Báo cáo 1, 2, 3, 4 (Backlog & Daily Task), Refuel Request & Cable Report:
 - 🌅 **Ca Sáng**: **05:45 SÁNG** (23:15 UTC ngày hôm trước)
@@ -35,10 +35,9 @@
 
 ---
 
-## 🛠️ Cập nhật Thu thập & Nối Plan trùng (`handleStoreDailyPlan` & `daily_plan_report.py`)
-- **Thu thập nối tiếp (Append Both)**: Khi có 2 hay nhiều tin Plan cùng Team và Ngày (ví dụ Main Plan + Subteam Plan), hệ thống **nối nội dung cả hai Plan vào Cột D (Daily Plan)** thay vì ghi đè. Cột F (Comparison) tự động tổng hợp trạm của cả 2 Plan để so sánh đầy đủ đối chiếu!
-- **Nhận diện tiêu đề 3 dòng đầu**: Soi từ khóa `"plan"` trong 3 dòng đầu để bắt trúng các tin nhắn có tên Manager/Leader ở Dòng 1.
-- **Mở khóa thu thập**: Cho phép thu thập tin Plan từ tất cả các thành viên trong nhóm.
+## 🛠️ Cập nhật Asset Bot (`collector.py`)
+- **Tự động đặt lại Webhook (`ensure_collector_webhook_active`)**: Đảm bảo Telegram Webhook cho Asset Bot luôn kết nối đúng `https://tni-bot.vercel.app/api/collector`.
+- **Hỗ trợ Slash Commands nâng cao**: Nhận diện chuẩn xác các lệnh dạng `/order@TNIASSETOrderREQUEST_BOT`, `/revoke`, `/move`, `/export` khi gõ trên Telegram app.
 
 ---
 

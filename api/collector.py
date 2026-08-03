@@ -301,12 +301,21 @@ def parse_plan_fields(text: str) -> tuple:
 
 # ── Detect collector keyword in message ───────────────────────────────────
 def is_collector_msg(text: str) -> bool:
-    """Match keyword at start of any line, case-insensitive, with or without ':'."""
-    lower = text.lower()
+    """Match keyword at start of any line, case-insensitive, with or without ':', or via slash command."""
+    if not text:
+        return False
+    # Xử lý lệnh dạng /order hoặc /order@TNIASSETOrderREQUEST_BOT
+    clean_text = text.strip()
+    if clean_text.startswith("/"):
+        # Lấy tên lệnh bỏ qua phần @botusername
+        cmd_m = re.match(r'^/([a-zA-Z0-9_]+)(?:@[a-zA-Z0-9_]+)?(?:\s+(.*))?$', clean_text, re.DOTALL)
+        if cmd_m:
+            cmd = cmd_m.group(1).lower()
+            rest = cmd_m.group(2) or ""
+            clean_text = f"{cmd} {rest}".strip()
+
+    lower = clean_text.lower()
     for k in get_keywords():
-        # Match keyword at start of text or start of any line
-        # Cho phép có hoặc không có ":" sau keyword, hoặc đứng ở cuối dòng/tin nhắn
-        # Ví dụ: "Order: abc", "Order abc", "order:abc", "ORDER", "hello\norder"
         pattern = r'(?:^|\n)\s*' + re.escape(k) + r'(?:\s*[:\s]|\s*$)'
         if re.search(pattern, lower):
             return True
@@ -1104,10 +1113,32 @@ async def handle(data: dict):
             )
 
 
+_collector_webhook_set = False
+def ensure_collector_webhook_active() -> None:
+    global _collector_webhook_set
+    if _collector_webhook_set or not COLLECTOR_BOT_TOKEN:
+        return
+    try:
+        expected = "https://tni-bot.vercel.app/api/collector"
+        r = requests.get(f"https://api.telegram.org/bot{COLLECTOR_BOT_TOKEN}/getWebhookInfo", timeout=5).json()
+        wh_url = r.get("result", {}).get("url", "")
+        if wh_url != expected:
+            logger.info(f"Setting Asset Bot webhook to {expected} (was: {wh_url})")
+            requests.post(f"https://api.telegram.org/bot{COLLECTOR_BOT_TOKEN}/setWebhook", json={
+                "url": expected,
+                "allowed_updates": ["message", "edited_message", "channel_post"],
+                "drop_pending_updates": False
+            }, timeout=5)
+        _collector_webhook_set = True
+    except Exception as e:
+        logger.error(f"ensure_collector_webhook_active error: {e}")
+
+
 # ── Vercel entry point ────────────────────────────────────────────────────
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
+            ensure_collector_webhook_active()
             length = int(self.headers.get("Content-Length", 0))
             data   = json.loads(self.rfile.read(length))
             asyncio.run(handle(data))
@@ -1119,6 +1150,31 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(b"OK")
 
     def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        parsed_url = urlparse(self.path)
+        query = parse_qs(parsed_url.query)
+        action = query.get("action", [None])[0]
+
+        if action == "reset" and COLLECTOR_BOT_TOKEN:
+            try:
+                expected = "https://tni-bot.vercel.app/api/collector"
+                r1 = requests.post(f"https://api.telegram.org/bot{COLLECTOR_BOT_TOKEN}/deleteWebhook", json={"drop_pending_updates": True}, timeout=10).json()
+                r2 = requests.post(f"https://api.telegram.org/bot{COLLECTOR_BOT_TOKEN}/setWebhook", json={
+                    "url": expected,
+                    "allowed_updates": ["message", "edited_message", "channel_post"],
+                    "drop_pending_updates": True
+                }, timeout=10).json()
+                r3 = requests.get(f"https://api.telegram.org/bot{COLLECTOR_BOT_TOKEN}/getWebhookInfo", timeout=10).json()
+                res = {"delete": r1, "set": r2, "info": r3.get("result", {})}
+            except Exception as ex:
+                res = {"error": str(ex)}
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(res, indent=2).encode("utf-8"))
+            return
+
+        ensure_collector_webhook_active()
         token_ok  = "SET" if COLLECTOR_BOT_TOKEN else "MISSING"
         script_ok = "SET" if APPS_SCRIPT_URL else "MISSING"
         self.send_response(200)
@@ -1126,6 +1182,5 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(
             f"Collector Bot OK | TOKEN:{token_ok} | SCRIPT_URL:{script_ok}".encode()
         )
-
 
     def log_message(self, *a): pass
