@@ -8,7 +8,7 @@
 
 | Repository / Service | Chế độ | Remote URL | Vai trò chính |
 |---|---|---|---|
-| **`MON6879/tni-sitedown-relay`** | 🟢 **PUBLIC** | `https://github.com/MON6879/tni-sitedown-relay.git` | **Nơi duy nhất chạy tự động 24/7 Báo cáo 1, 2, 3, 4, 5, 6, Refuel, Cable, Site Down & Keepalive 5 min cho Search & Asset Bot** (Miễn phí 100% không giới hạn) |
+| **`MON6879/tni-sitedown-relay`** | 🟢 **PUBLIC** | `https://github.com/MON6879/tni-sitedown-relay.git` | **Nơi duy nhất gánh 100% tự động 24/7 Báo cáo 1, 2, 3, 4, 5, 6, Refuel, Cable, Site Down & Keepalive 5 min cho TOÀN BỘ BOT (Miễn phí 100% không giới hạn)** |
 | **`MON6879/TNI-DONE`** | 🔒 **PRIVATE** | `https://github.com/MON6879/TNI-DONE.git` | Codebase Search Bot v3.6 |
 | **`phonghdpxd-cmd/tni-bot`** | 🔒 **PRIVATE** | `https://github.com/phonghdpxd-cmd/tni-bot.git` | Webhook handler trên Vercel (`api/collector.py`, `api/search_bot.py`) |
 | **Vercel Project** | Cloud Serverless | `tni-bot.vercel.app` & `tni-done.vercel.app` | Xử lý Webhook tức thì < 0.2s cho Search & Asset Bot |
@@ -16,28 +16,20 @@
 
 ---
 
-## ⏰ Cấu hình Lịch chạy Báo cáo Chuẩn đã khóa (`daily_reports.yml` & `keepalive_search_bot.yml`)
+## ⏰ Cấu hình 3 Workflows Chuẩn đã khóa gọn gàng trên Public Repo (`MON6879/tni-sitedown-relay`)
 
-### 1. Search & Asset Bot Keepalive 24/7 (5 phút / lần):
-- 🔄 **`keepalive_search_bot.yml`** chạy trên repo **PUBLIC** `MON6879/tni-sitedown-relay` (`cron: '*/5 * * * *'`): Ping tự động 3 server Vercel (`search_bot` & `collector`) mỗi 5 phút **MIỄN PHÍ 100% KHÔNG GIỚI HẠN**, đảm bảo cả Search Bot và Asset Bot không bao giờ ngủ quên và Webhook Telegram luôn hoạt động 24/7!
+### 1. `🔄 1. Master Keepalive 24/7 (All Bots)` (`keepalive_all_bots.yml`):
+- 🔄 Ping tự động mỗi 5 phút (`cron: '*/5 * * * *'`): Gộp chung ping Search Bot 1 (`tni-bot`), Search Bot 2 (`tni-done`), Asset Bot (`collector`), Site Down Bot (`tni-sitedown`) và Google Apps Script Backend. **Đảm bảo tất cả Bot hoạt động 24/7 vĩnh viễn 100% miễn phí!**
 
-### 2. Báo cáo 1, 2, 3, 4 (Backlog & Daily Task), Refuel Request & Cable Report:
-- 🌅 **Ca Sáng**: **05:45 SÁNG** (23:15 UTC ngày hôm trước)
-- 🌆 **Ca Chiều**: **16:20 CHIỀU** (09:50 UTC) — Tập trung gửi đồng loạt Báo cáo 1, 2, 3, 4, 5A, 6, Refuel Request & Cable Report
+### 2. `📡 2. Site Down Tin 1 Relay (Every 20 Min)` (`botlookup_relay.yml`):
+- 📡 Quét tự động đếm trạm Site Down tin 1 mỗi 20 phút (`cron: '*/20 * * * *'`).
 
-### 3. Báo cáo 5.1 (Nhắc nộp Kế hoạch sáng & tối):
-- 🌅 **Ca Sáng**: **05:25, 08:25, 09:50 SÁNG** (Giờ Myanmar)
-- 🌆 **Ca Tối**: **15:20, 19:00, 22:00 TỐI** (Giờ Myanmar)
-
-### 4. Báo cáo 5B (Plan Update) & Báo cáo 6 (Read Status):
-- 📌 **Report 5B**: **21:00 TỐI** (14:30 UTC)
-- 📌 **Report 6**: **14:00, 17:15, 19:00, 20:30** (Giờ Myanmar)
-
----
-
-## 🛠️ Khắc phục dứt điểm Webhook Asset Bot (`@TNIASSETorderREQUEST_BOT`)
-- **Fix lỗi trỏ nhầm Webhook**: Webhook Telegram của Asset Bot trước đó trỏ lầm sang `/api/search_bot` nên không xử lý các lệnh Order/Revoke. Đã chuyển chính xác về `https://tni-bot.vercel.app/api/collector` và khóa cứng tự động.
-- **Tự động biến đổi Target động Báo cáo 4**: Tự động đọc `/Target75%` từ Sheet để nhảy tiêu đề, chú thích và icon tự động.
+### 3. `📊 3. Unified Daily Reports (Reports 1-6, Refuel, Cable)` (`daily_reports.yml`):
+- 📋 Tập trung toàn bộ lịch phát các Báo cáo:
+  * **05:45 SÁNG & 16:20 CHIỀU**: Báo cáo 1, 2, 3, 4, 5A, 6, Refuel Request & Cable Report.
+  * **05:25, 08:25, 09:50 AM & 15:20, 19:00, 22:00 PM**: Báo cáo 5.1 (Plan Reminder).
+  * **21:00 TỐI**: Báo cáo 5B (Plan Update).
+  * **14:00, 17:15, 19:00, 20:30 PM**: Báo cáo 6 (Check Read Status).
 
 ---
 
