@@ -4,9 +4,13 @@
 
 ---
 
-## 🛠️ Nâng cấp Regex Tra cứu Info (`Info: TNIxxxx` vs `TNIxxxx`)
-- **Phát hiện lỗi**: Trước đó việc lấy chuỗi sau `Info:` dùng `text_stripped[5:]` cắt chuỗi cứng theo 5 vị trí. Khi người dùng gõ `Info: TNIxxxx` (có khoảng trắng sau dấu hai chấm), index bị lệch khiến chuỗi trích xuất mất chữ 'T' (`NIxxxx`), làm regex thất bại và bị nhảy nhầm xuống handler tra cứu `TNIxxxx` (Task & WO).
-- **Khắc phục**: Thay thế bằng Regex linh hoạt `re.search(r"^\s*info[:\s]+\s*(TNI\w+)", text, re.IGNORECASE)`. Từ nay dù gõ `Info: TNI0351`, `Info:TNI0351`, `info TNI0351` hay `INFO: TNI0351`, bot đều trích xuất chuẩn xác 100% mã `TNI0351` và trả về đúng dữ liệu **Site Info (Site / Cable / Gpon / DIA)** mà KHÔNG BAO GIỜ bị nhảy trùng sang Task/WO!
+## ⚡ ĐƠN GIẢN HÓA HỆ THỐNG: CHỈ DÙNG 1 SERVER CHÍNH DUY NHẤT
+- **Không còn chạy song song 2 server mây gây xung đột**.
+- Tất cả bot và webhook đã quy về **1 Server Chính Duy Nhất (`https://tni-bot.vercel.app`)**:
+  * **Search Bot**: `https://tni-bot.vercel.app/api/search_bot`
+  * **Asset Bot (Collector)**: `https://tni-bot.vercel.app/api/collector`
+  * **Site Down Bot (Relay)**: `https://tni-bot.vercel.app/api/site_down_relay`
+- Đã loại bỏ hoàn toàn server phụ `tni-done` khỏi Master Keepalive để triệt tiêu mọi rủi ro trôi code hay ghi đè lặp lại!
 
 ---
 
@@ -17,29 +21,10 @@
 
 ---
 
-## 🔒 Khóa Tự Động Webhook 24/7 (Master Keepalive Enforcement)
-- Trong workflow **`🔄 1. Master Keepalive 24/7 (All Bots)`** (`keepalive_all_bots.yml`), mỗi 5 phút hệ thống tự động khóa & khôi phục Webhook Search Bot về đúng địa chỉ:
-  `https://api.telegram.org/bot8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A/setWebhook?url=https://tni-bot.vercel.app/api/search_bot`
-- Đảm bảo Webhook không thể bị trôi, mất kết nối hay trỏ sai đường dẫn vĩnh viễn 100%!
-
----
-
-## 🗺️ Bản đồ phân bổ Repository & Service
-
-| Repository / Service | Chế độ | Remote URL | Vai trò chính |
-|---|---|---|---|
-| **`MON6879/tni-sitedown-relay`** | 🟢 **PUBLIC** | `https://github.com/MON6879/tni-sitedown-relay.git` | **Nơi duy nhất gánh 100% tự động 24/7 Báo cáo 1, 2, 3, 4, 5, 6, Refuel, Cable, Site Down & Keepalive 5 min cho TOÀN BỘ BOT & Auto Copy Paste GAS (Miễn phí 100% không giới hạn)** |
-| **`MON6879/TNI-DONE`** | 🔒 **PRIVATE** | `https://github.com/MON6879/TNI-DONE.git` | Codebase Search Bot v3.6 (Secondary deployment `tni-done.vercel.app`) |
-| **`phonghdpxd-cmd/tni-bot`** | 🔒 **PRIVATE** | `https://github.com/phonghdpxd-cmd/tni-bot.git` | Webhook handler trên Vercel (`api/collector.py`, `api/search_bot.py`) |
-| **Vercel Project** | Cloud Serverless | `tni-bot.vercel.app` & `tni-done.vercel.app` | Xử lý Webhook tức thì < 0.2s cho Search Bot & Asset Bot |
-| **Google Apps Script** | Google Cloud | Live Web Apps | Backend dữ liệu & Keepalive 5 min |
-
----
-
 ## ⏰ Cấu hình 3 Workflows Chuẩn đã khóa gọn gàng trên Public Repo (`MON6879/tni-sitedown-relay`)
 
 ### 1. `🔄 1. Master Keepalive 24/7 (All Bots)` (`keepalive_all_bots.yml`):
-- 🔄 Ping tự động mỗi 5 phút (`cron: '*/5 * * * *'`): Gộp chung ping Search Bot 1 (`tni-bot`), Search Bot 2 (`tni-done`), Asset Bot (`collector`), Site Down Bot (`tni-sitedown`), Google Apps Script Main Backend và Auto Copy Paste GAS Backend (`AKfycbwi3J0V...`). **Đảm bảo tất cả Bot & Tác vụ Copy Paste hoạt động 24/7 vĩnh viễn 100% miễn phí!**
+- 🔄 Ping tự động mỗi 5 phút (`cron: '*/5 * * * *'`): Ping Server Chính `tni-bot` (`search_bot`, `collector`), `tni-sitedown`, Google Apps Script Main Backend và Auto Copy Paste GAS Backend (`AKfycbwi3J0V...`). **Đảm bảo tất cả Bot & Tác vụ Copy Paste hoạt động 24/7 vĩnh viễn 100% miễn phí!**
 
 ### 2. `📡 2. Site Down Tin 1 Relay (Every 20 Min)` (`botlookup_relay.yml`):
 - 📡 Quét tự động đếm trạm Site Down tin 1 mỗi 20 phút (`cron: '*/20 * * * *'`).
