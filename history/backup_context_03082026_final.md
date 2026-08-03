@@ -4,6 +4,17 @@
 
 ---
 
+## 🛠️ Triệt Tiêu 100% Lỗi Trùng Lặp 2 Bot & Lỗi Ghi Nhiều Dòng Giống Nhau (`Daily Result` Single Bot Fix)
+- **Phát hiện nguyên nhân cốt lõi**:
+  1. Trong `api/collector.py` (Asset Bot `@TNIASSETorderREQUEST_BOT`), từ khóa `Daily Result:` nằm trong danh sách từ khóa thu thập ➔ Làm cho CẢ 2 BOT (`@TNIASSETorderREQUEST_BOT` và `@SEARCHTNITASKWOBOT`) cùng tham gia xử lý khi nhân viên gửi tin `Daily Result:`. Dẫn tới việc 2 Bot cùng trả lời và tạo ra 2 bản tin ghi trùng lặp nhau!
+  2. Khi Telegram thử lại kết nối ngầm (Retry Webhook) do thời gian phản hồi quá 12s, cả 2 bot đều nhận lại kết nối và chèn thêm các dòng lặp lại ➔ Dẫn tới việc bảng Google Sheets `Daily report and Bussiness` bị chèn 5 dòng giống hệt nhau (`Phyo Htet Aung`).
+- **Khắc phục triệt để**:
+  1. **Loại trừ `daily result` & `daily plan` khỏi Asset Collector Bot (`is_collector_msg`)**: Đảm bảo tin nhắn `Daily Result:` chỉ do DUY NHẤT 1 BOT (`@SEARCHTNITASKWOBOT`) xử lý theo đúng tài liệu thiết kế.
+  2. **Bổ sung bộ chặn lặp lại 10 giây (`_recent_daily_submits`)**: Trong vòng 10 giây, mỗi nhân viên gửi `Daily Result:` chỉ được nạp dữ liệu DUY NHẤT 1 LẦN. Mọi yêu cầu trùng lặp do Telegram gửi lại đều bị chặn ngay lập tức.
+- **Kết quả**: Triệt tiêu hoàn toàn lỗi chèn nhiều dòng trùng lặp trên Google Sheets, bot phản hồi 1 tin nhắn duy nhất!
+
+---
+
 ## 🛠️ Tăng Thời Gian Chờ HTTP & Khắc Phục Lỗi `Read timed out` (`submit_daily` Timeout Fix)
 - **Phát hiện nguyên nhân**: Trong `api/search_bot.py` (xử lý `Daily Result:` / `@SEARCHTNITASKWOBOT`) và `api/collector.py`, thời gian chờ HTTP `timeout` khi gọi sang Google Apps Script cũ chỉ để `12-15` giây. Khi nhân viên gửi tin `Daily Result:` vào giờ cao điểm, Google Apps Script cần 14-20 giây để ghi dữ liệu vào Google Sheets ➔ Làm cho kết nối của Python bị quá hạn (`requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='script.google.com', port=443): Read timed out`). Bot lầm tưởng là lỗi và phát tin nhắn báo lỗi đỏ ❌ `Connection error Read timed out` trong nhóm Telegram, mặc dù trên Google Sheets dữ liệu VẪN ĐƯỢC LƯU!
 - **Khắc phục triệt để**:
