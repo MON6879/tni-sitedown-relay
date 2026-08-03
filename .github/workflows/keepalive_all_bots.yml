@@ -11,7 +11,8 @@ jobs:
     steps:
       - name: ⚡ Keepalive Ping All Bot Endpoints & Webhooks
         run: |
-          echo "1️⃣ Pinging Search Bot 1 (tni-bot)..."
+          echo "1️⃣ Locking & Pinging Search Bot 1 (tni-bot)..."
+          curl -s -f "https://api.telegram.org/bot8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A/setWebhook?url=https://tni-bot.vercel.app/api/search_bot" || true
           curl -s -f "https://tni-bot.vercel.app/api/search_bot?action=reset" || true
           
           echo "2️⃣ Pinging Search Bot 2 (tni-done)..."
