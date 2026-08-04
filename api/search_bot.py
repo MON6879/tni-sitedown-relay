@@ -804,18 +804,8 @@ def fetch_daily_fields() -> list[str]:
     now = time.time()
     if _daily_fields and (now - _daily_fields_ts) < DAILY_FIELDS_TTL:
         return _daily_fields
-    if not DAILY_APPS_SCRIPT_URL:
-        return DAILY_FIELDS_DEFAULT
-    try:
-        resp = requests.get(DAILY_APPS_SCRIPT_URL + "?action=get_fields", timeout=10)
-        data = resp.json()
-        if data.get("status") == "ok" and data.get("fields"):
-            _daily_fields    = data["fields"]
-            _daily_fields_ts = now
-            return _daily_fields
-    except Exception as ex:
-        logger.warning(f"fetch_daily_fields: {ex}")
-    return _daily_fields or DAILY_FIELDS_DEFAULT
+    # Dùng ngay danh sách trường chuẩn có sẵn để phản hồi tức thì (tránh chờ 10s Google Apps Script)
+    return DAILY_FIELDS_DEFAULT
 
 def clean_field_name(s: str) -> str:
     """Làm sạch nhãn cột: loại bỏ số thứ tự hoặc số La Mã đầu câu (1., 3., VII., I., etc.)."""
