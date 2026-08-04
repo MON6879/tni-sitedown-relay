@@ -254,13 +254,14 @@ def parse_cable_fields(text: str) -> dict:
 
 # ── Daily Plan detection ──────────────────────────────────────────────────
 def is_daily_plan(text: str) -> bool:
-    """Detect plan message: first 3 lines have 'plan', text has date d/m/yyyy."""
+    """Detect plan message: text has 'plan' and date d/m/yyyy, excluding bot auto reports."""
     if not text:
         return False
     text_l = text.lower()
-    # 🛑 LOẠI BỎ TẤT CẢ CÁC BẢN TIN MẪU CỦA BOT HOẶC BÁO CÁO TỰ ĐỘNG
+    # 🛑 LOẠI BỎ CHỈ CÁC BẢN TIN TỰ ĐỘNG CỦA BOT HOẶC HƯỚNG DẪN COPY
+    # KHÔNG loại bỏ "daily plan template" hay "note: /find /tnixxxx" vì người dùng copy nguyên mẫu
     if any(kw in text_l for kw in (
-        "daily plan template", "copy → edit", "copy -> edit", "note: /find /tnixxxx",
+        "copy → edit → send back", "copy -> edit -> send back",
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
@@ -270,29 +271,37 @@ def is_daily_plan(text: str) -> bool:
 
     lines = [line.strip().lower() for line in text.split("\n") if line.strip()]
     first_few_lines = " ".join(lines[:3]) if lines else ""
-    has_plan = "plan" in first_few_lines
-    has_date = bool(re.search(r'\d{1,2}/\d{1,2}/\d{2,4}', text))
+    has_plan = "plan" in first_few_lines or "daily plan" in text_l
+    has_date = bool(re.search(r'\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}', text))
     return has_plan and has_date
 
 
 def parse_plan_fields(text: str) -> tuple:
     """Extract (date, team, content) from plan message."""
     lines = text.strip().split("\n")
-    # Date: tìm ngày trong toàn bộ text
+    # Date: tìm ngày trong toàn bộ text (ưu tiên theo chữ 'daily plan' hoặc 'plan for')
     date_str = ""
-    date_m = re.search(r'(\d{1,2}/\d{1,2}/\d{2,4})', text)
+    date_m = re.search(r'(?:daily\s*plan|plan\s*for)[:\s]+(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text, re.IGNORECASE)
+    if not date_m:
+        date_m = re.search(r'(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text)
     if date_m:
-        parts = date_m.group(1).split("/")
+        raw_d = date_m.group(1)
+        parts = re.split(r'[\/\.]', raw_d)
         if len(parts) == 3:
             d, m, y = parts
             if len(y) == 2:
                 y = "20" + y
-            date_str = f"{d.zfill(2)}/{m.zfill(2)}/{y}"
+            date_str = f"{int(d):02d}/{int(m):02d}/{y}"
+    if not date_str:
+        now_mm = datetime.now(TZ_MM)
+        date_str = now_mm.strftime("%d/%m/%Y")
+
     # Team: tìm Team + số
     team_str = ""
     team_m = re.search(r'Team\s*0?([1-5])', text, re.IGNORECASE)
     if team_m:
         team_str = f"Team {team_m.group(1)}"
+
     # Content: mọi thứ sau dòng header (dòng đầu có 'plan') và dòng team
     team_line_idx = 0
     for i, line in enumerate(lines[1:], 1):
