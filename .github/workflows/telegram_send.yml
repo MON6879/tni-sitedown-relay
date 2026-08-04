@@ -3,7 +3,7 @@ name: Telegram Daily Send
 on:
   schedule:
     - cron: '15 23 * * *'  # 05:45 AM Myanmar Time (UTC+6:30) -> 23:15 UTC
-    - cron: '40 9 * * *'   # 16:10 PM Myanmar Time (UTC+6:30) -> 09:40 UTC
+    - cron: '15 9 * * *'   # 15:45 PM Myanmar Time (UTC+6:30) -> 09:15 UTC
   repository_dispatch:
     types: [run_daily_report, run_telegram_send]
   workflow_dispatch:
