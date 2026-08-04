@@ -977,7 +977,7 @@ def is_daily_plan(text: str) -> bool:
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
-        "plans for "
+        "plans for ", "plan updated", "plan saved", "ref:", "ref:dp-", "đã lưu"
     )):
         return False
 

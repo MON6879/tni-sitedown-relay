@@ -104,13 +104,13 @@ def is_daily_plan_msg(text: str) -> bool:
         return False
     text_l = text.lower()
 
-    # 🛑 CHỈ LOẠI BỎ CÁC BẢN TIN BÁO CÁO TỰ ĐỘNG DO BOT PHÁT RA
+    # 🛑 CHỈ LOẠI BỎ CÁC BẢN TIN BÁO CÁO TỰ ĐỘNG VÀ PHẢN HỒI XÁC NHẬN CỦA BOT
     # KHÔNG loại bỏ "daily plan template", "copy → edit", "note: /find" vì người dùng copy/forward nguyên mẫu
     if any(kw in text_l for kw in (
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
-        "plans for "
+        "plans for ", "plan updated", "plan saved", "ref:", "ref:dp-", "đã lưu"
     )):
         return False
 
