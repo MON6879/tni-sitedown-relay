@@ -1055,15 +1055,6 @@ _processed_updates = set()
 
 # ── Update handler ────────────────────────────────────────────────────────────
 def handle(update: dict) -> None:
-    update_id = update.get("update_id")
-    if update_id:
-        if update_id in _processed_updates:
-            logger.info(f"Ignoring duplicate Telegram update_id: {update_id}")
-            return
-        _processed_updates.add(update_id)
-        if len(_processed_updates) > 1000:
-            _processed_updates.clear()
-
     ensure_webhook_active()
     msg = update.get("message") or update.get("edited_message")
     if not msg:

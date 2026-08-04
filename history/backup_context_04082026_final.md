@@ -1,19 +1,21 @@
-# 📌 System Snapshot Backup — 04/08/2026 (MY* COMMANDS MENU ENHANCEMENT)
+# 📌 System Snapshot Backup — 04/08/2026 (CRITICAL BUG FIX: UPDATE_ID DEDUPLICATION IN HANDLE)
 
-> **Lưu trữ cấu hình toàn bộ hệ thống TNI Bot - Bổ sung đầy đủ các lệnh tra cứu cá nhân (My*) vào Menu Bot.**
+> **Lưu trữ cấu hình toàn bộ hệ thống TNI Bot - Xử lý triệt để lỗi bỏ qua lệnh tra cứu trong `handle()`.**
 
 ---
 
-## 📌 Bổ Sung Đầy Đủ Các Lệnh Tra Cứu Cá Nhân (`my*`) Vào Menu Search Bot
-- **Nội dung bổ sung vào Menu `/start` & `/help`**:
-  * `mysite`: Tra cứu danh sách Trạm cá nhân được giao.
-  * `mycable`: Tra cứu tuyến Cáp cá nhân quản lý.
-  * `mydia`: Tra cứu đường truyền DIA cá nhân.
-  * `myolt`: Tra cứu thiết bị OLT cá nhân.
-  * `mysn`: Tra cứu số Serial Number thiết bị.
-  * `mydata`: Tổng hợp toàn bộ chỉ số cá nhân từ tab Staff.
-  * `info TNIxxxx`: Tra cứu thông tin chi tiết trạm/cáp/GPON.
-  * `CLEAR TNIxxxx`: Tra cứu lịch sử Clear trạm.
+## ⚡ BẢN CHẤT NGUYÊN NHÂN VÀ CÁCH KHẮC PHỤC TRIỆT ĐỂ (`api/search_bot.py`)
+
+- **Phát hiện thủ phạm làm Bot ngưng phản hồi tất cả lệnh tra cứu trong ảnh chụp**:
+  1. Trong hàm `do_POST()`, mã lệnh đã thêm `_processed_updates.add(up_id)` để ghi nhận mã tin nhắn Telegram.
+  2. Tuy nhiên, bên trong hàm `handle(update)`, mã nguồn cũ lại tiếp tục kiểm tra lại: `if update_id in _processed_updates: return`.
+  3. Vì `up_id` đã được thêm vào tập hợp từ `do_POST()`, khi `handle(update)` chạy đến dòng 1060, nó **báo trùng và thực hiện `return` ngay lập tức**!
+  4. Hậu quả: **Mọi tin nhắn/lệnh tra cứu (`/t1notclose`, `/mysite`, `TNI0013`, `Info: TNI0013`...) gửi đến Bot đều bị hủy ngầm và không phát ra tin nhắn phản hồi nào!**
+
+- **Khắc phục triệt để**:
+  1. Đã xóa bỏ đoạn kiểm tra `_processed_updates` thừa trong `handle()`.
+  2. Việc lọc trùng `update_id` chỉ được quản lý duy nhất tại `do_POST()` trước khi gọi `handle()`.
+  3. Mọi tin nhắn gõ trên Search Bot giờ đây được xử lý 100% chính xác và phản hồi siêu tốc ngay lập tức.
 
 ---
 
