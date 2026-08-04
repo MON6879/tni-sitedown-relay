@@ -1,11 +1,6 @@
 name: Daily Plan Report (Report 5.1)
 
 on:
-  schedule:
-    # 02:05 UTC = 08:35 Myanmar (Morning Plan)
-    # 11:00 UTC = 17:30 Myanmar (EOD Plan)
-    # 14:00 UTC = 20:30 Myanmar (Evening Update)
-    - cron: '5 2,11,14 * * *'
   workflow_dispatch:
     inputs:
       mode:

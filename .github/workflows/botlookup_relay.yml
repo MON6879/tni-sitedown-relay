@@ -1,9 +1,6 @@
 name: Botlookup Relay (Site Down)
 
 on:
-  schedule:
-    # Run every 20 minutes between 03:30 and 22:30 Myanmar Time (21:00 to 16:00 UTC)
-    - cron: '*/20 * * * *'
   workflow_dispatch:          # Manual trigger button
 
 jobs:

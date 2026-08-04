@@ -1,16 +1,6 @@
 name: Daily Note Read Report (Report 6)
 
 on:
-  schedule:
-    # 03:00 UTC = 09:30 Myanmar
-    # 07:30 UTC = 14:00 Myanmar
-    # 09:40 UTC = 16:10 Myanmar (+10m)
-    # 12:15 UTC = 18:45 Myanmar
-    # 14:30 UTC = 21:00 Myanmar
-    - cron: '0 3 * * *'
-    - cron: '30 7,14 * * *'
-    - cron: '40 9 * * *'
-    - cron: '15 12 * * *'
   workflow_dispatch:          # Nút chạy tay
 
 jobs:
