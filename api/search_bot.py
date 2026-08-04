@@ -186,6 +186,26 @@ DAILY_FIELDS_DEFAULT = [
 # ── Telegram API helper ───────────────────────────────────────────────────────
 TG_API = f"https://api.telegram.org/bot{TOKEN}"
 
+BOT_COMMANDS = [
+    {"command": "mysite", "description": "View your personal site stats"},
+    {"command": "mycable", "description": "View your personal cable stats"},
+    {"command": "mydia", "description": "View your personal DIA stats"},
+    {"command": "myolt", "description": "View your personal OLT stats"},
+    {"command": "mysn", "description": "View your personal SN stats"},
+    {"command": "mydata", "description": "View all your personal stats"},
+    {"command": "daily", "description": "Get Daily Report template"},
+    {"command": "plan", "description": "Get Daily Plan template"},
+    {"command": "help", "description": "Show full help menu"}
+]
+
+def setup_bot_menu_commands():
+    if not TOKEN:
+        return
+    try:
+        requests.post(f"{TG_API}/setMyCommands", json={"commands": BOT_COMMANDS}, timeout=10)
+    except Exception as e:
+        logger.error(f"setup_bot_menu_commands error: {e}")
+
 def tg_send(chat_id: int, text: str, parse_mode: str = "HTML", reply_markup: dict | None = None) -> None:
     """Gửi tin nhắn Telegram, tự chia chunk nếu > 4096 ký tự."""
     chunks = split_messages(text)
@@ -1468,9 +1488,11 @@ class handler(BaseHTTPRequestHandler):
                         "drop_pending_updates": True
                     }, timeout=10).json()
                 r3 = requests.get(f"{TG_API}/getWebhookInfo", timeout=10).json()
+                setup_bot_menu_commands()
                 result = {
                     "delete": r1,
                     "set": r2, 
+                    "menu": "updated",
                     "info": r3.get("result", {}),
                     "version": BOT_VERSION
                 }
