@@ -96,14 +96,15 @@ def normalize_date_str(s: str) -> str:
 
 def is_daily_plan_msg(text: str) -> bool:
     """
-    Nhận dạng tin plan linh hoạt, LOẠI BỎ tuyệt đối các bản tin Mẫu Bot / Báo cáo tự động:
+    Nhận dạng tin plan linh hoạt, LOẠI BỎ tuyệt đối các bản tin Báo cáo tự động / Mẫu hướng dẫn copy:
     """
     if not text:
         return False
     text_l = text.lower()
     # 🛑 LOẠI BỎ TẤT CẢ CÁC BẢN TIN MẪU CỦA BOT HOẶC BÁO CÁO TỰ ĐỘNG
+    # KHÔNG loại bỏ "daily plan template" hay "note: /find /tnixxxx" vì Đội trưởng copy nguyên mẫu
     if any(kw in text_l for kw in (
-        "daily plan template", "copy → edit", "copy -> edit", "note: /find /tnixxxx",
+        "copy → edit → send back", "copy -> edit -> send back",
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
@@ -113,7 +114,7 @@ def is_daily_plan_msg(text: str) -> bool:
 
     lines = [line.strip().lower() for line in text.split("\n") if line.strip()]
     first_few_lines = " ".join(lines[:3]) if lines else ""
-    has_plan_word = "plan" in first_few_lines
+    has_plan_word = "plan" in first_few_lines or "daily plan" in text_l
     has_date = bool(re.search(r'\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}', text))
     return has_plan_word and has_date
 
@@ -129,9 +130,11 @@ def parse_daily_plan(text: str) -> dict | None:
     if not lines:
         return None
 
-    # Extract date: tìm ngày trong toàn bộ tin (hỗ trợ cả / và .)
+    # Extract date: Ưu tiên tìm theo 'Daily Plan:' hoặc 'Plan for', sau đó mới tìm bất kỳ ngày nào
     date_str = ""
-    date_match = re.search(r'(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text)
+    date_match = re.search(r'(?:daily\s*plan|plan\s*for)[:\s]+(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text, re.IGNORECASE)
+    if not date_match:
+        date_match = re.search(r'(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text)
     if date_match:
         date_str = normalize_date_str(date_match.group(1))
     else:
