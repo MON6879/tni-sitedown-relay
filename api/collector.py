@@ -1072,32 +1072,9 @@ async def handle(data: dict):
             return
 
 
-        # ── Daily Plan → store to Team leader assign Plan sheet ─────────
+        # ── Daily Plan → Handled exclusively by Search Bot (@SEARCHTNITASKWOBOT) ──
         if is_daily_plan(text):
-            date_str, team_str, content = parse_plan_fields(text)
-            if date_str and team_str:
-                result = post_sheet({
-                    "action":      "store_daily_plan",
-                    "date":        date_str,
-                    "team":        team_str,
-                    "content":     content or text,
-                    "daily_report": "",
-                    "comparison":  "",
-                })
-                status = result.get("status", "")
-                if status == "ok":
-                    ref = result.get("ref", "?")
-                    dup = result.get("duplicate", False)
-                    icon = "⏭️" if dup else "📋"
-                    await bot.send_message(
-                        chat_id,
-                        f"{icon} Plan {'updated' if dup else 'saved'}"
-                        f" — REF:{ref} | {team_str} | {date_str}",
-                    )
-                else:
-                    err = html.escape(result.get("message", "unknown")[:80])
-                    await bot.send_message(chat_id, f"⚠️ Plan save failed: {err}", parse_mode="HTML")
-                return
+            return
 
         # ── Collector commands ─────────────────────────────────────────────
         if is_collector_msg(text):

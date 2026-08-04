@@ -455,21 +455,18 @@ function handleStoreDailyPlan(body) {
         const exDate = parseDateToDDMMYYYY_(exDateRaw);
         const exTeam = exTeamRaw.replace(/team\s*0?/i, "Team ").trim();
         if (exDate === date && exTeam.toLowerCase() === teamNorm.toLowerCase()) {
-          // Update existing row E and F with latest data
-          if (report)     sheet.getRange(i + 2, 5).setValue(report);
-          if (comparison) sheet.getRange(i + 2, 6).setValue(comparison);
-          // Also update plan content (col D): nếu đã có plan cũ, NỐI THÊM NỘI DUNG MỚI (Append) cả hai để so sánh
-          if (content) {
-            const existingPlan = sheet.getRange(i + 2, 4).getValue().toString().trim();
-            if (existingPlan && existingPlan.indexOf(content) === -1) {
-              sheet.getRange(i + 2, 4).setValue(existingPlan + "\n\n" + content);
-            } else if (!existingPlan) {
-              sheet.getRange(i + 2, 4).setValue(content);
-            }
+          const rowIdx = i + 2;
+          const refVal = sheet.getRange(rowIdx, 1).getValue();
+          if (report)     sheet.getRange(rowIdx, 5).setValue(report);
+          if (comparison) sheet.getRange(rowIdx, 6).setValue(comparison);
+          if (content)    sheet.getRange(rowIdx, 4).setValue(content);
+          sheet.getRange(rowIdx, 2).setValue(date);
+
+          // Sắp xếp lại toàn bộ bảng: Mới nhất luôn ở TRÊN CÙNG (REF giảm dần)
+          if (sheet.getLastRow() >= 2) {
+            sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).sort({ column: 1, ascending: false });
           }
-          // Normalize the stored date to DD/MM/YYYY format
-          sheet.getRange(i + 2, 2).setValue(date);
-          return jsonOut({ status: "ok", message: "Updated existing", ref: sheet.getRange(i + 2, 1).getValue(), duplicate: true });
+          return jsonOut({ status: "ok", message: "Updated existing", ref: refVal, duplicate: true });
         }
       }
     }
@@ -490,8 +487,12 @@ function handleStoreDailyPlan(body) {
 
     // Chèn dòng mới tại dòng 2 (newest first)
     sheet.insertRowBefore(2);
-    // Store normalized DD/MM/YYYY date for consistent future dedup
     sheet.getRange(2, 1, 1, 6).setValues([[ref, date, team, content, report, comparison]]);
+
+    // Sắp xếp lại toàn bộ bảng: Mới nhất luôn ở TRÊN CÙNG (REF giảm dần)
+    if (sheet.getLastRow() >= 2) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).sort({ column: 1, ascending: false });
+    }
 
     return jsonOut({ status: "ok", ref: ref });
   } catch (err) {
