@@ -962,9 +962,11 @@ def send_help_menu(chat_id: int) -> None:
     tg_send(chat_id,
         "👋 <b>TNI Search Bot</b>\n\n"
         "• Lookup Task/WO: Type <code>TNI0001</code> or <code>/tni TNI0001</code>\n"
+        "• Lookup Info: Type <code>info TNI0001</code>\n"
+        "• Lookup Clear Site: Type <code>CLEAR TNI0001</code>\n"
         "• Lookup Not Close: Type <code>t1notclose</code>, <code>t2notclose</code>...\n"
         "• Lookup Wait CD: Type <code>t1waitcd</code>, <code>t2waitcd</code>...\n"
-        "• Personal Lookup: Type <code>mysite</code>, <code>mycable</code>, <code>mydata</code>...\n"
+        "• Personal Lookup: <code>mysite</code>, <code>mycable</code>, <code>mydia</code>, <code>myolt</code>, <code>mysn</code>, <code>mydata</code>\n"
         "• Get Report Templates: Type <code>/daily</code> or <code>/plan</code>",
         parse_mode="HTML")
 
