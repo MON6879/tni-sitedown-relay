@@ -1215,14 +1215,14 @@ def handle(update: dict) -> None:
 
     # Map reply keyboard button labels to actual commands
     text_l = text.lower().strip()
-    if "plan" in text_l and "📋" in text:
-        if "t1" in text_l or "1" in text_l:
+    if not is_daily_plan(text) and "plan" in text_l and "📋" in text and len(text.splitlines()) <= 2:
+        if re.search(r'\bt1\b|\bteam\s*1\b', text_l):
             text = "/plan T1"
-        elif "t2" in text_l or "2" in text_l:
+        elif re.search(r'\bt2\b|\bteam\s*2\b', text_l):
             text = "/plan T2"
-        elif "t3" in text_l or "3" in text_l:
+        elif re.search(r'\bt3\b|\bteam\s*3\b', text_l):
             text = "/plan T3"
-        elif "t4" in text_l or "4" in text_l:
+        elif re.search(r'\bt4\b|\bteam\s*4\b', text_l):
             text = "/plan T4"
         else:
             text = "/plan"
