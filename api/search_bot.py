@@ -972,6 +972,81 @@ def get_plan_template_text(team_num: int) -> str:
         logger.error(f"get_plan_template_text error: {e}")
         return f"Error: {str(e)}"
 
+def is_daily_plan(text: str) -> bool:
+    """Detect plan message: text has 'plan' and date d/m/yyyy, excluding bot auto reports."""
+    if not text:
+        return False
+    text_l = text.lower()
+    if any(kw in text_l for kw in (
+        "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
+        "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
+        "shows detailed site assignments", "tasks grouped by department", "recent plans",
+        "plans for "
+    )):
+        return False
+
+    has_plan = "plan" in text_l
+    has_date = bool(re.search(r'\b\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}\b', text))
+    return has_plan and has_date
+
+
+def parse_plan_fields(text: str) -> tuple:
+    """Extract (date, team, content) from plan message."""
+    lines = text.strip().split("\n")
+    date_str = ""
+    date_m = re.search(r'(?:daily\s*plan|plan\s*for)[:\s]+(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text, re.IGNORECASE)
+    if not date_m:
+        date_m = re.search(r'(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text)
+    if date_m:
+        raw_d = date_m.group(1)
+        parts = re.split(r'[\/\.]', raw_d)
+        if len(parts) == 3:
+            d, m, y = parts
+            if len(y) == 2:
+                y = "20" + y
+            date_str = f"{int(d):02d}/{int(m):02d}/{y}"
+    if not date_str:
+        now_mm = datetime.now(TZ_MM)
+        date_str = now_mm.strftime("%d/%m/%Y")
+
+    team_str = ""
+    team_m = re.search(r'Team\s*0?([1-5])', text, re.IGNORECASE)
+    if team_m:
+        team_str = f"Team {team_m.group(1)}"
+
+    team_line_idx = 0
+    for i, line in enumerate(lines[1:], 1):
+        if re.match(r'^\s*Team\s*0?[1-5]\s*$', line.strip(), re.IGNORECASE):
+            team_line_idx = i
+            break
+    start_idx = max(1, team_line_idx + 1 if team_line_idx > 0 else 1)
+    content_lines = []
+    for i in range(start_idx, len(lines)):
+        line = lines[i].strip()
+        if not content_lines and not line:
+            continue
+        content_lines.append(lines[i])
+    content = "\n".join(content_lines).strip()
+    return date_str, team_str, content
+
+
+def store_daily_plan_to_sheet(date_str: str, team_str: str, content: str) -> dict:
+    url = DAILY_APPS_SCRIPT_URL or APPS_SCRIPT_URL or "https://script.google.com/macros/s/AKfycbzGFdnESGcSMt0Of7PrBIOHDXmuLCZsiraGv5iNzWrw4rjdxm8CGBDuVIP8pnPEkAULww/exec"
+    try:
+        r = requests.post(url, json={
+            "action": "store_daily_plan",
+            "date": date_str,
+            "team": team_str,
+            "content": content,
+            "daily_report": "",
+            "comparison": ""
+        }, timeout=25)
+        return r.json()
+    except Exception as e:
+        logger.error(f"store_daily_plan_to_sheet error: {e}")
+        return {}
+
+
 _recent_plan_sends = {}
 
 def send_daily_plan_template(chat_id: int, team_num: int) -> None:
@@ -1275,6 +1350,23 @@ def handle(update: dict) -> None:
     if is_daily(text):
         submit_daily(chat_id, user_id, first_name, text)
         return
+
+    # ── REALTIME DAILY PLAN COLLECTION ──────────────────────────────────────
+    if is_daily_plan(text):
+        date_str, team_str, content = parse_plan_fields(text)
+        if date_str and team_str:
+            logger.info(f"Storing daily plan from Search Bot: {date_str} {team_str}")
+            res = store_daily_plan_to_sheet(date_str, team_str, content or text)
+            if res.get("status") in ("ok", "duplicate"):
+                ref = res.get("ref", "?")
+                dup = res.get("duplicate", False)
+                icon = "⏭️" if dup else "📋"
+                msg_reply = f"{icon} <b>Plan {'updated' if dup else 'saved'}</b> — REF:<b>{ref}</b> | {team_str} | {date_str}"
+                tg_send(chat_id, msg_reply)
+            else:
+                err = html.escape(str(res.get("message", "unknown"))[:80])
+                tg_send(chat_id, f"⚠️ Plan save failed: {err}")
+            return
 
     # ── STAFF PERSONAL LOOKUP: "mysite" / "mycable" / ... hoặc range "Q1:U1" ──
     text_low = text.lower().strip()
