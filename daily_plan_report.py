@@ -96,15 +96,17 @@ def normalize_date_str(s: str) -> str:
 
 def is_daily_plan_msg(text: str) -> bool:
     """
-    Nhận dạng tin plan linh hoạt, LOẠI BỎ tuyệt đối các bản tin Báo cáo tự động / Mẫu hướng dẫn copy:
+    Nhận dạng tin plan linh hoạt từ Team Leader / User:
+    - Có chứa 'Daily Plan:' hoặc 'Plan for' hoặc chữ 'plan' đi cùng ngày tháng (DD/MM/YYYY hoặc D/M/YYYY)
+    - CHỈ loại bỏ các bản tin Báo cáo tự động do Bot phát ra (Auto Report, Daily Result, Plan vs Actual, EOD Summary...)
     """
     if not text:
         return False
     text_l = text.lower()
-    # 🛑 LOẠI BỎ TẤT CẢ CÁC BẢN TIN MẪU CỦA BOT HOẶC BÁO CÁO TỰ ĐỘNG
-    # KHÔNG loại bỏ "daily plan template" hay "note: /find /tnixxxx" vì Đội trưởng copy nguyên mẫu
+
+    # 🛑 CHỈ LOẠI BỎ CÁC BẢN TIN BÁO CÁO TỰ ĐỘNG DO BOT PHÁT RA
+    # KHÔNG loại bỏ "daily plan template", "copy → edit", "note: /find" vì người dùng copy/forward nguyên mẫu
     if any(kw in text_l for kw in (
-        "copy → edit → send back", "copy -> edit -> send back",
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
@@ -112,10 +114,8 @@ def is_daily_plan_msg(text: str) -> bool:
     )):
         return False
 
-    lines = [line.strip().lower() for line in text.split("\n") if line.strip()]
-    first_few_lines = " ".join(lines[:3]) if lines else ""
-    has_plan_word = "plan" in first_few_lines or "daily plan" in text_l
-    has_date = bool(re.search(r'\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}', text))
+    has_plan_word = "plan" in text_l
+    has_date = bool(re.search(r'\b\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}\b', text))
     return has_plan_word and has_date
 
 
