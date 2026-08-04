@@ -1419,7 +1419,18 @@ class handler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"status": "ok"}).encode("utf-8"))
                     return
 
-            # 2. Xử lý handle(data) TRƯỚC KHI phát 200 OK để Vercel không đóng băng Lambda tiến trình
+            # 2. Trả về 200 OK Ngay Lập Tức cho Telegram để không bao giờ bị Telegram Hủy/Xóa Webhook do Timeout
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+            try:
+                self.wfile.flush()
+            except Exception:
+                pass
+
+            # 3. Xử lý logic tra cứu handle(data)
             try:
                 handle(data)
             except Exception as ex:
@@ -1433,13 +1444,6 @@ class handler(BaseHTTPRequestHandler):
                         tg_send(chat_id, f"⚠️ <b>Error:</b>\n<pre>{html.escape(tb[:2000])}</pre>")
                 except Exception:
                     pass
-
-            # 3. Trả về 200 OK SAU KHI handle(data) hoàn tất 100%
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.end_headers()
-            self.wfile.write(b'{"ok":true}')
 
         except Exception as ex:
             logger.error(f"Webhook POST parse error: {ex}")
