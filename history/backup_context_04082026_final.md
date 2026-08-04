@@ -1,22 +1,18 @@
-# 📌 System Snapshot Backup — 04/08/2026 (SEARCH BOT REALTIME DAILY PLAN COLLECTION FULL FIX)
+# 📌 System Snapshot Backup — 04/08/2026 (TELEGRAM MENU SCOPE FULL SYNCHRONIZATION)
 
-> **Lưu trữ cấu hình toàn bộ hệ thống TNI Bot - Tích hợp thu thập & Phản hồi Daily Plan trực tiếp trong Search Bot (`api/search_bot.py`).**
+> **Lưu trữ cấu hình toàn bộ hệ thống TNI Bot - Nạp đồng bộ trọn bộ 17 lệnh cho TẤT CẢ các Scope (Private Chat & Group Chat).**
 
 ---
 
 ## ⚡ PHÁT HIỆN NGUYÊN NHÂN CỐT LÕI & GIẢI PHÁP TRIỆT ĐỂ 100%
 
-- **Phát hiện nguyên nhân vì sao trong các nhóm Telegram (`TNI TEAM 1`..`TNI TEAM 4`) Bot không thu thập & không phản hồi**:
-  1. Trong các nhóm Telegram của 4 Team, con Bot hoạt động chính nhận tin nhắn từ Telegram Webhook chính là **Search Bot (`@SEARCHTNITASKWOBOT`)**.
-  2. Trước đó, mã nguồn `api/search_bot.py` **chưa được tích hợp bộ xử lý `is_daily_plan()` và `store_daily_plan_to_sheet()`**.
-  3. Do đó, khi Đội trưởng/Thành viên đăng tin nhắn `Daily Plan: DD/MM/YYYY` vào nhóm, `api/search_bot.py` nhận được request nhưng không có hàm xử lý Daily Plan nên bỏ qua ngầm ➔ Dẫn tới không lưu vào Google Sheet và không nhắn lại câu phản hồi!
+- **Phát hiện nguyên nhân vì sao trong Chat Riêng tư (Private Chat) giao diện Telegram chưa hiện 4 lệnh `/mycable`, `/mydia`, `/myolt`, `/mysn`**:
+  1. Telegram Bot API quản lý menu lệnh theo từng phân vùng đối tượng (Scope): `default`, `all_private_chats`, `all_group_chats`.
+  2. Trước đó, menu cũ từng được đăng ký riêng cho Scope `all_private_chats`. Do đó khi người dùng mở Chat Riêng tư (Private Chat như trong ảnh 1 & 2), Telegram Desktop ưu tiên hiển thị menu của `all_private_chats` cũ mà không nạp menu `default` mới.
 
 - **Đã khắc phục triệt để**:
-  1. Tích hợp trực tiếp bộ ba hàm `is_daily_plan()`, `parse_plan_fields()`, `store_daily_plan_to_sheet()` vào `api/search_bot.py`.
-  2. Mỗi khi bất kỳ Đội trưởng/Thành viên nào gửi tin nhắn Plan vào nhóm, Search Bot lập tức:
-     - Trích xuất chính xác Ngày & Đội (`04/08/2026`, `Team 3`).
-     - Gọi Apps Script lưu trực tiếp vào tab `Team leader assign Plan` trên Google Sheet.
-     - Phát tin nhắn phản hồi ngay tại nhóm: `📋 Plan saved — REF:DP-xxx | Team X | DD/MM/YYYY`.
+  1. Cưỡng chế xóa toàn bộ menu cũ trên tất cả các Scope (`default`, `all_private_chats`, `all_group_chats`, `all_chat_administrators`).
+  2. Nạp đồng bộ trọn bộ 17 lệnh chuẩn (`mysite`, `mycable`, `mydia`, `myolt`, `mysn`, `mydata`, `t1notclose`..`t4notclose`, `t1waitcd`..`t4waitcd`, `daily`, `plan`, `help`) lên TẤT CẢ các Scope `all_private_chats`, `all_group_chats` và `default`.
 
 ---
 
