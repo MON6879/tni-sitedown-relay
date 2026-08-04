@@ -1,29 +1,15 @@
-# 📌 System Snapshot Backup — 04/08/2026 (COMPLETE TELEGRAM COMMANDS MENU CONFIGURATION)
+# 📌 System Snapshot Backup — 04/08/2026 (TELEGRAM MENU CACHE INVALIDATION)
 
-> **Lưu trữ cấu hình toàn bộ hệ thống TNI Bot - Nạp trọn bộ 17 lệnh chuẩn vào Nút Menu giao diện Telegram (`setMyCommands`).**
+> **Lưu trữ cấu hình toàn bộ hệ thống TNI Bot - Xóa bộ nhớ đệm cũ & Nạp mới trọn bộ 17 lệnh lên Nút Menu Telegram.**
 
 ---
 
-## 📌 Bổ Sung Trọn Bộ 17 Lệnh Vào Nút Menu Telegram (`setMyCommands`)
-- **Tùy chọn quy chuẩn giới hạn Telegram**: Telegram Bot API hỗ trợ tối đa tới **100 lệnh** trong Nút Menu UI (`setMyCommands`).
-- **Đã gán cứng trọn bộ 17 lệnh chính thức vào Nút Menu Telegram**:
-  1. `/mysite` — View your personal site stats
-  2. `/mycable` — View your personal cable stats
-  3. `/mydia` — View your personal DIA stats
-  4. `/myolt` — View your personal OLT stats
-  5. `/mysn` — View your personal SN stats
-  6. `/mydata` — View all your personal stats
-  7. `/t1notclose` — Team 1 Dawei - Not Close sites
-  8. `/t2notclose` — Team 2 Myeik - Not Close sites
-  9. `/t3notclose` — Team 3 Bokpyin - Not Close sites
-  10. `/t4notclose` — Team 4 Kawthoung - Not Close sites
-  11. `/t1waitcd` — Team 1 Dawei - Wait CD sites
-  12. `/t2waitcd` — Team 2 Myeik - Wait CD sites
-  13. `/t3waitcd` — Team 3 Bokpyin - Wait CD sites
-  14. `/t4waitcd` — Team 4 Kawthoung - Wait CD sites
-  15. `/daily` — Get Daily Report template
-  16. `/plan` — Get Daily Plan template
-  17. `/help` — Show full help menu
+## ⚡ XÓA CACHE MENU CŨ & NẠP TRỌN BỘ 17 LỆNH NÚT MENU TELEGRAM (`deleteMyCommands` + `setMyCommands`)
+- **Phát hiện nguyên nhân Telegram Desktop chưa hiển thị lệnh mới**:
+  - Telegram Desktop ứng dụng máy tính lưu bộ nhớ đệm (cache) danh sách lệnh cũ. Nếu chỉ gọi `setMyCommands`, ứng dụng Telegram Desktop chưa chịu làm mới UI ngay.
+- **Khắc phục triệt để**:
+  1. Thêm lệnh `deleteMyCommands` với `scope: {"type": "default"}` để cưỡng chế xóa bỏ hoàn toàn bộ nhớ đệm lệnh cũ trên ứng dụng Telegram Desktop / Mobile.
+  2. Nạp mới toàn bộ 17 lệnh chuẩn (`mysite`, `mycable`, `mydia`, `myolt`, `mysn`, `mydata`, `t1notclose`..`t4notclose`, `t1waitcd`..`t4waitcd`, `daily`, `plan`, `help`).
 
 ---
 

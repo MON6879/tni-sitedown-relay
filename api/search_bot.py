@@ -217,7 +217,11 @@ def setup_bot_menu_commands():
     if not TOKEN:
         return
     try:
-        requests.post(f"{TG_API}/setMyCommands", json={"commands": BOT_COMMANDS}, timeout=10)
+        # Xóa cache menu cũ trên Telegram UI
+        requests.post(f"{TG_API}/deleteMyCommands", json={"scope": {"type": "default"}}, timeout=10)
+        # Nạp lại toàn bộ 17 lệnh chuẩn vào Nút Menu
+        r = requests.post(f"{TG_API}/setMyCommands", json={"commands": BOT_COMMANDS, "scope": {"type": "default"}}, timeout=10)
+        logger.info(f"setup_bot_menu_commands result: {r.status_code} {r.text[:100]}")
     except Exception as e:
         logger.error(f"setup_bot_menu_commands error: {e}")
 
