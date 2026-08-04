@@ -1508,6 +1508,16 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"template": template_text}).encode("utf-8"))
             return
 
+        if TOKEN and not action:
+            try:
+                requests.post(
+                    f"https://api.telegram.org/bot{TOKEN}/setWebhook",
+                    json={"url": "https://tni-bot.vercel.app/api/search_bot", "allowed_updates": ["message", "edited_message", "channel_post"]},
+                    timeout=5
+                )
+            except Exception:
+                pass
+
         tok_ok  = "SET" if TOKEN else "MISSING"
         gas_ok  = "SET" if DAILY_APPS_SCRIPT_URL else "MISSING"
         log_val = APPS_SCRIPT_URL if APPS_SCRIPT_URL else "MISSING"
