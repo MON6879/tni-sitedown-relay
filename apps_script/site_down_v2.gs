@@ -58,7 +58,9 @@ const TEAM_COLORS = { T1: "🟠", T2: "🔵", T3: "🟢", T4: "🟡" };
 // WEB APP — doPost() (Xử lý dán Cột A — CHỈ GỌI LUỒNG COL C)
 // ============================================================
 function doPost(e) {
+  const lock = LockService.getScriptLock();
   try {
+    lock.tryLock(8000);
     const data = JSON.parse(e.postData.contents);
 
     if (data.update_id !== undefined && !data.action) {
@@ -93,8 +95,7 @@ function doPost(e) {
       if (relayTs > 0) props.setProperty("SD_LAST_RELAY_TS", relayTs.toString());
 
       SpreadsheetApp.flush();
-      Utilities.sleep(1500);
-      SpreadsheetApp.flush();
+      Utilities.sleep(300);
 
       // ✅ CHỈ CHẠY LUỒNG A1 / COL C (Không đụng chạm gì tới Luồng AW7)
       var sentColC = false;
@@ -287,7 +288,7 @@ function processSiteDownColC(sheet) {
   const colC = sheet.getRange(1, 3, lastRow, 1).getValues().flat().map(v => (v || "").toString().trim());
 
   function isTeamSummaryLine(l) {
-    return /Team\s+[1-4]\s*:\s*Total\s+Site\s+down/i.test(l);
+    return /Team\s*0?[1-4][\s\—\-]*:\s*Total\s+Site\s+down/i.test(l);
   }
 
   // Gửi nhóm CONTROL
