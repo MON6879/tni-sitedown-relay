@@ -187,12 +187,27 @@ DAILY_FIELDS_DEFAULT = [
 TG_API = f"https://api.telegram.org/bot{TOKEN}"
 
 BOT_COMMANDS = [
+    # Personal Lookups
     {"command": "mysite", "description": "View your personal site stats"},
     {"command": "mycable", "description": "View your personal cable stats"},
     {"command": "mydia", "description": "View your personal DIA stats"},
     {"command": "myolt", "description": "View your personal OLT stats"},
     {"command": "mysn", "description": "View your personal SN stats"},
     {"command": "mydata", "description": "View all your personal stats"},
+
+    # Not Close Lookups (T1 - T4)
+    {"command": "t1notclose", "description": "Team 1 Dawei - Not Close sites"},
+    {"command": "t2notclose", "description": "Team 2 Myeik - Not Close sites"},
+    {"command": "t3notclose", "description": "Team 3 Bokpyin - Not Close sites"},
+    {"command": "t4notclose", "description": "Team 4 Kawthoung - Not Close sites"},
+
+    # Wait CD Lookups (T1 - T4)
+    {"command": "t1waitcd", "description": "Team 1 Dawei - Wait CD sites"},
+    {"command": "t2waitcd", "description": "Team 2 Myeik - Wait CD sites"},
+    {"command": "t3waitcd", "description": "Team 3 Bokpyin - Wait CD sites"},
+    {"command": "t4waitcd", "description": "Team 4 Kawthoung - Wait CD sites"},
+
+    # Templates & System
     {"command": "daily", "description": "Get Daily Report template"},
     {"command": "plan", "description": "Get Daily Plan template"},
     {"command": "help", "description": "Show full help menu"}
