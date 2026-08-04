@@ -773,6 +773,10 @@ async def handle(data: dict):
 
         msg         = update.message
         user        = msg.from_user
+        if not user or user.is_bot:
+            logger.info("Ignoring message from bot or missing user")
+            return
+
         chat_id     = msg.chat_id
         now         = datetime.now(TZ_MM)          # Myanmar time for all groups
         sender_name = (user.full_name if user else "") or ""
@@ -1160,16 +1164,22 @@ def ensure_collector_webhook_active() -> None:
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
-            ensure_collector_webhook_active()
             length = int(self.headers.get("Content-Length", 0))
             data   = json.loads(self.rfile.read(length))
+            
+            # Trả 200 OK Ngay Lập Tức cho Telegram để không bị Telegram Hủy/Xóa Webhook
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b"OK")
+            try:
+                self.wfile.flush()
+            except Exception:
+                pass
+
             asyncio.run(handle(data))
         except Exception as e:
             logger.error(f"Webhook error: {e}")
-        finally:
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"OK")
 
     def do_GET(self):
         from urllib.parse import urlparse, parse_qs

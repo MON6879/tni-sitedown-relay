@@ -1,23 +1,21 @@
-# 📌 System Snapshot Backup — 04/08/2026 (TELEGRAM MENU CACHE INVALIDATION)
+# 📌 System Snapshot Backup — 04/08/2026 (HUMAN USER ONLY COLLECTION STRICT RULE)
 
-> **Lưu trữ cấu hình toàn bộ hệ thống TNI Bot - Xóa bộ nhớ đệm cũ & Nạp mới trọn bộ 17 lệnh lên Nút Menu Telegram.**
+> **Lưu trữ cấu hình toàn bộ hệ thống TNI Bot - Bắt buộc chỉ thu thập Plan từ Tài khoản Cá nhân (Người dùng thật), Bỏ qua 100% tất cả các Chat Bot.**
 
 ---
 
-## ⚡ XÓA CACHE MENU CŨ & NẠP TRỌN BỘ 17 LỆNH NÚT MENU TELEGRAM (`deleteMyCommands` + `setMyCommands`)
-- **Phát hiện nguyên nhân Telegram Desktop chưa hiển thị lệnh mới**:
-  - Telegram Desktop ứng dụng máy tính lưu bộ nhớ đệm (cache) danh sách lệnh cũ. Nếu chỉ gọi `setMyCommands`, ứng dụng Telegram Desktop chưa chịu làm mới UI ngay.
-- **Khắc phục triệt để**:
-  1. Thêm lệnh `deleteMyCommands` với `scope: {"type": "default"}` để cưỡng chế xóa bỏ hoàn toàn bộ nhớ đệm lệnh cũ trên ứng dụng Telegram Desktop / Mobile.
-  2. Nạp mới toàn bộ 17 lệnh chuẩn (`mysite`, `mycable`, `mydia`, `myolt`, `mysn`, `mydata`, `t1notclose`..`t4notclose`, `t1waitcd`..`t4waitcd`, `daily`, `plan`, `help`).
+## ⚡ CHẶN TẤT CẢ CÁC CHAT BOT & CHỈ THU THẬP TỪ NGƯỜI DÙNG THẬT (`api/collector.py`)
+- **Quy tắc tuyệt đối**:
+  1. Kiểm tra đối tượng người gửi `msg.from_user`. Nếu `not user` hoặc `user.is_bot == True` (tin nhắn do bất kỳ Chat Bot nào phát ra) ➔ **Bỏ qua ngầm 100%, không thu thập hay ghi vào Google Sheet**.
+  2. Chỉ khi tin nhắn do **Tài khoản Cá nhân / Đội trưởng (Người dùng thật)** gửi trong nhóm ➔ Collector Bot mới tiến hành thu thập, trích xuất Ngày/Team, lưu vào Google Sheet và phát thông báo phản hồi: `📋 Plan saved — REF:DP-xxx | Team X | DD/MM/YYYY`.
 
 ---
 
 ## ⚡ ĐỒNG BỘ MÃ NGUỒN VÀ REPOSITORY
 - **Hồ sơ file đã cập nhật**:
+  * `Task and WO/api/collector.py`
   * `Task and WO/api/search_bot.py`
   * `Task and WO/apps_script/site_down_v2.gs`
   * `Task and WO/tni_site_down_repo/site_down_v2.gs`
-  * `Task and WO/api/collector.py`
   * `Task and WO/daily_plan_report.py`
   * `tni-sitedown/daily_plan_report.py`
