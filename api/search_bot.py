@@ -969,7 +969,7 @@ def get_plan_template_text(team_num: int) -> str:
         return f"Error: {str(e)}"
 
 def is_daily_plan(text: str) -> bool:
-    """Detect plan message: text has 'plan' and date d/m/yyyy, excluding bot auto reports."""
+    """Detect plan message: text has 'plan'/'kế hoạch' and date, excluding bot auto reports."""
     if not text:
         return False
     text_l = text.lower()
@@ -981,34 +981,58 @@ def is_daily_plan(text: str) -> bool:
     )):
         return False
 
-    has_plan = "plan" in text_l
-    has_date = bool(re.search(r'\b\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}\b', text))
+    has_plan = "plan" in text_l or "kế hoạch" in text_l
+    has_date = bool(re.search(r'\b\d{1,2}[\/\.-]\d{1,2}(?:[\/\.-]\d{2,4})?\b', text))
     return has_plan and has_date
 
 
-def parse_plan_fields(text: str) -> tuple:
-    """Extract (date, team, content) from plan message."""
+def parse_plan_fields(text: str, chat_id: int | None = None, chat_title: str | None = None) -> tuple:
+    """Extract (date, team, content) from plan message, with fallback to chat ID/title for team inference."""
     lines = text.strip().split("\n")
     date_str = ""
-    date_m = re.search(r'(?:daily\s*plan|plan\s*for)[:\s]+(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text, re.IGNORECASE)
+    date_m = re.search(r'(?:daily\s*plan|plan\s*for)[:\s]+(\d{1,2}[\/\.-]\d{1,2}(?:[\/\.-]\d{2,4})?)', text, re.IGNORECASE)
     if not date_m:
-        date_m = re.search(r'(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text)
+        date_m = re.search(r'(\d{1,2}[\/\.-]\d{1,2}(?:[\/\.-]\d{2,4})?)', text)
     if date_m:
         raw_d = date_m.group(1)
-        parts = re.split(r'[\/\.]', raw_d)
+        parts = re.split(r'[\/\.-]', raw_d)
+        now_mm = datetime.now(TZ_MM)
         if len(parts) == 3:
             d, m, y = parts
             if len(y) == 2:
                 y = "20" + y
             date_str = f"{int(d):02d}/{int(m):02d}/{y}"
+        elif len(parts) == 2:
+            d, m = parts
+            date_str = f"{int(d):02d}/{int(m):02d}/{now_mm.year}"
     if not date_str:
         now_mm = datetime.now(TZ_MM)
         date_str = now_mm.strftime("%d/%m/%Y")
 
     team_str = ""
-    team_m = re.search(r'Team\s*0?([1-5])', text, re.IGNORECASE)
+    team_m = re.search(r'\bTeam\s*0?([1-5])\b', text, re.IGNORECASE)
+    if not team_m:
+        team_m = re.search(r'\bT([1-5])\b', text, re.IGNORECASE)
     if team_m:
         team_str = f"Team {team_m.group(1)}"
+
+    # Fallback to chat_title or chat_id if team is not explicitly written in text
+    if not team_str and chat_title:
+        title_m = re.search(r'TEAM\s*0?([1-5])', chat_title, re.IGNORECASE)
+        if title_m:
+            team_str = f"Team {title_m.group(1)}"
+    if not team_str and chat_id:
+        TELEGRAM_GROUPS = {
+            "Team 1": -1004215695747,
+            "Team 2": -1004480845549,
+            "Team 3": -1004369170658,
+            "Team 4": -1004293741999,
+        }
+        def norm_id(cid): return str(cid).replace("-100", "").replace("-", "")
+        for tname, gid in TELEGRAM_GROUPS.items():
+            if norm_id(chat_id) == norm_id(gid):
+                team_str = tname
+                break
 
     team_line_idx = 0
     for i, line in enumerate(lines[1:], 1):
@@ -1044,6 +1068,7 @@ def store_daily_plan_to_sheet(date_str: str, team_str: str, content: str) -> dic
 
 
 _recent_plan_sends = {}
+_recent_plan_msg_hashes = {}
 
 def send_daily_plan_template(chat_id: int, team_num: int) -> None:
     now_ts = time.time()
@@ -1349,14 +1374,22 @@ def handle(update: dict) -> None:
 
     # ── REALTIME DAILY PLAN COLLECTION ──────────────────────────────────────
     if is_daily_plan(text):
-        date_str, team_str, content = parse_plan_fields(text)
+        now_ts = time.time()
+        msg_key = f"{chat_id}:{hash(text)}"
+        if (now_ts - _recent_plan_msg_hashes.get(msg_key, 0)) < 15.0:
+            logger.info(f"Skipping duplicate plan execution for key {msg_key}")
+            return
+        _recent_plan_msg_hashes[msg_key] = now_ts
+
+        chat_title = msg.get("chat", {}).get("title", "")
+        date_str, team_str, content = parse_plan_fields(text, chat_id, chat_title)
         if date_str and team_str:
             logger.info(f"Storing daily plan from Search Bot: {date_str} {team_str}")
             res = store_daily_plan_to_sheet(date_str, team_str, content or text)
             if res.get("status") in ("ok", "duplicate"):
                 ref = res.get("ref", "?")
                 dup = res.get("duplicate", False)
-                icon = "⏭️" if dup else "📋"
+                icon = "✅"
                 msg_reply = f"{icon} <b>Plan {'updated' if dup else 'saved'}</b> — REF:<b>{ref}</b> | {team_str} | {date_str}"
                 tg_send(chat_id, msg_reply)
             else:
