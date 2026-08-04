@@ -258,10 +258,9 @@ def is_daily_plan(text: str) -> bool:
     if not text:
         return False
     text_l = text.lower()
-    # 🛑 LOẠI BỎ CHỈ CÁC BẢN TIN TỰ ĐỘNG CỦA BOT HOẶC HƯỚNG DẪN COPY
-    # KHÔNG loại bỏ "daily plan template" hay "note: /find /tnixxxx" vì người dùng copy nguyên mẫu
+    # 🛑 CHỈ LOẠI BỎ CÁC BẢN TIN BÁO CÁO TỰ ĐỘNG DO BOT PHÁT RA
+    # KHÔNG loại bỏ "daily plan template", "copy → edit", "note: /find" vì người dùng copy/forward nguyên mẫu
     if any(kw in text_l for kw in (
-        "copy → edit → send back", "copy -> edit -> send back",
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
@@ -269,10 +268,8 @@ def is_daily_plan(text: str) -> bool:
     )):
         return False
 
-    lines = [line.strip().lower() for line in text.split("\n") if line.strip()]
-    first_few_lines = " ".join(lines[:3]) if lines else ""
-    has_plan = "plan" in first_few_lines or "daily plan" in text_l
-    has_date = bool(re.search(r'\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}', text))
+    has_plan = "plan" in text_l
+    has_date = bool(re.search(r'\b\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}\b', text))
     return has_plan and has_date
 
 
