@@ -181,8 +181,18 @@ def format_and_send_report(rows: list[str]) -> list[int]:
             # Escape HTML characters < >
             clean = line_clean.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-            # CHỈ CHO DUY NHẤT 'Team 1 request' xuống dòng mới nếu đứng sau văn bản header
-            clean = re.sub(r'([^\n])\s*(?:🔴|🔵|🟢|🟡|🟠)?\s*(Team\s*1\s*request)', r'\1\n\n🔴 \2', clean, flags=re.IGNORECASE)
+            # 1. Loại bỏ các dòng chỉ chứa đơn độc emoji chấm màu (🔴 🔵 🟢 🟡 🟠 🟣)
+            clean_lines = []
+            for l in clean.split('\n'):
+                l_strip = l.strip()
+                if l_strip in ["🔴", "🔵", "🟢", "🟡", "🟠", "🟣"]:
+                    continue
+                clean_lines.append(l)
+
+            clean = "\n".join(clean_lines).strip()
+
+            # 2. CHỈ CHO DUY NHẤT 'Team 1 request' xuống dòng mới bên dưới văn bản header
+            clean = re.sub(r'([^\n])\s*(?:🔴|🔵|🟢|🟡|🟠|🟣)?\s*(Team\s*1\s*request)', r'\1\n\n🔴 \2', clean, flags=re.IGNORECASE)
 
             # Đảm bảo dòng bắt đầu bằng Team 1 có chấm đỏ 🔴
             if re.search(r'^Team\s*1\b', clean, re.IGNORECASE) and not clean.startswith("🔴"):
