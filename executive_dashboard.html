@@ -829,7 +829,8 @@
           <div class="row-detail"><span>M&E Tasks:</span><strong>TL:0 /35 P:0</strong></div>
         </div>
 
-        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 1 Engineer Roster & Performance</h4>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 1 Engineer Roster & Performance (Sorted by % Completion High to Low)</h4>
+        <!-- Team 1 Table -->
         <table class="data-table">
           <thead>
             <tr>
@@ -854,6 +855,12 @@
             <tr><td>8</td><td><code>myt_aungkyaw.latt</code></td><td>0</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>1</td><td>1</td></tr>
           </tbody>
         </table>
+
+        <div style="margin-top:1rem; background:rgba(239, 68, 68, 0.08); border:1px solid rgba(239, 68, 68, 0.2); border-radius:10px; padding:0.75rem 1rem; font-size:0.85rem; color:#fca5a5; display:flex; align-items:center; gap:0.6rem;">
+          <i class="fa-solid fa-user-slash" style="color:var(--rose); font-size:1.1rem;"></i>
+          <span><strong>Resigned Accounts (Need delete in system):</strong> <code>myt_nyi.nyi23</code>, <code>myt_thura.aung</code></span>
+        </div>
+
       </div>
     </div>
   </div>
@@ -891,7 +898,7 @@
           <div class="row-detail"><span>Corrective Maintenance (CM):</span><strong>TL:0 /22 P:0</strong></div>
           <div class="row-detail"><span>M&E Tasks:</span><strong>TL:0 /30 P:0</strong></div>
         </div>
-        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 2 Engineer Roster & Performance</h4>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 2 Engineer Roster & Performance (Sorted by % Completion High to Low)</h4>
         <table class="data-table">
           <thead>
             <tr>
@@ -914,6 +921,11 @@
             <tr><td>6</td><td><code>myt_myo.min</code></td><td>4</td><td><strong style="color:var(--amber);">13%</strong></td><td>1</td><td>0</td><td>8</td><td>9</td></tr>
           </tbody>
         </table>
+
+        <div style="margin-top:1rem; background:rgba(239, 68, 68, 0.08); border:1px solid rgba(239, 68, 68, 0.2); border-radius:10px; padding:0.75rem 1rem; font-size:0.85rem; color:#fca5a5; display:flex; align-items:center; gap:0.6rem;">
+          <i class="fa-solid fa-user-slash" style="color:var(--rose); font-size:1.1rem;"></i>
+          <span><strong>Resigned Accounts (Need delete in system):</strong> <code>myt_naymyo.thu</code>, <code>myt_soe.lwin</code>, <code>myt_phyo.hein</code>, <code>myt_tun.tun</code>, <code>myt_hlaing.win</code></span>
+        </div>
       </div>
     </div>
   </div>
@@ -951,7 +963,7 @@
           <div class="row-detail"><span>Corrective Maintenance (CM):</span><strong>TL:0 /10 P:0</strong></div>
           <div class="row-detail"><span>M&E Tasks:</span><strong>TL:0 /12 P:0</strong></div>
         </div>
-        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 3 Engineer Roster & Performance</h4>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 3 Engineer Roster & Performance (Sorted by % Completion High to Low)</h4>
         <table class="data-table">
           <thead>
             <tr>
@@ -1009,7 +1021,7 @@
           <div class="row-detail"><span>Corrective Maintenance (CM):</span><strong>TL:0 /14 P:0</strong></div>
           <div class="row-detail"><span>M&E Tasks:</span><strong>TL:0 /15 P:0</strong></div>
         </div>
-        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 4 Engineer Roster & Performance</h4>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 4 Engineer Roster & Performance (Sorted by % Completion High to Low)</h4>
         <table class="data-table">
           <thead>
             <tr>
@@ -1148,32 +1160,31 @@
             utter.lang = 'en-US';
           }
         } else {
-          utter.lang = 'en-US';
-          utter.text = "TNI Operations Briefing for Myanmar Region: Total 693 Work Orders assigned. Team 4 Kawthoung rank 1 with 54 percent completion. Team 1 Dawei 325 Work Orders.";
+          utter.lang = selectedLang;
+          let matched = availableVoices.find(v => v.lang.startsWith(selectedLang.split('-')[0]));
+          if (matched) utter.voice = matched;
         }
-      } else {
-        utter.lang = selectedLang;
-        let matchedVoice = availableVoices.find(v => v.lang.startsWith(selectedLang.split('-')[0]));
-        if (matchedVoice) utter.voice = matchedVoice;
+
+        utter.onend = () => {
+          sentenceIndex++;
+          speakSentence();
+        };
+
+        utter.onerror = () => {
+          sentenceIndex++;
+          speakSentence();
+        };
+
+        synth.speak(utter);
       }
 
-      utter.rate = 0.92;
+      isSpeaking = true;
+      playBtn.classList.add('speaking');
+      voiceIcon.className = "fa-solid fa-circle-pause";
+      voiceText.textContent = "Stop AI Voice";
 
-      utter.onstart = () => {
-        isSpeaking = true;
-        playBtn.classList.add('speaking');
-        voiceIcon.className = "fa-solid fa-circle-pause";
-        voiceText.textContent = "Stop AI Voice";
-      };
-
-      utter.onend = utter.onerror = () => {
-        isSpeaking = false;
-        playBtn.classList.remove('speaking');
-        voiceIcon.className = "fa-solid fa-volume-high";
-        voiceText.textContent = "AI Audio Briefing";
-      };
-
-      synth.speak(utter);
+      synth.cancel(); // Clear any ongoing speech
+      speakSentence();
     }
 
     window.addEventListener('DOMContentLoaded', () => {
