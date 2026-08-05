@@ -506,9 +506,28 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(b"OK")
 
     def do_GET(self):
+        try:
+            path = self.path.lower().split("?")[0]
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            target_file = "executive_dashboard.html" if "executive" in path or "dashboard" in path else "index.html"
+            file_path = os.path.join(base_dir, target_file)
+            
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read().encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+                return
+        except Exception as e:
+            logger.error(f"do_GET serve html error: {e}")
+
         self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
         self.end_headers()
-        self.wfile.write(b"TNI Bot OK")
+        self.wfile.write(b"TNI BI Platform OK")
 
     def log_message(self, *a):
         pass
