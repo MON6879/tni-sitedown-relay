@@ -399,17 +399,31 @@ def get_wos(tni: str) -> list:
     return wos
 
 def lookup_tni(tni: str) -> str:
-    """Tra cứu TNIxxxx từ cột H (nội dung gộp sẵn) trong sheet Tên Sum WO."""
+    """Tra cứu TNIxxxx từ cột H (nội dung gộp sẵn) trong sheet Tên Sum WO + thông tin Site Info."""
     def e(s): return html.escape(str(s))
     tni_upper = tni.upper()
+
+    # Lấy thông tin chi tiết Site (nếu có)
+    site_info_str = ""
+    try:
+        load_all_sheets()
+        s_info = get_site_info(tni_upper)
+        if s_info:
+            site_info_str = f"\n📌 <i>{e(s_info)}</i>\n"
+    except Exception as s_ex:
+        logger.warning(f"lookup_tni site_info fetch warning: {s_ex}")
 
     try:
         df = fetch_csv(GID_TEAM_SUM)
     except Exception as ex:
         logger.error(f"lookup_tni fetch error: {ex}")
+        if site_info_str:
+            return f"🔍 <b>{e(tni_upper)}</b>\n{site_info_str}━━━━━━━━━━━━━━━━━━━━\n❌ Error loading Task/WO data: {e(str(ex)[:80])}\n━━━━━━━━━━━━━━━━━━━━"
         return f"❌ Error loading data: {e(str(ex)[:80])}"
 
     if df is None or df.empty:
+        if site_info_str:
+            return f"🔍 <b>{e(tni_upper)}</b>\n{site_info_str}━━━━━━━━━━━━━━━━━━━━\n❌ No Task/WO data available.\n━━━━━━━━━━━━━━━━━━━━"
         return "❌ No data available."
 
     # Tìm row có cột B (index 1) = TNI code
@@ -423,7 +437,10 @@ def lookup_tni(tni: str) -> str:
 
         # Hiển thị nguyên nội dung cột H
         clean = col_h.strip().lstrip("~ ").strip()
-        return f"🔍 <b>{e(tni_upper)}</b>\n━━━━━━━━━━━━━━━━━━━━\n{e(clean)}\n━━━━━━━━━━━━━━━━━━━━"
+        return f"🔍 <b>{e(tni_upper)}</b>\n{site_info_str}━━━━━━━━━━━━━━━━━━━━\n{e(clean)}\n━━━━━━━━━━━━━━━━━━━━"
+
+    if site_info_str:
+        return f"🔍 <b>{e(tni_upper)}</b>\n{site_info_str}━━━━━━━━━━━━━━━━━━━━\n❌ No Task & WO found.\n━━━━━━━━━━━━━━━━━━━━"
 
     return f"❌ No data found for <b>{e(tni_upper)}</b>"
 
@@ -773,30 +790,41 @@ def lookup_waitcd(team_code: str) -> list[str]:
 
 # ── Info lookup (Site/Cable/Gpon/DIA) ─────────────────────────────────────
 def get_info(tni: str) -> dict | None:
-    """Tìm TNI trong sheet gid=171059303, trả về Site/Cable/Gpon/DIA."""
+    """Tìm TNI trong sheet GID_INFO (171059303) và GID_SITE (1095689918), trả về Site/Cable/Gpon/DIA."""
     try:
-        df = fetch_csv(GID_INFO)
-        if df is None or df.empty:
-            return None
         tni_upper = tni.upper().strip()
-        rows = df.iloc[1:] if len(df) > 1 else df
-        for _, row in rows.iterrows():
-            col_a = safe(row, 0).upper().strip()
-            if not col_a:
-                continue
-            code_part = col_a.split(":")[0].strip()
-            if code_part == tni_upper or col_a == tni_upper or col_a.startswith(tni_upper):
-                site_val  = safe(row, 1)
-                cable_val = safe(row, 2)
-                gpon_val  = safe(row, 3)
-                dia_val   = safe(row, 4)
-                if any([site_val, cable_val, gpon_val, dia_val]):
-                    return {
-                        "site":  site_val,
-                        "cable": cable_val,
-                        "gpon":  gpon_val,
-                        "dia":   dia_val,
-                    }
+        result = {}
+
+        # 1. Tìm trong GID_INFO
+        try:
+            df_info = fetch_csv(GID_INFO)
+            if df_info is not None and not df_info.empty:
+                rows = df_info.iloc[1:] if len(df_info) > 1 else df_info
+                for _, row in rows.iterrows():
+                    col_a = safe(row, 0).upper().strip()
+                    if not col_a:
+                        continue
+                    code_part = col_a.split(":")[0].strip()
+                    if code_part == tni_upper or col_a == tni_upper or col_a.startswith(tni_upper):
+                        result["site"]  = safe(row, 1)
+                        result["cable"] = safe(row, 2)
+                        result["gpon"]  = safe(row, 3)
+                        result["dia"]   = safe(row, 4)
+                        break
+        except Exception as e_info:
+            logger.warning(f"get_info GID_INFO fetch warning: {e_info}")
+
+        # 2. Nếu chưa có site info, lấy từ get_site_info (GID_SITE)
+        try:
+            load_all_sheets()
+            s_info = get_site_info(tni_upper)
+            if s_info and not result.get("site"):
+                result["site"] = s_info
+        except Exception as e_site:
+            logger.warning(f"get_info get_site_info warning: {e_site}")
+
+        if any(result.values()):
+            return result
         return None
     except Exception as ex:
         logger.error(f"get_info error: {ex}")
@@ -1505,8 +1533,9 @@ def handle(update: dict) -> None:
                 for chunk in split_messages(reply):
                     tg_send(chat_id, chunk)
             else:
-                # Không tìm thấy trong GID_INFO → CHỈ báo không tìm thấy, KHÔNG fallback sang Task/WO
-                tg_send(chat_id, f"❌ <b>Info: {html.escape(tni)}</b> — not found in Site Info sheet.\n💡 Type <b>{html.escape(tni)}</b> (without 'Info:') to lookup Task & WO.")
+                # Nếu không có thông tin nâng cao trong GID_INFO → Tự động gọi tra cứu Task & WO (lookup_tni)
+                res_tni = lookup_tni(tni)
+                tg_send(chat_id, res_tni)
         except Exception as err:
             logger.error(f"Info error [{tni}]: {err}")
             tg_send(chat_id, f"❌ Lookup error: {html.escape(str(err))}")
