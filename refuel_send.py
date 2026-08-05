@@ -163,18 +163,24 @@ def format_and_send_report(rows: list[str]) -> list[int]:
                 msg_lines.append("")
                 continue
 
-            # Loại bỏ ký tự hỏng mã hóa ở đầu nếu có và ép hiển thị đúng emoji chấm màu
-            clean = re.sub(r'^[^\w\s🔴🔵🟢🟡]+', '', line_clean).strip()
             # Escape HTML characters < >
-            clean = clean.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            if re.search(r'Team\s*1\b', clean, re.IGNORECASE) and not clean.startswith("🔴"):
-                clean = "🔴 " + re.sub(r'^(?:🔴|ð\s*\')?\s*', '', clean)
-            elif re.search(r'Team\s*2\b', clean, re.IGNORECASE) and not clean.startswith("🔵"):
-                clean = "🔵 " + re.sub(r'^(?:🔵|ðµ)?\s*', '', clean)
-            elif re.search(r'Team\s*3\b', clean, re.IGNORECASE) and not clean.startswith("🟢"):
-                clean = "🟢 " + re.sub(r'^(?:🟢|ð¢)?\s*', '', clean)
-            elif re.search(r'Team\s*4\b', clean, re.IGNORECASE) and not clean.startswith("🟡"):
-                clean = "🟡 " + re.sub(r'^(?:🟡|ð¡)?\s*', '', clean)
+            clean = line_clean.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+            # Đẩy 'Team X request' xuống dòng mới nếu đứng sau văn bản header
+            clean = re.sub(r'([^\n])\s*(?:🔴|🔵|🟢|🟡|🟠)?\s*(Team\s*1\s*request)', r'\1\n\n🔴 \2', clean, flags=re.IGNORECASE)
+            clean = re.sub(r'([^\n])\s*(?:🔴|🔵|🟢|🟡|🟠)?\s*(Team\s*2\s*request)', r'\1\n\n🔵 \2', clean, flags=re.IGNORECASE)
+            clean = re.sub(r'([^\n])\s*(?:🔴|🔵|🟢|🟡|🟠)?\s*(Team\s*3\s*request)', r'\1\n\n🟢 \2', clean, flags=re.IGNORECASE)
+            clean = re.sub(r'([^\n])\s*(?:🔴|🔵|🟢|🟡|🟠)?\s*(Team\s*4\s*request)', r'\1\n\n🟡 \2', clean, flags=re.IGNORECASE)
+
+            # Ép emoji màu cho dòng bắt đầu bằng Team 1/2/3/4 nếu chưa có
+            if re.search(r'^Team\s*1\b', clean, re.IGNORECASE) and not clean.startswith("🔴"):
+                clean = "🔴 " + clean
+            elif re.search(r'^Team\s*2\b', clean, re.IGNORECASE) and not clean.startswith("🔵"):
+                clean = "🔵 " + clean
+            elif re.search(r'^Team\s*3\b', clean, re.IGNORECASE) and not clean.startswith("🟢"):
+                clean = "🟢 " + clean
+            elif re.search(r'^Team\s*4\b', clean, re.IGNORECASE) and not clean.startswith("🟡"):
+                clean = "🟡 " + clean
 
             msg_lines.append(clean)
             msg_lines.append("")  # Dòng trống giữa các Team
