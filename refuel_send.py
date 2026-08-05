@@ -148,8 +148,23 @@ def parse_sites_from_row(line_text: str) -> list[tuple[str, str]]:
     return sites
 
 
+def delete_refuel_msg(chat_id: str, msg_id: int | str):
+    """Xóa tin nhắn cũ bằng REFUEL_BOT_TOKEN."""
+    if not msg_id:
+        return
+    try:
+        url = f"https://api.telegram.org/bot{REFUEL_BOT_TOKEN}/deleteMessage"
+        requests.post(
+            url,
+            json={"chat_id": chat_id, "message_id": int(msg_id)},
+            timeout=15
+        )
+    except Exception as e:
+        print(f"⚠️ delete_refuel_msg error: {e}", file=sys.stderr)
+
+
 def format_and_send_report(rows: list[str]) -> list[int]:
-    """Gửi nguyên văn nội dung các ô Y2:Y5 (đã có sẵn chấm màu 🔴 🔵 🟢 🟡) giữ đúng mẫu ngắn gọn."""
+    """Gửi nguyên văn nội dung các ô Y2:Y5 giữ đúng mẫu ngắn gọn (tự động xóa tin cũ trước khi gửi tin mới)."""
     now = datetime.now(TZ_MM)
     date_str = now.strftime("%d/%m/%Y")
     time_str = now.strftime("%H:%M")
@@ -166,21 +181,12 @@ def format_and_send_report(rows: list[str]) -> list[int]:
             # Escape HTML characters < >
             clean = line_clean.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-            # Đẩy 'Team X request' xuống dòng mới nếu đứng sau văn bản header
+            # CHỈ CHO DUY NHẤT 'Team 1 request' xuống dòng mới nếu đứng sau văn bản header
             clean = re.sub(r'([^\n])\s*(?:🔴|🔵|🟢|🟡|🟠)?\s*(Team\s*1\s*request)', r'\1\n\n🔴 \2', clean, flags=re.IGNORECASE)
-            clean = re.sub(r'([^\n])\s*(?:🔴|🔵|🟢|🟡|🟠)?\s*(Team\s*2\s*request)', r'\1\n\n🔵 \2', clean, flags=re.IGNORECASE)
-            clean = re.sub(r'([^\n])\s*(?:🔴|🔵|🟢|🟡|🟠)?\s*(Team\s*3\s*request)', r'\1\n\n🟢 \2', clean, flags=re.IGNORECASE)
-            clean = re.sub(r'([^\n])\s*(?:🔴|🔵|🟢|🟡|🟠)?\s*(Team\s*4\s*request)', r'\1\n\n🟡 \2', clean, flags=re.IGNORECASE)
 
-            # Ép emoji màu cho dòng bắt đầu bằng Team 1/2/3/4 nếu chưa có
+            # Đảm bảo dòng bắt đầu bằng Team 1 có chấm đỏ 🔴
             if re.search(r'^Team\s*1\b', clean, re.IGNORECASE) and not clean.startswith("🔴"):
                 clean = "🔴 " + clean
-            elif re.search(r'^Team\s*2\b', clean, re.IGNORECASE) and not clean.startswith("🔵"):
-                clean = "🔵 " + clean
-            elif re.search(r'^Team\s*3\b', clean, re.IGNORECASE) and not clean.startswith("🟢"):
-                clean = "🟢 " + clean
-            elif re.search(r'^Team\s*4\b', clean, re.IGNORECASE) and not clean.startswith("🟡"):
-                clean = "🟡 " + clean
 
             msg_lines.append(clean)
             msg_lines.append("")  # Dòng trống giữa các Team
@@ -189,7 +195,7 @@ def format_and_send_report(rows: list[str]) -> list[int]:
         msg_lines.append("📭 No refuel requests today.")
         msg_lines.append("")
         
-    # 3. Chia nhỏ dòng thô thành các phần an toàn (< 3800 ký tự)
+    # Chia nhỏ dòng thô thành các phần an toàn (< 3800 ký tự)
     chunks = []
     current_chunk = []
     current_len = 0
@@ -207,13 +213,16 @@ def format_and_send_report(rows: list[str]) -> list[int]:
         chunks.append(current_chunk)
         
     sent_ids = []
-    STATE_KEY = f"refuel_daily_{REFUEL_CHAT_ID}"
+    STATE_KEY = f"refuel_msg_ids_{REFUEL_CHAT_ID}"
 
-    # Xóa tin cũ trước khi gửi mới
+    # 1. XÓA TẤT CẢ TIN CỦ ĐÃ GỬI TRƯỚC ĐÓ BẰNG REFUEL_BOT_TOKEN
+    old_ids_str = get_msg_id(STATE_KEY)
+    if old_ids_str:
+        for old_id in str(old_ids_str).split(","):
+            if old_id.strip():
+                delete_refuel_msg(REFUEL_CHAT_ID, old_id.strip())
+
     tg_delete_by_title(REFUEL_CHAT_ID, "⛽ TNI REQUEST REFUEL")
-    old_id = get_msg_id(STATE_KEY)
-    if old_id:
-        tg_delete(REFUEL_CHAT_ID, old_id)
 
     for idx, chunk_lines in enumerate(chunks):
         title = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>"
@@ -238,9 +247,10 @@ def format_and_send_report(rows: list[str]) -> list[int]:
         ok, msg_id = send_telegram(REFUEL_CHAT_ID, msg)
         if ok and msg_id:
             sent_ids.append(msg_id)
-            # Lưu ID tin mới nhất để lần sau xóa
-            if idx == 0:
-                set_msg_id(STATE_KEY, msg_id)
+
+    # 2. LƯU ID CÁC TIN VỪA GỬI MỚI ĐỂ LẦN SAU XÓA TẠO CƠ CHẾ SẠCH SẼ
+    if sent_ids:
+        set_msg_id(STATE_KEY, ",".join(map(str, sent_ids)))
 
     return sent_ids
 
