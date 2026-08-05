@@ -258,13 +258,12 @@ def is_daily_plan(text: str) -> bool:
     if not text:
         return False
     text_l = text.lower()
-    # 🛑 CHỈ LOẠI BỎ CÁC BẢN TIN BÁO CÁO TỰ ĐỘNG DO BOT PHÁT RA
-    # KHÔNG loại bỏ "daily plan template", "copy → edit", "note: /find" vì người dùng copy/forward nguyên mẫu
     if any(kw in text_l for kw in (
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
-        "plans for "
+        "plans for ", "tni personal find task", "ft result daily", "personal find task",
+        "find task + wo", "list name ft"
     )):
         return False
 

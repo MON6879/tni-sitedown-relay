@@ -977,7 +977,9 @@ def is_daily_plan(text: str) -> bool:
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
-        "plans for ", "plan updated", "plan saved", "ref:", "ref:dp-", "đã lưu"
+        "plans for ", "plan updated", "plan saved", "ref:", "ref:dp-", "đã lưu",
+        "tni personal find task", "ft result daily", "personal find task", "find task + wo",
+        "list name ft"
     )):
         return False
 
@@ -1393,8 +1395,8 @@ def handle(update: dict) -> None:
                 msg_reply = f"{icon} <b>Plan {'updated' if dup else 'saved'}</b> — REF:<b>{ref}</b> | {team_str} | {date_str}"
                 tg_send(chat_id, msg_reply)
             else:
-                err = html.escape(str(res.get("message", "unknown"))[:80])
-                tg_send(chat_id, f"⚠️ Plan save failed: {err}")
+                err = str(res.get("message", "unknown"))[:80]
+                logger.warning(f"Plan save skipped/failed for chat {chat_id}: {err}")
             return
 
     # ── STAFF PERSONAL LOOKUP: "mysite" / "mycable" / ... hoặc range "Q1:U1" ──
