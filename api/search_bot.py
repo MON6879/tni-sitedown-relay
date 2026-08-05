@@ -399,31 +399,17 @@ def get_wos(tni: str) -> list:
     return wos
 
 def lookup_tni(tni: str) -> str:
-    """Tra cứu TNIxxxx từ cột H (nội dung gộp sẵn) trong sheet Tên Sum WO + thông tin Site Info."""
+    """Tra cứu TNIxxxx từ cột H (nội dung gộp sẵn) trong sheet Tên Sum WO."""
     def e(s): return html.escape(str(s))
-    tni_upper = tni.upper()
-
-    # Lấy thông tin chi tiết Site (nếu có)
-    site_info_str = ""
-    try:
-        load_all_sheets()
-        s_info = get_site_info(tni_upper)
-        if s_info:
-            site_info_str = f"\n📌 <i>{e(s_info)}</i>\n"
-    except Exception as s_ex:
-        logger.warning(f"lookup_tni site_info fetch warning: {s_ex}")
+    tni_upper = tni.upper().strip()
 
     try:
         df = fetch_csv(GID_TEAM_SUM)
     except Exception as ex:
         logger.error(f"lookup_tni fetch error: {ex}")
-        if site_info_str:
-            return f"🔍 <b>{e(tni_upper)}</b>\n{site_info_str}━━━━━━━━━━━━━━━━━━━━\n❌ Error loading Task/WO data: {e(str(ex)[:80])}\n━━━━━━━━━━━━━━━━━━━━"
         return f"❌ Error loading data: {e(str(ex)[:80])}"
 
     if df is None or df.empty:
-        if site_info_str:
-            return f"🔍 <b>{e(tni_upper)}</b>\n{site_info_str}━━━━━━━━━━━━━━━━━━━━\n❌ No Task/WO data available.\n━━━━━━━━━━━━━━━━━━━━"
         return "❌ No data available."
 
     # Tìm row có cột B (index 1) = TNI code
@@ -437,10 +423,7 @@ def lookup_tni(tni: str) -> str:
 
         # Hiển thị nguyên nội dung cột H
         clean = col_h.strip().lstrip("~ ").strip()
-        return f"🔍 <b>{e(tni_upper)}</b>\n{site_info_str}━━━━━━━━━━━━━━━━━━━━\n{e(clean)}\n━━━━━━━━━━━━━━━━━━━━"
-
-    if site_info_str:
-        return f"🔍 <b>{e(tni_upper)}</b>\n{site_info_str}━━━━━━━━━━━━━━━━━━━━\n❌ No Task & WO found.\n━━━━━━━━━━━━━━━━━━━━"
+        return f"🔍 <b>{e(tni_upper)}</b>\n━━━━━━━━━━━━━━━━━━━━\n{e(clean)}\n━━━━━━━━━━━━━━━━━━━━"
 
     return f"❌ No data found for <b>{e(tni_upper)}</b>"
 
