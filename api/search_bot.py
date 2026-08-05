@@ -48,21 +48,32 @@ def fetch_csv(gid: str) -> pd.DataFrame:
     now = time.time()
     if gid in _csv_cache and (now - _csv_cache_ts.get(gid, 0)) < CSV_CACHE_TTL:
         return _csv_cache[gid]
-    try:
-        url  = BASE_URL + gid
-        hdrs = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(url, headers=hdrs, timeout=8, allow_redirects=True)
-        resp.raise_for_status()
-        content = resp.content.decode("utf-8", errors="replace")
-        df = pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
-        _csv_cache[gid] = df
-        _csv_cache_ts[gid] = now
-        return df
-    except Exception as e:
-        logger.error(f"fetch_csv error [gid={gid}]: {e}")
-        if gid in _csv_cache:
-            return _csv_cache[gid]
-        raise e
+    
+    url  = BASE_URL + gid
+    hdrs = {"User-Agent": "Mozilla/5.0"}
+    last_err = None
+
+    # Tự động thử lại 3 lần nếu Google Sheet bị nghẽn mạng hoặc timeout
+    for attempt in range(1, 4):
+        try:
+            resp = requests.get(url, headers=hdrs, timeout=10, allow_redirects=True)
+            resp.raise_for_status()
+            content = resp.content.decode("utf-8", errors="replace")
+            df = pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
+            _csv_cache[gid] = df
+            _csv_cache_ts[gid] = now
+            return df
+        except Exception as e:
+            last_err = e
+            logger.warning(f"fetch_csv attempt {attempt}/3 error [gid={gid}]: {e}")
+            if attempt < 3:
+                time.sleep(1.0)
+    
+    # Fallback: nếu sau 3 lần thử lại vẫn lỗi -> lấy dữ liệu cache cũ (nếu có)
+    if gid in _csv_cache:
+        logger.warning(f"fetch_csv falling back to stale cache for [gid={gid}]")
+        return _csv_cache[gid]
+    raise last_err
 
 def get_site_access_template(site_id: str = "TNI0401", date_str: str = None) -> str:
     if not site_id or site_id.startswith("/"):
@@ -246,21 +257,28 @@ def tg_send(chat_id: int, text: str, parse_mode: str = "HTML", reply_markup: dic
         }
         if markup:
             payload["reply_markup"] = markup
-        try:
-            r = requests.post(
-                f"{TG_API}/sendMessage",
-                json=payload,
-                timeout=10,
-            )
-            if r.status_code != 200:
-                logger.error(f"tg_send API error: {r.status_code} {r.text[:200]}")
-                # Fallback: nếu lỗi HTML parse entity -> tự động gửi dạng plain text để không bị mất tin!
+        # Tự động thử lại 3 lần nếu phát tin nhắn Telegram bị nghẽn mạng / timeout
+        for attempt in range(1, 4):
+            try:
+                r = requests.post(
+                    f"{TG_API}/sendMessage",
+                    json=payload,
+                    timeout=10,
+                )
+                if r.status_code == 200:
+                    break
+                logger.error(f"tg_send API attempt {attempt}/3 error: {r.status_code} {r.text[:200]}")
+                # Fallback: nếu lỗi HTML parse entity -> tự động gửi dạng plain text
                 if "can't parse entities" in r.text or "BAD_REQUEST" in r.text or "parse" in r.text.lower():
                     payload.pop("parse_mode", None)
                     payload["text"] = re.sub(r"<[^>]+>", "", chunk)
-                    requests.post(f"{TG_API}/sendMessage", json=payload, timeout=10)
-        except Exception as ex:
-            logger.error(f"tg_send error: {ex}")
+                    r2 = requests.post(f"{TG_API}/sendMessage", json=payload, timeout=10)
+                    if r2.status_code == 200:
+                        break
+            except Exception as ex:
+                logger.error(f"tg_send exception attempt {attempt}/3: {ex}")
+            if attempt < 3:
+                time.sleep(0.8)
 
 def tg_get_file(file_id: str) -> str | None:
     """Lấy file_path từ Telegram."""
