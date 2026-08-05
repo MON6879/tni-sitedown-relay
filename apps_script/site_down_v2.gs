@@ -299,10 +299,10 @@ function processSiteDownColC(sheet) {
       const rawSites = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !isTeamSummaryLine(l));
 
       const teamDefs = [
-        { key: "T1", regex: /Team\s*0?1\b|Dawei/i,     label: "🟠 Team 1 Dawei" },
-        { key: "T2", regex: /Team\s*0?2\b|Myeik/i,     label: "🔵 Team 2 Myeik" },
-        { key: "T3", regex: /Team\s*0?3\b|Bokpyin/i,   label: "🟢 Team 3 Bokpyin" },
-        { key: "T4", regex: /Team\s*0?4\b|Kawthoung/i, label: "🟡 Team 4 Kawthoung" },
+        { key: "T1", regex: /Team\s*0?1\b|Dawei|DW\b/i,                         label: "🟠 Team 1 Dawei" },
+        { key: "T2", regex: /Team\s*0?2\b|Myeik|MK\b/i,                         label: "🔵 Team 2 Myeik" },
+        { key: "T3", regex: /Team\s*0?3\b|Bokpyin|Bok\s*pyin|Bok\s*Pyin|BP\b/i,    label: "🟢 Team 3 Bokpyin" },
+        { key: "T4", regex: /Team\s*0?4\b|Kawthoung|KT\b/i,                      label: "🟡 Team 4 Kawthoung" },
       ];
 
       const teamBlocks = { T1: [], T2: [], T3: [], T4: [] };
