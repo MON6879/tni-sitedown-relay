@@ -272,14 +272,32 @@ async def get_all_members(client, chat_id: int, me_id: int) -> list[dict]:
 
 
 async def get_note_msgs_period(client, chat_id: int,
-                               since_utc: datetime) -> list:
+                              since_utc: datetime) -> list:
     """
     Get Note messages from ANY sender from since_utc until now.
+    Checks pinned message of group first, then scans history.
     Returns list of (msg, date_mm) tuples.
     """
     notes = []
+    seen_ids = set()
     try:
         peer = await client.get_input_entity(chat_id)
+
+        # 1. Check pinned message of group first
+        try:
+            full_chat = await client.get_entity(chat_id)
+            pinned_id = getattr(full_chat, 'pinned_msg_id', None)
+            if pinned_id:
+                p_msgs = await client.get_messages(peer, ids=[pinned_id])
+                if p_msgs and p_msgs[0] and p_msgs[0].message:
+                    p_msg = p_msgs[0]
+                    dt_mm = p_msg.date.astimezone(MYANMAR_TZ) if p_msg.date.tzinfo else p_msg.date.replace(tzinfo=timezone.utc).astimezone(MYANMAR_TZ)
+                    notes.append((p_msg, dt_mm))
+                    seen_ids.add(p_msg.id)
+        except Exception:
+            pass
+
+        # 2. Scan history messages
         history = await client(GetHistoryRequest(
             peer=peer, limit=200,
             offset_date=None, offset_id=0,
@@ -288,9 +306,12 @@ async def get_note_msgs_period(client, chat_id: int,
         for msg in history.messages:
             if msg.date < since_utc:
                 break
+            if msg.id in seen_ids:
+                continue
             if msg.message and is_note_msg(msg.message):
                 dt_mm = msg.date.astimezone(MYANMAR_TZ) if msg.date.tzinfo else msg.date.replace(tzinfo=timezone.utc).astimezone(MYANMAR_TZ)
                 notes.append((msg, dt_mm))
+                seen_ids.add(msg.id)
     except Exception as e:
         print(f"    ⚠️  get_note_msgs error: {e}")
     return notes
@@ -385,14 +406,14 @@ async def process_group(client, group_key: str, chat_id: int,
     d7_start = today_start - timedelta(days=7)
 
     def in_read_window(read_dt, day_start):
-        """Check if read_dt is between 04:00 and 23:59 Myanmar cutoff of that day."""
+        """Check if read_dt is after the message was sent and within active reporting window."""
         if read_dt is None:
             return True  # no timestamp → count anyway
         if read_dt.tzinfo is None:
             read_dt = read_dt.replace(tzinfo=timezone.utc)
         read_mm = read_dt.astimezone(MYANMAR_TZ)
-        start_time = day_start.replace(hour=4, minute=0, second=0, microsecond=0)
-        end_time = day_start.replace(hour=23, minute=59, second=59, microsecond=0)
+        start_time = day_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_time = (day_start + timedelta(days=2)).replace(hour=23, minute=59, second=59, microsecond=0)
         return start_time <= read_mm <= end_time
 
     today_note_msg = None

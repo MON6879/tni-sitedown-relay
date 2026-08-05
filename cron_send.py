@@ -1900,6 +1900,14 @@ async def main():
                 result, msg_ids = await send_msg(bot, cid, msg, f"{label} row{sheet_row}")
                 if result:
                     ok += 1
+                    # Tự động ghim (Pin Note) bản tin Report 4 khi phát vào nhóm Team
+                    if msg_ids and ("4. Report — Daily EOD Task" in msg or "4. Report —" in msg):
+                        try:
+                            await bot.pin_chat_message(chat_id=cid, message_id=msg_ids[0], disable_notification=True)
+                            logger.info(f"📌 Auto-pinned Report 4 as Note in group {cid} (msg_id: {msg_ids[0]})")
+                        except Exception as pin_err:
+                            logger.warning(f"⚠️ Could not auto-pin Report 4 in group {cid}: {pin_err}")
+
                     # Xác định GAS key từ label + chat_id
                     if label == "TECH_GROUP":
                         gas_key = "CRON_TECHDEP_CONTROL"
