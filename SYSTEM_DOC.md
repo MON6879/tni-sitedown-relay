@@ -197,10 +197,10 @@ Missing: TNI0052, TNI0185, TNI0058
 
 | Group | Chat ID | Content |
 |---|---|---|
-| **TNI TEAM 1** (Dawei) | `-5180992881` | Per-team task report |
-| **TNI TEAM 2** (Myeik, includes Team 5) | `-5188855349` | Per-team task report |
-| **TNI TEAM 3** (Bokpyin) | `-5183480727` | Per-team task report |
-| **TNI TEAM 4** (Kawthoung) | `-5238696719` | Per-team task report |
+| **TNI TEAM 1 PLAN - ALARM** (Dawei) | `-1004215695747` | Per-team task & plan report |
+| **TNI TEAM 2 PLAN - ALARM** (Myeik, includes Team 5) | `-1004480845549` | Per-team task & plan report |
+| **TNI TEAM 3 PLAN - ALARM** (Bokpyin) | `-1004369170658` | Per-team task & plan report |
+| **TNI TEAM 4 PLAN - ALARM** (Kawthoung) | `-1004293741999` | Per-team task & plan report |
 | **5 TNI TECHNICA DEP CONTROL SITE** | `-5251698940` | Consolidated reports |
 
 ---

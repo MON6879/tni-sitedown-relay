@@ -19,11 +19,11 @@ const SD_BOT_TOKEN = PropertiesService.getScriptProperties().getProperty("SD_BOT
 
 // ── Telegram Group Chat IDs ──────────────────────────────────
 const SD_GROUPS = {
-  T1:      "-1004215695747",  // TNI TEAM 1 (Dawei)
-  T2:      "-1004480845549",  // TNI TEAM 2 (Myeik + Team5)
-  T3:      "-1004369170658",  // TNI TEAM 3 (Bokpyin)
-  T4:      "-1004293741999",  // TNI TEAM 4 (Kawthoung)
-  CONTROL: "-5251698940",     // TNI TECHNICA DEP CONTROL SITE
+  T1:      "-1004215695747",  // TNI TEAM 1 PLAN - ALARM (Dawei)
+  T2:      "-1004480845549",  // TNI TEAM 2 PLAN - ALARM (Myeik + Team5)
+  T3:      "-1004369170658",  // TNI TEAM 3 PLAN - ALARM (Bokpyin)
+  T4:      "-1004293741999",  // TNI TEAM 4 PLAN - ALARM (Kawthoung)
+  CONTROL: "-5251698940",     // TNI TECHNICAL DEP CONTROL SITE
 };
 
 // ── Cá nhân nhận Tin 2 (DM) ────────────────────────────────
