@@ -147,31 +147,60 @@
       box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45);
     }
 
-    .status-pill {
+    /* AI Voice Control Widget */
+    .ai-voice-widget {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.75rem;
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(56, 189, 248, 0.3);
       padding: 0.45rem 0.9rem;
       border-radius: 20px;
-      background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      color: var(--emerald);
-      font-size: 0.75rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .lang-select {
+      background: rgba(15, 23, 42, 0.9);
+      color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 0.4rem 0.7rem;
+      border-radius: 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .voice-btn {
+      background: linear-gradient(135deg, var(--cyan), var(--indigo));
+      color: #fff;
+      border: none;
+      padding: 0.45rem 0.95rem;
+      border-radius: 12px;
+      font-size: 0.78rem;
       font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      transition: all 0.2s ease;
     }
 
-    .dot-pulse {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--emerald);
-      animation: pulseAnim 2s infinite;
+    .voice-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
     }
 
-    @keyframes pulseAnim {
-      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    .voice-btn.speaking {
+      background: linear-gradient(135deg, var(--rose), #DC2626);
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+      animation: pulseBtn 1.5s infinite;
+    }
+
+    @keyframes pulseBtn {
+      0% { opacity: 1; }
+      50% { opacity: 0.75; }
+      100% { opacity: 1; }
     }
 
     main {
@@ -345,9 +374,18 @@
       </button>
     </nav>
 
-    <div class="status-pill">
-      <span class="dot-pulse"></span>
-      REAL SHEET DATA: 531 WOs
+    <!-- AI Voice Control Bar -->
+    <div class="ai-voice-widget">
+      <select id="voiceLang" class="lang-select">
+        <option value="en-US">🇬🇧 English AI Voice</option>
+        <option value="vi-VN">🇻🇳 Tiếng Việt AI Voice</option>
+        <option value="my-MM">🇲🇲 မြန်မာစာ AI Voice</option>
+      </select>
+
+      <button id="playVoiceBtn" class="voice-btn" onclick="toggleAIVoice()">
+        <i id="voiceIcon" class="fa-solid fa-volume-high"></i>
+        <span id="voiceText">Listen AI Briefing</span>
+      </button>
     </div>
   </header>
 
@@ -576,6 +614,74 @@
       document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
       document.getElementById(panelId).classList.add('active');
       tabBtn.classList.add('active');
+    }
+
+    /* 🤖 AI VOICE SPEECH SYNTHESIS ENGINE */
+    let isSpeaking = false;
+    let synth = window.speechSynthesis;
+    let currentUtterance = null;
+
+    const BRIEFING_SCRIPTS = {
+      'en-US': "Welcome to TNI Global Operations Executive BI Report. As of August 5th, 2026, our total work order volume is 531 Work Orders across 4 regional teams and 29 field engineers. Team 1 Dawei manages 10 engineers with 185 Work Orders. Team 2 Myeik manages 11 engineers with 214 Work Orders. Team 3 Bokpyin manages 4 engineers with 68 Work Orders. Team 4 Kawthoung manages 4 engineers with 64 Work Orders. Overall system completion rate stands at 23 percent with 133 completed tasks.",
+      'vi-VN': "Chào mừng bạn đến với Báo cáo Tổng hợp Vận hành TNI BI. Tính đến ngày 5 tháng 8 năm 2026, toàn bộ hệ thống quản lý 531 Work Orders với 29 kỹ sư hiện trường chia làm 4 đội khu vực. Đội 1 Dawei quản lý 10 kỹ sư với 185 Work Orders. Đội 2 Myeik quản lý 11 kỹ sư với 214 Work Orders. Đội 3 Bokpyin quản lý 4 kỹ sư với 68 Work Orders. Đội 4 Kawthoung quản lý 4 kỹ sư với 64 Work Orders. Tỷ lệ hoàn thành toàn hệ thống đạt 23 phần trăm với 133 nhiệm vụ đã hoàn tất.",
+      'my-MM': "TNI လုပ်ငန်းဆောင်ရွက်မှု အစီရင်ခံစာမှ ကြိုဆိုပါသည်။ ၂၀၂၆ ခုနှစ် ဩဂုတ်လ ၅ ရက်နေ့အထိ၊ စုစုပေါင်း လုပ်ငန်းအမိန့် ၅၃၁ ခု နှင့် အင်ဂျင်နီယာ ၂၉ ဦး ရှိပါသည်။ အသင်း ၁ ထားဝယ်၊ အသင်း ၂ မြိတ်၊ အသင်း ၃ ဘုတ်ပြင်း၊ အသင်း ၄ ကော့သောင်း အသီးသီး ဆောင်ရွက်လျက်ရှိပါသည်။"
+    };
+
+    function toggleAIVoice() {
+      if (!synth) {
+        alert("Your browser does not support Speech Synthesis API.");
+        return;
+      }
+
+      const playBtn = document.getElementById('playVoiceBtn');
+      const voiceIcon = document.getElementById('voiceIcon');
+      const voiceText = document.getElementById('voiceText');
+      const selectedLang = document.getElementById('voiceLang').value;
+
+      if (isSpeaking) {
+        synth.cancel();
+        isSpeaking = false;
+        playBtn.classList.remove('speaking');
+        voiceIcon.className = "fa-solid fa-volume-high";
+        voiceText.textContent = "Listen AI Briefing";
+        return;
+      }
+
+      const scriptText = BRIEFING_SCRIPTS[selectedLang] || BRIEFING_SCRIPTS['en-US'];
+      currentUtterance = new SpeechSynthesisUtterance(scriptText);
+      currentUtterance.lang = selectedLang;
+      currentUtterance.rate = 0.95; // Speech speed
+      currentUtterance.pitch = 1.0;
+
+      // Select matching voice if available
+      const voices = synth.getVoices();
+      const matchingVoice = voices.find(v => v.lang.includes(selectedLang) || v.lang.startsWith(selectedLang.split('-')[0]));
+      if (matchingVoice) {
+        currentUtterance.voice = matchingVoice;
+      }
+
+      currentUtterance.onstart = () => {
+        isSpeaking = true;
+        playBtn.classList.add('speaking');
+        voiceIcon.className = "fa-solid fa-circle-pause";
+        voiceText.textContent = "Stop AI Voice";
+      };
+
+      currentUtterance.onend = () => {
+        isSpeaking = false;
+        playBtn.classList.remove('speaking');
+        voiceIcon.className = "fa-solid fa-volume-high";
+        voiceText.textContent = "Listen AI Briefing";
+      };
+
+      currentUtterance.onerror = () => {
+        isSpeaking = false;
+        playBtn.classList.remove('speaking');
+        voiceIcon.className = "fa-solid fa-volume-high";
+        voiceText.textContent = "Listen AI Briefing";
+      };
+
+      synth.speak(currentUtterance);
     }
 
     window.addEventListener('DOMContentLoaded', () => {
