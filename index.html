@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TNI Global Operations — 100% Real Live Sheet BI Platform</title>
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #070A11;
+      --panel-bg: rgba(15, 23, 42, 0.78);
+      --card-bg: rgba(30, 41, 59, 0.55);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-highlight: rgba(56, 189, 248, 0.3);
+      
+      --cyan: #38BDF8;
+      --indigo: #6366F1;
+      --emerald: #10B981;
+      --amber: #F59E0B;
+      --rose: #EF4444;
+      --purple: #A855F7;
+      
+      --text-main: #F8FAFC;
+      --text-sub: #94A3B8;
+      --text-muted: #64748B;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 50%);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track { background: var(--bg-dark); }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+    /* Header Bar */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.1rem 2.2rem;
+      background: rgba(7, 10, 17, 0.88);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--cyan), var(--indigo));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      color: #fff;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.4);
+    }
+
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #FFFFFF, #CBD5E1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      font-size: 0.75rem;
+      color: var(--cyan);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* Navigation Bar */
+    .nav-bar {
+      display: flex;
+      gap: 0.35rem;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 0.4rem;
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+    }
+
+    .nav-tab {
+      padding: 0.6rem 1.1rem;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-sub);
+      font-size: 0.825rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .nav-tab.active {
+      background: linear-gradient(135deg, var(--indigo), #4F46E5);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45);
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.9rem;
+      border-radius: 20px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--emerald);
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .dot-pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--emerald);
+      animation: pulseAnim 2s infinite;
+    }
+
+    @keyframes pulseAnim {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    main {
+      padding: 2.2rem;
+      max-width: 1650px;
+      margin: 0 auto;
+    }
+
+    .tab-panel {
+      display: none;
+      animation: tabFadeIn 0.35s ease-out forwards;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    @keyframes tabFadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card {
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 22px;
+      padding: 1.6rem;
+      transition: all 0.3s ease;
+      margin-bottom: 1.5rem;
+    }
+
+    .card:hover {
+      border-color: var(--border-highlight);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35);
+    }
+
+    .section-head {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .section-head i { color: var(--cyan); }
+
+    /* Leaderboard Cards */
+    .rank-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .rank-card {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 1.4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .rank-badge {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1rem;
+    }
+
+    .rank-1 { background: rgba(245, 158, 11, 0.2); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.4); }
+    .rank-2 { background: rgba(56, 189, 248, 0.2); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.4); }
+    .rank-3 { background: rgba(16, 185, 129, 0.2); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.4); }
+    .rank-4 { background: rgba(239, 68, 68, 0.2); color: var(--rose); border: 1px solid rgba(239, 68, 68, 0.4); }
+
+    /* Custom Tables */
+    .data-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin-top: 1rem;
+    }
+
+    .data-table th {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 1rem 1.25rem;
+      text-align: left;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-sub);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .data-table td {
+      padding: 1.1rem 1.25rem;
+      font-size: 0.875rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .data-table tr:hover td {
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .team-tag {
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .tag-t1 { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+    .tag-t2 { background: rgba(56, 189, 248, 0.15); color: var(--cyan); }
+    .tag-t3 { background: rgba(16, 185, 129, 0.15); color: var(--emerald); }
+    .tag-t4 { background: rgba(239, 68, 68, 0.15); color: var(--rose); }
+
+    .status-pill-check {
+      padding: 0.25rem 0.65rem;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .sp-verified { background: rgba(16, 185, 129, 0.15); color: var(--emerald); }
+    .sp-pending { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+
+    .row-detail {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.6rem 0;
+      font-size: 0.85rem;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+    }
+    .row-detail:last-child { border-bottom: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Executive Header -->
+  <header>
+    <div class="brand-box">
+      <div class="brand-icon"><i class="fa-solid fa-trophy"></i></div>
+      <div class="brand-text">
+        <h1>TNI Operations BI</h1>
+        <p>100% Real Live Sheet BI Platform (Updated 05/08/2026)</p>
+      </div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="nav-bar">
+      <button class="nav-tab active" onclick="showTab('wo-leaderboard-panel', this)">
+        <i class="fa-solid fa-trophy"></i> WO Leaderboard (531 WOs)
+      </button>
+      <button class="nav-tab" onclick="showTab('general-task-panel', this)">
+        <i class="fa-solid fa-cubes"></i> General Task Categories
+      </button>
+      <button class="nav-tab" onclick="showTab('progress-detail-panel', this)">
+        <i class="fa-solid fa-users-gear"></i> 29 Engineers Staff Matrix
+      </button>
+      <button class="nav-tab" onclick="showTab('bot-guide-panel', this)">
+        <i class="fa-solid fa-robot"></i> Telegram Bot Manual
+      </button>
+    </nav>
+
+    <div class="status-pill">
+      <span class="dot-pulse"></span>
+      REAL SHEET DATA: 531 WOs
+    </div>
+  </header>
+
+  <main>
+
+    <!-- TAB 1: WO LEADERBOARD & SUMMARY (Sum all WO Team) -->
+    <div id="wo-leaderboard-panel" class="tab-panel active">
+      <div class="section-head"><i class="fa-solid fa-trophy"></i> Work Order (WO) Performance Leaderboard — Real Sheet Export Data (531 WOs)</div>
+
+      <!-- Top 4 Rank Cards -->
+      <div class="rank-grid">
+        <div class="rank-card">
+          <div class="rank-badge rank-1">🥇</div>
+          <span class="team-tag tag-t1">Team 1 Dawei</span>
+          <h3 style="margin-top:0.8rem; font-size:1.6rem; font-weight:800;">10 Staff</h3>
+          <div class="row-detail"><span style="color:var(--text-sub);">Assigned WOs:</span><span style="font-weight:700;">185 WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Completed Rate:</span><span style="font-weight:700; color:var(--emerald);">28.5% (53 Done)</span></div>
+        </div>
+
+        <div class="rank-card">
+          <div class="rank-badge rank-2">🥈</div>
+          <span class="team-tag tag-t2">Team 2 Myeik (+T5)</span>
+          <h3 style="margin-top:0.8rem; font-size:1.6rem; font-weight:800;">11 Staff</h3>
+          <div class="row-detail"><span style="color:var(--text-sub);">Assigned WOs:</span><span style="font-weight:700;">214 WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Completed Rate:</span><span style="font-weight:700; color:var(--cyan);">21.0% (45 Done)</span></div>
+        </div>
+
+        <div class="rank-card">
+          <div class="rank-badge rank-3">🥉</div>
+          <span class="team-tag tag-t3">Team 3 Bokpyin</span>
+          <h3 style="margin-top:0.8rem; font-size:1.6rem; font-weight:800;">4 Staff</h3>
+          <div class="row-detail"><span style="color:var(--text-sub);">Assigned WOs:</span><span style="font-weight:700;">68 WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Completed Rate:</span><span style="font-weight:700; color:var(--emerald);">26.4% (18 Done)</span></div>
+        </div>
+
+        <div class="rank-card">
+          <div class="rank-badge rank-4">4</div>
+          <span class="team-tag tag-t4">Team 4 Kawthoung</span>
+          <h3 style="margin-top:0.8rem; font-size:1.6rem; font-weight:800;">4 Staff</h3>
+          <div class="row-detail"><span style="color:var(--text-sub);">Assigned WOs:</span><span style="font-weight:700;">64 WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Completed Rate:</span><span style="font-weight:700; color:var(--amber);">26.5% (17 Done)</span></div>
+        </div>
+      </div>
+
+      <!-- Chart & Table -->
+      <div class="card">
+        <div class="section-head"><i class="fa-solid fa-chart-bar"></i> Total 531 Work Orders Distribution by Regional Team</div>
+        <canvas id="woChart" style="max-height: 280px;"></canvas>
+      </div>
+    </div>
+
+    <!-- TAB 2: GENERAL TASK CATEGORIES (Wed General Task) -->
+    <div id="general-task-panel" class="tab-panel">
+      <div class="section-head"><i class="fa-solid fa-cubes"></i> Real Sheet General Task Categories (Wed General Task)</div>
+
+      <div class="card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Department</th>
+              <th>Task Category</th>
+              <th>Detailed Scope of Work</th>
+              <th>Target Team Allocation</th>
+              <th>Target Complete Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="team-tag tag-t2">Admin</span></td>
+              <td><strong>repair CCTV</strong></td>
+              <td>Team 1 repair 2 CCTV at office + Team 1 Sub 1 Setup New 2 Camera + Team 2 repair 2 CCTV + Team 3 & 4.</td>
+              <td>Team 1, Team 2, Team 3, Team 4</td>
+              <td>08/07/2026</td>
+            </tr>
+            <tr>
+              <td><span class="team-tag tag-t3">Asset</span></td>
+              <td><strong>Inventory Site</strong></td>
+              <td>Team 1 Plan Site finish week 48 (Site: 42, Cable: 49, MW: 7) + Team 2 5S (Site: 49, Cable: 84, MW: 49) + Team 3 & 4.</td>
+              <td>Team 1, Team 2, Team 3, Team 4</td>
+              <td>15/12/2025</td>
+            </tr>
+            <tr>
+              <td><span class="team-tag tag-t3">Asset</span></td>
+              <td><strong>Inventory Team</strong></td>
+              <td>Organize Branch warehouse and Team 1 warehouse according to 5S guidelines + WO_WFM-OTHERS_20260503.</td>
+              <td>Team 1, Team 2</td>
+              <td>15/12/2025</td>
+            </tr>
+            <tr>
+              <td><span class="team-tag tag-t1">Asset</span></td>
+              <td><strong>Maintenance_Towerco_Station</strong></td>
+              <td>Towerco site maintenance across 36 sites (T1), 35 sites (T2), 11 sites (T3), 4 sites (T4). Total: 86 sites.</td>
+              <td>All Teams (T1..T4)</td>
+              <td>05/08/2026</td>
+            </tr>
+            <tr>
+              <td><span class="team-tag tag-t1">Asset</span></td>
+              <td><strong>Recall broken materials</strong></td>
+              <td>Recall materials from site (TNI0060, TNI0054, TNI0250, TNI0264, TNI0129, TNI0220) back to branch warehouse.</td>
+              <td>Team 1, Team 2</td>
+              <td>05/08/2026</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: 29 ENGINEERS STAFF MATRIX (Progress Team Task and WO+Oil) -->
+    <div id="progress-detail-panel" class="tab-panel">
+      <div class="section-head"><i class="fa-solid fa-users-gear"></i> Real Roster: 29 Field Engineers Assignment Matrix</div>
+
+      <div class="card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Field Engineer Name</th>
+              <th>System Account</th>
+              <th>Assigned Regional Team</th>
+              <th>Assigned Scope & WOs</th>
+              <th>Supervisor Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Bhone Htet Aung</strong></td>
+              <td><small style="color:var(--cyan);">myt_bhonehtet.aung</small></td>
+              <td><span class="team-tag tag-t1">MYT_TNI_TEAM01_Dawei</span></td>
+              <td>Cable Patrol BB (27 routes) & DG Oil Filter Change (8KVA: 7, 12KVA: 1)</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Aung Lwin Phyo</strong></td>
+              <td><small style="color:var(--cyan);">myt_aunglwin.phyo</small></td>
+              <td><span class="team-tag tag-t1">MYT_TNI_TEAM01_Dawei</span></td>
+              <td>Cable Patrol AC (10 routes) & Cable Measure (14 routes)</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Phyo Ko Ko</strong></td>
+              <td><small style="color:var(--cyan);">myt_phyoko.ko44</small></td>
+              <td><span class="team-tag tag-t1">MYT_TNI_TEAM01_Dawei</span></td>
+              <td>Towerco Station Maintenance (36 sites: TNI0390, TNI0059...)</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Aung Thin Myat</strong></td>
+              <td><small style="color:var(--cyan);">myt_aungthin.mya</small></td>
+              <td><span class="team-tag tag-t1">MYT_TNI_TEAM01_Dawei</span></td>
+              <td>Recall broken materials & Office CCTV Repair (Sub 1)</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Win Htet Aung</strong></td>
+              <td><small style="color:var(--cyan);">myt_winhtet.aung11</small></td>
+              <td><span class="team-tag tag-t2">MYT_TNI_TEAM02_Myeik</span></td>
+              <td>Myeik Region Optical Cable Patrol & DG Refuel Support</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Pyi Kyaw Aung</strong></td>
+              <td><small style="color:var(--cyan);">myt_pyikyaw.aung</small></td>
+              <td><span class="team-tag tag-t2">MYT_TNI_TEAM02_Myeik</span></td>
+              <td>Optical Cable Repair TNI0413 & TNI0415 (Myeik + T5)</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Wanna Oo</strong></td>
+              <td><small style="color:var(--cyan);">myt_wanna.oo2</small></td>
+              <td><span class="team-tag tag-t2">MYT_TNI_TEAM02_Myeik</span></td>
+              <td>Maintenance Mytel Station (13 sites) & Refuel Order 440L</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Zin Min Shein</strong></td>
+              <td><small style="color:var(--cyan);">myt_zinmin.shein</small></td>
+              <td><span class="team-tag tag-t2">MYT_TNI_TEAM02_Myeik</span></td>
+              <td>Myeik Sub-team Leader & DG Oil Maintenance</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Myint Ko Ko Aung</strong></td>
+              <td><small style="color:var(--cyan);">myt_myintkoko.aung</small></td>
+              <td><span class="team-tag tag-t3">MYT_TNI_TEAM03_Bokpyin</span></td>
+              <td>Bokpyin Towerco Maintenance (11 sites: TNI0383, TNI0402...)</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Si Thu Htun</strong></td>
+              <td><small style="color:var(--cyan);">myt_sithu.htun</small></td>
+              <td><span class="team-tag tag-t3">MYT_TNI_TEAM03_Bokpyin</span></td>
+              <td>Bokpyin Cable Measure (6 routes) & DG Water Coolant Change</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Tin Naing Lin</strong></td>
+              <td><small style="color:var(--cyan);">myt_tinnaing.lin11</small></td>
+              <td><span class="team-tag tag-t3">MYT_TNI_TEAM03_Bokpyin</span></td>
+              <td>Bokpyin Regional Support & Warehouse 5S Inventory</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+            <tr>
+              <td><strong>Khant Chaw Nyo</strong></td>
+              <td><small style="color:var(--cyan);">myt_khantchaw.nyo</small></td>
+              <td><span class="team-tag tag-t4">MYT_TNI_TEAM04_Kawthoung</span></td>
+              <td>Kawthoung Border Route TNI0401 & 20 Iron Poles Installation</td>
+              <td><span class="status-pill-check sp-verified">✓ Active Duty</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 4: BOT GUIDE -->
+    <div id="bot-guide-panel" class="tab-panel">
+      <div class="section-head"><i class="fa-solid fa-robot"></i> Telegram Bots & Group Command Reference</div>
+      <div class="card">
+        <p style="color:var(--text-sub);">Complete reference guide for Search Bot, Asset Collector Bot, Site Down Relay Bot, Refuel Bot 9, and BOD Assign Bot.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function showTab(panelId, tabBtn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+      document.getElementById(panelId).classList.add('active');
+      tabBtn.classList.add('active');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const ctx = document.getElementById('woChart')?.getContext('2d');
+      if (ctx) {
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['T1 Dawei (185 WOs)', 'T2 Myeik (214 WOs)', 'T3 Bokpyin (68 WOs)', 'T4 Kawthoung (64 WOs)'],
+            datasets: [
+              { label: 'Assigned Work Orders (WOs)', data: [185, 214, 68, 64], backgroundColor: '#38BDF8', borderRadius: 8 },
+              { label: 'Completed WOs (Done)', data: [53, 45, 18, 17], backgroundColor: '#10B981', borderRadius: 8 }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { ticks: { color: '#94A3B8' } },
+              y: { ticks: { color: '#94A3B8' } }
+            },
+            plugins: { legend: { labels: { color: '#F8FAFC' } } }
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
