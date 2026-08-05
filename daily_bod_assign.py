@@ -31,12 +31,13 @@ SHEET_URL = (
 # Timezone Myanmar
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 
-# Trái tim màu cố định cho mỗi Dep (9 màu, đồng cỡ)
+# Trái tim màu cố định cho mỗi Dep (đồng cỡ)
 DEP_SQUARES = {
-    "admin": "💙", "asset": "💚", "cm": "💛", "fbb": "🧡",
+    "admin": "💙", "asset": "💚", "cm": "🟡", "fbb": "🧡",
     "finance": "💜", "hr": "❤️", "m&e": "🤎", "manager": "🤍",
     "pm": "🖤", "transmission": "💙", "construction": "🧡",
     "construction projects": "🧡", "noc": "🖤", "technical": "💙",
+    "team 05": "🔵", "team 5": "🔵", "team5": "🔵"
 }
 
 def parse_date(val):
@@ -61,7 +62,7 @@ def parse_date(val):
 async def send_msg(bot: Bot, chat_id: int, text: str, label: str, reply_markup=None):
     """Gửi tin nhắn Telegram an toàn."""
     try:
-        sent = await bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+        sent = await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML", reply_markup=reply_markup)
         logger.info(f"✅ Sent message to {chat_id} ({label})")
         return True, [sent.message_id]
     except Exception as e:
@@ -99,15 +100,18 @@ async def main():
     d6_limit = (today - timedelta(days=6)).date()
 
     stats = {}
+    bod_new_assigns = {}
 
     for idx, row in data_rows.iterrows():
         # Đảm bảo hàng có đủ số cột
-        if len(row) < 11:
+        if len(row) < 3:
             continue
             
         role_val = row[0]       # Cột A: Chức vụ/Phòng ban
-        completed_val = row[7]  # Cột H: Dep update Date complete
-        confirm_val = row[9]    # Cột J: Manager Confirm
+        completed_val = row[7] if len(row) > 7 else None # Cột H: Dep update Date complete
+        confirm_val = row[9] if len(row) > 9 else None   # Cột J: Manager Confirm
+        assign_date_val = row[3] if len(row) > 3 else None # Cột D: Assign date
+        col_o_val = row[14] if len(row) > 14 else ""     # Cột O: BOD New assign formula
 
         if pd.isna(role_val) or not str(role_val).strip():
             continue
@@ -117,6 +121,7 @@ async def main():
         if role.lower() in ("nan", "", "assign admin", "chức vụ", "phòng ban"):
             continue
 
+        # Tích lũy số liệu thống kê tổng hợp
         if role not in stats:
             stats[role] = {
                 "total_assigned": 0,
@@ -131,7 +136,6 @@ async def main():
         is_confirmed = not pd.isna(confirm_val) and str(confirm_val).strip() != ""
 
         if is_completed:
-            # Check 3 Day (d2/d1/d0)
             if row_date == d0:
                 stats[role]["d0"] += 1
             elif row_date == d1:
@@ -139,127 +143,117 @@ async def main():
             elif row_date == d2:
                 stats[role]["d2"] += 1
 
-            # Check 7 Day
             if row_date >= d6_limit:
                 stats[role]["d7"] += 1
 
-            # Check Month
             if row_date.year == today.year and row_date.month == today.month:
                 stats[role]["month"] += 1
 
-            # Check Unconfirmed (cột H có ngày nhưng cột J trống)
             if not is_confirmed:
                 stats[role]["unconfirmed"] += 1
 
-    if not stats:
-        logger.info("No records found with valid roles and completed dates.")
-        return
+        # Lọc các task "BOD New assign" cho Transmission, M&E, Team 05...
+        col_o_str = str(col_o_val).strip().lower()
+        is_new_assign = ("bod new assign" in col_o_str or 
+                         "new assign" in col_o_str or 
+                         parse_date(assign_date_val) == d0)
 
-    # Sắp xếp các phòng ban
-    sorted_stats = sorted(stats.items())
+        pic_val = row[1] if len(row) > 1 else ""
+        content_val = row[2] if len(row) > 2 else ""
 
+        if is_new_assign and content_val and not pd.isna(content_val):
+            if role not in bod_new_assigns:
+                bod_new_assigns[role] = []
+            
+            bod_new_assigns[role].append({
+                "row": idx + 2,
+                "pic": str(pic_val).strip() if not pd.isna(pic_val) else "",
+                "content": str(content_val).strip(),
+                "status": str(col_o_val).strip() if str(col_o_val).strip() else "BOD New assign"
+            })
+
+    # ── 1. Gửi Báo cáo Tổng hợp (Daily BOD Assign - Summary) ──
+    if stats:
+        sorted_stats = sorted(stats.items())
+        date_str = today.strftime("%d/%m/%Y")
+        now_str = today.strftime("%H:%M")
+
+        lines = [
+            "📋 <b>2. Report — Daily BOD Assign — Summary</b>",
+            f"📅 {date_str}  |  🕐 {now_str}",
+            "📌 Compilation of BOD-assigned tasks completed and confirmation status by department.",
+            "━━━━━━━━━━━━━━━━━━━━━━"
+        ]
+
+        total_assigned_all = total_d0 = total_d1 = total_d2 = total_d7 = total_month = total_unconfirmed = 0
+
+        for i, (role, s) in enumerate(sorted_stats):
+            dot = DEP_SQUARES.get(role.lower().strip(), "🔹")
+            lines.append(
+                f"{dot} <b>{role}</b>: Task assign : {s['total_assigned']} = 3 day {s['d2']}/{s['d1']}/{s['d0']} "
+                f"7 day: {s['d7']} Month: {s['month']} Not Yet Cofirm : {s['unconfirmed']} case"
+            )
+            
+            total_assigned_all += s["total_assigned"]
+            total_d0 += s["d0"]
+            total_d1 += s["d1"]
+            total_d2 += s["d2"]
+            total_d7 += s["d7"]
+            total_month += s["month"]
+            total_unconfirmed += s["unconfirmed"]
+
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("📊 <b>Total:</b>")
+        lines.append(
+            f"   Task assign : {total_assigned_all} = 3 day {total_d2}/{total_d1}/{total_d0} "
+            f"7 day: {total_d7} Month: {total_month} Not Yet Cofirm : {total_unconfirmed} case"
+        )
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+
+        report_msg = "\n".join(lines)
+
+        if APPS_SCRIPT_URL:
+            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "BOD_ASSIGN_CONTROL")
+
+        async with Bot(token=SEND_BOT_TOKEN) as bot:
+            ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, report_msg, "BOD_ASSIGN_CONTROL")
+            if ok and msg_ids and APPS_SCRIPT_URL:
+                save_msgids(APPS_SCRIPT_URL, "BOD_ASSIGN_CONTROL", msg_ids)
+
+    # ── 2. Gửi Chi tiết Task Mới (Transmission, M&E, Team 05...) sang CONTROL & Teams ──
     date_str = today.strftime("%d/%m/%Y")
     now_str = today.strftime("%H:%M")
 
-    # Xây dựng tin nhắn báo cáo
-    lines = [
-        "📋 2. Report — Daily BOD Assign — Summary",
-        f"📅 {date_str}  |  🕐 {now_str}",
-        "📌 Compilation of BOD-assigned tasks completed and confirmation status by department.",
-        "━━━━━━━━━━━━━━━━━━━━━━"
-    ]
-
-    total_assigned_all = total_d0 = total_d1 = total_d2 = total_d7 = total_month = total_unconfirmed = 0
-
-    for i, (role, s) in enumerate(sorted_stats):
-        dot = DEP_SQUARES.get(role.lower().strip(), "🔹")
-        # Định dạng chuẩn theo yêu cầu:
-        # Admin: Task assign : 10 = 3 day 0/0/0 7 day: 1 Month: 5 Not Yet Cofirm : 3 case
-        lines.append(
-            f"{dot} {role}: Task assign : {s['total_assigned']} = 3 day {s['d2']}/{s['d1']}/{s['d0']} "
-            f"7 day: {s['d7']} Month: {s['month']} Not Yet Cofirm : {s['unconfirmed']} case"
-        )
+    for role_name, tasks in bod_new_assigns.items():
+        role_lower = role_name.lower().strip()
+        dot = DEP_SQUARES.get(role_lower, "💙")
         
-        total_assigned_all += s["total_assigned"]
-        total_d0 += s["d0"]
-        total_d1 += s["d1"]
-        total_d2 += s["d2"]
-        total_d7 += s["d7"]
-        total_month += s["month"]
-        total_unconfirmed += s["unconfirmed"]
-
-    lines.append("━━━━━━━━━━━━━━━━━━━━━━")
-    lines.append("📊 Total:")
-    lines.append(
-        f"   Task assign : {total_assigned_all} = 3 day {total_d2}/{total_d1}/{total_d0} "
-        f"7 day: {total_d7} Month: {total_month} Not Yet Cofirm : {total_unconfirmed} case"
-    )
-    lines.append("━━━━━━━━━━━━━━━━━━━━━━")
-
-    report_msg = "\n".join(lines)
-
-    # Gửi tin nhắn lên CONTROL
-    if APPS_SCRIPT_URL:
-        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "BOD_ASSIGN_CONTROL")
-
-    async with Bot(token=SEND_BOT_TOKEN) as bot:
-        ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, report_msg, "BOD_ASSIGN_CONTROL")
-        if ok and msg_ids and APPS_SCRIPT_URL:
-            save_msgids(APPS_SCRIPT_URL, "BOD_ASSIGN_CONTROL", msg_ids)
-
-    # ── 1.1. Report — BOD Assign to M&E ──
-    today_me_tasks = []
-    for idx, row in data_rows.iterrows():
-        if len(row) < 4:
-            continue
-        role_val = row[0]
-        assign_date_val = row[3]  # Column D
-        
-        if pd.isna(role_val) or not str(role_val).strip():
-            continue
-        role = str(role_val).strip().lower()
-        
-        if role == "m&e":
-            assign_date = parse_date(assign_date_val)
-            if assign_date == d0:
-                row_num = idx + 2
-                pic_val = row[1] if len(row) > 1 else ""
-                content_val = row[2] if len(row) > 2 else ""
-                
-                pic = str(pic_val).strip()
-                content = str(content_val).strip()
-                today_me_tasks.append({
-                    "row": row_num,
-                    "pic": pic,
-                    "content": content
-                })
-
-    if today_me_tasks:
-        report_1_1_lines = [
-            "📋 1.1. Report — BOD Assign to M&E",
+        report_lines = [
+            f"📋 <b>1.1. Report — BOD Assign to {role_name}</b>",
             f"📅 {date_str}  |  🕐 {now_str}",
             "━━━━━━━━━━━━━━━━━━━━━━",
-            "M&E: You have new Assign from BOD or Manager:",
+            f"{dot} <b>{role_name}</b>: You have new Assign from BOD or Manager:",
             "━━━━━━━━━━━━━━━━━━━━━━"
         ]
         
         buttons = []
-        for task in today_me_tasks:
+        for task in tasks:
             task_line = f"• Row #{task['row']} | PIC: {task['pic']} | Content: {task['content']}"
-            report_1_1_lines.append(task_line)
-            buttons.append([InlineKeyboardButton(f"Yes, I received Row #{task['row']}", callback_data=f"ack_bod_assign_me_{task['row']}")])
+            report_lines.append(task_line)
+            buttons.append([InlineKeyboardButton(f"Yes, I received Row #{task['row']}", callback_data=f"ack_bod_assign_{task['row']}")])
             
-        report_1_1_lines.append("━━━━━━━━━━━━━━━━━━━━━━")
-        report_1_1_msg = "\n".join(report_1_1_lines)
+        report_lines.append("━━━━━━━━━━━━━━━━━━━━━━")
+        report_msg = "\n".join(report_lines)
         
+        state_key = f"BOD_ASSIGN_{role_name.upper().replace(' ', '_')}_CONTROL"
         if APPS_SCRIPT_URL:
-            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "BOD_ASSIGN_1_1_CONTROL")
+            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, state_key)
             
         async with Bot(token=SEND_BOT_TOKEN) as bot:
             keyboard = InlineKeyboardMarkup(buttons)
-            ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, report_1_1_msg, "BOD_ASSIGN_1_1_CONTROL", reply_markup=keyboard)
+            ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, report_msg, state_key, reply_markup=keyboard)
             if ok and msg_ids and APPS_SCRIPT_URL:
-                save_msgids(APPS_SCRIPT_URL, "BOD_ASSIGN_1_1_CONTROL", msg_ids)
+                save_msgids(APPS_SCRIPT_URL, state_key, msg_ids)
 
 if __name__ == "__main__":
     asyncio.run(main())
