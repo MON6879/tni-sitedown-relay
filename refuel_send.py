@@ -49,7 +49,7 @@ def fetch_refuel_data() -> list[str] | None:
 
 
 def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
-    """Gửi tin nhắn định dạng HTML lên group Telegram."""
+    """Gửi tin nhắn định dạng HTML lên group Telegram (có tự động retry bằng Plain Text nếu lỗi)."""
     url = f"https://api.telegram.org/bot{REFUEL_BOT_TOKEN}/sendMessage"
     resp = requests.post(
         url,
@@ -63,7 +63,20 @@ def send_telegram(chat_id: str, text: str) -> tuple[bool, int | None]:
         print(f"✅ Report sent to {chat_id}")
         msg_id = res_json.get("result", {}).get("message_id")
     else:
-        print(f"❌ Send failed: {resp.text[:200]}", file=sys.stderr)
+        print(f"⚠️ HTML send failed, retrying plain text: {resp.text[:200]}", file=sys.stderr)
+        plain_text = re.sub(r'<[^>]*>', '', text)
+        resp_fallback = requests.post(
+            url,
+            json={"chat_id": chat_id, "text": plain_text},
+            timeout=60,
+        )
+        res_json_fb = resp_fallback.json()
+        ok = res_json_fb.get("ok", False)
+        if ok:
+            print(f"✅ Report sent to {chat_id} (Plain Text fallback)")
+            msg_id = res_json_fb.get("result", {}).get("message_id")
+        else:
+            print(f"❌ Send failed: {resp_fallback.text[:200]}", file=sys.stderr)
     return ok, msg_id
 
 
@@ -152,6 +165,8 @@ def format_and_send_report(rows: list[str]) -> list[int]:
 
             # Loại bỏ ký tự hỏng mã hóa ở đầu nếu có và ép hiển thị đúng emoji chấm màu
             clean = re.sub(r'^[^\w\s🔴🔵🟢🟡]+', '', line_clean).strip()
+            # Escape HTML characters < >
+            clean = clean.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             if re.search(r'Team\s*1\b', clean, re.IGNORECASE) and not clean.startswith("🔴"):
                 clean = "🔴 " + re.sub(r'^(?:🔴|ð\s*\')?\s*', '', clean)
             elif re.search(r'Team\s*2\b', clean, re.IGNORECASE) and not clean.startswith("🔵"):
