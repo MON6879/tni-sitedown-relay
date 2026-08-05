@@ -105,18 +105,37 @@ def is_daily_plan_msg(text: str) -> bool:
     text_l = text.lower()
 
     # 🛑 CHỈ LOẠI BỎ CÁC BẢN TIN BÁO CÁO TỰ ĐỘNG VÀ PHẢN HỒI XÁC NHẬN CỦA BOT
-    # KHÔNG loại bỏ "daily plan template", "copy → edit", "note: /find" vì người dùng copy/forward nguyên mẫu
     if any(kw in text_l for kw in (
+        "5.1 report", "5. report", "submission history", "3-day completion rate",
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
-        "plans for ", "plan updated", "plan saved", "ref:", "ref:dp-", "đã lưu"
+        "plans for ", "plan updated", "plan saved", "ref:", "ref:dp-", "đã lưu",
+        "tni personal find task", "ft result daily", "personal find task", "find task + wo",
+        "list name ft", "team leader: submitted", "plan content:", "overall: no data"
     )):
         return False
 
     has_plan_word = "plan" in text_l
     has_date = bool(re.search(r'\b\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4}\b', text))
     return has_plan_word and has_date
+
+
+def clean_plan_content(content: str) -> str:
+    """Dọn dẹp nội dung plan, loại bỏ phần chân tin nhắn tự động của bot nếu lỡ bị dính."""
+    if not content:
+        return ""
+    clean_lines = []
+    for line in content.splitlines():
+        line_l = line.lower().strip()
+        if any(kw in line_l for kw in (
+            "submission history:", "3-day completion rate:", "plan saved — ref:",
+            "5.1 report — plan", "team leader: submitted", "plan content:",
+            "overall: no data", "overall:"
+        )):
+            break
+        clean_lines.append(line)
+    return "\n".join(clean_lines).strip()
 
 
 def parse_daily_plan(text: str) -> dict | None:
@@ -1679,7 +1698,7 @@ async def run_morning():
                     lines.append(f"✅ Team Leader: Submitted ✓ (recorded in sheet)")
                 lines.append("")
                 lines.append("📋 Plan Content:")
-                lines.append(colorize_bullets(pt["content"]))
+                lines.append(colorize_bullets(clean_plan_content(pt["content"])))
             else:
                 lines.append("⚠️ Team Leader: NOT SUBMITTED (Deadline: before 07:00)")
 
@@ -1777,7 +1796,7 @@ async def run_morning():
                     team_name = GROUP_NAMES.get(group_key, group_key)
                     ctrl_lines.append("──────────")
                     ctrl_lines.append(f"🏷️ {team_name}:")
-                    ctrl_lines.append(colorize_bullets(pt["content"]))
+                    ctrl_lines.append(colorize_bullets(clean_plan_content(pt["content"])))
 
         ctrl_lines.append(divider)
 
