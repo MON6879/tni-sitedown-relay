@@ -191,7 +191,7 @@ def save_saved_msg_ids(key: str, sent_ids: list[int | str]):
         print(f"⚠️ Error saving local state: {e}", file=sys.stderr)
     set_msg_id(key, id_str)
 
-def delete_refuel_msg(chat_id: str, msg_id: int | str) -> bool:
+def delete_refuel_msg(chat_id: str, msg_id: int | str, timeout: int = 3) -> bool:
     """Xóa tin nhắn cũ bằng REFUEL_BOT_TOKEN."""
     if not msg_id:
         return False
@@ -200,14 +200,14 @@ def delete_refuel_msg(chat_id: str, msg_id: int | str) -> bool:
         resp = requests.post(
             url,
             json={"chat_id": chat_id, "message_id": int(msg_id)},
-            timeout=10
+            timeout=timeout
         )
         res_json = resp.json()
         if res_json.get("ok"):
             print(f"🗑️ Deleted old refuel msg #{msg_id}")
             return True
-    except Exception as e:
-        print(f"⚠️ delete_refuel_msg error for #{msg_id}: {e}", file=sys.stderr)
+    except Exception:
+        pass
     return False
 
 def delete_all_previous_refuel_msgs(chat_id: str, key: str):
@@ -216,14 +216,14 @@ def delete_all_previous_refuel_msgs(chat_id: str, key: str):
     deleted_set = set()
 
     for msg_id in saved_ids:
-        if delete_refuel_msg(chat_id, msg_id):
+        if delete_refuel_msg(chat_id, msg_id, timeout=3):
             deleted_set.add(str(msg_id))
         try:
             base_id = int(msg_id)
-            for offset in range(-20, 20):
+            for offset in range(-3, 4):
                 target_id = base_id + offset
                 if target_id > 0 and str(target_id) not in deleted_set:
-                    if delete_refuel_msg(chat_id, target_id):
+                    if delete_refuel_msg(chat_id, target_id, timeout=3):
                         deleted_set.add(str(target_id))
         except Exception:
             pass
