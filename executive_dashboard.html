@@ -11,8 +11,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <!-- Chart.js CDN -->
+  <!-- Chart.js & Datalabels Plugin CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 
   <style>
     :root {
@@ -576,9 +577,9 @@
 
       </div>
 
-      <!-- TABLE 1: PERFORMANCE LEADERBOARD SUMMARY (Range A50:P56) -->
+      <!-- TABLE 1: PERFORMANCE LEADERBOARD SUMMARY (Range A50:P56 with Cols J, K, L) -->
       <div class="card">
-        <div class="section-head"><i class="fa-solid fa-trophy"></i> Table 1: Performance Leaderboard Summary — Range A50:P56 (Formula: Total Assigned = Col P + Col G)</div>
+        <div class="section-head"><i class="fa-solid fa-trophy"></i> Table 1: Performance Leaderboard Summary — Range A50:P56 (Includes Cols J, K, L Daily Closures)</div>
         <table class="data-table">
           <thead>
             <tr>
@@ -587,6 +588,9 @@
               <th>Regional Team Code (Col E)</th>
               <th>Plan (Col M)</th>
               <th>Total FOT Close (Col G)</th>
+              <th>Close 05/08 (Col J)</th>
+              <th>Close 04/08 (Col K)</th>
+              <th>Close 03/08 (Col L)</th>
               <th>Remaining WOs (Col P)</th>
               <th>Total Assigned (Col P + Col G)</th>
               <th>Rank (Col H)</th>
@@ -600,6 +604,9 @@
               <td><span class="team-tag tag-t1">MYT_TNI_TEAM01_Dawei</span></td>
               <td><strong style="color:var(--amber);">22 WOs</strong></td>
               <td>46 WOs</td>
+              <td>0 WOs</td>
+              <td><strong style="color:var(--cyan);">7 WOs</strong></td>
+              <td>0 WOs</td>
               <td>279 WOs</td>
               <td><strong style="color:var(--cyan); font-size:1rem;">325 WOs</strong></td>
               <td><span class="rank-pill rk-4">Rank 4</span></td>
@@ -611,6 +618,9 @@
               <td><span class="team-tag tag-t2">MYT_TNI_TEAM02_Myeik</span></td>
               <td><strong style="color:var(--amber);">12 WOs</strong></td>
               <td>42 WOs</td>
+              <td>0 WOs</td>
+              <td><strong style="color:var(--cyan);">1 WO</strong></td>
+              <td><strong style="color:var(--cyan);">6 WOs</strong></td>
               <td>147 WOs</td>
               <td><strong style="color:var(--cyan); font-size:1rem;">189 WOs</strong></td>
               <td><span class="rank-pill rk-3">Rank 3</span></td>
@@ -622,6 +632,9 @@
               <td><span class="team-tag tag-t3">MYT_TNI_TEAM03_Bokpyin</span></td>
               <td><strong style="color:var(--amber);">5 WOs</strong></td>
               <td>24 WOs</td>
+              <td>0 WOs</td>
+              <td><strong style="color:var(--cyan);">6 WOs</strong></td>
+              <td><strong style="color:var(--cyan);">5 WOs</strong></td>
               <td>63 WOs</td>
               <td><strong style="color:var(--cyan); font-size:1rem;">87 WOs</strong></td>
               <td><span class="rank-pill rk-2">Rank 2</span></td>
@@ -633,6 +646,9 @@
               <td><span class="team-tag tag-t4">MYT_TNI_TEAM04_Kawthoung</span></td>
               <td><strong style="color:var(--amber);">3 WOs</strong></td>
               <td>50 WOs</td>
+              <td>0 WOs</td>
+              <td><strong style="color:var(--cyan);">8 WOs</strong></td>
+              <td><strong style="color:var(--cyan);">7 WOs</strong></td>
               <td>42 WOs</td>
               <td><strong style="color:var(--cyan); font-size:1rem;">92 WOs</strong></td>
               <td><span class="rank-pill rk-1">Rank 1</span></td>
@@ -644,7 +660,10 @@
               <td>4 Regional Teams</td>
               <td><strong style="color:var(--amber);">42 WOs Plan</strong></td>
               <td>162 WOs FOT Close</td>
-              <td>531 WOs Remaining</td>
+              <td>0 WOs</td>
+              <td>22 WOs</td>
+              <td>18 WOs</td>
+              <td>531 WOs Rem</td>
               <td><strong style="color:var(--cyan); font-size:1.05rem;">693 WOs Total Assigned</strong></td>
               <td>—</td>
               <td><strong style="color:var(--emerald);">23% Total</strong></td>
@@ -714,10 +733,10 @@
         </table>
       </div>
 
-      <!-- Performance Distribution Chart -->
+      <!-- Performance Comparison Chart (Plan vs Total FOT Close) -->
       <div class="card">
-        <div class="section-head"><i class="fa-solid fa-chart-column"></i> Total Assigned Work Orders (Col P + Col G) Overview</div>
-        <canvas id="woChart" style="max-height: 270px;"></canvas>
+        <div class="section-head"><i class="fa-solid fa-chart-column"></i> Performance Comparison Chart: Plan WOs (Col M) vs Total FOT Close (Col G)</div>
+        <canvas id="woChart" style="max-height: 290px;"></canvas>
       </div>
 
     </div>
@@ -888,7 +907,7 @@
             <span>Total Assigned (Col P+G): <strong style="color:var(--cyan);">325 WOs</strong></span>
           </div>
           <div style="display:flex; justify-content:space-between; margin-top:0.5rem;">
-            <span>Leaderboard Rank (Col H): <strong style="color:var(--amber);">Rank #4</strong></span>
+            <span>Close 04/08 (Col K): <strong style="color:var(--cyan);">7 WOs</strong></span>
             <span>Completion Benchmark (Col I): <strong style="color:var(--emerald);">13%</strong></span>
           </div>
         </div>
@@ -985,7 +1004,7 @@
     }
 
     function openTeamModal(name, leader, staff, cdNotClose, plan, fotClose, assigned, rankRate, region) {
-      document.getElementById('modalTeamName').textContent = name + " — Raw Sheet Details (Col P+G)";
+      document.getElementById('modalTeamName').textContent = name + " — Raw Sheet Details (Cols J, K, L)";
       document.getElementById('modalTeamContent').innerHTML = `
         <div class="row-detail"><span>Team Leader Name:</span><strong>${leader}</strong></div>
         <div class="row-detail"><span>Regional Zone:</span><strong>${region}</strong></div>
@@ -1032,14 +1051,14 @@
       btn.closest('tr').remove();
     }
 
-    /* 🤖 AI VOICE SPEECH SYNTHESIS ENGINE */
+    /* 🤖 AI VOICE SPEECH SYNTHESIS ENGINE (FULL COMPREHENSIVE AUDIO REPORT WITH SENTENCE CHUNKING QUEUE) */
     let isSpeaking = false;
     let synth = window.speechSynthesis;
 
     const BRIEFING_SCRIPTS = {
-      'en-US': "Welcome to TNI Operations Executive Portal. Total assigned work orders calculated as Column P plus Column G is 693 Work Orders system wide. Team 1 Dawei has 325 assigned Work Orders, Team 2 Myeik has 189, Team 4 Kawthoung has 92, and Team 3 Bokpyin has 87.",
-      'vi-VN': "Chào mừng bạn đến với Cổng thông tin Báo cáo Vận hành TNI BI. Tổng số Work Orders giao bằng Cột P cộng Cột G đạt 693 Work Orders trên toàn hệ thống. Đội 1 Dawei có 325 Work Orders được giao, Đội 2 Myeik có 189, Đội 4 Kawthoung có 92 và Đội 3 Bokpyin có 87 Work Orders.",
-      'my-MM': "TNI လုပ်ငန်းဆောင်ရွက်မှု အစီခံစာမှ ကြိုဆိုပါသည်။"
+      'en-US': "Welcome to TNI Operations BI Executive Management Portal. Here is the full operational summary for Tanintharyi region as of August 5th, 2026. Total assigned Work Orders calculated as Column P plus Column G is 693 Work Orders system wide, with 37 Work Orders pending close in Column A. Regional Team Rankings: Rank number 1 goes to Team 4 Kawthoung led by Naing Myo Htun, achieving 54 percent completion rate with 50 FOT closed Work Orders. Rank number 2 goes to Team 3 Bokpyin led by Pyae Phyo Zaw, with 26 percent completion rate. Rank number 3 goes to Team 2 Myeik led by Nay Myo Thu, achieving 21 percent completion rate with zero pending close Work Orders. Rank number 4 goes to Team 1 Dawei led by Paing Aung Soe, with 325 total assigned Work Orders and 32 Work Orders pending close in Column A. Thank you for listening to the TNI BI Executive Audio Report.",
+      'vi-VN': "Chào mừng bạn đến với Cổng thông tin Báo cáo Vận hành TNI BI. Sau đây là bản tin tổng hợp chi tiết tình hình vận hành toàn mạng Tanintharyi tính đến ngày 05 tháng 08 năm 2026. Tổng số Work Orders được giao toàn hệ thống tính theo Cột P cộng Cột G đạt 693 Work Orders. Số Work Orders chưa đóng Cột A là 37 Work Orders. Chi tiết tình hình 4 Đội khu vực: Vị trí Dẫn đầu Rank 1 thuộc về Đội 4 Kawthoung do Naing Myo Htun làm đội trưởng, đạt tỷ lệ hoàn thành 54 phần trăm với 50 Work Orders FOT Close. Vị trí Rank 2 thuộc về Đội 3 Bokpyin do Pyae Phyo Zaw làm đội trưởng, đạt tỷ lệ hoàn thành 26 phần trăm. Vị trí Rank 3 thuộc về Đội 2 Myeik do Nay Myo Thu làm đội trưởng, đạt tỷ lệ 21 phần trăm với 0 Work Order tồn đọng chưa đóng. Vị trí Rank 4 thuộc về Đội 1 Dawei do Paing Aung Soe làm đội trưởng, hiện có 325 Work Orders được giao, trong đó có 32 Work Orders chưa đóng Cột A. Xin cảm ơn bạn đã lắng nghe bản tin điều hành BI.",
+      'my-MM': "မင်္ဂလာပါ TNI လုပ်ငန်းဆောင်ရွက်မှု အစီရင်ခံစာမှ ကြိုဆိုပါသည်။ တနင်္သာရီ တိုင်းဒေသကြီး အသင်း ၄ ခု၏ စုစုပေါင်း လုပ်ငန်းအမိန့် ၆၉၃ ခု ရှိပါသည်။ အဆင့် ၁ အသင်း ၄ ကော့သောင်း ခေါင်းဆောင် နိုင်မျိုးထွန်း ဖြစ်ပြီး ၅၄ ရာခိုင်နှုန်း ပြီးစီးပါသည်။ အဆင့် ၂ အသင်း ၃ ဘုတ်ပြင်း ခေါင်းဆောင် ပြည့်ဖြိုးဇော် ဖြစ်ပြီး ၂၆ ရာခိုင်နှုန်း ပြီးစီးပါသည်။ အဆင့် ၃ အသင်း ၂ မြိတ် ခေါင်းဆောင် နေမျိုးသူ ဖြစ်ပြီး ၂၁ ရာခိုင်နှုန်း ပြီးစီးပါသည်။ အဆင့် ၄ အသင်း ၁ ထားဝယ် ခေါင်းဆောင် ပိုင်အောင်စိုး ဖြစ်ပြီး လုပ်ငန်းအမိန့် ၃၂၅ ခု ရှိပါသည်။ ကျေးဇူးတင်ပါသည်။"
     };
 
     function toggleAIVoice() {
@@ -1059,9 +1078,51 @@
       }
 
       const scriptText = BRIEFING_SCRIPTS[selectedLang] || BRIEFING_SCRIPTS['en-US'];
-      const utter = new SpeechSynthesisUtterance(scriptText);
-      utter.lang = selectedLang;
-      utter.rate = 0.95;
+      
+      // Split full text into sentence chunks to bypass Chrome/Windows 15-second cutoff bug
+      const sentences = scriptText.match(/[^.!?။]+[.!?။]+/g) || [scriptText];
+      let sentenceIndex = 0;
+
+      const availableVoices = synth.getVoices();
+      let targetVoice = availableVoices.find(v => v.lang.includes('my') || v.name.toLowerCase().includes('myanmar') || v.name.toLowerCase().includes('burmese'));
+
+      function speakSentence() {
+        if (sentenceIndex >= sentences.length || !isSpeaking) {
+          isSpeaking = false;
+          playBtn.classList.remove('speaking');
+          voiceIcon.className = "fa-solid fa-volume-high";
+          voiceText.textContent = "AI Audio Briefing";
+          return;
+        }
+
+        const currentText = sentences[sentenceIndex].trim();
+        if (!currentText) {
+          sentenceIndex++;
+          speakSentence();
+          return;
+        }
+
+        const utter = new SpeechSynthesisUtterance(currentText);
+        utter.rate = 0.92;
+
+        if (selectedLang === 'my-MM') {
+          if (targetVoice) {
+            utter.voice = targetVoice;
+            utter.lang = targetVoice.lang;
+          } else {
+            utter.lang = 'en-US';
+          }
+        } else {
+          utter.lang = 'en-US';
+          utter.text = "TNI Operations Briefing for Myanmar Region: Total 693 Work Orders assigned. Team 4 Kawthoung rank 1 with 54 percent completion. Team 1 Dawei 325 Work Orders.";
+        }
+      } else {
+        utter.lang = selectedLang;
+        let matchedVoice = availableVoices.find(v => v.lang.startsWith(selectedLang.split('-')[0]));
+        if (matchedVoice) utter.voice = matchedVoice;
+      }
+
+      utter.rate = 0.92;
 
       utter.onstart = () => {
         isSpeaking = true;
@@ -1085,18 +1146,30 @@
       if (ctx) {
         new Chart(ctx, {
           type: 'bar',
+          plugins: [ChartDataLabels],
           data: {
-            labels: ['T1 Dawei (Paing Aung Soe)', 'T2 Myeik (Nay Myo Thu)', 'T3 Bokpyin (Pyae Phyo Zaw)', 'T4 Kawthoung (Naing Myo Htun)'],
+            labels: ['Team 1 Dawei', 'Team 2 Myeik', 'Team 3 Bokpyin', 'Team 4 Kawthoung'],
             datasets: [
-              { label: 'Total Assigned WOs (Col P + Col G)', data: [325, 189, 87, 92], backgroundColor: '#38BDF8', borderRadius: 8 },
               { label: 'Plan WOs (Col M)', data: [22, 12, 5, 3], backgroundColor: '#F59E0B', borderRadius: 8 },
-              { label: 'CD Not Yet Close (Col A)', data: [32, 0, 2, 3], backgroundColor: '#EF4444', borderRadius: 8 }
+              { label: 'Total FOT Close (Col G)', data: [46, 42, 24, 50], backgroundColor: '#10B981', borderRadius: 8 }
             ]
           },
           options: {
             responsive: true,
-            scales: { x: { ticks: { color: '#94A3B8' } }, y: { ticks: { color: '#94A3B8' } } },
-            plugins: { legend: { labels: { color: '#F8FAFC' } } }
+            plugins: {
+              legend: { labels: { color: '#F8FAFC', font: { weight: 'bold' } } },
+              datalabels: {
+                anchor: 'end',
+                align: 'end',
+                color: '#38BDF8',
+                font: { weight: 'bold', size: 13 },
+                formatter: function(value) { return value + ' WOs'; }
+              }
+            },
+            scales: {
+              x: { ticks: { color: '#94A3B8', font: { weight: '600' } } },
+              y: { ticks: { color: '#94A3B8' }, max: 60 }
+            }
           }
         });
       }

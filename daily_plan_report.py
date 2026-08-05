@@ -112,7 +112,9 @@ def is_daily_plan_msg(text: str) -> bool:
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
         "plans for ", "plan updated", "plan saved", "ref:", "ref:dp-", "đã lưu",
         "tni personal find task", "ft result daily", "personal find task", "find task + wo",
-        "list name ft", "team leader: submitted", "plan content:", "overall: no data"
+        "list name ft", "team leader: submitted", "plan content:", "overall: no data",
+        "submitted ✓", "submitted v", "not yet submitted", "daily plan & results",
+        "tni auto report", "tni team"
     )):
         return False
 
@@ -122,18 +124,25 @@ def is_daily_plan_msg(text: str) -> bool:
 
 
 def clean_plan_content(content: str) -> str:
-    """Dọn dẹp nội dung plan, loại bỏ phần chân tin nhắn tự động của bot nếu lỡ bị dính."""
+    """Dọn dẹp nội dung plan, loại bỏ toàn bộ tiêu đề/chân tin nhắn tự động của bot nếu lỡ bị dính."""
     if not content:
         return ""
     clean_lines = []
     for line in content.splitlines():
         line_l = line.lower().strip()
         if any(kw in line_l for kw in (
-            "submission history:", "3-day completion rate:", "plan saved — ref:",
-            "5.1 report — plan", "team leader: submitted", "plan content:",
-            "overall: no data", "overall:"
+            "submission history", "3-day completion rate", "plan saved — ref:",
+            "5.1 report", "5. report", "team leader: submitted", "plan content:",
+            "overall: no data", "overall:", "submitted ✓", "submitted v",
+            "not yet submitted", "tni auto report", "📝 plan for", "📝 plan"
         )):
-            break
+            continue
+        # Skip date/time stamp lines like "📅 05/08/2026 | 🕐 11:28"
+        if re.search(r'📅.*🕐', line):
+            continue
+        # Skip separator lines like "━━━━━━━"
+        if re.match(r'^[━─═\-]{3,}$', line_l):
+            continue
         clean_lines.append(line)
     return "\n".join(clean_lines).strip()
 
@@ -145,15 +154,19 @@ def parse_daily_plan(text: str) -> dict | None:
     if not text:
         return None
 
-    lines = text.strip().split("\n")
+    # First clean away any nested bot report headers/footers
+    cleaned_text = clean_plan_content(text)
+    text_to_parse = cleaned_text if cleaned_text else text
+
+    lines = text_to_parse.strip().split("\n")
     if not lines:
         return None
 
     # Extract date: Ưu tiên tìm theo 'Daily Plan:' hoặc 'Plan for', sau đó mới tìm bất kỳ ngày nào
     date_str = ""
-    date_match = re.search(r'(?:daily\s*plan|plan\s*for)[:\s]+(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text, re.IGNORECASE)
+    date_match = re.search(r'(?:daily\s*plan|plan\s*for)[:\s]+(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text_to_parse, re.IGNORECASE)
     if not date_match:
-        date_match = re.search(r'(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text)
+        date_match = re.search(r'(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})', text_to_parse)
     if date_match:
         date_str = normalize_date_str(date_match.group(1))
     else:
@@ -179,12 +192,11 @@ def parse_daily_plan(text: str) -> dict | None:
                 team_line_idx = i
                 break
         if not team_str:
-            team_match2 = re.search(r'(Team\s*0?[1-5])', text, re.IGNORECASE)
+            team_match2 = re.search(r'(Team\s*0?[1-5])', text_to_parse, re.IGNORECASE)
             if team_match2:
                 team_str = team_match2.group(1).strip()
 
-    # Content: lấy mọi thứ sau dòng header (dòng đầu có 'plan')
-    # Nếu team nằm dòng riêng (không phải dòng đầu), bỏ qua dòng đó luôn
+    # Content: lấy mọi thứ sau dòng header
     start_idx = max(1, team_line_idx + 1 if team_line_idx > 0 else 1)
     content_lines = []
     for i in range(start_idx, len(lines)):
@@ -194,6 +206,7 @@ def parse_daily_plan(text: str) -> dict | None:
         content_lines.append(lines[i])
 
     content = "\n".join(content_lines).strip()
+    content = clean_plan_content(content)
 
     if not date_str and not team_str:
         return None
@@ -201,7 +214,7 @@ def parse_daily_plan(text: str) -> dict | None:
     return {
         "date": date_str,
         "team": team_str or "Unknown",
-        "content": content or text,
+        "content": content or text_to_parse,
     }
 
 
@@ -1042,7 +1055,7 @@ async def scan_plan_tomorrow(client, group_key: str, chat_id: int,
                         result = {
                             "found": True,
                             "sent_time": dt_mm.strftime("%d/%m/%Y %H:%M"),
-                            "content": parsed.get("content", msg.message),
+                            "content": clean_plan_content(parsed.get("content", msg.message)),
                             "plan": parsed,
                         }
                         return result  # Lấy plan mới nhất (messages desc)
