@@ -1,6 +1,10 @@
-name: Refuel Report Master (06:15, 13:10, 16:15 MMT)
+name: Refuel Report Master (05:32, 13:22, 21:07 MMT)
 
 on:
+  schedule:
+    - cron: '2 23 * * *'   # 05:32 AM Myanmar Time (UTC+6:30) -> 23:02 UTC
+    - cron: '52 6 * * *'   # 13:22 PM Myanmar Time (UTC+6:30) -> 06:52 UTC
+    - cron: '37 14 * * *'  # 21:07 PM Myanmar Time (UTC+6:30) -> 14:37 UTC
   workflow_dispatch:
 
 jobs:
