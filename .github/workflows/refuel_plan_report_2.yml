@@ -1,6 +1,10 @@
 name: Refuel Plan Report 2 (10:00, 15:00, 22:00 MMT)
 
 on:
+  schedule:
+    - cron: '30 3 * * *'   # 10:00 AM Myanmar Time (UTC+6:30) -> 03:30 UTC
+    - cron: '30 8 * * *'   # 15:00 PM Myanmar Time (UTC+6:30) -> 08:30 UTC
+    - cron: '30 15 * * *'  # 22:00 PM Myanmar Time (UTC+6:30) -> 15:30 UTC
   workflow_dispatch:
 
 jobs:
