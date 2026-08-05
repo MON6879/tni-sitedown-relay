@@ -311,16 +311,23 @@ function processSiteDownColC(sheet) {
       for (const line of rawSites) {
         let matched = false;
         for (const td of teamDefs) {
-          if (td.regex.test(line)) {
+          if (/^Team\s*/i.test(line.trim()) && td.regex.test(line)) {
             currentTeam = td.key;
             matched = true;
             break;
           }
         }
         if (matched) continue;
-        if (currentTeam && teamBlocks[currentTeam]) {
+
+        let lineTeam = currentTeam;
+        if (/\|\s*🟠?\s*T1\b/i.test(line)) lineTeam = "T1";
+        else if (/\|\s*🔵?\s*T2\b/i.test(line)) lineTeam = "T2";
+        else if (/\|\s*🟢?\s*T3\b/i.test(line)) lineTeam = "T3";
+        else if (/\|\s*🟡?\s*T4\b/i.test(line)) lineTeam = "T4";
+
+        if (lineTeam && teamBlocks[lineTeam]) {
           if (/^_{5,}$/.test(line.trim())) continue;
-          teamBlocks[currentTeam].push(line);
+          teamBlocks[lineTeam].push(line);
         }
       }
 
@@ -606,12 +613,12 @@ function sendOrEditTelegram(chatId, text, msgKey, tag) {
 }
 
 function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
-  // ✅ Xóa tin cũ và bắn tin mới xuống ĐÁY CHAT TELEGRAM (Không edit ngầm lên tin cũ ở lịch sử 2 tiếng trước)
+  // ✅ Xóa tin cũ và bắn tin mới xuống ĐÁY CHAT TELEGRAM theo định dạng HTML đẹp mắt (KHÔNG dùng thẻ <pre> ô xám code)
   deleteOldMessages_(chatId, msgKey);
   Utilities.sleep(200);
   const props  = PropertiesService.getScriptProperties();
   const idKey  = "SD_MSGID_" + msgKey;
-  const newIds = sendTelegramPreCollectIds_(chatId, plainContent, tag);
+  const newIds = sendTelegramCollectIds_(chatId, plainContent, tag);
   props.setProperty(idKey, JSON.stringify(newIds));
 }
 
