@@ -147,7 +147,7 @@
       box-shadow: 0 4px 20px rgba(99, 102, 241, 0.45);
     }
 
-    /* AI Voice & Security Widget */
+    /* AI Voice & Security Header Actions */
     .header-actions {
       display: flex;
       align-items: center;
@@ -401,7 +401,7 @@
       border: 1px solid var(--cyan);
       border-radius: 24px;
       width: 90%;
-      max-width: 680px;
+      max-width: 780px;
       padding: 2rem;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
     }
@@ -512,56 +512,68 @@
         <button class="filter-btn" onclick="setPeriodFilter('monthly', this)"><i class="fa-solid fa-calendar-days"></i> Monthly Report</button>
       </div>
 
-      <div class="section-head"><i class="fa-solid fa-layer-group"></i> Regional Teams Summary Cards (Click Card for Team Details)</div>
+      <div class="section-head"><i class="fa-solid fa-layer-group"></i> Regional Teams Summary Cards (Click Card for Live Sheet Rows)</div>
 
       <!-- 4 Interactive Team Cards (Clickable) -->
       <div class="team-card-grid">
         
         <!-- Team 1 Card -->
-        <div class="interactive-team-card" onclick="openTeamModal('Team 1 Dawei', '10 Staff', '185 WOs', '53 Done (28.5%)', 'Dawei, Tanintharyi Region')">
-          <div class="team-badge-icon tb-t1"><i class="fa-solid fa-location-dot"></i></div>
+        <div class="interactive-team-card" onclick="openTeam1Modal()">
+          <div class="team-badge-icon tb-t1"><i class="fa-solid fa-crown"></i></div>
           <span class="team-tag tag-t1">Team 1 Dawei</span>
-          <h3 style="margin-top:0.8rem; font-size:1.5rem; font-weight:800;">10 Engineers</h3>
-          <div class="row-detail"><span style="color:var(--text-sub);">Work Orders:</span><span style="font-weight:700;">185 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Completed Rate:</span><span style="font-weight:700; color:var(--emerald);">28.5% (53 Done)</span></div>
-          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:600;">👉 Click for Team 1 Detail Spec</div>
+          <h3 style="margin-top:0.6rem; font-size:1.4rem; font-weight:800; color:#fff;">Leader: Paing Aung Soe</h3>
+          <p style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM01_Dawei (10 Staff)</p>
+          
+          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close WOs (Col A):</span><strong style="color:var(--rose); font-size:1.05rem;">32 WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Assigned WOs:</span><span style="font-weight:700;">185 WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Completion Rate:</span><span style="font-weight:700; color:var(--emerald);">13%</span></div>
+          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details (Col A to H)</div>
         </div>
 
         <!-- Team 2 Card -->
-        <div class="interactive-team-card" onclick="openTeamModal('Team 2 Myeik (+T5)', '11 Staff', '214 WOs', '45 Done (21.0%)', 'Myeik & Palaw Sub-region')">
-          <div class="team-badge-icon tb-t2"><i class="fa-solid fa-location-dot"></i></div>
+        <div class="interactive-team-card" onclick="openTeamModal('Team 2 Myeik (+T5)', 'Nay Myo Thu', '11 Staff', '0 WOs', '214 WOs', '21%', 'MYT_TNI_TEAM02_Myeik')">
+          <div class="team-badge-icon tb-t2"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t2">Team 2 Myeik (+T5)</span>
-          <h3 style="margin-top:0.8rem; font-size:1.5rem; font-weight:800;">11 Engineers</h3>
-          <div class="row-detail"><span style="color:var(--text-sub);">Work Orders:</span><span style="font-weight:700;">214 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Completed Rate:</span><span style="font-weight:700; color:var(--cyan);">21.0% (45 Done)</span></div>
-          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:600;">👉 Click for Team 2 Detail Spec</div>
+          <h3 style="margin-top:0.6rem; font-size:1.4rem; font-weight:800; color:#fff;">Leader: Nay Myo Thu</h3>
+          <p style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM02_Myeik (11 Staff)</p>
+          
+          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close WOs (Col A):</span><strong style="color:var(--emerald); font-size:1.05rem;">0 WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Assigned WOs:</span><span style="font-weight:700;">214 WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Completion Rate:</span><span style="font-weight:700; color:var(--cyan);">21%</span></div>
+          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details (Col A to H)</div>
         </div>
 
         <!-- Team 3 Card -->
-        <div class="interactive-team-card" onclick="openTeamModal('Team 3 Bokpyin', '4 Staff', '68 WOs', '18 Done (26.4%)', 'Bokpyin Southern Region')">
-          <div class="team-badge-icon tb-t3"><i class="fa-solid fa-location-dot"></i></div>
+        <div class="interactive-team-card" onclick="openTeamModal('Team 3 Bokpyin', 'Pyae Phyo Zaw', '4 Staff', '2 WOs', '68 WOs', '26%', 'MYT_TNI_TEAM03_Bokpyin')">
+          <div class="team-badge-icon tb-t3"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t3">Team 3 Bokpyin</span>
-          <h3 style="margin-top:0.8rem; font-size:1.5rem; font-weight:800;">4 Engineers</h3>
-          <div class="row-detail"><span style="color:var(--text-sub);">Work Orders:</span><span style="font-weight:700;">68 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Completed Rate:</span><span style="font-weight:700; color:var(--emerald);">26.4% (18 Done)</span></div>
-          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:600;">👉 Click for Team 3 Detail Spec</div>
+          <h3 style="margin-top:0.6rem; font-size:1.4rem; font-weight:800; color:#fff;">Leader: Pyae Phyo Zaw</h3>
+          <p style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM03_Bokpyin (4 Staff)</p>
+          
+          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close WOs (Col A):</span><strong style="color:var(--amber); font-size:1.05rem;">2 WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Assigned WOs:</span><span style="font-weight:700;">68 WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Completion Rate:</span><span style="font-weight:700; color:var(--emerald);">26%</span></div>
+          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details (Col A to H)</div>
         </div>
 
         <!-- Team 4 Card -->
-        <div class="interactive-team-card" onclick="openTeamModal('Team 4 Kawthoung', '4 Staff', '64 WOs', '17 Done (26.5%)', 'Kawthoung Border Region')">
-          <div class="team-badge-icon tb-t4"><i class="fa-solid fa-location-dot"></i></div>
+        <div class="interactive-team-card" onclick="openTeamModal('Team 4 Kawthoung', 'Naing Myo Htun', '4 Staff', '3 WOs', '64 WOs', '54%', 'MYT_TNI_TEAM04_Kawthoung')">
+          <div class="team-badge-icon tb-t4"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t4">Team 4 Kawthoung</span>
-          <h3 style="margin-top:0.8rem; font-size:1.5rem; font-weight:800;">4 Engineers</h3>
-          <div class="row-detail"><span style="color:var(--text-sub);">Work Orders:</span><span style="font-weight:700;">64 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Completed Rate:</span><span style="font-weight:700; color:var(--amber);">26.5% (17 Done)</span></div>
-          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:600;">👉 Click for Team 4 Detail Spec</div>
+          <h3 style="margin-top:0.6rem; font-size:1.4rem; font-weight:800; color:#fff;">Leader: Naing Myo Htun</h3>
+          <p style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM04_Kawthoung (4 Staff)</p>
+          
+          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close WOs (Col A):</span><strong style="color:var(--amber); font-size:1.05rem;">3 WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Assigned WOs:</span><span style="font-weight:700;">64 WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Completion Rate:</span><span style="font-weight:700; color:var(--emerald);">54%</span></div>
+          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details (Col A to H)</div>
         </div>
 
       </div>
 
       <!-- Performance Distribution Chart -->
       <div class="card">
-        <div class="section-head"><i class="fa-solid fa-chart-column"></i> Total 531 Work Orders Performance Overview</div>
+        <div class="section-head"><i class="fa-solid fa-chart-column"></i> Total 531 Work Orders & CD Not Yet Close Overview</div>
         <canvas id="woChart" style="max-height: 270px;"></canvas>
       </div>
 
@@ -705,16 +717,82 @@
 
   </main>
 
-  <!-- Interactive Team Modal -->
+  <!-- TEAM 1 DAWEI COMPLETE RAW DATA MODAL -->
+  <div id="team1Modal" class="modal-backdrop">
+    <div class="modal-box" style="max-width: 850px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="color:var(--amber); font-weight:800; font-size:1.3rem;">Team 1 Dawei — Sheet Row Data (Row 45, Sheet 'Sum all WO Team')</h3>
+          <p style="font-size:0.8rem; color:var(--text-sub);">Google Sheet ID: 1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8 (gid=1840482617)</p>
+        </div>
+        <button class="close-btn" onclick="closeTeam1Modal()">&times;</button>
+      </div>
+
+      <div style="max-height: 480px; overflow-y: auto;">
+        
+        <!-- Summary Header Box -->
+        <div style="background:rgba(245, 158, 11, 0.12); border:1px solid rgba(245, 158, 11, 0.3); border-radius:16px; padding:1.2rem; margin-bottom:1.2rem;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <span>Team Leader (Col C): <strong>Paing Aung Soe</strong></span>
+            <span>Title (Col D): <strong>Team leader 1</strong></span>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <span>Region Code (Col E): <strong>MYT_TNI_TEAM01_Dawei</strong></span>
+            <span>CD Not Yet Close (Col A): <strong style="color:var(--rose); font-size:1.1rem;">32 WOs</strong></span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span>Assigned WOs: <strong>185 WOs</strong></span>
+            <span>Completion Benchmark: <strong style="color:var(--emerald);">13%</strong></span>
+          </div>
+        </div>
+
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-list-check"></i> Point & Department Breakdown for Team 1</h4>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.8rem; margin-bottom:1.5rem;">
+          <div class="row-detail"><span>Asset Tasks:</span><strong>TL:27 /39 P:0</strong></div>
+          <div class="row-detail"><span>Finance Tasks:</span><strong>TL:3 /3 P:0</strong></div>
+          <div class="row-detail"><span>Manager Tasks:</span><strong>TL:0 /14 P:0</strong></div>
+          <div class="row-detail"><span>Preventive Maintenance (PM):</span><strong>TL:0 /24 P:0</strong></div>
+          <div class="row-detail"><span>Corrective Maintenance (CM):</span><strong>TL:0 /26 P:0</strong></div>
+          <div class="row-detail"><span>M&E Tasks:</span><strong>TL:0 /35 P:0</strong></div>
+        </div>
+
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 1 Engineer Roster & Performance</h4>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Engineer Name</th>
+              <th>System Username Account</th>
+              <th>Completed WOs</th>
+              <th>Completion Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td><strong>Paing Aung Soe</strong> (Team Leader)</td><td>myt_paingaung.soe</td><td>0 WOs (CD Pending: 32)</td><td>0%</td></tr>
+            <tr><td>2</td><td>Bhone Htet Aung</td><td>myt_bhonehtet.aung</td><td>14 WOs</td><td>29%</td></tr>
+            <tr><td>3</td><td>Bone Myat Naing</td><td>myt_bonemyat.naing1</td><td>13 WOs</td><td>18%</td></tr>
+            <tr><td>4</td><td>Aung Lwin Phyo</td><td>myt_aunglwin.phyo</td><td>6 WOs</td><td>10%</td></tr>
+            <tr><td>5</td><td>Phyo Ko Ko</td><td>myt_phyoko.ko44</td><td>4 WOs</td><td>9%</td></tr>
+            <tr><td>6</td><td>Thar Htoo Aung</td><td>myt_tharhtoo.aung11</td><td>1 WO</td><td>2%</td></tr>
+            <tr><td>7</td><td>Aung Thin Myat</td><td>myt_aungthin.mya</td><td>8 WOs</td><td>0%</td></tr>
+            <tr><td>8</td><td>Kaung Htet Kyaw</td><td>myt_kaunghtet.kyaw12</td><td>0 WOs</td><td>0%</td></tr>
+            <tr><td>9</td><td>Nyi Nyi</td><td>myt_nyi.nyi23</td><td>0 WOs</td><td>0%</td></tr>
+            <tr><td>10</td><td>Thura Aung</td><td>myt_thura.aung22</td><td>0 WOs</td><td>0%</td></tr>
+          </tbody>
+        </table>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- GENERIC TEAM MODAL -->
   <div id="teamModal" class="modal-backdrop">
     <div class="modal-box">
       <div class="modal-header">
         <h3 id="modalTeamName" style="color:var(--cyan); font-weight:800;">Team Details</h3>
         <button class="close-btn" onclick="closeTeamModal()">&times;</button>
       </div>
-      <div id="modalTeamContent" style="color:var(--text-sub); line-height:1.7;">
-        <!-- Team Detail Content Populated Dynamically -->
-      </div>
+      <div id="modalTeamContent" style="color:var(--text-sub); line-height:1.7;"></div>
     </div>
   </div>
 
@@ -750,16 +828,24 @@
       btn.classList.add('active');
     }
 
-    /* Modal Handler */
-    function openTeamModal(name, staff, wo, rate, region) {
-      document.getElementById('modalTeamName').textContent = name + " — Operational Details";
+    /* Modal Handlers */
+    function openTeam1Modal() {
+      document.getElementById('team1Modal').classList.add('active');
+    }
+
+    function closeTeam1Modal() {
+      document.getElementById('team1Modal').classList.remove('active');
+    }
+
+    function openTeamModal(name, leader, staff, cdNotClose, wo, rate, region) {
+      document.getElementById('modalTeamName').textContent = name + " — Raw Sheet Details";
       document.getElementById('modalTeamContent').innerHTML = `
+        <div class="row-detail"><span>Team Leader Name:</span><strong>${leader}</strong></div>
         <div class="row-detail"><span>Regional Zone:</span><strong>${region}</strong></div>
+        <div class="row-detail"><span>CD Not Yet Close WOs (Col A):</span><strong style="color:var(--amber);">${cdNotClose}</strong></div>
         <div class="row-detail"><span>Engineer Headcount:</span><strong>${staff}</strong></div>
         <div class="row-detail"><span>Total Assigned Work Orders:</span><strong>${wo}</strong></div>
         <div class="row-detail"><span>Completion Benchmark:</span><strong style="color:var(--emerald);">${rate}</strong></div>
-        <br>
-        <p style="font-size:0.85rem; color:var(--text-sub);">Every team member is assigned specific site maintenance tasks, optical cable patrol routes, and generator oil maintenance schedules.</p>
       `;
       document.getElementById('teamModal').classList.add('active');
     }
@@ -779,10 +865,7 @@
     function submitAddGmail() {
       const email = document.getElementById('newGmailInput').value.trim();
       const name = document.getElementById('newNameInput').value.trim();
-      if (!email || !name) {
-        alert("Please fill in both Gmail address and Name.");
-        return;
-      }
+      if (!email || !name) return;
       const tbody = document.getElementById('gmailListTable');
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -793,8 +876,6 @@
         <td><button class="filter-btn" style="color:var(--rose);" onclick="removeGmail(this)">Remove</button></td>
       `;
       tbody.appendChild(tr);
-      document.getElementById('newGmailInput').value = '';
-      document.getElementById('newNameInput').value = '';
       closeAddGmailModal();
     }
 
@@ -807,9 +888,9 @@
     let synth = window.speechSynthesis;
 
     const BRIEFING_SCRIPTS = {
-      'en-US': "Welcome to TNI Global Operations Executive Portal. As of August 5th, 2026, total system volume is 531 Work Orders across 4 regional teams and 29 engineers. Team 1 Dawei 185 Work Orders. Team 2 Myeik 214 Work Orders. Team 3 Bokpyin 68 Work Orders. Team 4 Kawthoung 64 Work Orders.",
-      'vi-VN': "Chào mừng bạn đến với Cổng thông tin Báo cáo Vận hành TNI BI. Tính đến ngày 5 tháng 8 năm 2026, hệ thống quản lý 531 Work Orders với 29 kỹ sư hiện trường chia làm 4 đội khu vực. Đội 1 Dawei 185 Work Orders. Đội 2 Myeik 214 Work Orders. Đội 3 Bokpyin 68 Work Orders. Đội 4 Kawthoung 64 Work Orders.",
-      'my-MM': "TNI လုပ်ငန်းဆောင်ရွက်မှု အစီရင်ခံစာမှ ကြိုဆိုပါသည်။ ၂၀၂၆ ခုနှစ် ဩဂုတ်လ ၅ ရက်နေ့အထိ၊ စုစုပေါင်း လုပ်ငန်းအမိန့် ၅၃၁ ခု ရှိပါသည်။"
+      'en-US': "Welcome to TNI Global Operations Executive Portal. As of August 5th, 2026, total system volume is 531 Work Orders across 4 regional teams. Team 1 Dawei led by Paing Aung Soe has 32 Work Orders pending close out of 185 total Work Orders. Team 2 Myeik led by Nay Myo Thu has zero pending close.",
+      'vi-VN': "Chào mừng bạn đến với Cổng thông tin Báo cáo Vận hành TNI BI. Đội 1 Dawei do Paing Aung Soe làm đội trưởng hiện có 32 Work Orders chưa đóng trên tổng số 185 Work Orders được giao. Đội 2 Myeik do Nay Myo Thu dẫn đầu đã xử lý tốt với 0 Work Order tồn đọng.",
+      'my-MM': "TNI လုပ်ငန်းဆောင်ရွက်မှု အစီရင်ခံစာမှ ကြိုဆိုပါသည်။ အသင်း ၁ ထားဝယ် ခေါင်းဆောင် ပိုင်အောင်စိုး ဖြစ်ပါသည်။"
     };
 
     function toggleAIVoice() {
@@ -856,10 +937,10 @@
         new Chart(ctx, {
           type: 'bar',
           data: {
-            labels: ['T1 Dawei (185 WOs)', 'T2 Myeik (214 WOs)', 'T3 Bokpyin (68 WOs)', 'T4 Kawthoung (64 WOs)'],
+            labels: ['T1 Dawei (Paing Aung Soe)', 'T2 Myeik (Nay Myo Thu)', 'T3 Bokpyin (Pyae Phyo Zaw)', 'T4 Kawthoung (Naing Myo Htun)'],
             datasets: [
               { label: 'Assigned WOs', data: [185, 214, 68, 64], backgroundColor: '#38BDF8', borderRadius: 8 },
-              { label: 'Completed WOs', data: [53, 45, 18, 17], backgroundColor: '#10B981', borderRadius: 8 }
+              { label: 'CD Not Yet Close (Col A)', data: [32, 0, 2, 3], backgroundColor: '#EF4444', borderRadius: 8 }
             ]
           },
           options: {
