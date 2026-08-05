@@ -40,6 +40,19 @@ DEP_SQUARES = {
     "team 05": "🔵", "team 5": "🔵", "team5": "🔵"
 }
 
+# Map gộp các tên alias của Team về tên chuẩn (Team 5 gộp vào Team 2)
+ROLE_ALIASES = {
+    "team 05": "Team 2",
+    "team 5": "Team 2",
+    "team5": "Team 2",
+    "t5": "Team 2",
+    "team 5 merg": "Team 2",
+    "team 01": "Team 1",
+    "team 02": "Team 2",
+    "team 03": "Team 3",
+    "team 04": "Team 4",
+}
+
 def parse_date(val):
     if pd.isna(val):
         return None
@@ -115,11 +128,14 @@ async def main():
 
         if pd.isna(role_val) or not str(role_val).strip():
             continue
-        role = str(role_val).strip()
+        role_raw = str(role_val).strip()
 
         # Bỏ qua các hàng tiêu đề phụ nếu có
-        if role.lower() in ("nan", "", "assign admin", "chức vụ", "phòng ban"):
+        if role_raw.lower() in ("nan", "", "assign admin", "chức vụ", "phòng ban"):
             continue
+
+        # Gộp Team 5 / Team 05 về Team 2
+        role = ROLE_ALIASES.get(role_raw.lower(), role_raw)
 
         # Tích lũy số liệu thống kê tổng hợp
         if role not in stats:
