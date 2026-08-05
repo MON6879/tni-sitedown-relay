@@ -21,7 +21,9 @@ def _tg_session()  -> str: return os.environ.get("TELEGRAM_SESSION", "")
 # ── Cấu hình chung ─────────────────────────────────────────────────────────
 
 
-def _bot_token():
+def _bot_token(bot_token: str = None):
+    if bot_token and str(bot_token).strip():
+        return str(bot_token).strip()
     return (
         os.environ.get("REFUEL_BOT_TOKEN") or
         os.environ.get("SEND_BOT_TOKEN") or
@@ -44,7 +46,9 @@ def get_msg_id(key: str) -> str:
         return ""
     try:
         r = requests.post(gas_url, json={"action": "get_msg_id", "key": key}, timeout=25)
-        return r.json().get("msg_id", "")
+        if r.status_code == 200:
+            return r.json().get("msg_id", "")
+        return ""
     except Exception as e:
         logger.warning(f"get_msg_id error: {e}")
         return ""
@@ -61,12 +65,12 @@ def set_msg_id(key: str, msg_id):
 
 # ── Telegram helpers ───────────────────────────────────────────────────────
 
-def tg_delete(chat_id: str, msg_id):
+def tg_delete(chat_id: str, msg_id, bot_token: str = None):
     """Xóa tin nhắn cũ theo message_id. Bỏ qua nếu không có."""
     if not msg_id:
         return
     try:
-        token = _bot_token()
+        token = _bot_token(bot_token)
         r = requests.post(
             f"https://api.telegram.org/bot{token}/deleteMessage",
             json={"chat_id": chat_id, "message_id": int(msg_id)},
@@ -150,10 +154,10 @@ def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300)
         return 0
 
 def tg_send_fresh(chat_id: str, text: str, state_key: str = None,
-                  parse_mode: str = "HTML", title_prefix: str = "") -> int:
+                  parse_mode: str = "HTML", title_prefix: str = "", bot_token: str = None) -> int:
     """
     Xóa tin cũ → gửi tin mới → lưu message_id mới.
-    Đưu tiên dùng Telethon xóa theo tiêu đề (nếu có title_prefix),
+    Ưu tiên dùng Telethon xóa theo tiêu đề (nếu có title_prefix),
     fallback về GAS msg_id nếu không có Telethon session.
     """
     # Bước 1: xóa tin cũ
@@ -163,22 +167,22 @@ def tg_send_fresh(chat_id: str, text: str, state_key: str = None,
     if state_key:
         old_id = get_msg_id(state_key)
         if old_id:
-            tg_delete(chat_id, old_id)             # Fallback: xóa 1 tin theo GAS msg_id
+            tg_delete(chat_id, old_id, bot_token=bot_token)             # Fallback: xóa 1 tin theo GAS msg_id
             logger.info(f"Deleted old msg {old_id} for key={state_key}")
 
         # Xóa cả tin cũ từ legacy keys nếu có (report3 -> report1, report4 -> report2)
         if "report1_" in state_key:
             legacy_id = get_msg_id(state_key.replace("report1_", "report3_"))
             if legacy_id:
-                tg_delete(chat_id, legacy_id)
+                tg_delete(chat_id, legacy_id, bot_token=bot_token)
         elif "report2_" in state_key:
             legacy_id = get_msg_id(state_key.replace("report2_", "report4_"))
             if legacy_id:
-                tg_delete(chat_id, legacy_id)
+                tg_delete(chat_id, legacy_id, bot_token=bot_token)
 
     # Bước 2: gửi tin mới
     try:
-        token = _bot_token()
+        token = _bot_token(bot_token)
         r = requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},

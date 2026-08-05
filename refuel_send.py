@@ -38,13 +38,17 @@ def fetch_refuel_data() -> list[str] | None:
         print(f"⚠️ Direct CSV fetch warning: {e}", file=sys.stderr)
 
     # Fallback qua Apps Script API
-    if REFUEL_APPS_SCRIPT_URL:
+    gas_url = (
+        REFUEL_APPS_SCRIPT_URL or
+        "https://script.google.com/macros/s/AKfycbwHyzulEMVGjslfjN_m38HzpFZHRfk2qwbQmdwb6MMqBM8xNm20JJxxzW_4zTNzp3n24Q/exec"
+    )
+    if gas_url:
         try:
-            resp = requests.get(REFUEL_APPS_SCRIPT_URL, params={"action": "get_refuel_data"}, timeout=30)
+            resp = requests.get(gas_url, params={"action": "get_refuel_data"}, timeout=30)
             if resp.status_code == 200 and resp.json().get("status") == "ok":
                 return resp.json()["data"]
-        except Exception:
-            pass
+        except Exception as ex:
+            print(f"⚠️ GAS fallback warning: {ex}", file=sys.stderr)
     return None
 
 
@@ -148,19 +152,81 @@ def parse_sites_from_row(line_text: str) -> list[tuple[str, str]]:
     return sites
 
 
-def delete_refuel_msg(chat_id: str, msg_id: int | str):
+LOCAL_STATE_FILE = "scratch/refuel_msg_ids.json"
+
+def get_saved_msg_ids(key: str) -> list[str]:
+    """Lấy danh sách ID tin nhắn cũ từ file cục bộ và GAS BotState."""
+    ids = []
+    if os.path.exists(LOCAL_STATE_FILE):
+        try:
+            with open(LOCAL_STATE_FILE, "r", encoding="utf-8") as f:
+                import json
+                data = json.load(f)
+                val = data.get(key, "")
+                if val:
+                    ids.extend(str(val).split(","))
+        except Exception:
+            pass
+    gas_val = get_msg_id(key)
+    if gas_val:
+        for item in str(gas_val).split(","):
+            if item and item not in ids:
+                ids.append(item)
+    return [i.strip() for i in ids if i.strip()]
+
+def save_saved_msg_ids(key: str, sent_ids: list[int | str]):
+    """Lưu danh sách ID tin mới vào file cục bộ và GAS BotState."""
+    id_str = ",".join(map(str, sent_ids))
+    try:
+        import json
+        os.makedirs("scratch", exist_ok=True)
+        data = {}
+        if os.path.exists(LOCAL_STATE_FILE):
+            with open(LOCAL_STATE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        data[key] = id_str
+        with open(LOCAL_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception as e:
+        print(f"⚠️ Error saving local state: {e}", file=sys.stderr)
+    set_msg_id(key, id_str)
+
+def delete_refuel_msg(chat_id: str, msg_id: int | str) -> bool:
     """Xóa tin nhắn cũ bằng REFUEL_BOT_TOKEN."""
     if not msg_id:
-        return
+        return False
     try:
         url = f"https://api.telegram.org/bot{REFUEL_BOT_TOKEN}/deleteMessage"
-        requests.post(
+        resp = requests.post(
             url,
             json={"chat_id": chat_id, "message_id": int(msg_id)},
-            timeout=15
+            timeout=10
         )
+        res_json = resp.json()
+        if res_json.get("ok"):
+            print(f"🗑️ Deleted old refuel msg #{msg_id}")
+            return True
     except Exception as e:
-        print(f"⚠️ delete_refuel_msg error: {e}", file=sys.stderr)
+        print(f"⚠️ delete_refuel_msg error for #{msg_id}: {e}", file=sys.stderr)
+    return False
+
+def delete_all_previous_refuel_msgs(chat_id: str, key: str):
+    """Xóa triệt để 100% tất cả các tin nhắn Refuel cũ trong nhóm."""
+    saved_ids = get_saved_msg_ids(key)
+    deleted_set = set()
+
+    for msg_id in saved_ids:
+        if delete_refuel_msg(chat_id, msg_id):
+            deleted_set.add(str(msg_id))
+        try:
+            base_id = int(msg_id)
+            for offset in range(-20, 20):
+                target_id = base_id + offset
+                if target_id > 0 and str(target_id) not in deleted_set:
+                    if delete_refuel_msg(chat_id, target_id):
+                        deleted_set.add(str(target_id))
+        except Exception:
+            pass
 
 
 def format_and_send_report(rows: list[str]) -> list[int]:
@@ -225,17 +291,12 @@ def format_and_send_report(rows: list[str]) -> list[int]:
     sent_ids = []
     STATE_KEY = f"refuel_msg_ids_{REFUEL_CHAT_ID}"
 
-    # 1. XÓA TẤT CẢ TIN CỦ ĐÃ GỬI TRƯỚC ĐÓ BẰNG REFUEL_BOT_TOKEN
-    old_ids_str = get_msg_id(STATE_KEY)
-    if old_ids_str:
-        for old_id in str(old_ids_str).split(","):
-            if old_id.strip():
-                delete_refuel_msg(REFUEL_CHAT_ID, old_id.strip())
-
+    # 1. XÓA TRIỆT ĐỂ 100% TẤT CẢ TIN CỦ BẰNG SMART SCANNER & REFUEL_BOT_TOKEN
+    delete_all_previous_refuel_msgs(REFUEL_CHAT_ID, STATE_KEY)
     tg_delete_by_title(REFUEL_CHAT_ID, "⛽ TNI REQUEST REFUEL")
 
     for idx, chunk_lines in enumerate(chunks):
-        title = "⛽ <b>TNI REQUEST REFUEL — Daily Report</b>"
+        title = "🔄 <b>[Report 1] TNI REQUEST REFUEL — Daily Report</b>"
         if len(chunks) > 1:
             title += f" (Phần {idx + 1}/{len(chunks)})"
 
@@ -258,9 +319,9 @@ def format_and_send_report(rows: list[str]) -> list[int]:
         if ok and msg_id:
             sent_ids.append(msg_id)
 
-    # 2. LƯU ID CÁC TIN VỪA GỬI MỚI ĐỂ LẦN SAU XÓA TẠO CƠ CHẾ SẠCH SẼ
+    # 2. LƯU ID CÁC TIN VỪA GỬI MỚI VÀO CẢ LOCAL FILE VÀ GAS BOTSTATE
     if sent_ids:
-        set_msg_id(STATE_KEY, ",".join(map(str, sent_ids)))
+        save_saved_msg_ids(STATE_KEY, sent_ids)
 
     return sent_ids
 

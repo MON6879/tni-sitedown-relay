@@ -55,7 +55,7 @@ def tg_send(text: str, report_key: str = "") -> bool:
     """Xóa TẤT CẢ tin cũ cùng tiêu đề rồi gửi tin mới lên Telegram group."""
     state_key    = f"{report_key}_{REFUEL_CHAT_ID}" if report_key else None
     title_prefix = REPORT_TITLE_PREFIX.get(report_key, "")
-    msg_id = tg_send_fresh(REFUEL_CHAT_ID, text, state_key=state_key, title_prefix=title_prefix)
+    msg_id = tg_send_fresh(REFUEL_CHAT_ID, text, state_key=state_key, title_prefix=title_prefix, bot_token=REFUEL_BOT_TOKEN)
     if not msg_id:
         print("❌ Telegram send failed", file=sys.stderr)
         return False
