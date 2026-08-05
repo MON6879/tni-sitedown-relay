@@ -2,8 +2,8 @@ name: Daily Plan Report (Report 5.1)
 
 on:
   schedule:
-    - cron: '15 23 * * *'  # 05:45 AM Myanmar Time (UTC+6:30) -> 23:15 UTC
-    - cron: '15 9 * * *'   # 15:45 PM Myanmar Time (UTC+6:30) -> 09:15 UTC
+    - cron: '18 23 * * *'  # 05:48 AM Myanmar Time (UTC+6:30) -> 23:18 UTC
+    - cron: '18 9 * * *'   # 15:48 PM Myanmar Time (UTC+6:30) -> 09:18 UTC
   repository_dispatch:
     types: [run_daily_report, run_daily_plan_report]
   workflow_dispatch:
