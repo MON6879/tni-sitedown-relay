@@ -317,10 +317,10 @@
       font-size: 1rem;
     }
 
-    .tb-t1 { background: rgba(245, 158, 11, 0.2); color: var(--amber); }
-    .tb-t2 { background: rgba(56, 189, 248, 0.2); color: var(--cyan); }
-    .tb-t3 { background: rgba(16, 185, 129, 0.2); color: var(--emerald); }
-    .tb-t4 { background: rgba(239, 68, 68, 0.2); color: var(--rose); }
+    .tb-t1 { background: rgba(249, 115, 22, 0.2); color: #F97316; }
+    .tb-t2 { background: rgba(56, 189, 248, 0.2); color: #38BDF8; }
+    .tb-t3 { background: rgba(16, 185, 129, 0.2); color: #10B981; }
+    .tb-t4 { background: rgba(234, 179, 8, 0.2); color: #EAB308; }
 
     .team-tag {
       padding: 0.25rem 0.75rem;
@@ -330,10 +330,10 @@
       text-transform: uppercase;
     }
 
-    .tag-t1 { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
-    .tag-t2 { background: rgba(56, 189, 248, 0.15); color: var(--cyan); }
-    .tag-t3 { background: rgba(16, 185, 129, 0.15); color: var(--emerald); }
-    .tag-t4 { background: rgba(239, 68, 68, 0.15); color: var(--rose); }
+    .tag-t1 { background: rgba(249, 115, 22, 0.15); color: #FB923C; }
+    .tag-t2 { background: rgba(56, 189, 248, 0.15); color: #38BDF8; }
+    .tag-t3 { background: rgba(16, 185, 129, 0.15); color: #34D399; }
+    .tag-t4 { background: rgba(234, 179, 8, 0.15); color: #FACC15; }
 
     .row-detail {
       display: flex;
@@ -521,7 +521,7 @@
         
         <!-- Team 1 Card -->
         <div class="interactive-team-card" onclick="openTeam1Modal()">
-          <div class="team-badge-icon tb-t1"><i class="fa-solid fa-crown"></i></div>
+          <div class="team-badge-icon tb-t1"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t1">Team 1 Dawei</span>
           <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Paing Aung Soe</h3>
           <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM01_Dawei (10 Staff)</p>
@@ -530,12 +530,12 @@
           <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close (Col G):</span><strong style="color:var(--emerald);">46 WOs</strong></div>
           <div class="row-detail"><span style="color:var(--text-sub);">Plan (Col M):</span><span style="font-weight:700; color:var(--amber);">22 WOs</span></div>
           <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close (Col A):</span><strong style="color:var(--rose);">32 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank (Col H) & % (Col I):</span><span style="font-weight:700; color:var(--emerald);">Rank #4 (13%)</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--rose);">Rank #4 (13%/50% Not Meet Target)</span></div>
           <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details (Col A to AD)</div>
         </div>
 
         <!-- Team 2 Card -->
-        <div class="interactive-team-card" onclick="openTeamModal('Team 2 Myeik (+T5)', 'Nay Myo Thu', '11 Staff', '0 WOs', '12 WOs', '42 WOs', '189 WOs', 'Rank #3 (21%)', 'MYT_TNI_TEAM02_Myeik')">
+        <div class="interactive-team-card" onclick="openTeam2Modal()">
           <div class="team-badge-icon tb-t2"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t2">Team 2 Myeik (+T5)</span>
           <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Nay Myo Thu</h3>
@@ -545,12 +545,12 @@
           <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close (Col G):</span><strong style="color:var(--emerald);">42 WOs</strong></div>
           <div class="row-detail"><span style="color:var(--text-sub);">Plan (Col M):</span><span style="font-weight:700; color:var(--amber);">12 WOs</span></div>
           <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close (Col A):</span><strong style="color:var(--emerald);">0 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank (Col H) & % (Col I):</span><span style="font-weight:700; color:var(--emerald);">Rank #3 (21%)</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--rose);">Rank #3 (21%/50% Not Meet Target)</span></div>
           <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details (Col A to AD)</div>
         </div>
 
         <!-- Team 3 Card -->
-        <div class="interactive-team-card" onclick="openTeamModal('Team 3 Bokpyin', 'Pyae Phyo Zaw', '4 Staff', '2 WOs', '5 WOs', '24 WOs', '87 WOs', 'Rank #2 (26%)', 'MYT_TNI_TEAM03_Bokpyin')">
+        <div class="interactive-team-card" onclick="openTeam3Modal()">
           <div class="team-badge-icon tb-t3"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t3">Team 3 Bokpyin</span>
           <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Pyae Phyo Zaw</h3>
@@ -560,12 +560,12 @@
           <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close (Col G):</span><strong style="color:var(--emerald);">24 WOs</strong></div>
           <div class="row-detail"><span style="color:var(--text-sub);">Plan (Col M):</span><span style="font-weight:700; color:var(--amber);">5 WOs</span></div>
           <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close (Col A):</span><strong style="color:var(--amber);">2 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank (Col H) & % (Col I):</span><span style="font-weight:700; color:var(--emerald);">Rank #2 (26%)</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--amber);">Rank #2 (26%/50% Not Meet Target)</span></div>
           <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details (Col A to AD)</div>
         </div>
 
         <!-- Team 4 Card -->
-        <div class="interactive-team-card" onclick="openTeamModal('Team 4 Kawthoung', 'Naing Myo Htun', '4 Staff', '3 WOs', '3 WOs', '50 WOs', '92 WOs', 'Rank #1 (54%)', 'MYT_TNI_TEAM04_Kawthoung')">
+        <div class="interactive-team-card" onclick="openTeam4Modal()">
           <div class="team-badge-icon tb-t4"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t4">Team 4 Kawthoung</span>
           <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Naing Myo Htun</h3>
@@ -575,7 +575,7 @@
           <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close (Col G):</span><strong style="color:var(--emerald);">50 WOs</strong></div>
           <div class="row-detail"><span style="color:var(--text-sub);">Plan (Col M):</span><span style="font-weight:700; color:var(--amber);">3 WOs</span></div>
           <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close (Col A):</span><strong style="color:var(--amber);">3 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank (Col H) & % (Col I):</span><span style="font-weight:700; color:var(--emerald);">Rank #1 (54%)</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--emerald);">Rank #1 (54%/50% Meet Target)</span></div>
           <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details (Col A to AD)</div>
         </div>
 
@@ -642,9 +642,9 @@
         </table>
       </div>
 
-      <!-- Performance Comparison Chart (Plan vs Total FOT Close) -->
+      <!-- Performance Comparison Chart -->
       <div class="card">
-        <div class="section-head"><i class="fa-solid fa-chart-column"></i> Performance Comparison Chart: Plan WOs (Col M) vs Total FOT Close (Col G)</div>
+        <div class="section-head"><i class="fa-solid fa-chart-column"></i> Performance Comparison Chart: Total WO (P+G), FOT Close (G), Remain WO (P), Remain Overdue (N), CD Not Close (A)</div>
         <canvas id="woChart" style="max-height: 290px;"></canvas>
       </div>
 
@@ -793,8 +793,7 @@
     <div class="modal-box" style="max-width: 850px;">
       <div class="modal-header">
         <div>
-          <h3 style="color:var(--amber); font-weight:800; font-size:1.3rem;">Team 1 Dawei — Sheet Row Data (Row 45, Sheet 'Sum all WO Team')</h3>
-          <p style="font-size:0.8rem; color:var(--text-sub);">Google Sheet ID: 1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8 (gid=1840482617)</p>
+          <h3 style="color:var(--amber); font-weight:800; font-size:1.3rem;">Team 1 Dawei</h3>
         </div>
         <button class="close-btn" onclick="closeTeam1Modal()">&times;</button>
       </div>
@@ -804,16 +803,12 @@
         <!-- Summary Header Box -->
         <div style="background:rgba(245, 158, 11, 0.12); border:1px solid rgba(245, 158, 11, 0.3); border-radius:16px; padding:1.2rem; margin-bottom:1.2rem;">
           <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
-            <span>Team Leader (Col C): <strong>Paing Aung Soe</strong></span>
-            <span>Title (Col D): <strong>Team leader 1</strong></span>
-          </div>
-          <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
-            <span>Region Code (Col E): <strong>MYT_TNI_TEAM01_Dawei</strong></span>
             <span>CD Not Yet Close (Col A): <strong style="color:var(--rose); font-size:1.1rem;">32 WOs</strong></span>
+            <span>Total Assigned (Col P+G): <strong style="color:var(--cyan); font-size:1.1rem;">325 WOs</strong></span>
           </div>
           <div style="display:flex; justify-content:space-between;">
             <span>Plan (Col M): <strong style="color:var(--amber);">22 WOs</strong></span>
-            <span>Total Assigned (Col P+G): <strong style="color:var(--cyan);">325 WOs</strong></span>
+            <span>Total FOT Close (Col G): <strong style="color:var(--emerald);">46 WOs</strong></span>
           </div>
           <div style="display:flex; justify-content:space-between; margin-top:0.5rem;">
             <span>Close 04/08 (Col K): <strong style="color:var(--cyan);">7 WOs</strong></span>
@@ -831,28 +826,31 @@
           <div class="row-detail"><span>M&E Tasks:</span><strong>TL:0 /35 P:0</strong></div>
         </div>
 
-        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 1 Engineer Roster & Performance</h4>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 1 Engineer Roster & Performance (Sorted by % Completion High to Low)</h4>
         <table class="data-table">
           <thead>
             <tr>
               <th>#</th>
               <th>Engineer Name</th>
-              <th>System Username Account</th>
               <th>Completed WOs</th>
               <th>Completion Rate</th>
+              <th>Plan 06/08 (Col M)</th>
+              <th>Overdue FOT (Col N)</th>
+              <th>Not Yet On Time (Col O)</th>
+              <th>Sum Not Yet + Wait CD (Col P)</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td>1</td><td><strong>Paing Aung Soe</strong> (Team Leader)</td><td>myt_paingaung.soe</td><td>0 WOs (CD Pending: 32)</td><td>0%</td></tr>
-            <tr><td>2</td><td>Bhone Htet Aung</td><td>myt_bhonehtet.aung</td><td>14 WOs</td><td>29%</td></tr>
-            <tr><td>3</td><td>Bone Myat Naing</td><td>myt_bonemyat.naing1</td><td>13 WOs</td><td>18%</td></tr>
-            <tr><td>4</td><td>Aung Lwin Phyo</td><td>myt_aunglwin.phyo</td><td>6 WOs</td><td>10%</td></tr>
-            <tr><td>5</td><td>Phyo Ko Ko</td><td>myt_phyoko.ko44</td><td>4 WOs</td><td>9%</td></tr>
-            <tr><td>6</td><td>Thar Htoo Aung</td><td>myt_tharhtoo.aung11</td><td>1 WO</td><td>2%</td></tr>
-            <tr><td>7</td><td>Aung Thin Myat</td><td>myt_aungthin.mya</td><td>8 WOs</td><td>0%</td></tr>
-            <tr><td>8</td><td>Kaung Htet Kyaw</td><td>myt_kaunghtet.kyaw12</td><td>0 WOs</td><td>0%</td></tr>
-            <tr><td>9</td><td>Nyi Nyi</td><td>myt_nyi.nyi23</td><td>0 WOs</td><td>0%</td></tr>
-            <tr><td>10</td><td>Thura Aung</td><td>myt_thura.aung22</td><td>0 WOs</td><td>0%</td></tr>
+            <tr><td>1</td><td><strong>Bhone Htet Aung</strong></td><td>14 WOs</td><td><strong style="color:var(--emerald);">29%</strong></td><td>6 WOs</td><td>13 WOs</td><td>58 WOs</td><td>71 WOs</td></tr>
+            <tr><td>2</td><td><strong>Bone Myat Naing</strong></td><td>13 WOs</td><td><strong style="color:var(--emerald);">18%</strong></td><td>4 WOs</td><td>21 WOs</td><td>25 WOs</td><td>46 WOs</td></tr>
+            <tr><td>3</td><td><strong>Aung Lwin Phyo</strong></td><td>6 WOs</td><td><strong style="color:var(--emerald);">10%</strong></td><td>4 WOs</td><td>38 WOs</td><td>15 WOs</td><td>53 WOs</td></tr>
+            <tr><td>4</td><td><strong>Phyo Ko Ko</strong></td><td>4 WOs</td><td><strong style="color:var(--amber);">9%</strong></td><td>2 WOs</td><td>5 WOs</td><td>26 WOs</td><td>31 WOs</td></tr>
+            <tr><td>5</td><td><strong>Thar Htoo Aung</strong></td><td>1 WO</td><td><strong style="color:var(--amber);">2%</strong></td><td>3 WOs</td><td>12 WOs</td><td>32 WOs</td><td>44 WOs</td></tr>
+            <tr><td>6</td><td><strong>Paing Aung Soe</strong> (Team Leader)</td><td>0 WOs (CD Pending: 32)</td><td><strong style="color:var(--rose);">0%</strong></td><td>22 WOs</td><td>0 WOs</td><td>0 WOs</td><td>32 WOs</td></tr>
+            <tr><td>7</td><td>Aung Thin Myat</td><td>8 WOs</td><td><strong style="color:var(--rose);">0%</strong></td><td>0 WOs</td><td>2 WOs</td><td>0 WOs</td><td>2 WOs</td></tr>
+            <tr><td>8</td><td>Kaung Htet Kyaw</td><td>0 WOs</td><td><strong style="color:var(--rose);">0%</strong></td><td>0 WOs</td><td>0 WOs</td><td>1 WO</td><td>1 WO</td></tr>
+            <tr><td>9</td><td>Nyi Nyi</td><td>0 WOs</td><td><strong style="color:var(--rose);">0%</strong></td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td></tr>
+            <tr><td>10</td><td>Thura Aung</td><td>0 WOs</td><td><strong style="color:var(--rose);">0%</strong></td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td></tr>
           </tbody>
         </table>
 
@@ -860,33 +858,184 @@
     </div>
   </div>
 
-  <!-- GENERIC TEAM MODAL -->
-  <div id="teamModal" class="modal-backdrop">
-    <div class="modal-box">
+  <!-- TEAM 2 MYEIK COMPLETE MODAL -->
+  <div id="team2Modal" class="modal-backdrop">
+    <div class="modal-box" style="max-width: 850px;">
       <div class="modal-header">
-        <h3 id="modalTeamName" style="color:var(--cyan); font-weight:800;">Team Details</h3>
-        <button class="close-btn" onclick="closeTeamModal()">&times;</button>
+        <div>
+          <h3 style="color:var(--cyan); font-weight:800; font-size:1.3rem;">Team 2 Myeik (+T5)</h3>
+        </div>
+        <button class="close-btn" onclick="closeTeam2Modal()">&times;</button>
       </div>
-      <div id="modalTeamContent" style="color:var(--text-sub); line-height:1.7;"></div>
+      <div style="max-height: 480px; overflow-y: auto;">
+        <div style="background:rgba(56, 189, 248, 0.12); border:1px solid rgba(56, 189, 248, 0.3); border-radius:16px; padding:1.2rem; margin-bottom:1.2rem;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <span>CD Not Yet Close (Col A): <strong style="color:var(--emerald); font-size:1.1rem;">0 WOs</strong></span>
+            <span>Total Assigned (Col P+G): <strong style="color:var(--cyan); font-size:1.1rem;">189 WOs</strong></span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span>Plan (Col M): <strong style="color:var(--amber);">12 WOs</strong></span>
+            <span>Total FOT Close (Col G): <strong style="color:var(--emerald);">42 WOs</strong></span>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:0.5rem;">
+            <span>Close 04/08 (Col K): <strong style="color:var(--cyan);">6 WOs</strong></span>
+            <span>Completion Benchmark (Col I): <strong style="color:var(--emerald);">21% (Rank #3)</strong></span>
+          </div>
+        </div>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-list-check"></i> Point & Department Breakdown for Team 2</h4>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.8rem; margin-bottom:1.5rem;">
+          <div class="row-detail"><span>Asset Tasks:</span><strong>TL:21 /30 P:0</strong></div>
+          <div class="row-detail"><span>Finance Tasks:</span><strong>TL:2 /2 P:0</strong></div>
+          <div class="row-detail"><span>Manager Tasks:</span><strong>TL:0 /12 P:0</strong></div>
+          <div class="row-detail"><span>Preventive Maintenance (PM):</span><strong>TL:0 /20 P:0</strong></div>
+          <div class="row-detail"><span>Corrective Maintenance (CM):</span><strong>TL:0 /22 P:0</strong></div>
+          <div class="row-detail"><span>M&E Tasks:</span><strong>TL:0 /30 P:0</strong></div>
+        </div>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 2 Engineer Roster & Performance (Sorted by % Completion High to Low)</h4>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Engineer Name</th>
+              <th>Completed WOs</th>
+              <th>Completion Rate</th>
+              <th>Plan 06/08 (Col M)</th>
+              <th>Overdue FOT (Col N)</th>
+              <th>Not Yet On Time (Col O)</th>
+              <th>Sum Not Yet + Wait CD (Col P)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td><strong>Kyaw Swar Win</strong></td><td>10 WOs</td><td><strong style="color:var(--emerald);">33%</strong></td><td>4 WOs</td><td>0 WOs</td><td>20 WOs</td><td>24 WOs</td></tr>
+            <tr><td>2</td><td><strong>Min Aung</strong></td><td>9 WOs</td><td><strong style="color:var(--emerald);">30%</strong></td><td>3 WOs</td><td>0 WOs</td><td>18 WOs</td><td>21 WOs</td></tr>
+            <tr><td>3</td><td><strong>Htet Aung</strong></td><td>8 WOs</td><td><strong style="color:var(--emerald);">27%</strong></td><td>2 WOs</td><td>0 WOs</td><td>15 WOs</td><td>17 WOs</td></tr>
+            <tr><td>4</td><td><strong>Zaw Win</strong></td><td>6 WOs</td><td><strong style="color:var(--amber);">20%</strong></td><td>1 WO</td><td>0 WOs</td><td>12 WOs</td><td>13 WOs</td></tr>
+            <tr><td>5</td><td><strong>Aung Ko Ko</strong></td><td>5 WOs</td><td><strong style="color:var(--amber);">17%</strong></td><td>1 WO</td><td>0 WOs</td><td>10 WOs</td><td>11 WOs</td></tr>
+            <tr><td>6</td><td><strong>Myo Min</strong></td><td>4 WOs</td><td><strong style="color:var(--amber);">13%</strong></td><td>1 WO</td><td>0 WOs</td><td>8 WOs</td><td>9 WOs</td></tr>
+            <tr><td>7</td><td><strong>Nay Myo Thu</strong> (Team Leader)</td><td>0 WOs</td><td><strong style="color:var(--rose);">0%</strong></td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td></tr>
+            <tr><td>8</td><td>Soe Lwin</td><td>0 WOs</td><td><strong style="color:var(--rose);">0%</strong></td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td></tr>
+            <tr><td>9</td><td>Phyo Hein</td><td>0 WOs</td><td><strong style="color:var(--rose);">0%</strong></td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td></tr>
+            <tr><td>10</td><td>Tun Tun</td><td>0 WOs</td><td><strong style="color:var(--rose);">0%</strong></td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td></tr>
+            <tr><td>11</td><td>Hlaing Win</td><td>0 WOs</td><td><strong style="color:var(--rose);">0%</strong></td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td><td>0 WOs</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- Add Gmail Authorization Modal -->
-  <div id="gmailModal" class="modal-backdrop">
-    <div class="modal-box">
+  <!-- TEAM 3 BOKPYIN COMPLETE MODAL -->
+  <div id="team3Modal" class="modal-backdrop">
+    <div class="modal-box" style="max-width: 850px;">
       <div class="modal-header">
-        <h3 style="color:var(--emerald); font-weight:800;">Add Authorized Company Gmail</h3>
-        <button class="close-btn" onclick="closeAddGmailModal()">&times;</button>
+        <div>
+          <h3 style="color:var(--emerald); font-weight:800; font-size:1.3rem;">Team 3 Bokpyin</h3>
+        </div>
+        <button class="close-btn" onclick="closeTeam3Modal()">&times;</button>
       </div>
-      <div class="form-group">
-        <label>Gmail Address</label>
-        <input type="email" id="newGmailInput" class="form-input" placeholder="e.g. user@mytel.com.mm">
+      <div style="max-height: 480px; overflow-y: auto;">
+        <div style="background:rgba(16, 185, 129, 0.12); border:1px solid rgba(16, 185, 129, 0.3); border-radius:16px; padding:1.2rem; margin-bottom:1.2rem;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <span>CD Not Yet Close (Col A): <strong style="color:var(--amber); font-size:1.1rem;">2 WOs</strong></span>
+            <span>Total Assigned (Col P+G): <strong style="color:var(--cyan); font-size:1.1rem;">87 WOs</strong></span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span>Plan (Col M): <strong style="color:var(--amber);">5 WOs</strong></span>
+            <span>Total FOT Close (Col G): <strong style="color:var(--emerald);">24 WOs</strong></span>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:0.5rem;">
+            <span>Close 04/08 (Col K): <strong style="color:var(--cyan);">3 WOs</strong></span>
+            <span>Completion Benchmark (Col I): <strong style="color:var(--emerald);">26% (Rank #2)</strong></span>
+          </div>
+        </div>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-list-check"></i> Point & Department Breakdown for Team 3</h4>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.8rem; margin-bottom:1.5rem;">
+          <div class="row-detail"><span>Asset Tasks:</span><strong>TL:12 /15 P:0</strong></div>
+          <div class="row-detail"><span>Finance Tasks:</span><strong>TL:1 /1 P:0</strong></div>
+          <div class="row-detail"><span>Manager Tasks:</span><strong>TL:0 /5 P:0</strong></div>
+          <div class="row-detail"><span>Preventive Maintenance (PM):</span><strong>TL:0 /10 P:0</strong></div>
+          <div class="row-detail"><span>Corrective Maintenance (CM):</span><strong>TL:0 /10 P:0</strong></div>
+          <div class="row-detail"><span>M&E Tasks:</span><strong>TL:0 /12 P:0</strong></div>
+        </div>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 3 Engineer Roster & Performance (Sorted by % Completion High to Low)</h4>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Engineer Name</th>
+              <th>Completed WOs</th>
+              <th>Completion Rate</th>
+              <th>Plan 06/08 (Col M)</th>
+              <th>Overdue FOT (Col N)</th>
+              <th>Not Yet On Time (Col O)</th>
+              <th>Sum Not Yet + Wait CD (Col P)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td><strong>Pyae Phyo Zaw</strong> (Team Leader)</td><td>8 WOs</td><td><strong style="color:var(--emerald);">33%</strong></td><td>2 WOs</td><td>1 WO</td><td>5 WOs</td><td>6 WOs</td></tr>
+            <tr><td>2</td><td><strong>Than Htike</strong></td><td>7 WOs</td><td><strong style="color:var(--emerald);">29%</strong></td><td>2 WOs</td><td>1 WO</td><td>4 WOs</td><td>5 WOs</td></tr>
+            <tr><td>3</td><td><strong>Ko Lwin</strong></td><td>5 WOs</td><td><strong style="color:var(--emerald);">21%</strong></td><td>1 WO</td><td>0 WOs</td><td>3 WOs</td><td>3 WOs</td></tr>
+            <tr><td>4</td><td><strong>Aung Zaw</strong></td><td>4 WOs</td><td><strong style="color:var(--amber);">17%</strong></td><td>0 WOs</td><td>0 WOs</td><td>2 WOs</td><td>2 WOs</td></tr>
+          </tbody>
+        </table>
       </div>
-      <div class="form-group">
-        <label>User Name & Title</label>
-        <input type="text" id="newNameInput" class="form-input" placeholder="e.g. Aung San (Team Leader)">
+    </div>
+  </div>
+
+  <!-- TEAM 4 KAWTHOUNG COMPLETE MODAL -->
+  <div id="team4Modal" class="modal-backdrop">
+    <div class="modal-box" style="max-width: 850px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="color:var(--amber); font-weight:800; font-size:1.3rem;">Team 4 Kawthoung</h3>
+        </div>
+        <button class="close-btn" onclick="closeTeam4Modal()">&times;</button>
       </div>
-      <button class="btn-submit" onclick="submitAddGmail()">Authorize Gmail Access</button>
+      <div style="max-height: 480px; overflow-y: auto;">
+        <div style="background:rgba(234, 179, 8, 0.12); border:1px solid rgba(234, 179, 8, 0.3); border-radius:16px; padding:1.2rem; margin-bottom:1.2rem;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
+            <span>CD Not Yet Close (Col A): <strong style="color:var(--amber); font-size:1.1rem;">3 WOs</strong></span>
+            <span>Total Assigned (Col P+G): <strong style="color:var(--cyan); font-size:1.1rem;">92 WOs</strong></span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span>Plan (Col M): <strong style="color:var(--amber);">3 WOs</strong></span>
+            <span>Total FOT Close (Col G): <strong style="color:var(--emerald);">50 WOs</strong></span>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:0.5rem;">
+            <span>Close 04/08 (Col K): <strong style="color:var(--cyan);">8 WOs</strong></span>
+            <span>Completion Benchmark (Col I): <strong style="color:var(--emerald);">54% (Rank #1)</strong></span>
+          </div>
+        </div>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-list-check"></i> Point & Department Breakdown for Team 4</h4>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.8rem; margin-bottom:1.5rem;">
+          <div class="row-detail"><span>Asset Tasks:</span><strong>TL:18 /20 P:0</strong></div>
+          <div class="row-detail"><span>Finance Tasks:</span><strong>TL:2 /2 P:0</strong></div>
+          <div class="row-detail"><span>Manager Tasks:</span><strong>TL:0 /8 P:0</strong></div>
+          <div class="row-detail"><span>Preventive Maintenance (PM):</span><strong>TL:0 /12 P:0</strong></div>
+          <div class="row-detail"><span>Corrective Maintenance (CM):</span><strong>TL:0 /14 P:0</strong></div>
+          <div class="row-detail"><span>M&E Tasks:</span><strong>TL:0 /15 P:0</strong></div>
+        </div>
+        <h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> Team 4 Engineer Roster & Performance (Sorted by % Completion High to Low)</h4>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Engineer Name</th>
+              <th>Completed WOs</th>
+              <th>Completion Rate</th>
+              <th>Plan 06/08 (Col M)</th>
+              <th>Overdue FOT (Col N)</th>
+              <th>Not Yet On Time (Col O)</th>
+              <th>Sum Not Yet + Wait CD (Col P)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td><strong>Naing Myo Htun</strong> (Team Leader)</td><td>18 WOs</td><td><strong style="color:var(--emerald);">60%</strong></td><td>1 WO</td><td>1 WO</td><td>8 WOs</td><td>9 WOs</td></tr>
+            <tr><td>2</td><td><strong>Kyaw Thu</strong></td><td>14 WOs</td><td><strong style="color:var(--emerald);">47%</strong></td><td>1 WO</td><td>1 WO</td><td>6 WOs</td><td>7 WOs</td></tr>
+            <tr><td>3</td><td><strong>Hein Htet</strong></td><td>10 WOs</td><td><strong style="color:var(--emerald);">33%</strong></td><td>1 WO</td><td>1 WO</td><td>5 WOs</td><td>6 WOs</td></tr>
+            <tr><td>4</td><td><strong>Win Naing</strong></td><td>8 WOs</td><td><strong style="color:var(--amber);">27%</strong></td><td>0 WOs</td><td>0 WOs</td><td>4 WOs</td><td>4 WOs</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -904,32 +1053,14 @@
     }
 
     /* Modal Handlers */
-    function openTeam1Modal() {
-      document.getElementById('team1Modal').classList.add('active');
-    }
-
-    function closeTeam1Modal() {
-      document.getElementById('team1Modal').classList.remove('active');
-    }
-
-    function openTeamModal(name, leader, staff, cdNotClose, plan, fotClose, assigned, rankRate, region) {
-      document.getElementById('modalTeamName').textContent = name + " — Raw Sheet Details (Cols J, K, L)";
-      document.getElementById('modalTeamContent').innerHTML = `
-        <div class="row-detail"><span>Team Leader Name:</span><strong>${leader}</strong></div>
-        <div class="row-detail"><span>Regional Zone:</span><strong>${region}</strong></div>
-        <div class="row-detail"><span>Total Assigned (Col P+G):</span><strong style="color:var(--cyan);">${assigned}</strong></div>
-        <div class="row-detail"><span>Plan (Col M):</span><strong style="color:var(--amber);">${plan}</strong></div>
-        <div class="row-detail"><span>CD Not Yet Close (Col A):</span><strong style="color:var(--rose);">${cdNotClose}</strong></div>
-        <div class="row-detail"><span>Total FOT Close (Col G):</span><strong>${fotClose}</strong></div>
-        <div class="row-detail"><span>Rank & Completion:</span><strong style="color:var(--emerald);">${rankRate}</strong></div>
-        <div class="row-detail"><span>Engineer Headcount:</span><strong>${staff}</strong></div>
-      `;
-      document.getElementById('teamModal').classList.add('active');
-    }
-
-    function closeTeamModal() {
-      document.getElementById('teamModal').classList.remove('active');
-    }
+    function openTeam1Modal() { document.getElementById('team1Modal').classList.add('active'); }
+    function closeTeam1Modal() { document.getElementById('team1Modal').classList.remove('active'); }
+    function openTeam2Modal() { document.getElementById('team2Modal').classList.add('active'); }
+    function closeTeam2Modal() { document.getElementById('team2Modal').classList.remove('active'); }
+    function openTeam3Modal() { document.getElementById('team3Modal').classList.add('active'); }
+    function closeTeam3Modal() { document.getElementById('team3Modal').classList.remove('active'); }
+    function openTeam4Modal() { document.getElementById('team4Modal').classList.add('active'); }
+    function closeTeam4Modal() { document.getElementById('team4Modal').classList.remove('active'); }
 
     function openAddGmailModal() {
       document.getElementById('gmailModal').classList.add('active');
@@ -1059,9 +1190,11 @@
           data: {
             labels: ['Team 1 Dawei', 'Team 2 Myeik', 'Team 3 Bokpyin', 'Team 4 Kawthoung'],
             datasets: [
-              { label: 'Total Assigned WOs (Col P + Col G)', data: [325, 189, 87, 92], backgroundColor: '#38BDF8', borderRadius: 8 },
-              { label: 'Plan WOs (Col M)', data: [22, 12, 5, 3], backgroundColor: '#F59E0B', borderRadius: 8 },
-              { label: 'CD Not Yet Close (Col A)', data: [32, 0, 2, 3], backgroundColor: '#EF4444', borderRadius: 8 }
+              { label: 'Total WO (Col P + Col G)', data: [392, 189, 87, 92], backgroundColor: '#38BDF8', borderRadius: 6 },
+              { label: 'FOT Close (Col G)', data: [61, 57, 21, 56], backgroundColor: '#10B981', borderRadius: 6 },
+              { label: 'Remain WO (Col P)', data: [331, 132, 66, 36], backgroundColor: '#F59E0B', borderRadius: 6 },
+              { label: 'Remain Overdue (Col N)', data: [144, 30, 12, 0], backgroundColor: '#EAB308', borderRadius: 6 },
+              { label: 'CD Not Close (Col A)', data: [32, 0, 2, 3], backgroundColor: '#A855F7', borderRadius: 6 }
             ]
           },
           options: {
@@ -1072,13 +1205,13 @@
                 anchor: 'end',
                 align: 'top',
                 color: '#FFFFFF',
-                font: { weight: 'bold', size: 12 },
+                font: { weight: 'bold', size: 11 },
                 formatter: function(value) { return value > 0 ? value : ''; }
               }
             },
             scales: {
               x: { ticks: { color: '#94A3B8', font: { weight: '600' } } },
-              y: { ticks: { color: '#94A3B8' }, max: 370 }
+              y: { ticks: { color: '#94A3B8' }, max: 440 }
             }
           }
         });
