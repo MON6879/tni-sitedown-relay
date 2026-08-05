@@ -9,17 +9,9 @@
     { "src": "api/refuel_collector.py","use": "@vercel/python", "config": { "maxDuration": 30 } },
     { "src": "api/site_down_relay.py", "use": "@vercel/python", "config": { "maxDuration": 30 } }
   ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate, max-age=0" }
-      ]
-    }
-  ],
   "routes": [
-    { "src": "/index.html",            "dest": "index.html" },
-    { "src": "/executive_dashboard.html", "dest": "executive_dashboard.html" },
+    { "src": "/index.html",            "dest": "index.html", "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" } },
+    { "src": "/executive_dashboard.html", "dest": "executive_dashboard.html", "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" } },
     { "src": "/api/index",             "dest": "api/index.py" },
     { "src": "/api/collector",         "dest": "api/collector.py" },
     { "src": "/api/search_bot",        "dest": "api/search_bot.py" },
