@@ -1,4 +1,4 @@
-<!-- TNI Operations BI Portal v331 - Pure 24 Engineers Roster Excluding All Team Leaders -->
+<!-- TNI Operations BI Portal v332 - Sticky Table Header Fix -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -357,14 +357,18 @@
     }
 
     .data-table th {
-      background: rgba(255, 255, 255, 0.03);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #0F172A;
       padding: 0.9rem 1.1rem;
       text-align: left;
       font-size: 0.78rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--text-sub);
-      border-bottom: 1px solid var(--border-color);
+      border-bottom: 2px solid var(--border-color);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
 
     .data-table td {
