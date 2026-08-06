@@ -1,4 +1,4 @@
-<!-- TNI Operations BI Portal v343 - Gmail Whitelist Tab Access Level Selection -->
+<!-- TNI Operations BI Portal v344 - Working Add Gmail Whitelist Modal with Tab Role Selection -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1221,7 +1221,12 @@
     function closeAllEngineersModal() { document.getElementById('allEngineersModal').classList.remove('active'); }
 
     function openAddGmailModal() {
-      document.getElementById('gmailModal').classList.add('active');
+      const modal = document.getElementById('gmailModal');
+      if (modal) {
+        modal.classList.add('active');
+      } else {
+        alert('Hệ thống đang tải bản v344. Vui lòng bấm Ctrl + F5 để tải lại trang!');
+      }
     }
 
     function closeAddGmailModal() {
