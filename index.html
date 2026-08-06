@@ -1,4 +1,4 @@
-<!-- TNI Operations BI Portal v342 - Enforced Pink Plan Column Header and Values -->
+<!-- TNI Operations BI Portal v343 - Gmail Whitelist Tab Access Level Selection -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -828,21 +828,21 @@
             <tr>
               <td><strong>phong.hd@mytel.com.mm</strong></td>
               <td>Ha Duc Phong (System Administrator)</td>
-              <td><span class="team-tag tag-t2">Super Admin</span></td>
+              <td><span class="team-tag tag-t2">🌟 Full Access (Super Admin)</span></td>
               <td><span class="status-pill-check sp-verified">✓ Active Authorized</span></td>
               <td><button class="filter-btn" style="color:var(--rose);" onclick="removeGmail(this)">Remove</button></td>
             </tr>
             <tr>
               <td><strong>bod.exec@mytel.com.mm</strong></td>
               <td>Board of Directors Executive Account</td>
-              <td><span class="team-tag tag-t1">Executive VIP</span></td>
+              <td><span class="team-tag tag-t1">👑 BOD Assign Only</span></td>
               <td><span class="status-pill-check sp-verified">✓ Active Authorized</span></td>
               <td><button class="filter-btn" style="color:var(--rose);" onclick="removeGmail(this)">Remove</button></td>
             </tr>
             <tr>
               <td><strong>manager.operations@mytel.com.mm</strong></td>
               <td>Regional Operations Manager</td>
-              <td><span class="team-tag tag-t3">Manager</span></td>
+              <td><span class="team-tag tag-t3">🏢 Dept Assign Only</span></td>
               <td><span class="status-pill-check sp-verified">✓ Active Authorized</span></td>
               <td><button class="filter-btn" style="color:var(--rose);" onclick="removeGmail(this)">Remove</button></td>
             </tr>
@@ -1157,6 +1157,44 @@
     </div>
   </div>
 
+  <!-- ADD AUTHORIZED GMAIL MODAL -->
+  <div id="gmailModal" class="modal-backdrop">
+    <div class="modal-box" style="max-width: 580px;">
+      <div class="modal-header">
+        <div>
+          <h3 style="color:var(--cyan); font-weight:800; font-size:1.25rem;"><i class="fa-solid fa-user-lock"></i> Add Authorized Gmail Account</h3>
+          <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0.2rem;">Phân quyền truy cập tài khoản Gmail theo Thẻ (Executive / Dept / BOD Assign)</p>
+        </div>
+        <button class="close-btn" onclick="closeAddGmailModal()">&times;</button>
+      </div>
+      
+      <div class="form-group">
+        <label><i class="fa-solid fa-envelope"></i> Authorized Gmail Address:</label>
+        <input type="email" id="newGmailInput" class="form-input" placeholder="e.g. user@mytel.com.mm or user@gmail.com" required />
+      </div>
+
+      <div class="form-group">
+        <label><i class="fa-solid fa-id-card"></i> User Name & Role Description:</label>
+        <input type="text" id="newNameInput" class="form-input" placeholder="e.g. U Thura Aung (BOD Executive Assistant)" required />
+      </div>
+
+      <div class="form-group">
+        <label><i class="fa-solid fa-shield-halved"></i> Assigned Tab Access Permission (Phân Quyền Xem Thẻ):</label>
+        <select id="newRoleSelect" class="form-input" style="background:#1E293B; cursor:pointer;">
+          <option value="FULL">🌟 Full Access (Xem Tất Cả Các Thẻ)</option>
+          <option value="BOD">👑 BOD Assign Only (Chỉ xem Thẻ BOD Assign)</option>
+          <option value="DEPT">🏢 Department Assign Only (Chỉ xem Thẻ Phòng Dep)</option>
+          <option value="EXEC">📊 Executive Summary Only (Chỉ xem Thẻ Báo Cáo Tổng Quan)</option>
+        </select>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:0.8rem; margin-top:1.5rem;">
+        <button class="filter-btn" style="background:rgba(255,255,255,0.08);" onclick="closeAddGmailModal()">Cancel</button>
+        <button class="voice-btn" style="background:linear-gradient(135deg, var(--cyan), #059669);" onclick="submitAddGmail()"><i class="fa-solid fa-check"></i> Save & Grant Access</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     function showTab(panelId, tabBtn) {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -1193,17 +1231,36 @@
     function submitAddGmail() {
       const email = document.getElementById('newGmailInput').value.trim();
       const name = document.getElementById('newNameInput').value.trim();
+      const roleVal = document.getElementById('newRoleSelect').value;
       if (!email || !name) return;
+
+      let tagClass = 'tag-t2';
+      let roleLabel = '🌟 Full Access';
+      if (roleVal === 'BOD') {
+        tagClass = 'tag-t1';
+        roleLabel = '👑 BOD Assign Only';
+      } else if (roleVal === 'DEPT') {
+        tagClass = 'tag-t3';
+        roleLabel = '🏢 Dept Assign Only';
+      } else if (roleVal === 'EXEC') {
+        tagClass = 'tag-t4';
+        roleLabel = '📊 Executive Only';
+      }
+
       const tbody = document.getElementById('gmailListTable');
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><strong>${email}</strong></td>
         <td>${name}</td>
-        <td><span class="team-tag tag-t2">Authorized</span></td>
+        <td><span class="team-tag ${tagClass}">${roleLabel}</span></td>
         <td><span class="status-pill-check sp-verified">✓ Active Authorized</span></td>
         <td><button class="filter-btn" style="color:var(--rose);" onclick="removeGmail(this)">Remove</button></td>
       `;
       tbody.appendChild(tr);
+
+      // Clear form inputs
+      document.getElementById('newGmailInput').value = '';
+      document.getElementById('newNameInput').value = '';
       closeAddGmailModal();
     }
 
