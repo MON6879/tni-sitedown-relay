@@ -1699,10 +1699,7 @@ async def main():
                 f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
                 "━━━━━━━━━━━━━━━━━━━━"
             ]
-            # TL: 🟧 trước, nổi bật phía trên cùng
-            for prefix, name, content in tl_list:
-                if content:
-                    team_lines_indiv.append(f"🟧 {content}")
+            # TL đã có đầy đủ trong Report 4b — không lặp lại ở Report 4
 
             # NV: parse_emp_metrics → compact 1 dòng với 🔺 prefix
             # Không dedup — mỗi dòng sheet = 1 người (name = nv_ROW — luôn unique)
