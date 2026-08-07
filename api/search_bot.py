@@ -249,35 +249,37 @@ def lookup_team(team_code: str) -> list:
     return [split_messages(r)[0] for r in results]
 
 def lookup_notclose(team_code: str) -> list:
-    """Tra cứu WO Not Close cho team (GID_TL_WAITCD col B=team, col G=notclose)."""
+    """Tra cứu WO Not Close (GID_TL_WAITCD col H='T1notclose', col I=nội dung)."""
     df = fetch_single_csv(GID_TL_WAITCD)
     if df is None or df.empty:
-        return [f"❌ No data for {html.escape(team_code)} not close"]
+        return [f"\u274c No data for {html.escape(team_code)} not close"]
+    target = f"{team_code}notclose".lower()
     results = []
     for _, row in df.iterrows():
-        col_b = safe(row, 1).strip().upper()
-        if col_b.startswith(team_code.upper()):
-            col_g = safe(row, 6)
-            if col_g:
-                results.append(col_g.strip())
+        col_h = safe(row, 7).strip().lower()   # col H = category label
+        if col_h == target:
+            col_i = safe(row, 8)               # col I = formatted content
+            if col_i:
+                results.append(col_i.strip())
     if not results:
-        return [f"❌ No Not Close data for <b>{html.escape(team_code)}</b>"]
+        return [f"\u274c No Not Close data for <b>{html.escape(team_code)}</b>"]
     return [split_messages(r)[0] for r in results]
 
 def lookup_waitcd(team_code: str) -> list:
-    """Tra cứu WO Wait CD cho team (GID_TL_WAITCD col B=team, col H=waitcd)."""
+    """Tra cứu WO Wait CD (GID_TL_WAITCD col H='T1waitcd', col I=nội dung)."""
     df = fetch_single_csv(GID_TL_WAITCD)
     if df is None or df.empty:
-        return [f"❌ No data for {html.escape(team_code)} wait CD"]
+        return [f"\u274c No data for {html.escape(team_code)} wait CD"]
+    target = f"{team_code}waitcd".lower()
     results = []
     for _, row in df.iterrows():
-        col_b = safe(row, 1).strip().upper()
-        if col_b.startswith(team_code.upper()):
-            col_h = safe(row, 7)
-            if col_h:
-                results.append(col_h.strip())
+        col_h = safe(row, 7).strip().lower()   # col H = category label
+        if col_h == target:
+            col_i = safe(row, 8)               # col I = formatted content
+            if col_i:
+                results.append(col_i.strip())
     if not results:
-        return [f"❌ No Wait CD data for <b>{html.escape(team_code)}</b>"]
+        return [f"\u274c No Wait CD data for <b>{html.escape(team_code)}</b>"]
     return [split_messages(r)[0] for r in results]
 
 # ── Site Access Template ───────────────────────────────────────────────────────
