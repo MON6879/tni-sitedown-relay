@@ -35,6 +35,8 @@ BASE_URL       = (
 GID_SITE       = "1095689918"   # 'Site down now'   – col B=TNI, cols R,T,U,V,Y,AA = alarm durations
 GID_TASK       = "1755404595"   # 'Input task'      – col T=TNI, col J=""=pending, D:E:K+H
 GID_WO         = "1429089905"   # 'Input WO'(matrix)– col E=TNI, A+B:C+F
+GID_INFO       = "171059303"    # Tab: Name Site / Site / Cable / Gpon / DIA
+GID_TEAM_SUM   = "893574714"    # Tab: Tên Sum WO (Team Leader search)
 GID_SITE_CLEAR = "610944071"    # Tab: Search Site Clear
 GID_STAFF      = "1684930643"   # 'Staff' – col A=Telegram ID, row 1=headers (mysite/mycable/...)
 
@@ -288,32 +290,69 @@ def get_staff_data(sender_id: str, field_name: str | None = None) -> str:
 
 # ===================== MAIN LOOKUP =====================
 def lookup_tni(tni: str) -> str:
-    # Dùng HTML mode: escape nội dung động để tránh lỗi ký tự đặc biệt
-    def e(s: str) -> str:
-        return html.escape(str(s))
+    """Tra cứu TNI hợp nhất 100% cho CẢ Telegram Webhook lẫn Long Polling."""
+    def e(s: str) -> str: return html.escape(str(s))
+    tni_upper = tni.upper().strip()
 
-    lines = [f"🔍 <b>{e(tni)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
+    # Query GID_INFO (Site, Cable, GPON, DIA)
+    info_res = {}
+    try:
+        df_info = fetch_csv(GID_INFO)
+        if df_info is not None and not df_info.empty:
+            rows = df_info.iloc[1:] if len(df_info) > 1 else df_info
+            for _, row in rows.iterrows():
+                col_a = safe(row, 0).upper().strip()
+                if not col_a: continue
+                code_part = col_a.split(":")[0].strip()
+                if code_part == tni_upper or col_a == tni_upper or col_a.startswith(tni_upper):
+                    info_res["site"]  = safe(row, 1)
+                    info_res["cable"] = safe(row, 2)
+                    info_res["gpon"]  = safe(row, 3)
+                    info_res["dia"]   = safe(row, 4)
+                    break
+    except Exception as ex:
+        logger.warning(f"lookup_tni GID_INFO warning: {ex}")
 
-    # Site info
-    site_info = get_site_info(tni)
-    if site_info:
-        lines.append(f"\n📍 <b>Site Info</b>\n{e(site_info)}")
+    # Query GID_TEAM_SUM (Col H)
+    team_res = ""
+    try:
+        df_sum = fetch_csv(GID_TEAM_SUM)
+        if df_sum is not None and not df_sum.empty:
+            for _, row in df_sum.iterrows():
+                col_b = safe(row, 1).strip().upper()
+                if col_b == tni_upper:
+                    col_h = safe(row, 7)
+                    if col_h:
+                        team_res = col_h.strip().lstrip("~ ").strip()
+                        break
+    except Exception as ex:
+        logger.warning(f"lookup_tni GID_TEAM_SUM warning: {ex}")
 
-    # Tasks
-    tasks = get_tasks(tni)
-    lines.append(f"\n📋 <b>Task ({len(tasks)})</b>")
-    if tasks:
-        lines += [f"• {e(t)}" for t in tasks]
-    else:
-        lines.append("• No see")
+    has_info = bool(info_res and any(info_res.values()))
+    has_tasks = bool(team_res)
 
-    # WOs
-    wos = get_wos(tni)
-    lines.append(f"\n🔧 <b>WO ({len(wos)})</b>")
-    if wos:
-        lines += [f"• {e(w)}" for w in wos]
-    else:
-        lines.append("• No see")
+    if not has_info and not has_tasks:
+        return f"❌ No data found for <b>{e(tni_upper)}</b>"
+
+    lines = [f"🔍 <b>{e(tni_upper)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
+
+    if has_info:
+        if info_res.get("site"):
+            lines.append(f"\n🏢 <b>Site</b>\n{e(info_res['site'])}")
+        if info_res.get("cable"):
+            lines.append(f"\n🔌 <b>Cable</b>\n{e(info_res['cable'])}")
+        if info_res.get("gpon"):
+            lines.append(f"\n📶 <b>Gpon</b>\n{e(info_res['gpon'])}")
+        if info_res.get("dia"):
+            lines.append(f"\n🌐 <b>DIA</b>\n{e(info_res['dia'])}")
+
+    if has_tasks:
+        clean_task = team_res
+        if "━━━━━━━━━━━━━━━━━━━━" in clean_task:
+            parts = clean_task.split("━━━━━━━━━━━━━━━━━━━━")
+            if len(parts) >= 2:
+                clean_task = parts[1].strip()
+        lines.append(f"\n{clean_task}")
 
     lines.append("━━━━━━━━━━━━━━━━━━━━")
     return "\n".join(lines)
