@@ -142,7 +142,7 @@ def build_search_summary(now_str, report_data):
 
 
 def get_note_from_sheet() -> str:
-    """Read G1:G5 from Config tab (GID 1236389870)."""
+    """Read H1:H5 from Config tab (GID 1236389870) — Note column is H (index 7)."""
     try:
         resp = requests.get(CONFIG_SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
         resp.raise_for_status()
@@ -150,8 +150,8 @@ def get_note_from_sheet() -> str:
         
         note_lines = []
         for r_idx in range(0, min(5, len(df))):
-            if len(df.columns) > 6:
-                val = str(df.iloc[r_idx].iloc[6]).strip() if not pd.isna(df.iloc[r_idx].iloc[6]) else ""
+            if len(df.columns) > 7:
+                val = str(df.iloc[r_idx].iloc[7]).strip() if not pd.isna(df.iloc[r_idx].iloc[7]) else ""
                 if val and val.lower() not in ("nan", "none", ""):
                     note_lines.append(val)
         return "\n".join(note_lines)
