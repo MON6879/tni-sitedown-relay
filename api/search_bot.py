@@ -795,6 +795,7 @@ def send_help_menu(chat_id: int) -> None:
         "• Lookup Not Close: Type <code>t1notclose</code>, <code>t2notclose</code>...\n"
         "• Lookup Wait CD: Type <code>t1waitcd</code>, <code>t2waitcd</code>...\n"
         "• Personal Lookup: <code>mysite</code>, <code>mycable</code>, <code>mydia</code>, <code>myolt</code>, <code>mysn</code>, <code>mydata</code>\n"
+        "• <b>Admin Lookup:</b> <code>mysite &lt;ID&gt;</code>, <code>mycable &lt;ID&gt;</code>, <code>mydia &lt;ID&gt;</code>, <code>myolt &lt;ID&gt;</code>, <code>mysn &lt;ID&gt;</code>, <code>mydata &lt;ID&gt;</code>\n"
         "• Get Report Templates: Type <code>/daily</code> or <code>/plan</code>",
         parse_mode="HTML")
 
@@ -1090,8 +1091,21 @@ def handle(update: dict) -> None:
                 logger.warning(f"Plan save skipped/failed for chat {chat_id}: {err}")
             return
 
-    # ── STAFF PERSONAL LOOKUP: "mysite" / "mycable" / ... hoặc range "Q1:U1" ──
+    # ── STAFF PERSONAL LOOKUP: "mysite" / "mycable" / ... hoặc "mysite <id>" (admin) ──
     text_low = text.lower().strip()
+
+    # Admin lookup: "mysite 6859790680" / "mydata 1234567890" — xem data của bất kỳ user nào
+    admin_lookup = re.match(r'^(my\S+)\s+(\d{6,12})$', text_low)
+    if admin_lookup:
+        field_name = admin_lookup.group(1)           # e.g. "mysite", "mydata"
+        target_id  = int(admin_lookup.group(2))
+        field      = None if field_name in ("mydata", "myall") else field_name
+        reply = get_staff_data(target_id, field)
+        # Thêm header cho admin biết đang xem data của ai
+        header = f"👤 <b>Viewing ID:</b> <code>{target_id}</code>\n"
+        tg_send(chat_id, header + reply)
+        return
+
     is_my_field    = (text_low.startswith("my") and len(text_low) > 2 and " " not in text_low)
     is_range_query = bool(re.match(r'^[A-Z]\d+:[A-Z]\d+$', text, re.IGNORECASE))
     if is_my_field or is_range_query:
