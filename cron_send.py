@@ -1699,6 +1699,10 @@ async def main():
                 f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
                 "━━━━━━━━━━━━━━━━━━━━"
             ]
+            # NOTE ngay đầu — luôn hiển thị dù message dài bị split
+            if note_text:
+                team_lines_indiv.append(f"📝 NOTE:\n{note_text}")
+                team_lines_indiv.append("────────────────────")
             # TL đã có đầy đủ trong Report 4b — không lặp lại ở Report 4
 
             # NV: parse_emp_metrics → compact 1 dòng với 🔺 prefix
@@ -1746,9 +1750,7 @@ async def main():
             if no_search:
                 team_lines_indiv.append(no_search)
 
-            if note_text:
-                team_lines_indiv.append("────────────────────")
-                team_lines_indiv.append(f"📝 NOTE:\n{note_text}")
+            # NOTE đã hiển thị ở đầu message — không lặp lại cuối
 
             team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
             team_lines_indiv.append(f"👥 Total: {len(members)} members")
