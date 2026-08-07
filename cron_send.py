@@ -27,18 +27,18 @@ TELEGRAM_API_HASH       = os.getenv("TELEGRAM_API_HASH", "")
 TELEGRAM_SESSION        = os.getenv("TELEGRAM_SESSION", "")
 
 SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
-# Dùng export CSV trực tiếp thay vì gviz/tq để giữ đúng số hàng (bao gồm hàng trống)
+# Dùng gviz/tq thay vì export?format=csv — export trả 307 redirect từ GitHub Actions
 SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
-    "/export?format=csv&gid=133591305"
+    "/gviz/tq?tqx=out:csv&gid=133591305"
 )
 STAFF_SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
-    "/export?format=csv&gid=1684930643"
+    "/gviz/tq?tqx=out:csv&gid=1684930643"
 )
 CONFIG_SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
-    "/export?format=csv&gid=1236389870"
+    "/gviz/tq?tqx=out:csv&gid=1236389870"
 )
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 HEADER_ROWS = 3  # rows 1-3 là header (row 3 có 'export sms')
