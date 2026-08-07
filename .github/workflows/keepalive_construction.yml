@@ -1,8 +1,8 @@
-name: Construction Bot Keep-Alive (5 Mins)
+name: Construction Bot Keep-Alive + Search Cache (5 Mins)
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Trigger every 5 minutes to prevent bot cold starts
+    - cron: '*/5 * * * *'  # Every 5 minutes
   workflow_dispatch:
 
 jobs:
@@ -12,4 +12,33 @@ jobs:
       - name: Ping Construction Bot Google Apps Script Web App
         run: |
           curl -s -L "https://script.google.com/macros/s/AKfycbHraNPzUGVRNGvy-7_q4NyTiJSRUvlodCIjiJZJ00PaNMen-MpVjb4YTmyVex00mn6xQ/exec" > /dev/null
-          echo "✅ Construction Bot Keep-Alive pinged successfully at $(date)!"
+          echo "✅ Construction Bot Keep-Alive pinged at $(date)!"
+
+  build-search-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests pandas
+
+      - name: Build search index cache
+        run: python build_cache.py
+
+      - name: Commit and push if cache changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add api/data_cache.json
+          if git diff --staged --quiet; then
+            echo "No changes to cache, skipping commit."
+          else
+            git commit -m "chore: update search cache [$(date -u +%H:%M)]"
+            git push
+          fi

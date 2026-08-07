@@ -347,13 +347,32 @@ def build_search_indexes(force: bool = False):
 
     if not force and _tni_info_index and (now - _index_last_built) < CSV_CACHE_TTL:
         return
-
     if _index_building:
         return
-
     _index_building = True
     try:
-        # Fetch GID_INFO and GID_TEAM_SUM in parallel threads
+        # ── 1. Fast path: data_cache.json (GitHub Actions build mỗi 5 phút) ──
+        cache_path = os.path.join(os.path.dirname(__file__), "data_cache.json")
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, encoding="utf-8") as cf:
+                    cache_data = json.load(cf)
+                built_at_str = cache_data.get("built_at", "")
+                if built_at_str:
+                    from datetime import datetime as _dt, timezone as _tz
+                    built_ts = _dt.strptime(built_at_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_tz.utc).timestamp()
+                    age_min = (time.time() - built_ts) / 60
+                    if age_min < 10:   # Dùng file nếu cache mới hơn 10 phút
+                        _tni_info_index     = cache_data.get("info", {})
+                        _tni_team_sum_index = cache_data.get("team", {})
+                        _index_last_built   = time.time()
+                        logger.info(f"Loaded index from data_cache.json (age={age_min:.1f}m) — Info:{len(_tni_info_index)}, Team:{len(_tni_team_sum_index)}")
+                        return
+            except Exception as fe:
+                logger.warning(f"data_cache.json load error: {fe}")
+
+        # ── 2. Fallback: fetch trực tiếp từ Google Sheets (~3-5s) ──
+        logger.info("data_cache.json missing/stale — fetching from Google Sheets...")
         with ThreadPoolExecutor(max_workers=2) as executor:
             f_info = executor.submit(fetch_single_csv, GID_INFO)
             f_team = executor.submit(fetch_single_csv, GID_TEAM_SUM)
@@ -383,15 +402,16 @@ def build_search_indexes(force: bool = False):
                 if col_h:
                     new_team_idx[col_b] = col_h.strip().lstrip("~ ").strip()
 
-        _tni_info_index = new_info_idx
+        _tni_info_index     = new_info_idx
         _tni_team_sum_index = new_team_idx
-        _index_last_built = time.time()
-        logger.info(f"Built O(1) search indexes OK — Info codes: {len(new_info_idx)}, TeamSum codes: {len(new_team_idx)}")
+        _index_last_built   = time.time()
+        logger.info(f"Built index from Sheets — Info:{len(new_info_idx)}, Team:{len(new_team_idx)}")
 
     except Exception as err:
         logger.error(f"Error building search indexes: {err}")
     finally:
         _index_building = False
+
 
 def trigger_bg_index_refresh():
     """Chạy làm mới cache trong background thread để không bắt user chờ."""
