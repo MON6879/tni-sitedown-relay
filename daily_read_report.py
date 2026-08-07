@@ -49,19 +49,19 @@ TEAM_TO_GROUP = {
     "TEAM04": "T4", "TEAM 4": "T4", "TEAM4": "T4",
 }
 
-# Sheet config — Task remain (GID 133591305)
+# Dùng gviz/tq — export?format=csv trả 307 redirect từ GitHub Actions
 SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
 SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
-    "/export?format=csv&gid=133591305"
+    "/gviz/tq?tqx=out:csv&gid=133591305"
 )
 HEADER_ROWS = 3
 COL_A, COL_B, COL_C, COL_E = 0, 1, 2, 4
 
-# Staff sheet config (GID 1684930643) — nguồn chính xác danh sách nhân viên
+# Dùng gviz/tq — export?format=csv trả 307 redirect từ GitHub Actions
 STAFF_SHEET_URL = (
     f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}"
-    "/export?format=csv&gid=1684930643"
+    "/gviz/tq?tqx=out:csv&gid=1684930643"
 )
 # Col indices trong Staff sheet (0-based)
 S_COL_ID   = 0   # A: Employee ID / Telegram ID (số không đổi)
