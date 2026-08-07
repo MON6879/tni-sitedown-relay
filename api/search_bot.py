@@ -42,7 +42,7 @@ MAX_LEN  = 4096
 # ── CSV loader with per-GID caching ───────────────────────────────────────────
 _csv_cache = {}
 _csv_cache_ts = {}
-CSV_CACHE_TTL = 1800   # 30 phút cache cho mỗi GID (giảm latency từ 6s xuống <0.001s, chống Telegram Webhook Retry)
+CSV_CACHE_TTL = 60   # 30 phút cache cho mỗi GID (giảm latency từ 6s xuống <0.001s, chống Telegram Webhook Retry)
 
 def fetch_csv(gid: str) -> pd.DataFrame:
     now = time.time()
@@ -813,6 +813,49 @@ def get_info(tni: str) -> dict | None:
         logger.error(f"get_info error: {ex}")
         return None
 
+def perform_unified_tni_search(tni: str) -> str:
+    """Tra cứu hợp nhất 100% cho mọi mã TNI:
+    Kết hợp cả Thông tin nâng cao (Site, Cable, Gpon, DIA từ GID_INFO)
+    VÀ Thông tin Task / WO / Alarm (từ GID_TEAM_SUM Cột H) thành 1 phản hồi đầy đủ duy nhất.
+    """
+    e = html.escape
+    tni_upper = tni.upper().strip()
+
+    info = get_info(tni_upper)
+    task_wo = lookup_tni(tni_upper)
+
+    has_info = bool(info and any(info.values()))
+    has_tasks = bool(task_wo and not task_wo.startswith("❌"))
+
+    if not has_info and not has_tasks:
+        return f"❌ No data found for <b>{e(tni_upper)}</b>"
+
+    lines = [f"🔍 <b>{e(tni_upper)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
+
+    # 1. Phần thông tin Site, Cable, GPON, DIA (từ GID_INFO / GID_SITE)
+    if has_info:
+        if info.get("site"):
+            lines.append(f"\n🏢 <b>Site</b>\n{e(info['site'])}")
+        if info.get("cable"):
+            lines.append(f"\n🔌 <b>Cable</b>\n{e(info['cable'])}")
+        if info.get("gpon"):
+            lines.append(f"\n📶 <b>Gpon</b>\n{e(info['gpon'])}")
+        if info.get("dia"):
+            lines.append(f"\n🌐 <b>DIA</b>\n{e(info['dia'])}")
+
+    # 2. Phần thông tin Task, WO, Alarm (từ GID_TEAM_SUM Cột H)
+    if has_tasks:
+        clean_task = task_wo
+        if "━━━━━━━━━━━━━━━━━━━━" in clean_task:
+            parts = clean_task.split("━━━━━━━━━━━━━━━━━━━━")
+            if len(parts) >= 2:
+                clean_task = parts[1].strip()
+        lines.append(f"\n{clean_task}")
+
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    return "\n".join(lines)
+
+
 def build_info_reply(tni: str, info: dict) -> str:
     e = html.escape
     lines = [f"📡 <b>Info: {e(tni)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
@@ -1503,56 +1546,49 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
-    # ── 2. KEY "INFO": Info: TNIxxxx / Info TNIxxxx / /info TNIxxxx ───────────────
-    info_match = re.search(r"^\s*(?:/info|info)[:\s]+\s*(TNI[A-Z0-9_]+)", text.strip(), re.IGNORECASE)
-    if info_match:
-        tni = info_match.group(1).upper()
-        logger.info(f"Info lookup: {tni} | chat={chat_id}")
-        log_search_bg(first_name or str(user_id), user_id, f"Info:{tni}")
-        try:
-            info = get_info(tni)
-            if info and any(info.values()):
-                reply = build_info_reply(tni, info)
-                for chunk in split_messages(reply):
-                    tg_send(chat_id, chunk)
-            else:
-                # Nếu không có thông tin nâng cao trong GID_INFO → Tự động gọi tra cứu Task & WO (lookup_tni)
-                res_tni = lookup_tni(tni)
-                tg_send(chat_id, res_tni)
-        except Exception as err:
-            logger.error(f"Info error [{tni}]: {err}")
-            tg_send(chat_id, f"❌ Lookup error: {html.escape(str(err))}")
-        return
-
-    # ── 3. KEY "TNI": TNIxxxx / TNIxxxx_0x — tra cứu Task & WO (chỉ khi câu lệnh BẮT ĐẦU bằng TNI, /tni, /find) ──
+    # ── 2. KEY "INFO" & "TNI" SEARCH: Hợp nhất 100% cho Info: TNIxxxx, TNIxxxx, /tni, /info, /find ───────────────
     text_clean = text.strip()
     text_l = text_clean.lower()
 
-    # CHỈ TRA CỨU NẾU TIN NHẮN BẮT ĐẦU BẰNG 'tni', '/tni', '/find'
-    # Nếu TNI nằm ở giữa/cuối đoạn chat trò chuyện (vd: "V Hot task: TNI0067...") -> KHÔNG TRA CỨU
-    if not (text_l.startswith("tni") or text_l.startswith("/tni") or text_l.startswith("/find")):
+    # Kiểm tra xem có lệnh Info: TNIxxxx hoặc /info TNIxxxx hay không
+    info_match = re.search(r"^\s*(?:/info|info)[:\s]+\s*(TNI[A-Z0-9_]+)", text_clean, re.IGNORECASE)
+    if info_match:
+        tni = info_match.group(1).upper()
+        logger.info(f"Unified Info/TNI lookup: {tni} | chat={chat_id}")
+        log_search_bg(first_name or str(user_id), user_id, f"Info:{tni}")
+        try:
+            result = perform_unified_tni_search(tni)
+            for chunk in split_messages(result):
+                tg_send(chat_id, chunk)
+        except Exception as err:
+            logger.error(f"Unified search error [{tni}]: {err}")
+            tg_send(chat_id, f"❌ Lookup error: {html.escape(str(err))}")
         return
 
-    if text_l.startswith("/tni") or text_l.startswith("/find"):
-        parts = text_clean.split(maxsplit=1)
-        if len(parts) > 1:
-            text_clean = parts[1].strip()
-        else:
+    # Kiểm tra lệnh TNIxxxx / /tni TNIxxxx / /find TNIxxxx
+    if text_l.startswith("tni") or text_l.startswith("/tni") or text_l.startswith("/find"):
+        if text_l.startswith("/tni") or text_l.startswith("/find"):
+            parts = text_clean.split(maxsplit=1)
+            if len(parts) > 1:
+                text_clean = parts[1].strip()
+            else:
+                return
+
+        tni_list = re.findall(r"TNI[A-Z0-9_]{4,10}", text_clean, re.IGNORECASE)
+        if not tni_list:
             return
 
-    # Tìm mã TNI (hỗ trợ cả suffix như TNI0007_01 hoặc TNI0007_1)
-    tni_list = re.findall(r"TNI[A-Z0-9_]{4,10}", text_clean, re.IGNORECASE)
-    if not tni_list:
+        tni = tni_list[0].upper()
+        logger.info(f"Unified TNI lookup: {tni} | chat={chat_id}")
+        log_search_bg(first_name or str(user_id), user_id, tni)
+        try:
+            result = perform_unified_tni_search(tni)
+            for chunk in split_messages(result):
+                tg_send(chat_id, chunk)
+        except Exception as err:
+            logger.error(f"Unified search error [{tni}]: {err}")
+            tg_send(chat_id, f"❌ Lookup error: {html.escape(str(err))}")
         return
-
-    # CHỈ TRA CỨU DUY NHẤT 1 MÃ TNI ĐẦU TIÊN THEO YÊU CẦU
-    tni = tni_list[0].upper()
-
-    # Ghi log tìm kiếm mã TNI trong background
-    log_search_bg(first_name or str(user_id), user_id, tni)
-    result = lookup_tni(tni)
-    for chunk in split_messages(result):
-        tg_send(chat_id, chunk)
 
 
 def ensure_webhook_locked_bg():
