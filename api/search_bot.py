@@ -445,22 +445,73 @@ def trigger_bg_index_refresh():
     t = threading.Thread(target=_bg, daemon=True)
     t.start()
 
-def perform_unified_tni_search(tni: str) -> str:
-    """Tra cứu TNI siêu tốc O(1) < 0.01s: Hợp nhất Site, Cable, DIA, GPON & Task/WO/Alarm."""
+def format_task_wo(raw: str) -> str:
+    """Render col H content thành HTML sạch — hỗ trợ 2 định dạng:
+       1. Old pre-formatted (có ─────): strip header/footer, giữ nội dung.
+       2. Raw /Alarm: <+> /Task: <+> /WO: format: parse thành emoji sections."""
+    e = html.escape
+    if not raw:
+        return ""
+
+    # ── Format 1: Old pre-formatted (🔍 TNI...\n─────\n📍 Site Info\n...\n─────) ──
+    if "\u2500\u2500\u2500\u2500\u2500" in raw:      # ─────
+        lines = raw.split("\n")
+        content_lines = []
+        in_content = False
+        for line in lines:
+            if "\u2500\u2500\u2500\u2500\u2500" in line:
+                if not in_content:
+                    in_content = True
+                else:
+                    break
+            elif in_content:
+                content_lines.append(line)
+        if content_lines:
+            return e("\n".join(content_lines).strip())
+
+    # ── Format 2: Raw /Alarm: <+> /Task: ... <+> /WO: ... ──
+    if "<+>" in raw:
+        sections = raw.split("<+>")
+        parts = []
+        for sec in sections:
+            sec = sec.strip()
+            if sec.startswith("/Alarm:"):
+                content = sec[7:].strip()
+                if content:
+                    parts.append(f"🔔 <b>Alarm:</b> {e(content[:300])}")
+            elif sec.startswith("/Task:"):
+                content = sec[6:].strip()
+                if content and content.lower() not in ("no see", ""):
+                    tasks = [t.strip() for t in content.split("/") if t.strip()]
+                    parts.append("📋 <b>Task:</b>\n" + "\n".join(f"• {e(t[:150])}" for t in tasks[:5]))
+            elif sec.startswith("/WO:"):
+                content = sec[4:].strip()
+                if content:
+                    wos = [w.strip() for w in content.split("/") if w.strip()]
+                    parts.append("🔧 <b>WO:</b>\n" + "\n".join(f"• {e(w[:150])}" for w in wos[:3]))
+        return "\n".join(parts) if parts else e(raw[:500])
+
+    # ── Format 3: Unknown — escape và cắt bớt ──
+    return e(raw[:500])
+
+
+def perform_unified_tni_search(tni: str, full_info: bool = False) -> str:
+    """Tra cứu TNI O(1) — nhanh < 0.01s.
+    full_info=False (TNI0122):      Task + WO ngắn gọn.
+    full_info=True  (Info:TNI0122): Site + Cable + DIA + Task/WO đầy đủ."""
     e = html.escape
     tni_upper = tni.upper().strip()
 
-    # Kiểm tra cache SWR (Stale-While-Revalidate)
     now = time.time()
     if not _tni_info_index:
         build_search_indexes(force=True)
     elif (now - _index_last_built) >= CSV_CACHE_TTL:
-        trigger_bg_index_refresh()  # Trả kết quả cache lập tức & refresh background
+        trigger_bg_index_refresh()
 
-    info = _tni_info_index.get(tni_upper)
+    info    = _tni_info_index.get(tni_upper)
     task_wo = _tni_team_sum_index.get(tni_upper)
 
-    has_info = bool(info and any(info.values()))
+    has_info  = bool(info and any(info.values()))
     has_tasks = bool(task_wo)
 
     if not has_info and not has_tasks:
@@ -468,23 +519,27 @@ def perform_unified_tni_search(tni: str) -> str:
 
     lines = [f"🔍 <b>{e(tni_upper)}</b>\n━━━━━━━━━━━━━━━━━━━━"]
 
-    if has_info:
+    if full_info:
+        # ── Info: TNI0122 → CHỈ Site + Cable + GPON + DIA (không gộp Task/WO) ──
+        if not has_info:
+            return f"❌ No site/cable/DIA info for <b>{e(tni_upper)}</b>"
         if info.get("site"):
-            lines.append(f"\n🏢 <b>Site</b>\n{e(info['site'])}")
+            lines.append(f"\n🏢 <b>Site</b>\n{e(info['site'][:500])}")
         if info.get("cable"):
-            lines.append(f"\n🔌 <b>Cable</b>\n{e(info['cable'])}")
+            lines.append(f"\n🔌 <b>Cable</b>\n{e(info['cable'][:500])}")
         if info.get("gpon"):
-            lines.append(f"\n📶 <b>Gpon</b>\n{e(info['gpon'])}")
+            lines.append(f"\n📶 <b>Gpon</b>\n{e(info['gpon'][:300])}")
         if info.get("dia"):
-            lines.append(f"\n🌐 <b>DIA</b>\n{e(info['dia'])}")
-
-    if has_tasks:
-        clean_task = task_wo
-        if "━━━━━━━━━━━━━━━━━━━━" in clean_task:
-            parts = clean_task.split("━━━━━━━━━━━━━━━━━━━━")
-            if len(parts) >= 2:
-                clean_task = parts[1].strip()
-        lines.append(f"\n{html.escape(clean_task)}")
+            dia_text = info["dia"]
+            suffix = "..." if len(dia_text) > 500 else ""
+            lines.append(f"\n🌐 <b>DIA</b>\n{e(dia_text[:500])}{suffix}")
+    else:
+        # ── TNI0122 → CHỈ Task + WO (không gộp Site/Cable/DIA) ──
+        if not has_tasks:
+            return f"❌ No task/WO data for <b>{e(tni_upper)}</b>"
+        formatted = format_task_wo(task_wo)
+        if formatted:
+            lines.append(f"\n{formatted}")
 
     lines.append("━━━━━━━━━━━━━━━━━━━━")
     return "\n".join(lines)
@@ -1190,7 +1245,7 @@ def handle(update: dict) -> None:
         logger.info(f"Unified Info/TNI lookup: {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, f"Info:{tni}")
         try:
-            result = perform_unified_tni_search(tni)
+            result = perform_unified_tni_search(tni, full_info=True)   # Info: → Site+Cable+DIA only
             for chunk in split_messages(result):
                 tg_send(chat_id, chunk)
         except Exception as err:
@@ -1215,7 +1270,7 @@ def handle(update: dict) -> None:
         logger.info(f"Unified TNI lookup: {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, tni)
         try:
-            result = perform_unified_tni_search(tni)
+            result = perform_unified_tni_search(tni, full_info=False)  # TNI0122 → Task+WO only
             for chunk in split_messages(result):
                 tg_send(chat_id, chunk)
         except Exception as err:
