@@ -49,6 +49,14 @@ AI phai tuan thu TUYET DOI - khong co ngoai le:
 
 ## 📅 CHANGELOG
 
+### 07/08/2026 — v358: Fix critical crash search bot im lặng
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `api/search_bot.py` | **Thêm lại 261 dòng code bị thiếu**: `tg_send()`, `split_messages()`, `tg_get_file()`, `load_all_sheets()`, `get_staff_df()`, `get_staff_data()`, `log_search_bg()`, `lookup_team()`, `lookup_notclose()`, `lookup_waitcd()`, `get_site_access_template()`, `setup_bot_menu_commands()`, `DAILY_FIELDS_DEFAULT`, `TG_API`, `_cache_ts` | Khi v355 refactor sang O(1) Hash Map, các hàm helper cốt lõi bị xóa mất khỏi file nhưng vẫn còn được gọi → **NameError crash im lặng** ngay khi nhận tin nhắn → bot không phản hồi gì |
+
+> [!CAUTION]
+> **Bài học v358**: Khi refactor lớn (thêm O(1) indexing), PHẢI kiểm tra `python -c "import ast; ast.parse(...)"` VÀ grep tất cả hàm đang được gọi để đảm bảo không mất hàm nào. NameError trên Vercel bị nuốt im lặng, không có stack trace nào hiển thị ra ngoài.
+
 ### 03/08/2026 — ĐÓNG BĂNG: Gộp hết Reports + Thu thập vào MON6879
 | File | Thay đổi | Lý do |
 |---|---|---|
