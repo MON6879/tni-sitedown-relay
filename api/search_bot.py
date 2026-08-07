@@ -38,6 +38,267 @@ GID_STAFF      = "1684930643"  # Tab: Staff — col A=Telegram ID, row 1=headers
 
 TZ_MM    = timezone(timedelta(hours=6, minutes=30))   # Myanmar UTC+6:30
 MAX_LEN  = 4096
+TG_API   = f"https://api.telegram.org/bot{TOKEN if TOKEN else 'MISSING'}"
+
+# ── Daily fields cache ─────────────────────────────────────────────────────────
+DAILY_FIELDS_DEFAULT = [
+    "Daily report",
+    "Transportation Used", "Full Name", "Detail WO", "Detail task",
+    "Name Site rescue", "Name Cell rescue", "Resuce Cable",
+    "Name and detail Site repair alarm",
+    "Name Site follow partner refuel", "Other task",
+    "Name and detail Site go busines trip start go",
+    "Name and detail Site go busines trip end go",
+    "Km moto bike start", "Km moto bike the end",
+]
+DAILY_FIELDS_TTL = 600
+_daily_fields: list = []
+_daily_fields_ts: float = 0.0
+
+# ── Sheet cache ────────────────────────────────────────────────────────────────
+_cache_ts: float = 0.0
+CACHE_TTL: float = 120.0
+
+# ── split_messages PHẢI đứng trước tg_send ────────────────────────────────────
+def split_messages(text: str) -> list:
+    """Tách text thành các chunk ≤ MAX_LEN ký tự, cắt theo dòng."""
+    chunks, current = [], ""
+    for line in text.split("\n"):
+        candidate = (current + "\n" + line) if current else line
+        if len(candidate) <= MAX_LEN:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            while len(line) > MAX_LEN:
+                chunks.append(line[:MAX_LEN])
+                line = line[MAX_LEN:]
+            current = line
+    if current:
+        chunks.append(current)
+    return chunks or [""]
+
+# ── Telegram helpers ───────────────────────────────────────────────────────────
+def tg_send(chat_id, text, parse_mode="HTML"):
+    """Gửi tin nhắn Telegram, tự chia chunk nếu quá dài."""
+    if not TOKEN:
+        logger.error("TELEGRAM_TOKEN missing")
+        return
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    for chunk in split_messages(text):
+        try:
+            r = requests.post(url, json={
+                "chat_id": chat_id,
+                "text": chunk,
+                "parse_mode": parse_mode,
+                "disable_web_page_preview": True,
+            }, timeout=30)
+            if not r.ok:
+                logger.error(f"tg_send error: {r.text[:200]}")
+        except Exception as ex:
+            logger.error(f"tg_send exception: {ex}")
+
+def tg_get_file(file_id: str) -> str | None:
+    """Lấy file_path từ Telegram file_id."""
+    try:
+        r = requests.get(
+            f"https://api.telegram.org/bot{TOKEN}/getFile",
+            params={"file_id": file_id}, timeout=10
+        ).json()
+        return r.get("result", {}).get("file_path")
+    except Exception as ex:
+        logger.error(f"tg_get_file: {ex}")
+        return None
+
+
+
+# ── Staff & Sheet helpers ──────────────────────────────────────────────────────
+_staff_df_cache = None
+_staff_df_ts: float = 0.0
+
+def get_staff_df():
+    """Lấy Staff sheet, cache 2 phút."""
+    global _staff_df_cache, _staff_df_ts
+    now = time.time()
+    if _staff_df_cache is not None and (now - _staff_df_ts) < CSV_CACHE_TTL:
+        return _staff_df_cache
+    df = fetch_single_csv(GID_STAFF)
+    if df is not None:
+        _staff_df_cache = df
+        _staff_df_ts = now
+    return _staff_df_cache
+
+def load_all_sheets():
+    """Warm-up: tải song song 2 sheet chính vào cache."""
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        ex.submit(fetch_single_csv, GID_INFO)
+        ex.submit(fetch_single_csv, GID_TEAM_SUM)
+
+def get_staff_data(user_id: int, field_name: str | None = None) -> str:
+    """Tra cứu dữ liệu cá nhân từ Staff sheet theo Telegram user_id."""
+    def e(s): return html.escape(str(s))
+    df = get_staff_df()
+    if df is None or df.empty:
+        return "❌ Staff sheet empty."
+    headers = df.iloc[0]
+    data    = df.iloc[1:]
+    sid     = str(user_id).strip()
+    col_a   = data.iloc[:, 0].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+    matched = data[col_a == sid]
+    if matched.empty:
+        return f"❌ No data for your ID.\nYour ID: <code>{e(sid)}</code>"
+    row = matched.iloc[0]
+
+    def clean(v: str) -> str:
+        return "" if v.lower() in ("nan", "none", "", "#n/a", "#na", "#ref!", "#value!") else v
+
+    if field_name is None:
+        results = []
+        for ci in range(len(headers)):
+            h = str(headers.iloc[ci]).strip()
+            if h.lower().startswith("my") and h.lower() not in ("nan", "none", ""):
+                val = clean(safe(row, ci))
+                results.append(f"• <b>{e(h)}:</b> {e(val) if val else '—'}")
+        if not results:
+            return "ℹ️ No 'my*' columns found."
+        return "👤 <b>My Stats</b>\n━━━━━━━━━━━━━━━━━━━━\n" + "\n".join(results) + "\n━━━━━━━━━━━━━━━━━━━━"
+    else:
+        for ci in range(len(headers)):
+            if str(headers.iloc[ci]).strip().lower() == field_name.lower():
+                val = clean(safe(row, ci))
+                if not val:
+                    return f"ℹ️ <b>{e(field_name)}:</b> (empty)"
+                return f"📊 <b>{e(field_name)}:</b>\n{e(val)}"
+        return f"❌ Column '<b>{e(field_name)}</b>' not found."
+
+# ── Log search (fire-and-forget background) ────────────────────────────────────
+def log_search_bg(user_name: str, user_id: int, tni_code: str):
+    """Ghi log tìm kiếm vào GAS (background thread, không block)."""
+    if not APPS_SCRIPT_URL:
+        return
+    now_mm = datetime.now(TZ_MM)
+    payload = {
+        "action":    "log_search",
+        "user_name": user_name,
+        "user_id":   str(user_id),
+        "tni_code":  tni_code,
+        "date":      now_mm.strftime("%Y-%m-%d"),
+        "time":      now_mm.strftime("%H:%M"),
+    }
+    def _post():
+        try:
+            requests.post(APPS_SCRIPT_URL, json=payload, timeout=20)
+        except Exception:
+            pass
+    threading.Thread(target=_post, daemon=True).start()
+
+# ── Team lookups ───────────────────────────────────────────────────────────────
+GID_TL_SUM = GID_TEAM_SUM  # alias
+
+def _lookup_sheet_col(gid: str, col_match_idx: int, match_val: str, col_result_idx: int) -> list:
+    """Generic: tìm rows theo col_match_idx == match_val, trả về col_result_idx."""
+    df = fetch_single_csv(gid)
+    if df is None or df.empty:
+        return []
+    results = []
+    for _, row in df.iterrows():
+        cell = safe(row, col_match_idx).upper()
+        if cell == match_val.upper():
+            val = safe(row, col_result_idx)
+            if val:
+                results.append(val)
+    return results
+
+def lookup_team(team_code: str) -> list:
+    """Tra cứu TL team summary (GID_TEAM_SUM col B=team_code, col H=content)."""
+    df = fetch_single_csv(GID_TEAM_SUM)
+    if df is None or df.empty:
+        return [f"❌ No data for {html.escape(team_code)}"]
+    results = []
+    for _, row in df.iterrows():
+        col_b = safe(row, 1).strip().upper()
+        if col_b.startswith(team_code.upper()):
+            col_h = safe(row, 7)
+            if col_h:
+                results.append(col_h.strip().lstrip("~ ").strip())
+    if not results:
+        return [f"❌ No data found for team <b>{html.escape(team_code)}</b>"]
+    return [split_messages(r)[0] for r in results]
+
+def lookup_notclose(team_code: str) -> list:
+    """Tra cứu WO Not Close cho team (GID_TL_WAITCD col B=team, col G=notclose)."""
+    df = fetch_single_csv(GID_TL_WAITCD)
+    if df is None or df.empty:
+        return [f"❌ No data for {html.escape(team_code)} not close"]
+    results = []
+    for _, row in df.iterrows():
+        col_b = safe(row, 1).strip().upper()
+        if col_b.startswith(team_code.upper()):
+            col_g = safe(row, 6)
+            if col_g:
+                results.append(col_g.strip())
+    if not results:
+        return [f"❌ No Not Close data for <b>{html.escape(team_code)}</b>"]
+    return [split_messages(r)[0] for r in results]
+
+def lookup_waitcd(team_code: str) -> list:
+    """Tra cứu WO Wait CD cho team (GID_TL_WAITCD col B=team, col H=waitcd)."""
+    df = fetch_single_csv(GID_TL_WAITCD)
+    if df is None or df.empty:
+        return [f"❌ No data for {html.escape(team_code)} wait CD"]
+    results = []
+    for _, row in df.iterrows():
+        col_b = safe(row, 1).strip().upper()
+        if col_b.startswith(team_code.upper()):
+            col_h = safe(row, 7)
+            if col_h:
+                results.append(col_h.strip())
+    if not results:
+        return [f"❌ No Wait CD data for <b>{html.escape(team_code)}</b>"]
+    return [split_messages(r)[0] for r in results]
+
+# ── Site Access Template ───────────────────────────────────────────────────────
+def get_site_access_template(site_id: str = "TNI0401", date_str: str = None) -> str:
+    if not site_id or site_id.startswith("/"):
+        site_id = "TNI0401"
+    if not date_str:
+        date_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
+    return (
+        f"Site access format\n"
+        f"Site ID: {site_id}\n"
+        f"Towerco ID: OCK\n"
+        f"Contact Me: Khant Chaw Nyo\n"
+        f"Contact No: 09688433214\n"
+        f"NRC NO: 6/KaTaNa(N)114981\n"
+        f"Mail add: Khantchaw.nyo@vcm.com.mm\n"
+        f"Date: {date_str}\n"
+        f"Activity Detail: Site down check\n"
+        f"Activity Start time: 2 PM\n"
+        f"Activity End Time: 4 PM"
+    )
+
+# ── Bot menu commands ──────────────────────────────────────────────────────────
+def setup_bot_menu_commands():
+    """Cài đặt menu lệnh cho bot."""
+    commands = [
+        {"command": "request_enter_site", "description": "Request enter Site towerco format"},
+        {"command": "mysite",  "description": "All Site you control"},
+        {"command": "mycable", "description": "All your cable route"},
+        {"command": "mydia",   "description": "All your customer DIA"},
+        {"command": "myolt",   "description": "All Site have OLT"},
+        {"command": "mysn",    "description": "All SN you control"},
+        {"command": "mydata",  "description": "All your personal stats"},
+        {"command": "daily",   "description": "Daily report template"},
+        {"command": "plan",    "description": "Daily plan template"},
+        {"command": "help",    "description": "Show help menu"},
+    ]
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{TOKEN}/setMyCommands",
+            json={"commands": commands}, timeout=10
+        )
+    except Exception as ex:
+        logger.error(f"setup_bot_menu_commands: {ex}")
 
 # ── ULTRA-FAST HIGH-PERFORMANCE SEARCH ENGINE (Parallel + SWR + O(1) Hash Indexing) ──
 from concurrent.futures import ThreadPoolExecutor
