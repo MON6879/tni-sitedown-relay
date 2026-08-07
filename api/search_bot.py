@@ -25,7 +25,7 @@ APPS_SCRIPT_URL       = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\uf
 SPREADSHEET_ID        = os.environ.get("SPREADSHEET_ID", "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8").strip().strip("\ufeff")
 BASE_URL              = (
     f"https://docs.google.com/spreadsheets/d/"
-    f"{SPREADSHEET_ID}/export?format=csv&gid="
+    f"{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid="
 )
 GID_SITE       = "1095689918"
 GID_TASK       = "1755404595"
