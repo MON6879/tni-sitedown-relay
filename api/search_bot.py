@@ -135,7 +135,7 @@ def get_staff_df():
                 from datetime import datetime as _dt, timezone as _tz
                 built_ts = _dt.strptime(built_at_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_tz.utc).timestamp()
                 age_min = (time.time() - built_ts) / 60
-                if age_min < 10:
+                if age_min < 30:   # Dùng file nếu cache mới hơn 30 phút
                     _staff_df_cache = pd.DataFrame(staff_rows, dtype=str)
                     _staff_df_ts    = time.time()
                     logger.info(f"Loaded staff from data_cache.json (age={age_min:.1f}m) — {len(_staff_df_cache)} rows")
@@ -387,7 +387,7 @@ def build_search_indexes(force: bool = False):
                     from datetime import datetime as _dt, timezone as _tz
                     built_ts = _dt.strptime(built_at_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=_tz.utc).timestamp()
                     age_min = (time.time() - built_ts) / 60
-                    if age_min < 10:   # Dùng file nếu cache mới hơn 10 phút
+                    if age_min < 30:   # Dùng file nếu cache mới hơn 30 phút (GH Actions rebuild mỗi 5 phút)
                         _tni_info_index     = cache_data.get("info", {})
                         _tni_team_sum_index = cache_data.get("team", {})
                         _index_last_built   = time.time()
@@ -484,7 +484,7 @@ def perform_unified_tni_search(tni: str) -> str:
             parts = clean_task.split("━━━━━━━━━━━━━━━━━━━━")
             if len(parts) >= 2:
                 clean_task = parts[1].strip()
-        lines.append(f"\n{clean_task}")
+        lines.append(f"\n{html.escape(clean_task)}")
 
     lines.append("━━━━━━━━━━━━━━━━━━━━")
     return "\n".join(lines)
