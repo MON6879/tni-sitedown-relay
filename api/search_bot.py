@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-BOT_VERSION = "v3.8"
+BOT_VERSION = "v3.9"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
@@ -313,6 +313,10 @@ _index_last_built = 0.0
 _index_building = False
 
 def fetch_single_csv(gid: str) -> pd.DataFrame | None:
+    # Cache check — tránh fetch 2 lần (load_all_sheets + build_search_indexes)
+    cached = _csv_cache.get(gid)
+    if cached is not None and (time.time() - _csv_cache_ts.get(gid, 0)) < CSV_CACHE_TTL:
+        return cached
     url = BASE_URL + str(gid)
     hdrs = {"User-Agent": "Mozilla/5.0"}
     for attempt in range(1, 3):
@@ -848,8 +852,8 @@ def handle(update: dict) -> None:
     if user.get("is_bot"):
         return
 
-    # Warm-up / ensure all 5 sheets are loaded in parallel
-    load_all_sheets()
+    # build_search_indexes() trong perform_unified_tni_search() đã fetch đủ
+    # Không cần warm-up riêng (Vercel stateless, cache không persist giữa invocations)
 
     # ── PHOTO ──────────────────────────────────────────────────────────────
     if "photo" in msg:
