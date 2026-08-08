@@ -1699,10 +1699,7 @@ async def main():
                 f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
                 "━━━━━━━━━━━━━━━━━━━━"
             ]
-            # NOTE ngay đầu — luôn hiển thị dù message dài bị split
-            if note_text:
-                team_lines_indiv.append(f"📝 NOTE:\n{note_text}")
-                team_lines_indiv.append("────────────────────")
+            # Note sẽ được gửi riêng dưới tên @phongha79 (Telethon reply) sau khi pin Report 4
             # TL đã có đầy đủ trong Report 4b — không lặp lại ở Report 4
 
             # NV: parse_emp_metrics → compact 1 dòng với 🔺 prefix
@@ -1890,7 +1887,8 @@ async def main():
 
 
     # ── Gửi tất cả messages ──
-    collected_msgids = {}  # key → list[int], gom msg_ids theo GAS key
+    collected_msgids = {}      # gas_key → list[int]
+    pinned_report4_msgids = {}  # str(chat_id) → msg_id — dùng để Telethon reply Note
     for token, items in groups.items():
         bot_name = items[0][3] if items else "BOT"
         logger.info(f"--- {bot_name}: {len(items)} messages ---")
@@ -1904,6 +1902,7 @@ async def main():
                         try:
                             await bot.pin_chat_message(chat_id=cid, message_id=msg_ids[0], disable_notification=True)
                             logger.info(f"📌 Auto-pinned Report 4 as Note in group {cid} (msg_id: {msg_ids[0]})")
+                            pinned_report4_msgids[str(cid)] = msg_ids[0]  # collect for Note reply
                         except Exception as pin_err:
                             logger.warning(f"⚠️ Could not auto-pin Report 4 in group {cid}: {pin_err}")
 
@@ -1930,6 +1929,32 @@ async def main():
             save_msgids(APPS_SCRIPT_URL, gas_key, ids)
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
+
+    # ── 7d. Gửi NOTE reply dưới tên @phongha79 (Telethon) ──
+    # Note là tin riêng reply dưới Report 4 trong mỗi nhóm Team — để daily_read_report.py track ai đọc
+    if control_note and TELEGRAM_SESSION and TELEGRAM_API_ID and pinned_report4_msgids:
+        try:
+            async with TelegramClient(
+                StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH
+            ) as tg_note_client:
+                logger.info(f"📝 Gửi Note reply dưới tên user → {len(pinned_report4_msgids)} nhóm...")
+                for cid_str, reply_to_id in pinned_report4_msgids.items():
+                    try:
+                        await tg_note_client.send_message(
+                            entity=int(cid_str),
+                            message=control_note,
+                            reply_to=reply_to_id
+                        )
+                        logger.info(f"  ✅ Note reply → {cid_str} (reply_to msg_id: {reply_to_id})")
+                        await asyncio.sleep(0.5)
+                    except Exception as note_send_err:
+                        logger.error(f"  ❌ Note reply thất bại → {cid_str}: {note_send_err}")
+        except Exception as note_client_err:
+            logger.error(f"❌ Telethon Note client lỗi: {note_client_err}")
+    elif not control_note:
+        logger.info("No control_note — skip Note reply")
+    elif not pinned_report4_msgids:
+        logger.info("No pinned Report 4 msg_ids — skip Note reply")
 
     # ── 8. Xóa các tin nhắn asset cũ lẻ loi ở CONTROL SITE & các Team ──
     if SEND_BOT_TOKEN and APPS_SCRIPT_URL:
