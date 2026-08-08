@@ -2119,10 +2119,16 @@ function handleGetTeamWoStats_() {
     const hdr0 = fmtCell(raw[0][1]);  // period start e.g. "21/07/2026"
     const hdr1 = fmtCell(raw[0][2]);  // period end   e.g. "20/08/2026"
 
-    // Row 1 = Export time, Row 2 = empty, Rows 3+ = engineers
+    // Row 1 = Export time, Row 2 = empty, Rows 3+ = engineer rows
+    // NOTE: GID 133591305 contains both individual engineer rows AND one "Team leader N"
+    // summary row per team (col C = "Team leader 1" etc.).
+    // The summary row has team-TOTAL for closeMonth & fotClose (equal to sum of individuals),
+    // but its WO Remain is ADDITIONAL unassigned sites not in individual rows.
+    // Fix: skip summary row for closeMonth/fotClose/d-day (avoid 2×), include it for remain.
     for (let i = 3; i < raw.length; i++) {
-      const teamRaw = String(raw[i][0] || "").trim();
-      const woText  = String(raw[i][3] || "").trim();
+      const teamRaw  = String(raw[i][0] || "").trim();
+      const username = String(raw[i][2] || "").trim();
+      const woText   = String(raw[i][3] || "").trim();
 
       if (!teamRaw || !woText || woText === "0" || woText === "") continue;
 
@@ -2133,22 +2139,27 @@ function handleGetTeamWoStats_() {
       if (!teamKey) continue;
 
       const s = stats[teamKey];
-      s.engineers++;
+      const isLeaderSummary = username.startsWith("Team leader");
 
       function gi(pattern) {
         const m = woText.match(pattern);
         return m ? parseInt(m[1], 10) : 0;
       }
-      s.remain      += gi(/\/(\d+) WO Remain/);
-      s.closeMonth  += gi(/Day \/\d+ of the month= \/(\d+) WO Close/);
-      s.fotClose    += gi(/\/WO \/Overdue \/FOT \/NOT \/Close: \/(\d+)/);
 
-      // 3-day close: "3Day: D2 /D1 /D0"
-      const m3 = woText.match(/3Day: (\d+) \/(\d+) \/(\d+)/);
-      if (m3) {
-        s.d2 += parseInt(m3[1], 10);
-        s.d1 += parseInt(m3[2], 10);
-        s.d0 += parseInt(m3[3], 10);
+      // Remain: sum ALL rows (individual + team leader summary)
+      s.remain += gi(/\/(\d+) WO Remain/);
+
+      // closeMonth, fotClose, 3-day: ONLY from individual engineer rows (not the summary row)
+      if (!isLeaderSummary) {
+        s.engineers++;
+        s.closeMonth += gi(/Day \/\d+ of the month= \/(\d+) WO Close/);
+        s.fotClose   += gi(/\/WO \/Overdue \/FOT \/NOT \/Close: \/(\d+)/);
+        const m3 = woText.match(/3Day: (\d+) \/(\d+) \/(\d+)/);
+        if (m3) {
+          s.d2 += parseInt(m3[1], 10);
+          s.d1 += parseInt(m3[2], 10);
+          s.d0 += parseInt(m3[3], 10);
+        }
       }
     }
 
