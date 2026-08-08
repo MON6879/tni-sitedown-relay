@@ -662,78 +662,16 @@
 
         // Load on DOM ready
         if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', loadTeamStats);
+          document.addEventListener('DOMContentLoaded', function() {
+            loadTeamStats();
+            setInterval(loadTeamStats, 5 * 60 * 1000); // auto-refresh every 5 minutes
+          });
         } else {
           loadTeamStats();
+          setInterval(loadTeamStats, 5 * 60 * 1000); // auto-refresh every 5 minutes
         }
       })();
       </script>
-
-
-        <div class="interactive-team-card" onclick="openTeam1Modal()">
-          <div class="team-badge-icon tb-t1"><i class="fa-solid fa-user-tie"></i></div>
-          <span class="team-tag tag-t1">Team 1 Dawei</span>
-          <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Paing Aung Soe</h3>
-          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM01_Dawei (10 Staff)</p>
-          
-          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong style="color:var(--cyan); font-size:1.05rem;">397 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong style="color:var(--emerald);">68 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Plan:</span><span style="font-weight:700; color:var(--amber);">30 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close:</span><strong style="color:var(--rose);">41 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">06/05/04-07-2026:</span><span><strong style="color:#38BDF8;">7</strong> / <strong style="color:#38BDF8;">0</strong> / <strong style="color:#38BDF8;">7 WOs</strong></span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--rose);">Rank #4 (16%/50% Not Meet Target)</span></div>
-          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
-        </div>
-
-        <!-- Team 2 Card -->
-        <div class="interactive-team-card" onclick="openTeam2Modal()">
-          <div class="team-badge-icon tb-t2"><i class="fa-solid fa-user-tie"></i></div>
-          <span class="team-tag tag-t2">Team 2 Myeik</span>
-          <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Nay Myo Thu</h3>
-          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM02_Myeik (11 Staff)</p>
-          
-          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong style="color:var(--cyan); font-size:1.05rem;">194 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong style="color:var(--emerald);">63 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Plan:</span><span style="font-weight:700; color:var(--amber);">12 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close:</span><strong style="color:var(--amber);">1 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">06/05/04-07-2026:</span><span><strong style="color:#38BDF8;">3</strong> / <strong style="color:#38BDF8;">18</strong> / <strong style="color:#38BDF8;">1 WOs</strong></span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--rose);">Rank #2 (31%/50% Not Meet Target)</span></div>
-          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
-        </div>
-
-        <!-- Team 3 Card -->
-        <div class="interactive-team-card" onclick="openTeam3Modal()">
-          <div class="team-badge-icon tb-t3"><i class="fa-solid fa-user-tie"></i></div>
-          <span class="team-tag tag-t3">Team 3 Bokpyin</span>
-          <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Pyae Phyo Zaw</h3>
-          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM03_Bokpyin (4 Staff)</p>
-          
-          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong style="color:var(--cyan); font-size:1.05rem;">92 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong style="color:var(--emerald);">26 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Plan:</span><span style="font-weight:700; color:var(--amber);">6 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close:</span><strong style="color:var(--emerald);">0 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">06/05/04-07-2026:</span><span><strong style="color:#38BDF8;">0</strong> / <strong style="color:#38BDF8;">2</strong> / <strong style="color:#38BDF8;">6 WOs</strong></span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--amber);">Rank #3 (28%/50% Not Meet Target)</span></div>
-          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
-        </div>
-
-        <!-- Team 4 Card -->
-        <div class="interactive-team-card" onclick="openTeam4Modal()">
-          <div class="team-badge-icon tb-t4"><i class="fa-solid fa-user-tie"></i></div>
-          <span class="team-tag tag-t4">Team 4 Kawthoung</span>
-          <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Naing Myo Htun</h3>
-          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM04_Kawthoung (4 Staff)</p>
-          
-          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong style="color:var(--cyan); font-size:1.05rem;">92 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong style="color:var(--emerald);">57 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Plan:</span><span style="font-weight:700; color:var(--amber);">3 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close:</span><strong style="color:var(--amber);">3 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">06/05/04-07-2026:</span><span><strong style="color:#38BDF8;">0</strong> / <strong style="color:#38BDF8;">6</strong> / <strong style="color:#38BDF8;">8 WOs</strong></span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--emerald);">Rank #1 (62%/50% Meet Target)</span></div>
-          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
-        </div>
-
-      </div>
 
       <!-- TABLE 2: DEPARTMENT POINT MATRIX (Range X50:AD56) -->
       <div class="card">
