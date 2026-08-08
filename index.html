@@ -532,21 +532,21 @@
         <button class="filter-btn active" style="background:linear-gradient(135deg, #10B981, #06B6D4); color:#fff; border:none; padding:0.5rem 1rem; font-weight:700; border-radius:10px; cursor:pointer;" onclick="openAllEngineersModal()"><i class="fa-solid fa-users-viewfinder"></i> View All 22 Engineers Roster (% High to Low)</button>
       </div>
 
-      <!-- 4 Interactive Team Cards (Clickable) -->
-      <div class="team-card-grid">
+      <!-- 4 Interactive Team Cards — LIVE DATA via GAS -->
+      <div class="team-card-grid" id="team-card-grid">
+
         <!-- Team 1 Card -->
         <div class="interactive-team-card" onclick="openTeam1Modal()">
           <div class="team-badge-icon tb-t1"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t1">Team 1 Dawei</span>
           <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Paing Aung Soe</h3>
-          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM01_Dawei (10 Staff)</p>
-          
-          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong style="color:var(--cyan); font-size:1.05rem;">397 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong style="color:var(--emerald);">68 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Plan:</span><span style="font-weight:700; color:var(--amber);">30 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close:</span><strong style="color:var(--rose);">41 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">06/05/04-07-2026:</span><span><strong style="color:#38BDF8;">7</strong> / <strong style="color:#38BDF8;">0</strong> / <strong style="color:#38BDF8;">7 WOs</strong></span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--rose);">Rank #4 (16%/50% Not Meet Target)</span></div>
+          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM01_Dawei (<span id="t1-engineers">10</span> Staff)</p>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong id="t1-assigned" style="color:var(--cyan); font-size:1.05rem;">⏳ --</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong id="t1-fot" style="color:var(--emerald);">⏳ --</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Close (Month):</span><span id="t1-close" style="font-weight:700; color:var(--amber);">⏳ --</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Remain:</span><strong id="t1-remain" style="color:var(--rose);">⏳ --</strong></div>
+          <div class="row-detail"><span id="t1-datelabel" style="color:var(--text-sub);">--/--/--:</span><span><strong id="t1-d2" style="color:#38BDF8;">-</strong> / <strong id="t1-d1" style="color:#38BDF8;">-</strong> / <strong id="t1-d0" style="color:#38BDF8;">- WOs</strong></span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank &amp; Completion Status:</span><span id="t1-rank" style="font-weight:700; color:var(--text-sub);">⏳ Loading...</span></div>
           <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
         </div>
 
@@ -555,14 +555,13 @@
           <div class="team-badge-icon tb-t2"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t2">Team 2 Myeik</span>
           <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Nay Myo Thu</h3>
-          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM02_Myeik (11 Staff)</p>
-          
-          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong style="color:var(--cyan); font-size:1.05rem;">194 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong style="color:var(--emerald);">63 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Plan:</span><span style="font-weight:700; color:var(--amber);">12 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close:</span><strong style="color:var(--amber);">1 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">06/05/04-07-2026:</span><span><strong style="color:#38BDF8;">3</strong> / <strong style="color:#38BDF8;">18</strong> / <strong style="color:#38BDF8;">1 WOs</strong></span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--rose);">Rank #2 (31%/50% Not Meet Target)</span></div>
+          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM02_Myeik (<span id="t2-engineers">11</span> Staff)</p>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong id="t2-assigned" style="color:var(--cyan); font-size:1.05rem;">⏳ --</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong id="t2-fot" style="color:var(--emerald);">⏳ --</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Close (Month):</span><span id="t2-close" style="font-weight:700; color:var(--amber);">⏳ --</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Remain:</span><strong id="t2-remain" style="color:var(--rose);">⏳ --</strong></div>
+          <div class="row-detail"><span id="t2-datelabel" style="color:var(--text-sub);">--/--/--:</span><span><strong id="t2-d2" style="color:#38BDF8;">-</strong> / <strong id="t2-d1" style="color:#38BDF8;">-</strong> / <strong id="t2-d0" style="color:#38BDF8;">- WOs</strong></span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank &amp; Completion Status:</span><span id="t2-rank" style="font-weight:700; color:var(--text-sub);">⏳ Loading...</span></div>
           <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
         </div>
 
@@ -571,14 +570,13 @@
           <div class="team-badge-icon tb-t3"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t3">Team 3 Bokpyin</span>
           <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Pyae Phyo Zaw</h3>
-          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM03_Bokpyin (4 Staff)</p>
-          
-          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong style="color:var(--cyan); font-size:1.05rem;">92 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong style="color:var(--emerald);">26 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Plan:</span><span style="font-weight:700; color:var(--amber);">6 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close:</span><strong style="color:var(--emerald);">0 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">06/05/04-07-2026:</span><span><strong style="color:#38BDF8;">0</strong> / <strong style="color:#38BDF8;">2</strong> / <strong style="color:#38BDF8;">6 WOs</strong></span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--amber);">Rank #3 (28%/50% Not Meet Target)</span></div>
+          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM03_Bokpyin (<span id="t3-engineers">4</span> Staff)</p>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong id="t3-assigned" style="color:var(--cyan); font-size:1.05rem;">⏳ --</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong id="t3-fot" style="color:var(--emerald);">⏳ --</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Close (Month):</span><span id="t3-close" style="font-weight:700; color:var(--amber);">⏳ --</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Remain:</span><strong id="t3-remain" style="color:var(--rose);">⏳ --</strong></div>
+          <div class="row-detail"><span id="t3-datelabel" style="color:var(--text-sub);">--/--/--:</span><span><strong id="t3-d2" style="color:#38BDF8;">-</strong> / <strong id="t3-d1" style="color:#38BDF8;">-</strong> / <strong id="t3-d0" style="color:#38BDF8;">- WOs</strong></span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank &amp; Completion Status:</span><span id="t3-rank" style="font-weight:700; color:var(--text-sub);">⏳ Loading...</span></div>
           <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
         </div>
 
@@ -587,18 +585,71 @@
           <div class="team-badge-icon tb-t4"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t4">Team 4 Kawthoung</span>
           <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Naing Myo Htun</h3>
-          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM04_Kawthoung (4 Staff)</p>
-          
-          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong style="color:var(--cyan); font-size:1.05rem;">92 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong style="color:var(--emerald);">57 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Plan:</span><span style="font-weight:700; color:var(--amber);">3 WOs</span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">CD Not Yet Close:</span><strong style="color:var(--amber);">3 WOs</strong></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">06/05/04-07-2026:</span><span><strong style="color:#38BDF8;">0</strong> / <strong style="color:#38BDF8;">6</strong> / <strong style="color:#38BDF8;">8 WOs</strong></span></div>
-          <div class="row-detail"><span style="color:var(--text-sub);">Rank & Completion Status:</span><span style="font-weight:700; color:var(--emerald);">Rank #1 (62%/50% Meet Target)</span></div>
+          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM04_Kawthoung (<span id="t4-engineers">4</span> Staff)</p>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong id="t4-assigned" style="color:var(--cyan); font-size:1.05rem;">⏳ --</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong id="t4-fot" style="color:var(--emerald);">⏳ --</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Close (Month):</span><span id="t4-close" style="font-weight:700; color:var(--amber);">⏳ --</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Remain:</span><strong id="t4-remain" style="color:var(--rose);">⏳ --</strong></div>
+          <div class="row-detail"><span id="t4-datelabel" style="color:var(--text-sub);">--/--/--:</span><span><strong id="t4-d2" style="color:#38BDF8;">-</strong> / <strong id="t4-d1" style="color:#38BDF8;">-</strong> / <strong id="t4-d0" style="color:#38BDF8;">- WOs</strong></span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank &amp; Completion Status:</span><span id="t4-rank" style="font-weight:700; color:var(--text-sub);">⏳ Loading...</span></div>
           <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
         </div>
 
       </div>
+
+      <!-- Live sync badge -->
+      <div id="team-stats-badge" style="text-align:center; margin-top:0.4rem; font-size:0.72rem; color:#6b7280; padding:0.3rem 0;">
+        ⏳ Loading live data...
+      </div>
+
+      <!-- LIVE TEAM WO STATS — Auto-refresh every 5 min -->
+      <script>
+      (function() {
+        var GAS = 'https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec';
+        var TEAMS = ['team1','team2','team3','team4'];
+        var PFX   = {team1:'t1', team2:'t2', team3:'t3', team4:'t4'};
+        function $id(id)   { return document.getElementById(id); }
+        function set(id,v) { var e=$id(id); if(e) e.textContent=v; }
+        function applyTeam(k, d, dl) {
+          var p=PFX[k], met=d.metTarget;
+          var rc=met?'var(--emerald)':(d.rank<=2?'var(--amber)':'var(--rose)');
+          var rt='Rank #'+d.rank+' ('+d.pct+'%/50% '+(met?'✅ Met':'❌ Not Met')+')';
+          set(p+'-engineers',d.engineers);
+          set(p+'-assigned', d.totalAssigned+' WOs');
+          set(p+'-fot',      d.fotClose+' WOs');
+          set(p+'-close',    d.closeMonth+' WOs');
+          set(p+'-remain',   d.remain+' WOs');
+          set(p+'-datelabel',dl+':');
+          set(p+'-d2',d.d2); set(p+'-d1',d.d1); set(p+'-d0',d.d0+' WOs');
+          var re=$id(p+'-rank'); if(re){re.textContent=rt; re.style.color=rc;}
+        }
+        function loadStats() {
+          fetch(GAS+'?action=get_team_wo_stats')
+            .then(function(r){return r.json();})
+            .then(function(resp){
+              if(resp.status!=='ok'||!resp.data){
+                var b=$id('team-stats-badge');
+                if(b) b.textContent='\u26a0\ufe0f '+(resp.message||'Error loading data');
+                return;
+              }
+              TEAMS.forEach(function(k){ if(resp.data[k]) applyTeam(k,resp.data[k],resp.dateLabel||''); });
+              var b=$id('team-stats-badge');
+              if(b){
+                b.innerHTML='\ud83d\udd34 LIVE &nbsp;|&nbsp; \u2705 Synced from Google Sheets &nbsp;|&nbsp; Period: <strong>'+(resp.period||'')+'</strong> &nbsp;|&nbsp; Updated: <strong>'+resp.updatedAt+'</strong> &nbsp;|&nbsp; <span style="color:#6b7280;">Auto-refresh 5min</span>';
+                b.style.color='#10b981'; b.style.fontWeight='600';
+              }
+            })
+            .catch(function(err){
+              var b=$id('team-stats-badge');
+              if(b) b.textContent='\u26a0\ufe0f Fetch error: '+err.message+'. Will retry in 5 min.';
+            });
+        }
+        function init(){ loadStats(); setInterval(loadStats, 5*60*1000); }
+        if(document.readyState==='loading'){
+          document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+      })();
+      </script>
 
       <!-- TABLE 2: DEPARTMENT POINT MATRIX (Range X50:AD56) -->
       <div class="card">
