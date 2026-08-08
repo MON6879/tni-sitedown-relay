@@ -533,8 +533,143 @@
       </div>
 
       <!-- 4 Interactive Team Cards (Clickable) -->
-      <div class="team-card-grid">
+      <div class="team-card-grid" id="team-card-grid">
         <!-- Team 1 Card -->
+        <div class="interactive-team-card" onclick="openTeam1Modal()">
+          <div class="team-badge-icon tb-t1"><i class="fa-solid fa-user-tie"></i></div>
+          <span class="team-tag tag-t1">Team 1 Dawei</span>
+          <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Paing Aung Soe</h3>
+          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM01_Dawei (<span id="t1-engineers">10</span> Staff)</p>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong id="t1-assigned" style="color:var(--cyan); font-size:1.05rem;">⏳ WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong id="t1-fot" style="color:var(--emerald);">⏳ WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Close (Period):</span><span id="t1-close" style="font-weight:700; color:var(--amber);">⏳ WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Remain:</span><strong id="t1-remain" style="color:var(--rose);">⏳ WOs</strong></div>
+          <div class="row-detail"><span id="t1-datelabel" style="color:var(--text-sub);">--/--/-- :</span><span><strong id="t1-d2" style="color:#38BDF8;">⏳</strong> / <strong id="t1-d1" style="color:#38BDF8;">⏳</strong> / <strong id="t1-d0" style="color:#38BDF8;">⏳ WOs</strong></span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank &amp; Completion Status:</span><span id="t1-rank" style="font-weight:700;">⏳ Loading...</span></div>
+          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
+        </div>
+
+        <!-- Team 2 Card -->
+        <div class="interactive-team-card" onclick="openTeam2Modal()">
+          <div class="team-badge-icon tb-t2"><i class="fa-solid fa-user-tie"></i></div>
+          <span class="team-tag tag-t2">Team 2 Myeik</span>
+          <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Nay Myo Thu</h3>
+          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM02_Myeik (<span id="t2-engineers">11</span> Staff)</p>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong id="t2-assigned" style="color:var(--cyan); font-size:1.05rem;">⏳ WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong id="t2-fot" style="color:var(--emerald);">⏳ WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Close (Period):</span><span id="t2-close" style="font-weight:700; color:var(--amber);">⏳ WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Remain:</span><strong id="t2-remain" style="color:var(--rose);">⏳ WOs</strong></div>
+          <div class="row-detail"><span id="t2-datelabel" style="color:var(--text-sub);">--/--/-- :</span><span><strong id="t2-d2" style="color:#38BDF8;">⏳</strong> / <strong id="t2-d1" style="color:#38BDF8;">⏳</strong> / <strong id="t2-d0" style="color:#38BDF8;">⏳ WOs</strong></span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank &amp; Completion Status:</span><span id="t2-rank" style="font-weight:700;">⏳ Loading...</span></div>
+          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
+        </div>
+
+        <!-- Team 3 Card -->
+        <div class="interactive-team-card" onclick="openTeam3Modal()">
+          <div class="team-badge-icon tb-t3"><i class="fa-solid fa-user-tie"></i></div>
+          <span class="team-tag tag-t3">Team 3 Bokpyin</span>
+          <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Pyae Phyo Zaw</h3>
+          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM03_Bokpyin (<span id="t3-engineers">4</span> Staff)</p>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong id="t3-assigned" style="color:var(--cyan); font-size:1.05rem;">⏳ WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong id="t3-fot" style="color:var(--emerald);">⏳ WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Close (Period):</span><span id="t3-close" style="font-weight:700; color:var(--amber);">⏳ WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Remain:</span><strong id="t3-remain" style="color:var(--rose);">⏳ WOs</strong></div>
+          <div class="row-detail"><span id="t3-datelabel" style="color:var(--text-sub);">--/--/-- :</span><span><strong id="t3-d2" style="color:#38BDF8;">⏳</strong> / <strong id="t3-d1" style="color:#38BDF8;">⏳</strong> / <strong id="t3-d0" style="color:#38BDF8;">⏳ WOs</strong></span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank &amp; Completion Status:</span><span id="t3-rank" style="font-weight:700;">⏳ Loading...</span></div>
+          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
+        </div>
+
+        <!-- Team 4 Card -->
+        <div class="interactive-team-card" onclick="openTeam4Modal()">
+          <div class="team-badge-icon tb-t4"><i class="fa-solid fa-user-tie"></i></div>
+          <span class="team-tag tag-t4">Team 4 Kawthoung</span>
+          <h3 style="margin-top:0.6rem; font-size:1.35rem; font-weight:800; color:#fff;">Leader: Naing Myo Htun</h3>
+          <p style="font-size:0.75rem; color:var(--text-sub); margin-bottom:0.6rem;">Region: MYT_TNI_TEAM04_Kawthoung (<span id="t4-engineers">4</span> Staff)</p>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total Assigned:</span><strong id="t4-assigned" style="color:var(--cyan); font-size:1.05rem;">⏳ WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Total FOT Close:</span><strong id="t4-fot" style="color:var(--emerald);">⏳ WOs</strong></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Close (Period):</span><span id="t4-close" style="font-weight:700; color:var(--amber);">⏳ WOs</span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">WO Remain:</span><strong id="t4-remain" style="color:var(--rose);">⏳ WOs</strong></div>
+          <div class="row-detail"><span id="t4-datelabel" style="color:var(--text-sub);">--/--/-- :</span><span><strong id="t4-d2" style="color:#38BDF8;">⏳</strong> / <strong id="t4-d1" style="color:#38BDF8;">⏳</strong> / <strong id="t4-d0" style="color:#38BDF8;">⏳ WOs</strong></span></div>
+          <div class="row-detail"><span style="color:var(--text-sub);">Rank &amp; Completion Status:</span><span id="t4-rank" style="font-weight:700;">⏳ Loading...</span></div>
+          <div style="margin-top:0.8rem; font-size:0.75rem; color:var(--cyan); font-weight:700;">👉 Click for Full Row Details</div>
+        </div>
+
+      </div>
+
+      <!-- Live data update badge -->
+      <div id="team-stats-badge" style="text-align:center; margin-top:0.5rem; font-size:0.72rem; color:var(--text-muted);">
+        ⏳ Loading live data from Apps Script...
+      </div>
+
+      <!-- LIVE TEAM STATS FETCH SCRIPT -->
+      <script>
+      (function() {
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec';
+        const TEAMS = ['team1','team2','team3','team4'];
+        const PREFIX = {team1:'t1', team2:'t2', team3:'t3', team4:'t4'};
+
+        function $id(id) { return document.getElementById(id); }
+        function set(id, val) { var el=$id(id); if(el) el.textContent=val; }
+        function setHTML(id, val) { var el=$id(id); if(el) el.innerHTML=val; }
+
+        function applyTeam(key, d, dateLabel) {
+          var p = PREFIX[key];
+          var met = d.metTarget;
+          var rankColor = met ? 'var(--emerald)' : (d.rank <= 2 ? 'var(--amber)' : 'var(--rose)');
+          var rankText = 'Rank #' + d.rank + ' (' + d.pct + '%/50% ' + (met ? '✅ Meet Target' : '❌ Not Meet Target') + ')';
+
+          set(p+'-engineers', d.engineers);
+          set(p+'-assigned', d.totalAssigned + ' WOs');
+          set(p+'-fot', d.fotClose + ' WOs');
+          set(p+'-close', d.closeMonth + ' WOs');
+          set(p+'-remain', d.remain + ' WOs');
+          set(p+'-datelabel', dateLabel + ':');
+          set(p+'-d2', d.d2);
+          set(p+'-d1', d.d1);
+          set(p+'-d0', d.d0 + ' WOs');
+
+          var rankEl = $id(p+'-rank');
+          if (rankEl) {
+            rankEl.textContent = rankText;
+            rankEl.style.color = rankColor;
+          }
+        }
+
+        function loadTeamStats() {
+          fetch(GAS_URL + '?action=get_team_wo_stats')
+            .then(function(r){ return r.json(); })
+            .then(function(resp) {
+              if (resp.status !== 'ok' || !resp.data) {
+                setHTML('team-stats-badge', '⚠️ Could not load live data: ' + (resp.message || 'unknown error'));
+                return;
+              }
+              var d = resp.data;
+              var dl = resp.dateLabel || '';
+              TEAMS.forEach(function(k) {
+                if (d[k]) applyTeam(k, d[k], dl);
+              });
+              var badge = $id('team-stats-badge');
+              if (badge) {
+                badge.innerHTML = '🔴 LIVE &nbsp;|&nbsp; ✅ Data synced from Google Sheets &nbsp;|&nbsp; Period: <strong>' + (resp.period||'') + '</strong> &nbsp;|&nbsp; Updated: <strong>' + resp.updatedAt + '</strong>';
+                badge.style.color = 'var(--emerald)';
+                badge.style.fontWeight = '600';
+              }
+            })
+            .catch(function(err) {
+              setHTML('team-stats-badge', '⚠️ Fetch error — ' + err.message + '. Please refresh.');
+            });
+        }
+
+        // Load on DOM ready
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', loadTeamStats);
+        } else {
+          loadTeamStats();
+        }
+      })();
+      </script>
+
+
         <div class="interactive-team-card" onclick="openTeam1Modal()">
           <div class="team-badge-icon tb-t1"><i class="fa-solid fa-user-tie"></i></div>
           <span class="team-tag tag-t1">Team 1 Dawei</span>

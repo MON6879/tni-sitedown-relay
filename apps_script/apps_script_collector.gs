@@ -177,6 +177,11 @@ function doGet(e) {
     if (action === "get_fields")                                       return doGetDaily_(e);
 
     if (action === "trigger_16h" || action === "trigger_report" || action === "relay_all") return handleWebhookRequest_(e);
+    if (action === "run_dashboard_build") {
+      drStep1_BuildTables();
+      return json({ status: "ok", message: "Dashboard build triggered" });
+    }
+    if (action === "get_team_wo_stats") return handleGetTeamWoStats_();
 
     // ── Default: status check ─────────────────────────────────
     const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -2052,7 +2057,134 @@ function getNoteB2B5() {
 
 
 
+// ═══════════════════════════════════════════════════════════════
+// GET TEAM WO STATS — real-time team summary for executive dashboard
+// GET ?action=get_team_wo_stats
+// ═══════════════════════════════════════════════════════════════
+function handleGetTeamWoStats_() {
+  try {
+    const ss = SpreadsheetApp.openById(SHEET_ID);
 
+    // Dashboard Report sheet (DR_REPORT_GID = "133591305")
+    const rptSh = ss.getSheets().find(function(s) {
+      return s.getSheetId() === 133591305 || s.getName() === "Dashboard Report";
+    });
+    if (!rptSh || rptSh.getLastRow() < 4)
+      return json({ status: "error", message: "Dashboard Report sheet not found — run drStep1_BuildTables first" });
+
+    const raw = rptSh.getRange(1, 1, rptSh.getLastRow(), 5).getValues();
+
+    const TEAMS = {
+      "MYT_TNI_TEAM01_Dawei":     "team1",
+      "MYT_TNI_TEAM02_Myeik":     "team2",
+      "MYT_TNI_TEAM03_Bokpyin":   "team3",
+      "MYT_TNI_TEAM04_Kawthoung": "team4"
+    };
+    const TEAM_LABELS = {
+      team1: "Team 1 Dawei",   team2: "Team 2 Myeik",
+      team3: "Team 3 Bokpyin", team4: "Team 4 Kawthoung"
+    };
+    const TEAM_REGIONS = {
+      team1: "MYT_TNI_TEAM01_Dawei",   team2: "MYT_TNI_TEAM02_Myeik",
+      team3: "MYT_TNI_TEAM03_Bokpyin", team4: "MYT_TNI_TEAM04_Kawthoung"
+    };
+
+    const stats = {};
+    for (const k of Object.keys(TEAM_LABELS)) {
+      stats[k] = { remain:0, closeMonth:0, fotClose:0, d0:0, d1:0, d2:0, engineers:0 };
+    }
+
+    // Parse header row 0 for report date range
+    const hdr0 = String(raw[0][1] || "");  // "21/7/2026"
+    const hdr1 = String(raw[0][2] || "");  // "20/08/2026"
+
+    // Row 1 = Export time, Row 2 = empty, Rows 3+ = engineers
+    for (let i = 3; i < raw.length; i++) {
+      const teamRaw = String(raw[i][0] || "").trim();
+      const woText  = String(raw[i][3] || "").trim();
+
+      if (!teamRaw || !woText || woText === "0" || woText === "") continue;
+
+      let teamKey = null;
+      for (const k of Object.keys(TEAMS)) {
+        if (teamRaw === k) { teamKey = TEAMS[k]; break; }
+      }
+      if (!teamKey) continue;
+
+      const s = stats[teamKey];
+      s.engineers++;
+
+      function gi(pattern) {
+        const m = woText.match(pattern);
+        return m ? parseInt(m[1], 10) : 0;
+      }
+      s.remain      += gi(/\/(\d+) WO Remain/);
+      s.closeMonth  += gi(/Day \/\d+ of the month= \/(\d+) WO Close/);
+      s.fotClose    += gi(/\/WO \/Overdue \/FOT \/NOT \/Close: \/(\d+)/);
+
+      // 3-day close: "3Day: D2 /D1 /D0"
+      const m3 = woText.match(/3Day: (\d+) \/(\d+) \/(\d+)/);
+      if (m3) {
+        s.d2 += parseInt(m3[1], 10);
+        s.d1 += parseInt(m3[2], 10);
+        s.d0 += parseInt(m3[3], 10);
+      }
+    }
+
+    // Today's date label for 3-day
+    const now     = new Date();
+    const tzOff   = 6.5 * 3600000;
+    const mmt     = new Date(now.getTime() + tzOff);
+    function fmtD(d) {
+      const dd = String(d.getUTCDate()).padStart(2,"0");
+      const mm = String(d.getUTCMonth()+1).padStart(2,"0");
+      const yy = String(d.getUTCFullYear()).slice(-2);
+      return dd+"/"+mm+"/"+yy;
+    }
+    const d0Str = fmtD(mmt);
+    const d1Str = fmtD(new Date(mmt.getTime() - 86400000));
+    const d2Str = fmtD(new Date(mmt.getTime() - 2*86400000));
+    const dateLabel = d0Str+"/"+d1Str+"/"+d2Str;
+
+    // Build result
+    const result = {};
+    const ranks = [];
+    for (const k of Object.keys(TEAM_LABELS)) {
+      const s = stats[k];
+      const total = s.remain + s.closeMonth;
+      const pct   = total > 0 ? Math.round(s.closeMonth / total * 100) : 0;
+      ranks.push({ k: k, pct: pct });
+      result[k] = {
+        name:          TEAM_LABELS[k],
+        region:        TEAM_REGIONS[k],
+        engineers:     s.engineers,
+        totalAssigned: total,
+        fotClose:      s.fotClose,
+        closeMonth:    s.closeMonth,
+        remain:        s.remain,
+        d0: s.d0, d1: s.d1, d2: s.d2,
+        pct:           pct,
+        metTarget:     pct >= 50
+      };
+    }
+
+    // Compute ranks (highest % = rank 1)
+    ranks.sort(function(a,b){ return b.pct - a.pct; });
+    ranks.forEach(function(r, i) { result[r.k].rank = i + 1; });
+
+    const updatedAt = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy HH:mm");
+    return json({
+      status:    "ok",
+      updatedAt: updatedAt,
+      period:    hdr0 + " – " + hdr1,
+      dateLabel: dateLabel,
+      data:      result
+    });
+
+  } catch(e) {
+    return json({ status: "error", message: e.message, stack: e.stack });
+  }
+}
 // ============================================================
 // NOTE MESSAGE_IDS — Lưu/đọc message_ids của Note gửi bởi @Phongha79
 // botlookup_relay.py gọi GAS để lưu/đọc, rồi xóa Note cũ qua Telethon
