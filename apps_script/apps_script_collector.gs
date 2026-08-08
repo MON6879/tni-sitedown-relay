@@ -2065,14 +2065,31 @@ function handleGetTeamWoStats_() {
   try {
     const ss = SpreadsheetApp.openById(SHEET_ID);
 
-    // Dashboard Report sheet (DR_REPORT_GID = "133591305")
-    const rptSh = ss.getSheets().find(function(s) {
-      return s.getSheetId() === 133591305 || s.getName() === "Dashboard Report";
+    // The engineer data sheet is at GID 133591305 (read by drGatherData as DR_REPORT_GID).
+    // NOTE: Do NOT search by name "Dashboard Report" — that is the VISUAL OUTPUT sheet (different format).
+    let rptSh = ss.getSheets().find(function(s) {
+      return String(s.getSheetId()) === "133591305";
     });
+
+    // Fallback: scan sheets for the one whose 4th row, col A starts with "MYT_TNI_TEAM"
+    if (!rptSh) {
+      for (const sh of ss.getSheets()) {
+        if (sh.getLastRow() >= 4) {
+          try {
+            const probe = String(sh.getRange(4, 1).getValue()).trim();
+            if (probe.startsWith("MYT_TNI_TEAM")) { rptSh = sh; break; }
+          } catch(e2) { /* skip */ }
+        }
+      }
+    }
+
     if (!rptSh || rptSh.getLastRow() < 4)
-      return json({ status: "error", message: "Dashboard Report sheet not found — run drStep1_BuildTables first" });
+      return json({ status: "error", message: "Engineer data sheet not found (GID 133591305). Run drStep1_BuildTables first." });
 
     const raw = rptSh.getRange(1, 1, rptSh.getLastRow(), 5).getValues();
+    // Debug: log which sheet was found
+    const sheetDebug = rptSh.getName() + " (id=" + rptSh.getSheetId() + ", rows=" + rptSh.getLastRow() + ")";
+
 
     const TEAMS = {
       "MYT_TNI_TEAM01_Dawei":     "team1",
@@ -2094,9 +2111,13 @@ function handleGetTeamWoStats_() {
       stats[k] = { remain:0, closeMonth:0, fotClose:0, d0:0, d1:0, d2:0, engineers:0 };
     }
 
-    // Parse header row 0 for report date range
-    const hdr0 = String(raw[0][1] || "");  // "21/7/2026"
-    const hdr1 = String(raw[0][2] || "");  // "20/08/2026"
+    // Parse header row 0 for report date range (cells may be Date objects)
+    function fmtCell(v) {
+      if (v instanceof Date) return Utilities.formatDate(v, "Asia/Rangoon", "dd/MM/yyyy");
+      return String(v || "").replace(/\s+/g, " ").trim();
+    }
+    const hdr0 = fmtCell(raw[0][1]);  // period start e.g. "21/07/2026"
+    const hdr1 = fmtCell(raw[0][2]);  // period end   e.g. "20/08/2026"
 
     // Row 1 = Export time, Row 2 = empty, Rows 3+ = engineers
     for (let i = 3; i < raw.length; i++) {
@@ -2131,20 +2152,18 @@ function handleGetTeamWoStats_() {
       }
     }
 
-    // Today's date label for 3-day
+    // Today's date label — format: "D2/D1/D0-MM-YYYY" (matches old dashboard style)
     const now     = new Date();
-    const tzOff   = 6.5 * 3600000;
-    const mmt     = new Date(now.getTime() + tzOff);
-    function fmtD(d) {
-      const dd = String(d.getUTCDate()).padStart(2,"0");
-      const mm = String(d.getUTCMonth()+1).padStart(2,"0");
-      const yy = String(d.getUTCFullYear()).slice(-2);
-      return dd+"/"+mm+"/"+yy;
-    }
-    const d0Str = fmtD(mmt);
-    const d1Str = fmtD(new Date(mmt.getTime() - 86400000));
-    const d2Str = fmtD(new Date(mmt.getTime() - 2*86400000));
-    const dateLabel = d0Str+"/"+d1Str+"/"+d2Str;
+    const DR_TZ2  = "Asia/Rangoon";
+    const d0Date  = now;
+    const d1Date  = new Date(now.getTime() - 86400000);
+    const d2Date  = new Date(now.getTime() - 2*86400000);
+    function fmtDay(d)  { return Utilities.formatDate(d, DR_TZ2, "dd"); }
+    function fmtMY(d)   { return Utilities.formatDate(d, DR_TZ2, "MM/yyyy"); }
+    // e.g. "06/07/08-08-2026" (day2/day1/day0 then -month-year from D0)
+    const dateLabel = fmtDay(d2Date) + "/" + fmtDay(d1Date) + "/" + fmtDay(d0Date)
+                    + "-" + Utilities.formatDate(now, DR_TZ2, "MM") + "-"
+                    + Utilities.formatDate(now, DR_TZ2, "yyyy");
 
     // Build result
     const result = {};
@@ -2174,11 +2193,12 @@ function handleGetTeamWoStats_() {
 
     const updatedAt = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy HH:mm");
     return json({
-      status:    "ok",
-      updatedAt: updatedAt,
-      period:    hdr0 + " – " + hdr1,
-      dateLabel: dateLabel,
-      data:      result
+      status:     "ok",
+      updatedAt:  updatedAt,
+      period:     hdr0 + " – " + hdr1,
+      dateLabel:  dateLabel,
+      sheetFound: sheetDebug,
+      data:       result
     });
 
   } catch(e) {
