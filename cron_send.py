@@ -1951,6 +1951,8 @@ async def main():
                         logger.error(f"  ❌ Note reply thất bại → {cid_str}: {note_send_err}")
         except Exception as note_client_err:
             logger.error(f"❌ Telethon Note client lỗi: {note_client_err}")
+    elif not TELEGRAM_SESSION:
+        logger.info("⚠️ TELEGRAM_SESSION not set — skip Note reply (works in GitHub Actions)")
     elif not control_note:
         logger.info("No control_note — skip Note reply")
     elif not pinned_report4_msgids:
