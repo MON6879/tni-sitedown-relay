@@ -65,6 +65,7 @@ function doPost(e) {
     if (body.action === "save_msgids")          return handleSaveMsgIds(body);
     if (body.action === "get_msg_id")           return handleGetMsgId(body);
     if (body.action === "set_msg_id")           return handleSetMsgId(body);
+    if (body.action === "clean_blank_rows")      return handleCleanBlankRows(sheet);
 
     // ── Daily Report Collector ─────────────────────────────────────────────
     if (body.action === "daily_add" ||
@@ -287,6 +288,35 @@ function handleSetMsgId(body) { return handleSaveMsgIds(body); }
 
 
 // ============================================================
+// ACTION: CLEAN_BLANK_ROWS — xóa hàng trắng trong data sheet
+// ============================================================
+function handleCleanBlankRows(sheet) {
+  const lastRow = sheet.getLastRow();
+  const lastCol = 5; // A–E
+  if (lastRow < 2) return json({ status: "ok", deleted: 0 });
+
+  const values  = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  // Collect blank row indices (1-indexed, bottom-up for safe deletion)
+  const toDelete = [];
+  for (let i = values.length - 1; i >= 0; i--) {
+    const isEmpty = values[i].slice(0, lastCol).every(function(c) { return c === "" || c === null; });
+    if (isEmpty) toDelete.push(i + 2);
+  }
+  // Batch delete: group consecutive rows, delete from bottom up
+  let deleted = 0;
+  let i = 0;
+  while (i < toDelete.length) {
+    const start = toDelete[i];
+    let count = 1;
+    while (i + count < toDelete.length && toDelete[i + count] === start - count) count++;
+    sheet.deleteRows(start - count + 1, count);
+    deleted += count;
+    i += count;
+  }
+  return json({ status: "ok", deleted: deleted, rows: toDelete });
+}
+
+// ============================================================
 // ACTION: ADD — write new row to data sheet
 // Payload: { action, date, chat_id, msg }
 // Sheet columns: A=Date Sent  B=Telegram ID  C=Content  D=Asset action done
@@ -307,9 +337,18 @@ function handleAdd(sheet, body) {
     content = parts.join("\n");
   }
 
+  // Guard: if content is empty, don't insert anything
+  if (!content) return json({ status: "error", message: "Empty content — row not inserted" });
+
   const row = ["", dateTime, chatId, content, ""];
   sheet.insertRowBefore(2);
-  sheet.getRange(2, 1, 1, row.length).setValues([row]);
+  try {
+    sheet.getRange(2, 1, 1, row.length).setValues([row]);
+  } catch (writeErr) {
+    // Rollback: xóa hàng trắng vừa insert để tránh để lại blank row
+    try { sheet.deleteRow(2); } catch(e) {}
+    throw writeErr; // re-throw để doPost catch block xử lý
+  }
 
   const rowNum = 2;
   const seqId  = sheet.getLastRow() - 1;
@@ -1681,13 +1720,13 @@ function writeAssetStatsLog(ss, stats, grandTotal, actionTypes, teams) {
     if (rows.length > 0) {
       const lastRow = logSheet.getLastRow();
       logSheet.getRange(lastRow + 1, 1, rows.length, rows[0].length).setValues(rows);
-      // Tô màu xen kẽ
-      for (let i = 0; i < rows.length; i++) {
-        const r = lastRow + 1 + i;
-        const bg = rows[i][2] === 'GRAND TOTAL' ? '#FFF9C4' :
-                   (r % 2 === 0 ? '#F8F9FA' : '#FFFFFF');
-        logSheet.getRange(r, 1, 1, rows[i].length).setBackground(bg);
-      }
+      // Batch color — 1 API call thay vì 40
+      const bgs = rows.map(function(row, i) {
+        const color = row[2] === 'GRAND TOTAL' ? '#FFF9C4' :
+                      ((lastRow + 1 + i) % 2 === 0 ? '#F8F9FA' : '#FFFFFF');
+        return new Array(row.length).fill(color);
+      });
+      logSheet.getRange(lastRow + 1, 1, rows.length, rows[0].length).setBackgrounds(bgs);
     }
 
     Logger.log(`✅ writeAssetStatsLog: ${rows.length} rows written to "${LOG_TAB}"`);
