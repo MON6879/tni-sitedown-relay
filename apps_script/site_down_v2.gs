@@ -57,7 +57,8 @@ const TEAM_COLORS = { T1: "🟠", T2: "🔵", T3: "🟢", T4: "🟡" };
 // ============================================================
 // WEB APP — doPost() (Xử lý dán Cột A — CHỈ GỌI LUỒNG COL C)
 // ============================================================
-function doPost(e) {
+// NOTE: renamed from doPost → private, to avoid conflict with apps_script_collector.gs master doPost
+function doPost_siteDownStandalone_(e) {
   const lock = LockService.getScriptLock();
   try {
     lock.tryLock(8000);
@@ -142,7 +143,8 @@ function doPost(e) {
   }
 }
 
-function doGet(e) {
+// NOTE: renamed from doGet → private, to avoid conflict with apps_script_collector.gs master doGet
+function doGet_siteDownStandalone_(e) {
   try {
     const action = (e.parameter && e.parameter.action) || "";
 
