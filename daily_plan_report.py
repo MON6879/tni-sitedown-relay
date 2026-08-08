@@ -133,12 +133,13 @@ def clean_plan_content(content: str) -> str:
         if any(kw in line_l for kw in (
             "submission history", "3-day completion rate", "plan saved — ref:",
             "5.1 report", "5. report", "team leader: submitted", "plan content:",
-            "overall: no data", "overall:", "submitted ✓", "submitted v",
-            "not yet submitted", "tni auto report", "📝 plan for", "📝 plan"
+            "overall: no data", "overall:", "submitted ✓", "submitted v", "submitted✓",
+            "not yet submitted", "tni auto report", "📝 plan for", "📝 plan",
+            "plan for", "3-day", "7day:", "month:"
         )):
             continue
-        # Skip date/time stamp lines like "📅 05/08/2026 | 🕐 11:28"
-        if re.search(r'📅.*🕐', line):
+        # Skip date/time stamp lines like "📅 05/08/2026 | 🕐 11:28" or "🗓️ ... | 🕐 ..."
+        if re.search(r'(?:📅|🗓).*(?:🕐|\|.*\d{2}:\d{2})', line):
             continue
         # Skip separator lines like "━━━━━━━"
         if re.match(r'^[━─═\-]{3,}$', line_l):
@@ -1711,7 +1712,10 @@ async def run_morning():
                     lines.append(f"✅ Team Leader: Submitted ✓ (recorded in sheet)")
                 lines.append("")
                 lines.append("📋 Plan Content:")
-                lines.append(colorize_bullets(clean_plan_content(pt["content"])))
+                plan_content = clean_plan_content(pt["content"])
+                if len(plan_content) > 1500:
+                    plan_content = plan_content[:1500].rsplit("\n", 1)[0] + "\n... [see full plan in group]"
+                lines.append(colorize_bullets(plan_content))
             else:
                 lines.append("⚠️ Team Leader: NOT SUBMITTED (Deadline: before 07:00)")
 
