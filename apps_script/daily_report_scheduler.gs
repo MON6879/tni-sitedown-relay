@@ -112,7 +112,7 @@ function triggerDailyWorkflow(reportType, extraInputs) {
       Logger.log("[triggerDailyWorkflow] ⚠️ GITHUB_PAT chưa set");
       return false;
     }
-    const url = "https://api.github.com/repos/MON6879/tni-sitedown-relay/actions/workflows/daily_reports.yml/dispatches";
+    const url = "https://api.github.com/repos/phonghdpxd-cmd/TNI-SITE-DOWN/actions/workflows/daily_reports.yml/dispatches";
     const inputs = { report_type: reportType };
     if (extraInputs) {
       Object.assign(inputs, extraInputs);
