@@ -822,10 +822,7 @@ def send_daily_plan_template(chat_id: int, team_num: int) -> None:
     _recent_plan_sends[key] = now_ts
 
     template = get_plan_template_text(team_num)
-    tg_send(chat_id,
-        f"📋 <b>Daily Plan Template (Team {team_num})</b>\n\n"
-        f"{html.escape(template)}"
-    )
+    tg_send(chat_id, template)
 
 _recent_help_sends = {}
 

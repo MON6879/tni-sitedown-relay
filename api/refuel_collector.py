@@ -221,7 +221,6 @@ def process_update(update: dict):
         if cmd == "/refuel":
             today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: Refueled Report</b>\n\n"
                 f"DG Type\n"
                 f"Date: {today_str}\n"
                 f"DG ID: TNIXXXX\n"
@@ -244,26 +243,19 @@ def process_update(update: dict):
             
         elif cmd == "/plan":
             tomorrow_str = (datetime.now(TZ_MM) + timedelta(days=1)).strftime("%d/%m/%Y")
-            reply_text = (
-                "📝 <b>Template: Refuel Plan</b>\n\n"
-                f"Team X Plan refuel {tomorrow_str} : TNIXXXX 440L + TNIXXXX 220L"
-            )
+            reply_text = f"Team X Plan refuel {tomorrow_str} : TNIXXXX 440L + TNIXXXX 220L"
             tg_reply(chat_id, reply_text)
             return
             
         elif cmd == "/request":
             tomorrow_str = (datetime.now(TZ_MM) + timedelta(days=1)).strftime("%d/%m/%Y")
-            reply_text = (
-                "📝 <b>Template: Refuel Request</b>\n\n"
-                f"Team X request {tomorrow_str}: TNIXXXX: 440L + TNIXXXX: 220L"
-            )
+            reply_text = f"Team X request {tomorrow_str}: TNIXXXX: 440L + TNIXXXX: 220L"
             tg_reply(chat_id, reply_text)
             return
             
         elif cmd == "/letter":
             today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: Transport Letter</b>\n\n"
                 "• Submit Letter:\n"
                 f"Letter Submit: {today_str}\n\n"
                 "• Approved Letter:\n"
@@ -274,10 +266,7 @@ def process_update(update: dict):
 
         elif cmd == "/monitor":
             today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
-            reply_text = (
-                "📝 <b>Template: FT Follow Monitor</b>\n\n"
-                f"Name of FT staff member accompanying to supervise the quality of premium oil and ensure the correct quantity is poured according to the plan: Paung Aung Soe - {today_str} TNI0213 + 660L, TNI0129 + 660L"
-            )
+            reply_text = f"Name of FT staff member accompanying to supervise the quality of premium oil and ensure the correct quantity is poured according to the plan: Paung Aung Soe - {today_str} TNI0213 + 660L, TNI0129 + 660L"
             tg_reply(chat_id, reply_text)
             return
             

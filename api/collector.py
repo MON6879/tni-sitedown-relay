@@ -644,7 +644,6 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
         elif cmd == "/inventory":
             await bot.send_message(
                 chat_id,
-                "📝 <b>Template: Inventory Fuel</b>\n\n"
                 "Inventory fuel:\n"
                 "DG ID: TNIXXXX\n"
                 "Fuel cm: \n"
@@ -935,7 +934,6 @@ async def handle(data: dict):
             elif cmd == "/inventory":
                 await bot.send_message(
                     chat_id,
-                    "📝 <b>Template: Inventory Fuel</b>\n\n"
                     "Inventory fuel:\n"
                     "DG ID: TNIXXXX\n"
                     "Fuel cm: \n"
@@ -950,7 +948,6 @@ async def handle(data: dict):
             elif cmd == "/order" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
-                    "📝 <b>Template: Order</b>\n\n"
                     "Order: TNIXXXX [Description/Item detail]",
                     parse_mode="HTML"
                 )
@@ -958,7 +955,6 @@ async def handle(data: dict):
             elif cmd == "/revoke" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
-                    "📝 <b>Template: Revoke</b>\n\n"
                     "Revoke: TNIXXXX [Description/Reason]",
                     parse_mode="HTML"
                 )
@@ -966,7 +962,6 @@ async def handle(data: dict):
             elif cmd == "/move" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
-                    "📝 <b>Template: Move</b>\n\n"
                     "Move: TNIXXXX [From station A to station B]",
                     parse_mode="HTML"
                 )
@@ -974,7 +969,6 @@ async def handle(data: dict):
             elif cmd == "/export" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
-                    "📝 <b>Template: Export</b>\n\n"
                     "Export: TNIXXXX [Detail]",
                     parse_mode="HTML"
                 )
@@ -982,7 +976,6 @@ async def handle(data: dict):
             elif cmd == "/done" and chat_id != MDG_CHAT_ID:
                 await bot.send_message(
                     chat_id,
-                    "📝 <b>Template: Done</b>\n\n"
                     "Done: #XXXXX [Action taken]",
                     parse_mode="HTML"
                 )
