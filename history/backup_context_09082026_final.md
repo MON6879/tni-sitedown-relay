@@ -177,6 +177,7 @@
   - `api/collector.py`: Tự động lấy toàn bộ mẫu template động từ **cột A (A2:A)** tab `Config` của Google Sheet `Team All Find - Sum WO and Task` (`1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8`). Tự động làm mới cache vào lúc **1:08 AM MMT hàng ngày**. Gửi trực tiếp văn bản thô không bọc khung code hay tiêu đề phụ.
   - `api/refuel_collector.py`: Bỏ toàn bộ dòng tiêu đề chú thích (`Template: ...`), gửi trực tiếp văn bản template (`/refuel`, `/plan`, `/request`, `/letter`, `/monitor`).
   - `QLTC_GAS/13_TNI_CONSTRUCTION.gs`: Bỏ thẻ `<code>...</code>` trong hàm `handleTemplateCommand()` và xử lý slash command template của Construction Bot (`@8903841312`).
+  - `tni-search-cf/src/worker.js`: Đồng bộ 100% Cloudflare Worker, bỏ toàn bộ tin nhắn `⏳ Loading...`, bỏ bọc khung `<pre>` và tiêu đề phụ cho các lệnh `/daily` và `/plan`.
 
 ---
 
