@@ -1162,16 +1162,17 @@ def handle(update: dict) -> None:
     # ── STAFF PERSONAL LOOKUP: "mysite" / "mycable" / ... hoặc "mysite <id>" (admin) ──
     text_low = text.lower().strip()
 
-    # Admin lookup: "mysite 6859790680" / "mydata 1234567890" — xem data của bất kỳ user nào
-    admin_lookup = re.match(r'^(my\S+)\s+(\d{6,12})$', text_low)
+    # Admin lookup: "mysite 6859790680", "/mydata 6361576236" — xem data của bất kỳ user nào
+    admin_lookup = re.match(r'^/?(my\S+)\s+(\d{6,12})$', text_low)
     if admin_lookup:
-        field_name = admin_lookup.group(1)           # e.g. "mysite", "mydata"
+        field_name = admin_lookup.group(1).lower()   # e.g. "mysite", "mydata"
         target_id  = int(admin_lookup.group(2))
         field      = None if field_name in ("mydata", "myall") else field_name
         reply = get_staff_data(target_id, field)
         # Thêm header cho admin biết đang xem data của ai
-        header = f"👤 <b>Viewing ID:</b> <code>{target_id}</code>\n"
-        tg_send(chat_id, header + reply)
+        header = f"👤 <b>Viewing ID:</b> <code>{target_id}</code> ({html.escape(field_name)})\n"
+        for chunk in split_messages(header + reply):
+            tg_send(chat_id, chunk)
         return
 
     is_my_field    = (text_low.startswith("my") and len(text_low) > 2 and " " not in text_low)

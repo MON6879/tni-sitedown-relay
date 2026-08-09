@@ -157,6 +157,16 @@
 - **Mục tiêu:** Giúp người dùng khi mở bất kỳ Google Sheet nào lên cũng thấy ngay dữ liệu mới nhất nằm ngay trên cùng mà không cần cuộn xuống tận cùng của Sheet.
 - **Cập nhật Docs:** Đã ghi nhận nguyên tắc này vào [`AGENTS.md`](file:///d:/6.%20AI/1.%20QLTC/AGENTS.md) và [`system_map.md`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/system_map.md).
 
+---
+
+## 🔑 Hỗ Trợ Cú Pháp Tra Cứu Nhân Viên Bất Kỳ (Admin Lookup Slash Prefix Support) (09/08/2026)
+- **Giải thích cú pháp:**
+  - `mydata`: Xem dữ liệu cá nhân của **chính ID Telegram người gõ**. (Nếu ID Telegram chưa được đăng ký trong tab Staff ➔ Báo `❌ No data for your ID`).
+  - `mydata <ID_Telegram>` hoặc `/mydata <ID_Telegram>`: Xem **TẤT CẢ** dữ liệu (mysite, mycable, mydia, myolt, mysn) của nhân viên có Telegram ID được nhập.
+  - `mysite <ID_Telegram>` hoặc `/mysite <ID_Telegram>`: Chỉ xem dữ liệu **mysite** của nhân viên có Telegram ID được nhập.
+- **Nâng cấp Regex:** Cập nhật `admin_lookup = re.match(r'^/?(my\S+)\s+(\d{6,12})$', text_low)` hỗ trợ 100% tất cả các biến thể có hoặc không có dấu gạch chéo `/` đầu lệnh!
+- **Chunking:** Tự động gom dòng bằng `split_messages(header + reply)` để đảm bảo tin nhắn không bị vượt quá giới hạn HTML parse của Telegram.
+
 
 
 
