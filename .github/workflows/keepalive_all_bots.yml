@@ -12,7 +12,7 @@ jobs:
       - name: ⚡ Keepalive Ping All Bot Endpoints & Webhooks
         run: |
           echo "1️⃣ Locking & Pinging Primary Search Bot (tni-bot)..."
-          curl -s -f "https://api.telegram.org/bot8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A/setWebhook?url=https://tni-bot.vercel.app/api/search_bot" || true
+          curl -s -f "https://api.telegram.org/bot8606383435:AAEstcN4Om6_9ZAjs4OoFV2uVlRALgae2Ac/setWebhook?url=https://tni-bot.vercel.app/api/search_bot" || true
           curl -s -f "https://tni-bot.vercel.app/api/search_bot?action=reset" || true
           
           echo "2️⃣ Pinging Primary Asset Bot (collector)..."
