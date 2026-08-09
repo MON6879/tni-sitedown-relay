@@ -50,7 +50,10 @@ API_HASH       = os.environ.get("TELEGRAM_API_HASH", "")
 SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
 SEND_BOT_TOKEN = os.environ.get("SEND_BOT_TOKEN", "")
 # Dùng APPS_SCRIPT_URL chung — doPost route "daily_*" → doPostDaily_
-APPS_SCRIPT_URL = os.environ.get("APPS_SCRIPT_URL", "")
+MAIN_GAS_FALLBACK = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+APPS_SCRIPT_URL = os.environ.get("APPS_SCRIPT_URL", "").strip()
+if not APPS_SCRIPT_URL or "AKfycbzGFdnE" in APPS_SCRIPT_URL:
+    APPS_SCRIPT_URL = MAIN_GAS_FALLBACK
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 

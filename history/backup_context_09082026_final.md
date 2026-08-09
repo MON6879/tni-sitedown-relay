@@ -127,6 +127,12 @@
 - **Cập nhật AGENTS.md:** Đã bổ sung chính thức **Bước 5** (Đồng bộ 100% logic liên quan giữa code, workflow, env & docs) và **Bước 6** (Kiểm thử thực tế Live Output Verification) vào Quy tắc LƯU ĐI bắt buộc.
 - **Cam kết tuân thủ:** Mọi thao tác cập nhật hệ thống từ nay về sau BẮT BUỘC phải thực hiện đầy đủ 6 bước LƯU ĐI mà không được bỏ sót bất kỳ bước nào!
 
+---
+
+## 🔒 ĐỒNG BỘ TOÀN DIỆN 100% MAIN_GAS_FALLBACK TRÊN TẤT CẢ CÁC SCRIPT PYTHON (09/08/2026)
+- **Đã rà soát & cập nhật:** Bổ sung biến kiểm tra & chuyển hướng `MAIN_GAS_FALLBACK` (`AKfycbz-NZlBk8q2...` Version `@302`) cho **TOÀN BỘ** các script Python trong hệ thống (`daily_plan_report.py`, `daily_bod_assign.py`, `cron_send.py`, `backlog_send.py`, `daily_read_report.py`, `api/collector.py`, `api/search_bot.py`).
+- **Triệt tiêu nguy cơ lệch version:** Đảm bảo không bao giờ bị trôi về version cũ hoặc bị thiếu đồng bộ URL như sự cố Asset Collector trước đó.
+
 
 
 

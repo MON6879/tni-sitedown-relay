@@ -19,7 +19,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 SEND_BOT_TOKEN  = os.getenv("SEND_BOT_TOKEN")
-APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL", "")
+MAIN_GAS_FALLBACK = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL", "").strip()
+if not APPS_SCRIPT_URL or "AKfycbzGFdnE" in APPS_SCRIPT_URL:
+    APPS_SCRIPT_URL = MAIN_GAS_FALLBACK
 CONTROL_CHAT_ID = -5251698940
 
 SHEET_URL = (
