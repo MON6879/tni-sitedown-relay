@@ -115,7 +115,7 @@ def is_daily_plan_msg(text: str) -> bool:
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
         "plans for ", "plan updated", "plan saved", "ref:", "ref:dp-", "đã lưu",
         "tni personal find task", "ft result daily", "personal find task", "find task + wo",
-        "list name ft", "team leader: submitted", "plan content:", "overall: no data",
+        "team leader: submitted", "plan content:", "overall: no data",
         "submitted ✓", "submitted v", "not yet submitted", "daily plan & results",
         "tni auto report", "tni team"
     )):
@@ -983,8 +983,10 @@ def deduplicate_plans_by_date(plans: list) -> list:
             continue
         date_str = dt.strftime("%Y-%m-%d")
         key = (team, date_str)
-        # Giữ bản tin mới nhất cho mỗi cặp (team, date_str)
-        latest_map[key] = p
+        # Telegram messages come in DESCENDING order (newest first).
+        # Keep the FIRST occurrence (= newest) and skip later (= older) duplicates.
+        if key not in latest_map:
+            latest_map[key] = p
         
     return list(latest_map.values())
 
@@ -1269,6 +1271,9 @@ async def run_eod_or_update(mode: str):
                 dt = parse_plan_date(p.get("date", ""))
                 if dt and dt.replace(hour=0, minute=0, second=0, microsecond=0) >= today_start:
                     today_plans.append(p)
+
+            # ── Deduplicate before storing to Sheet (prevent duplicate rows) ──
+            today_plans = deduplicate_plans_by_date(today_plans)
 
             if today_plans:
                 all_today_plans[group_key] = today_plans
