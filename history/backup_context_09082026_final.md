@@ -173,10 +173,10 @@
 ## 📋 Cập Nhật Định Dạng Mẫu Daily Result (Loại Bỏ Số Thứ Tự) (09/08/2026)
 - **Yêu cầu người dùng:** Bỏ các con số `1. `, `2. `, `3. `... ở đầu mỗi trường thông tin của mẫu `Daily result` để giao diện đơn giản, dễ chọn copy text.
 - **Đã cập nhật:**
+  - `api/refuel_collector.py`: Khắc phục lỗi `norm_chat_id` bị dư tiền tố `-100` khiến Bot bỏ qua tin nhắn từ group `9 TNI REQUEST REFUEL` (`-1005469544739`). Mở rộng bộ lọc `classify()` để thu thập cả báo cáo giám sát FT viết tắt (chứa mã TNI và L/+). Tự động lấy tag `@TeamLeader` / người gửi và bổ sung câu hỏi tiếng Anh: `📢 @TeamLeader Who is assigned to follow and supervise?` vào tin nhắn xác nhận thu thập.
   - `.github/workflows/keepalive_all_bots.yml`: Sửa Bot Token dòng 15 từ `8897800070` (`@TNIREPORTTASK_BOT`) sang đúng Token `8606383435` (`@SEARCHTNITASKWOBOT`). Đã xóa webhook bị gán nhầm trên Token `8897800070`, chấm dứt hoàn toàn hiện tượng 2 Bot cùng phản hồi gây nhân đôi tin nhắn.
   - `api/search_bot.py`: Thêm bộ lọc `update_id` (`_recent_update_ids`) chống Telegram retry và bổ sung `is_duplicate_search()` cho các lệnh `/plan` và `/daily`. Nhận diện cả `Daily report:` và `Daily result:`, loại bỏ khung code và số thứ tự nhân viên FT.
   - `api/collector.py`: Tự động lấy toàn bộ mẫu template động từ **cột A (A2:A)** tab `Config` của Google Sheet `Team All Find - Sum WO and Task` (`1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8`). Tự động làm mới cache vào lúc **1:08 AM MMT hàng ngày**. Gửi trực tiếp văn bản thô không bọc khung code hay tiêu đề phụ.
-  - `api/refuel_collector.py`: Bỏ toàn bộ dòng tiêu đề chú thích (`Template: ...`), gửi trực tiếp văn bản template (`/refuel`, `/plan`, `/request`, `/letter`, `/monitor`).
   - `QLTC_GAS/13_TNI_CONSTRUCTION.gs`: Bỏ thẻ `<code>...</code>` trong hàm `handleTemplateCommand()` và xử lý slash command template của Construction Bot (`@8903841312`).
   - `tni-search-cf/src/worker.js`: Đồng bộ 100% Cloudflare Worker, hỗ trợ `Daily report:`, bỏ toàn bộ tin nhắn `⏳ Loading...`, bỏ bọc khung `<pre>` và tiêu đề phụ.
   - `tni_site_down_repo/telegram_bot.py`: Đồng bộ 100% `cmd_daily()`, loại bỏ toàn bộ tiêu đề rác `📋 Mẫu Daily Report`, bỏ số thứ tự `1. `, `2. `... và bỏ khung code triple backticks ``` để chỉ phản hồi thuần văn bản thô.

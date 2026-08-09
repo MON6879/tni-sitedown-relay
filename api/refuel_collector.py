@@ -37,7 +37,7 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))
 def classify(text: str) -> str | None:
     """Phân loại tin nhắn theo keyword."""
     t = text.lower()
-    if ("name of ft staff member" in t and "supervise" in t) or "follow monitor" in t or "follow moniter" in t:
+    if ("name of ft staff member" in t and "supervise" in t) or "follow monitor" in t or "follow moniter" in t or "supervise" in t:
         return "FT_MONITOR"
     if "dg type" in t:
         return "REFUELED"
@@ -51,6 +51,9 @@ def classify(text: str) -> str | None:
         return "PLAN"
     if "request" in t:
         return "REQUEST"
+    # Fallback cho báo cáo FT monitor có mã TNI và số lít L
+    if "tni" in t and ("l" in t or "+" in t):
+        return "FT_MONITOR"
     return None
 
 
@@ -195,23 +198,25 @@ def process_update(update: dict):
         return
 
     chat        = msg.get("chat", {})
-    raw_chat_id = chat.get("id", 0)
-    chat_id     = str(abs(raw_chat_id))
-    chat_title  = chat.get("title", "")
-    text        = (msg.get("text") or msg.get("caption") or "").strip()
+    raw_chat_id  = chat.get("id", 0)
+    norm_chat_id = str(raw_chat_id).replace("-100", "").replace("-", "")
+    chat_id      = str(raw_chat_id)
+    chat_title   = chat.get("title", "")
+    text         = (msg.get("text") or msg.get("caption") or "").strip()
 
     if not text:
         return
 
-    logger.info(f"Received msg from raw_chat_id={raw_chat_id} (title='{chat_title}'): {text[:50]}")
+    logger.info(f"Received msg from raw_chat_id={raw_chat_id} (norm={norm_chat_id}, title='{chat_title}'): {text[:50]}")
 
     if text.startswith("/id") or text.startswith("/chatid") or text.startswith("/start"):
         tg_reply(str(raw_chat_id), f"<b>Chat Title:</b> {chat_title}\n<b>Chat ID:</b> <code>{raw_chat_id}</code>")
         return
 
     # Chỉ xử lý tin từ group refuel chính
-    if chat_id != PLAN_GROUP_ID and "cross check" not in chat_title.lower() and "9.1" not in chat_title:
-        logger.info(f"Skip chat_id={chat_id}")
+    title_l = chat_title.lower()
+    if norm_chat_id != PLAN_GROUP_ID and "refuel" not in title_l and "cross check" not in title_l and "9.1" not in title_l and "9" not in title_l:
+        logger.info(f"Skip norm_chat_id={norm_chat_id}")
         return
 
     # Xử lý các lệnh lấy template
@@ -292,13 +297,26 @@ def process_update(update: dict):
         logger.info("No keyword match — skip")
         return
 
-    # Lấy tên và ID người gởi
+    # Lấy tên, ID và username của người gởi (Team Leader)
     sender = ""
     sender_id = ""
+    sender_user = ""
     if msg.get("from"):
         f = msg["from"]
         sender = f"{f.get('first_name','')} {f.get('last_name','')}".strip()
         sender_id = str(f.get("id", ""))
+        sender_user = f.get("username", "").strip()
+
+    tl_tag = f"@{sender_user}" if sender_user else f"<a href='tg://user?id={sender_id}'>{sender}</a>"
+
+    # Tự động gán tag Team Leader theo số Team trong báo cáo
+    text_u = text.upper()
+    if "TEAM 1" in text_u or "TEAM01" in text_u or "TEAM 01" in text_u:
+        mention_tag = f"@PaingAung {tl_tag}" if sender_user != "PaingAung" else tl_tag
+    elif "TEAM 2" in text_u or "TEAM02" in text_u or "TEAM 02" in text_u:
+        mention_tag = f"@AungNaing {tl_tag}" if sender_user != "AungNaing" else tl_tag
+    else:
+        mention_tag = tl_tag
 
     now    = datetime.now(TZ_MM)
     result = post_gas({
@@ -311,19 +329,21 @@ def process_update(update: dict):
     })
     logger.info(f"[{category}] sender={sender} | GAS={result.get('status')} def={result.get('def','')}")
 
-    # Gửi reply 2 dòng xác nhận khi ghi thành công
+    # Gửi reply xác nhận khi ghi thành công kèm câu hỏi tiếng Anh tag Team Leader
     if result.get("status") == "ok":
         ts = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
 
         if category == "LETTER_SUBMIT":
             reply_text = (
                 f"📋 <b>Letter Submit</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
-                f"📅 Date: <b>{result.get('date', ts)}</b>"
+                f"📅 Date: <b>{result.get('date', ts)}</b>\n"
+                f"📢 {mention_tag} Who is assigned to follow and supervise?"
             )
         elif category == "LETTER_APPROVED":
             reply_text = (
                 f"✅ <b>Letter Approved</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
-                f"📅 Date: <b>{result.get('date', ts)}</b>"
+                f"📅 Date: <b>{result.get('date', ts)}</b>\n"
+                f"📢 {mention_tag} Who is assigned to follow and supervise?"
             )
         else:
             def_id    = result.get("def", "")
@@ -336,7 +356,8 @@ def process_update(update: dict):
 
             reply_text = (
                 f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
-                f"Done 📅 {ts}"
+                f"Done 📅 {ts}\n"
+                f"📢 {mention_tag} Who is assigned to follow and supervise?"
             )
         tg_reply(chat_id, reply_text)
 
