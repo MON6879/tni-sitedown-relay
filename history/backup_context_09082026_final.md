@@ -44,6 +44,30 @@
 
 ---
 
+### 5. 📝 Bóc tách Tự động Báo cáo FT (`daily_report_collector.gs`)
+- **Nâng cấp `handleDailyAdd`:**
+  - Thêm bộ bóc tách `KEY_ALIASES` lọc chính xác các mục `3.` đến `10.` trong tin nhắn báo cáo Daily Result từ Telegram.
+  - Tự động điền dữ liệu sạch đẹp vào đúng các **Cột F, G, H, I, J, K, L** trên sheet `Daily report and Bussiness` thay vì dồn nguyên khối text vào Cột D/E.
+
+---
+
+### 6. 🧹 Khử trùng Báo cáo Kế hoạch (`daily_plan_report.py`)
+- **Thuật toán `deduplicate_plans_by_date`:**
+  - Tự động lọc giữ lại duy nhất 1 bản tin Plan mới nhất khi Team Leader gửi cập nhật nhiều lần cho cùng 1 ngày.
+  - Khắc phục hoàn toàn sự cố lặp đôi nội dung Plan và xé nhỏ tin nhắn Telegram.
+
+---
+
+### 7. 📷 Loại bỏ AI Nhận diện Khuôn mặt Bot Điểm danh (`TNI attendance.js`)
+- **Xóa bỏ hoàn toàn Gemini Vision AI:**
+  - Xóa sạch hàm `identifyFaces_` và `triggerUpdateMasterLibrary1225` khỏi `apps_script_attendance/TNI attendance.js`.
+- **Chuyển sang Tra cứu Trực tiếp bằng Telegram ID:**
+  - Tự động khớp nhân viên theo `ID Telegram` (Cột D) trong bảng `Staff attendance`. Tên nhân viên ở Cột E & F tự động điền đúng 100%, tốc độ xử lý điểm danh cực nhanh (0.5s).
+- **Đã Deploy Clasp trực tiếp:**
+  - Đã nạp code và Deploy phiên bản **Version @41** (`AKfycbxoM2KgWFJ4pXaYYdE7bAelngrpVD335D1a9y6Ryusr7Wh7xEwTOG4rfpPTC7K_ZMaqlg`) lên Google Apps Script Cloud.
+
+---
+
 ### 📋 Webhook & Registry cố định
 
 | Bot Name | Telegram Username | Webhook / Dispatch Endpoint | Source Location |
@@ -52,4 +76,5 @@
 | **Asset Collector** | `@TNIASSETorderREQUEST_BOT` | `https://tni-bot.vercel.app/api/collector` | `api/collector.py` |
 | **Refuel Collector** | `@TNI_FUEL` | `https://tni-bot.vercel.app/api/refuel_collector` | `api/refuel_collector.py` |
 | **Site Down Relay** | `@tni_site_down_bot` | `https://tni-bot.vercel.app/api/site_down_relay` | `botlookup_relay.py` |
+| **Attendance Bot** | `@TNIATTENDANCE_BOT` | Apps Script Cloud (Version @41) | `apps_script_attendance/TNI attendance.js` |
 | **Construction Bot** | `@8903841312` (`10 TNI_SITE`) | Apps Script Web App Endpoint | `13_TNI_CONSTRUCTION.gs` |
