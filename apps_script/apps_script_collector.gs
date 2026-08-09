@@ -182,6 +182,8 @@ function doGet(e) {
       return json({ status: "ok", message: "Dashboard build triggered" });
     }
     if (action === "get_team_wo_stats") return handleGetTeamWoStats_();
+    if (action === "debug_sum_sheet")   return handleDebugSumSheet_();
+
 
     // ── Default: status check ─────────────────────────────────
     const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -2090,42 +2092,47 @@ function handleGetTeamWoStats_() {
     // Debug: log which sheet was found
     const sheetDebug = rptSh.getName() + " (id=" + rptSh.getSheetId() + ", rows=" + rptSh.getLastRow() + ")";
 
-    // ── v299: Read GID 893574714 rows 53:56 for authoritative G/P formula values ──
-    // The user confirmed: row 53=Team1, 54=Team2, 55=Team3, 56=Team4 in "Sum all WO Team" sheet.
-    // Column G (7) = Total FOT Close, Column P (16) = CD not yet Close (Remain WO).
-    // These are the exact cells the Google Sheets chart reads from.
-    const GID_SUM = "893574714";
-    // Team order at rows 53-56 in GID 893574714
+    // ── v301: CONFIRMED GID = 1840482617 "Sum all WO Team"
+    // Row 53=Team1, 54=Team2, 55=Team3, 56=Team4
+    // Confirmed cell values (Team 1 example): G=66, P=327, N=151, A=39, J=2, K=0, L=7
+    const GID_SUM = "1840482617";
     const TEAM_ORDER = ["team1", "team2", "team3", "team4"];
-    const chartG = {};  // teamKey -> G value (FOT Close)
-    const chartP = {};  // teamKey -> P value (Remain WO = CD not yet Close)
-    const chartN = {};  // teamKey -> N value (Remain Overdue, col N=14)
-    const chartA = {};  // teamKey -> A value (CD Not Close, col A=1)
+    const chartG = {};  // G col(7)  = Total FOT Close
+    const chartP = {};  // P col(16) = Remain WO (CD not yet Close)
+    const chartN = {};  // N col(14) = Overdue FOT not closed
+    const chartA = {};  // A col(1)  = CD Not Yet Close
+    const chartJ = {};  // J col(10) = 3-day: closes on day-1 (yesterday)
+    const chartK = {};  // K col(11) = 3-day: closes on day-2
+    const chartL = {};  // L col(12) = 3-day: closes on day-3
     try {
       const sumSh = ss.getSheets().find(function(s) {
         return String(s.getSheetId()) === GID_SUM;
       });
       if (sumSh && sumSh.getLastRow() >= 56) {
-        // Read rows 53-56, columns A(1) through P(16)
+        // Read rows 53-56, cols A(1) to P(16)
         const sumRng = sumSh.getRange(53, 1, 4, 16).getValues();
         for (let r = 0; r < 4; r++) {
           const tk  = TEAM_ORDER[r];
           const row = sumRng[r];
-          const gv = row[6];   // col G = index 6
-          const pv = row[15];  // col P = index 15
-          const nv = row[13];  // col N = index 13
-          const av = row[0];   // col A = index 0
-          if (typeof gv === "number" && gv > 0) chartG[tk] = gv;
-          if (typeof pv === "number" && pv > 0) chartP[tk] = pv;
-          if (typeof nv === "number" && nv > 0) chartN[tk] = nv;
-          if (typeof av === "number" && av > 0) chartA[tk] = av;
+          const gv = row[6];   // col G (index 6) = FOT Close
+          const pv = row[15];  // col P (index 15) = Remain WO
+          const nv = row[13];  // col N (index 13) = Overdue FOT
+          const av = row[0];   // col A (index 0)  = CD Not Yet Close
+          const jv = row[9];   // col J (index 9)  = day-1 closes
+          const kv = row[10];  // col K (index 10) = day-2 closes
+          const lv = row[11];  // col L (index 11) = day-3 closes
+          if (typeof gv === "number") chartG[tk] = gv;
+          if (typeof pv === "number") chartP[tk] = pv;
+          if (typeof nv === "number") chartN[tk] = nv;
+          if (typeof av === "number") chartA[tk] = av;
+          if (typeof jv === "number") chartJ[tk] = jv;
+          if (typeof kv === "number") chartK[tk] = kv;
+          if (typeof lv === "number") chartL[tk] = lv;
         }
       }
     } catch(eSum) {
-      // Non-fatal: continue with text-parsed values if this fails
-      Logger.log("GID 893574714 read error: " + eSum.message);
+      Logger.log("GID 1840482617 read error: " + eSum.message);
     }
-
 
 
     const TEAMS = {
@@ -2224,16 +2231,17 @@ function handleGetTeamWoStats_() {
       }
     }
 
-    // Today's date label — format: "D2/D1/D0-MM-YYYY" (matches old dashboard style)
+    // Date label — format: "JJ/KK/LL-MM-YYYY" where J=day-1, K=day-2, L=day-3
+    // Matches user-visible format: "08/07/06-08-2026" (yesterday/2daysago/3daysago)
     const now     = new Date();
     const DR_TZ2  = "Asia/Rangoon";
-    const d0Date  = now;
-    const d1Date  = new Date(now.getTime() - 86400000);
-    const d2Date  = new Date(now.getTime() - 2*86400000);
+    const d0Date  = new Date(now.getTime() - 1*86400000);  // J = yesterday
+    const d1Date  = new Date(now.getTime() - 2*86400000);  // K = 2 days ago
+    const d2Date  = new Date(now.getTime() - 3*86400000);  // L = 3 days ago
     function fmtDay(d)  { return Utilities.formatDate(d, DR_TZ2, "dd"); }
     function fmtMY(d)   { return Utilities.formatDate(d, DR_TZ2, "MM/yyyy"); }
-    // e.g. "06/07/08-08-2026" (day2/day1/day0 then -month-year from D0)
-    const dateLabel = fmtDay(d2Date) + "/" + fmtDay(d1Date) + "/" + fmtDay(d0Date)
+    // e.g. "08/07/06-08-2026" (J-date/K-date/L-date then -month-year)
+    const dateLabel = fmtDay(d0Date) + "/" + fmtDay(d1Date) + "/" + fmtDay(d2Date)
                     + "-" + Utilities.formatDate(now, DR_TZ2, "MM") + "-"
                     + Utilities.formatDate(now, DR_TZ2, "yyyy");
 
@@ -2249,9 +2257,12 @@ function handleGetTeamWoStats_() {
       const remain   = chartP[k] !== undefined ? chartP[k] : s.remain;     // P
       const overdueF = chartN[k] !== undefined ? chartN[k] : s.fotClose;   // N
       const cdNotYet = chartA[k] !== undefined ? chartA[k] : s.cdNotYet;   // A
+      // 3-day closes from chart (J=day-1, K=day-2, L=day-3) or fall back to text
+      const dJ = chartJ[k] !== undefined ? chartJ[k] : s.d1;  // yesterday
+      const dK = chartK[k] !== undefined ? chartK[k] : s.d2;  // 2 days ago
+      const dL = chartL[k] !== undefined ? chartL[k] : s.d0;  // 3 days ago
 
       const total = fotClose + remain;   // G + P = Total WO
-      // Use close rate from leader text (accurate) if available, else compute
       const pct = s.closeRate > 0 ? Math.round(s.closeRate) : (total > 0 ? Math.round(fotClose / total * 100) : 0);
       ranks.push({ k: k, pct: s.closeRate > 0 ? s.closeRate : pct, rankT: s.rankFromText });
       result[k] = {
@@ -2259,18 +2270,18 @@ function handleGetTeamWoStats_() {
         region:        TEAM_REGIONS[k],
         engineers:     s.engineers,
         totalAssigned: total,        // G + P
-        fotClose:      fotClose,     // G = Total FOT Close (from chart formula cell or text)
-        remain:        remain,       // P = Remain WO (CD not yet Close)
-        overdueF:      overdueF,     // N = Remain Overdue (Overdue FOT not closed)
-        waitCD:        s.waitCD,     // Wait CD
+        fotClose:      fotClose,     // G = Total FOT Close
+        remain:        remain,       // P = Remain WO
+        overdueF:      overdueF,     // N = Overdue FOT not closed
+        waitCD:        s.waitCD,     // Wait CD (from team leader text)
         cdNotYet:      cdNotYet,     // A = CD Not Yet Close
-        d0: s.d0, d1: s.d1, d2: s.d2,
+        d0: dL,  // L col = 3 days ago (Aug 6) — shown last  → 7
+        d1: dK,  // K col = 2 days ago (Aug 7) — shown middle → 0
+        d2: dJ,  // J col = yesterday  (Aug 8) — shown first  → 2
+        // HTML: d2/d1/d0 = 2/0/7 ✅
         pct:           pct,
         closeRate:     s.closeRate,
-        metTarget:     s.closeRate >= 50,
-        // Debug: which source was used
-        srcG: chartG[k] !== undefined ? "chart" : "text",
-        srcP: chartP[k] !== undefined ? "chart" : "text"
+        metTarget:     s.closeRate >= 50
       };
     }
 
@@ -2290,6 +2301,50 @@ function handleGetTeamWoStats_() {
 
   } catch(e) {
     return json({ status: "error", message: e.message, stack: e.stack });
+  }
+}
+// ─────────────────────────────────────────────────────────────────────
+// DEBUG: Read rows 53-56 of ALL sheets — find which sheet has G/P/N/A
+// GET ?action=debug_sum_sheet
+// ─────────────────────────────────────────────────────────────────────
+function handleDebugSumSheet_() {
+  try {
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const sheets = ss.getSheets();
+    const result = {};
+
+    for (const sh of sheets) {
+      const shId   = String(sh.getSheetId());
+      const shName = sh.getName();
+      const lastR  = sh.getLastRow();
+      const lastC  = sh.getLastColumn();
+      if (lastR < 53 || lastC < 1) continue;
+
+      // Read rows 53-56 with up to 20 cols
+      const cols = Math.min(lastC, 20);
+      try {
+        const vals = sh.getRange(53, 1, Math.min(4, lastR - 52), cols).getValues();
+        const rows = [];
+        for (let r = 0; r < vals.length; r++) {
+          const rowObj = {};
+          for (let c = 0; c < vals[r].length; c++) {
+            const v = vals[r][c];
+            if (v !== "" && v !== null && v !== 0) {
+              // Column letter: A=1, G=7, J=10, K=11, L=12, N=14, P=16
+              const colLetter = c < 26 ? String.fromCharCode(65 + c) : "COL"+(c+1);
+              rowObj[colLetter] = v instanceof Date ? Utilities.formatDate(v,"Asia/Rangoon","dd/MM/yyyy") : v;
+            }
+          }
+          rows.push({ row: 53 + r, data: rowObj });
+        }
+        if (rows.some(function(r){ return Object.keys(r.data).length > 0; })) {
+          result[shId + "_" + shName] = rows;
+        }
+      } catch(e2) { /* skip inaccessible sheet */ }
+    }
+    return json({ status: "ok", sheets_with_data: result });
+  } catch(e) {
+    return json({ status: "error", message: e.message });
   }
 }
 // ============================================================
