@@ -2090,6 +2090,43 @@ function handleGetTeamWoStats_() {
     // Debug: log which sheet was found
     const sheetDebug = rptSh.getName() + " (id=" + rptSh.getSheetId() + ", rows=" + rptSh.getLastRow() + ")";
 
+    // ── v299: Read GID 893574714 rows 53:56 for authoritative G/P formula values ──
+    // The user confirmed: row 53=Team1, 54=Team2, 55=Team3, 56=Team4 in "Sum all WO Team" sheet.
+    // Column G (7) = Total FOT Close, Column P (16) = CD not yet Close (Remain WO).
+    // These are the exact cells the Google Sheets chart reads from.
+    const GID_SUM = "893574714";
+    // Team order at rows 53-56 in GID 893574714
+    const TEAM_ORDER = ["team1", "team2", "team3", "team4"];
+    const chartG = {};  // teamKey -> G value (FOT Close)
+    const chartP = {};  // teamKey -> P value (Remain WO = CD not yet Close)
+    const chartN = {};  // teamKey -> N value (Remain Overdue, col N=14)
+    const chartA = {};  // teamKey -> A value (CD Not Close, col A=1)
+    try {
+      const sumSh = ss.getSheets().find(function(s) {
+        return String(s.getSheetId()) === GID_SUM;
+      });
+      if (sumSh && sumSh.getLastRow() >= 56) {
+        // Read rows 53-56, columns A(1) through P(16)
+        const sumRng = sumSh.getRange(53, 1, 4, 16).getValues();
+        for (let r = 0; r < 4; r++) {
+          const tk  = TEAM_ORDER[r];
+          const row = sumRng[r];
+          const gv = row[6];   // col G = index 6
+          const pv = row[15];  // col P = index 15
+          const nv = row[13];  // col N = index 13
+          const av = row[0];   // col A = index 0
+          if (typeof gv === "number" && gv > 0) chartG[tk] = gv;
+          if (typeof pv === "number" && pv > 0) chartP[tk] = pv;
+          if (typeof nv === "number" && nv > 0) chartN[tk] = nv;
+          if (typeof av === "number" && av > 0) chartA[tk] = av;
+        }
+      }
+    } catch(eSum) {
+      // Non-fatal: continue with text-parsed values if this fails
+      Logger.log("GID 893574714 read error: " + eSum.message);
+    }
+
+
 
     const TEAMS = {
       "MYT_TNI_TEAM01_Dawei":     "team1",
@@ -2205,24 +2242,35 @@ function handleGetTeamWoStats_() {
     const ranks = [];
     for (const k of Object.keys(TEAM_LABELS)) {
       const s = stats[k];
-      const total = s.closeMonth + s.remain;   // G + P = Total WO
+
+      // v299: Prefer formula cells from GID 893574714 rows 53-56 (same source as chart)
+      // Fall back to team leader text values if formula cells not available
+      const fotClose = chartG[k] !== undefined ? chartG[k] : s.closeMonth; // G
+      const remain   = chartP[k] !== undefined ? chartP[k] : s.remain;     // P
+      const overdueF = chartN[k] !== undefined ? chartN[k] : s.fotClose;   // N
+      const cdNotYet = chartA[k] !== undefined ? chartA[k] : s.cdNotYet;   // A
+
+      const total = fotClose + remain;   // G + P = Total WO
       // Use close rate from leader text (accurate) if available, else compute
-      const pct = s.closeRate > 0 ? Math.round(s.closeRate) : (total > 0 ? Math.round(s.closeMonth / total * 100) : 0);
+      const pct = s.closeRate > 0 ? Math.round(s.closeRate) : (total > 0 ? Math.round(fotClose / total * 100) : 0);
       ranks.push({ k: k, pct: s.closeRate > 0 ? s.closeRate : pct, rankT: s.rankFromText });
       result[k] = {
         name:          TEAM_LABELS[k],
         region:        TEAM_REGIONS[k],
         engineers:     s.engineers,
         totalAssigned: total,        // G + P
-        fotClose:      s.closeMonth, // G = WO Close (period)
-        remain:        s.remain,     // P = Remain WO
-        overdueF:      s.fotClose,   // N = Remain Overdue (Overdue FOT not closed)
+        fotClose:      fotClose,     // G = Total FOT Close (from chart formula cell or text)
+        remain:        remain,       // P = Remain WO (CD not yet Close)
+        overdueF:      overdueF,     // N = Remain Overdue (Overdue FOT not closed)
         waitCD:        s.waitCD,     // Wait CD
-        cdNotYet:      s.cdNotYet,   // A = CD Not Yet Close
+        cdNotYet:      cdNotYet,     // A = CD Not Yet Close
         d0: s.d0, d1: s.d1, d2: s.d2,
         pct:           pct,
         closeRate:     s.closeRate,
-        metTarget:     s.closeRate >= 50
+        metTarget:     s.closeRate >= 50,
+        // Debug: which source was used
+        srcG: chartG[k] !== undefined ? "chart" : "text",
+        srcP: chartP[k] !== undefined ? "chart" : "text"
       };
     }
 
