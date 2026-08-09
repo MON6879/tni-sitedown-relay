@@ -67,8 +67,7 @@ jobs:
         if: |
           (github.event_name == 'schedule' && (
             github.event.schedule == '15 23 * * *' ||
-            github.event.schedule == '50 9 * * *'  ||
-            github.event.schedule == '30 9 * * *'
+            github.event.schedule == '15 9 * * *'
           )) ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 2 (BOD) - BOD Assign')
         env:
@@ -80,8 +79,7 @@ jobs:
         if: |
           (github.event_name == 'schedule' && (
             github.event.schedule == '15 23 * * *' ||
-            github.event.schedule == '50 9 * * *' ||
-            github.event.schedule == '31 9 * * *' ||
+            github.event.schedule == '15 9 * * *'  ||
             github.event.schedule == '30 0 * * *'
           )) ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Reports 1, 2, 3, 4 - Daily Task & Backlog')
@@ -101,7 +99,7 @@ jobs:
 
       - name: Report 5A — Daily Plan EOD
         if: |
-          (github.event_name == 'schedule' && (github.event.schedule == '50 9 * * *' || github.event.schedule == '30 9 * * *')) ||
+          (github.event_name == 'schedule' && (github.event.schedule == '15 9 * * *' || github.event.schedule == '15 23 * * *')) ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Report 5A - Plan EOD')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
@@ -145,7 +143,7 @@ jobs:
       - name: Report 6 — Daily Note Read Report
         if: |
           (github.event_name == 'schedule' && (
-            github.event.schedule == '50 9 * * *'  ||
+            github.event.schedule == '15 9 * * *'  ||
             github.event.schedule == '0 14 * * *'  ||
             github.event.schedule == '30 3 * * *'  ||
             github.event.schedule == '30 7 * * *'  ||
@@ -187,7 +185,7 @@ jobs:
 
       - name: Task — Cable Daily Report (Cron or Manual)
         if: |
-          (github.event_name == 'schedule' && (github.event.schedule == '50 9 * * *' || github.event.schedule == '15 23 * * *' || github.event.schedule == '30 9 * * *')) ||
+          (github.event_name == 'schedule' && (github.event.schedule == '15 9 * * *' || github.event.schedule == '15 23 * * *')) ||
           (github.event_name == 'workflow_dispatch' && github.event.inputs.report_type == 'Task - Cable Daily Report')
         env:
           COLLECTOR_BOT_TOKEN: ${{ secrets.COLLECTOR_BOT_TOKEN }}
@@ -198,7 +196,7 @@ jobs:
 
       - name: Task — Refuel Request Report (Cron or Manual)
         if: |
-          (github.event_name == 'schedule' && (github.event.schedule == '50 9 * * *' || github.event.schedule == '15 23 * * *' || github.event.schedule == '30 9 * * *' || github.event.schedule == '30 6 * * *')) ||
+          (github.event_name == 'schedule' && (github.event.schedule == '15 9 * * *' || github.event.schedule == '15 23 * * *' || github.event.schedule == '30 6 * * *')) ||
           (github.event_name == 'workflow_dispatch' && (github.event.inputs.report_type == 'Task - All Refuel Reports' || github.event.inputs.report_type == 'Task - Refuel Request Report'))
         env:
           REFUEL_BOT_TOKEN: ${{ secrets.REFUEL_BOT_TOKEN }}
@@ -212,7 +210,7 @@ jobs:
             github.event.schedule == '30 0 * * *' ||
             github.event.schedule == '30 2 * * *' ||
             github.event.schedule == '30 6 * * *' ||
-            github.event.schedule == '30 9 * * *' ||
+            github.event.schedule == '15 9 * * *' ||
             github.event.schedule == '30 13 * * *' ||
             github.event.schedule == '30 15 * * *'
           )) ||

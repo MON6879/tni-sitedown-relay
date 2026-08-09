@@ -98,3 +98,12 @@
   - **Cặp Trạm & Số lít (Site & Liters):** Bóc tách linh hoạt các trạm `TNIxxxx` và số lít đi kèm bất kể khoảng cách, dấu hai chấm, dấu gạch ngang, dấu cộng, chữ L hay lit/lít (`TNI0381 440L`, `TNI0008 220L`, `TNI0015: 440 L`, `TNI0099 - 440lit`).
 - **Deploy:** Google Apps Script `apps_script_refuel_proj` Version `@71`.
 
+---
+
+## ⏰ Sửa lỗi Cron Schedule 15:45 PM MMT cho Reports 1, 2, 3, 4 (09/08/2026)
+- **Nguyên nhân:** Khi đổi lịch cron chính ở đầu file `.github/workflows/daily_reports.yml` sang `'15 9 * * *'` (15:45 MMT / 09:15 UTC), các điều kiện `if:` trong từng bước công việc vẫn còn sót lại chuỗi cũ `'50 9 * * *'` làm GitHub Actions bỏ qua bước gửi báo cáo.
+- **Khắc phục:**
+  - Cập nhật toàn bộ các câu lệnh `if:` của các bước `Report 2`, `Reports 1, 2, 3, 4`, `Report 5A`, `Report 6`, `Cable Report`, `Refuel Request`, `Refuel Plan 1` sang `'15 9 * * *'`.
+  - Đã chạy kích hoạt trực tiếp `backlog_send.py` và `cron_send.py` thủ công ngay lập tức để gửi đầy đủ các báo cáo 1, 2, 3, 4 chiều nay vào các nhóm Telegram!
+
+
