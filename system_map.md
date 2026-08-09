@@ -669,7 +669,7 @@ SAI:   clasp deploy                 ← tạo deployment mới chưa có quyền
 
 | Biến | URL |
 |---|---|
-| `APPS_SCRIPT_URL` | `https://script.google.com/macros/s/AKfycbzGFdnESGcSMt0Of7PrBIOHDXmuLCZsiraGv5iNzWrw4rjdxm8CGBDuVIP8pnPEkAULww/exec` |
+| `APPS_SCRIPT_URL` | `https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec` |
 | Script ID | `1rvgWwrAMDbqtmqwOfqzguXB7m9snA5UZeOs9iGu64VJbejlNAkH2m6uR` |
 | Search Log GID | `1426553697` |
 
@@ -781,7 +781,7 @@ logSheet.getRange(nextRow, 1, 1, 5).setValues([[dateObj, gasTime, userName, user
 ⚠️ APPS_SCRIPT_URL bị mất trên Vercel = Search Log CHẾT ÂM THẦM (không báo lỗi gì cả!)
 
 URL hiện tại (ĐÚNG — KHÔNG ĐỔI):
-https://script.google.com/macros/s/AKfycbzGFdnESGcSMt0Of7PrBIOHDXmuLCZsiraGv5iNzWrw4rjdxm8CGBDuVIP8pnPEkAULww/exec
+https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec
 
 Phải có ở CẢ 3 CHỖ:
   [x] Vercel Production env var → search_bot.py → log_search (Search Log)
@@ -862,7 +862,7 @@ KHÔNG ĐỤNG: hàm dateToStr() và 3 chỗ gọi nó
 ### 3. APPS_SCRIPT_URL trên Vercel
 ```
 ✅ ĐÃ XÁC NHẬN HOẠT ĐỘNG 28/06/2026
-URL: https://script.google.com/macros/s/AKfycbzGFdnESGcSMt0Of7PrBIOHDXmuLCZsiraGv5iNzWrw4rjdxm8CGBDuVIP8pnPEkAULww/exec
+URL: https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec
 
 Kiểm tra sau MỖI lần deploy Vercel:
   npx -y vercel env ls production
