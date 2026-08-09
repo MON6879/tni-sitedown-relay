@@ -173,7 +173,7 @@
 ## 📋 Cập Nhật Định Dạng Mẫu Daily Result (Loại Bỏ Số Thứ Tự) (09/08/2026)
 - **Yêu cầu người dùng:** Bỏ các con số `1. `, `2. `, `3. `... ở đầu mỗi trường thông tin của mẫu `Daily result` để giao diện đơn giản, dễ chọn copy text.
 - **Đã cập nhật:**
-  - `api/search_bot.py`: Nhận diện cả `Daily report:` và `Daily result:` trong `is_daily()`, gửi trực tiếp văn bản template Daily report.
+  - `api/search_bot.py`: Nhận diện cả `Daily report:` và `Daily result:` trong `is_daily()`, gửi trực tiếp văn bản template Daily report và Daily plan không bọc khung code, loại bỏ các con số `1. `, `2. ` trước danh sách nhân viên FT.
   - `api/collector.py`: Tự động lấy toàn bộ mẫu template động từ **cột A (A2:A)** tab `Config` của Google Sheet `Team All Find - Sum WO and Task` (`1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8`). Tự động làm mới cache vào lúc **1:08 AM MMT hàng ngày**. Gửi trực tiếp văn bản thô không bọc khung code hay tiêu đề phụ.
   - `api/refuel_collector.py`: Bỏ toàn bộ dòng tiêu đề chú thích (`Template: ...`), gửi trực tiếp văn bản template (`/refuel`, `/plan`, `/request`, `/letter`, `/monitor`).
   - `QLTC_GAS/13_TNI_CONSTRUCTION.gs`: Bỏ thẻ `<code>...</code>` trong hàm `handleTemplateCommand()` và xử lý slash command template của Construction Bot (`@8903841312`).

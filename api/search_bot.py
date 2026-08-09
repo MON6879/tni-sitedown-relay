@@ -701,8 +701,8 @@ def get_plan_template_text(team_num: int) -> str:
             "VII. List name FT : Name Site ( WO + Task)"
         ]
         
-        for i, name in enumerate(matched_staff, start=1):
-            lines.append(f"{i}. {name}: ")
+        for name in matched_staff:
+            lines.append(f"{name}: ")
             
         return "\n".join(lines)
     except Exception as e:
