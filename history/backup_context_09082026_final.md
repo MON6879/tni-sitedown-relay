@@ -114,5 +114,13 @@
   - Cập nhật tự động chuyển hướng `APPS_SCRIPT_URL` và `MDG_APPS_SCRIPT_URL` về Web App URL đang hoạt động của Main Apps Script: `https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec` (Version `@302`).
   - Đã test ghi nhận báo cáo MDG trực tiếp qua `post_mdg_sheet` thành công 100% (`status: ok`, `ref: 00043`).
 
+---
+
+## 🔒 Nâng cấp Quy tắc Tìm kiếm Nghiêm ngặt & Khóa Chống Trùng Lặp Search Bot (09/08/2026)
+- **Quy tắc 1 (Khớp độ dài mã trạm):** Lệnh tra cứu `TNIxxxx` / `TNIxxxx_01` chỉ kích hoạt khi tin nhắn khớp CHÍNH XÁC độ dài mã trạm (`TNI0394`, `TNI0394_01`, `/tni TNI0394`). Nếu tin nhắn có độ dài dài hơn (do chứa lời thoại, trao đổi công việc, báo cáo xăng dầu như `TNI0394 440L` hay `TNI0394 door open`) ➔ **BỎ QUA KHÔNG SEARCH!**
+- **Quy tắc 2 (Lệnh Info):** Bắt đầu bằng `Info: TNIxxxx` hoặc `info: TNIxxxx` hoặc `/info TNIxxxx` (không chứa thêm văn bản thừa) ➔ Đưa vào tra cứu thông tin Site (`full_info=True`).
+- **Quy tắc 3 (Khóa Dedup Key 10s):** Tạo bộ đệm `is_duplicate_search(chat_id, user_id, query)` chặn 100% các request trùng lặp do Telegram retry hoặc người dùng gõ lặp lại trong 10 giây ➔ **Triệt tiêu lỗi gửi kết quả tìm kiếm lặp lại!**
+
+
 
 
