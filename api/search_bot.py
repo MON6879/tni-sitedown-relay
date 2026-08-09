@@ -638,11 +638,7 @@ def send_daily_template(chat_id: int) -> None:
     for f in fields[1:]:
         lines.append(f"{f}:")
     template = "\n".join(lines)
-    
-    tg_send(chat_id,
-        f"📋 <b>Daily Result Template</b>\n\n"
-        f"{html.escape(template)}"
-    )
+    tg_send(chat_id, template)
 
 def get_user_team_number(user_id: int) -> int | None:
     try:

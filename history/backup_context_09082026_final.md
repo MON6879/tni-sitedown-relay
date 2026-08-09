@@ -173,8 +173,8 @@
 ## 📋 Cập Nhật Định Dạng Mẫu Daily Result (Loại Bỏ Số Thứ Tự) (09/08/2026)
 - **Yêu cầu người dùng:** Bỏ các con số `1. `, `2. `, `3. `... ở đầu mỗi trường thông tin của mẫu `Daily result` để giao diện đơn giản, dễ chọn copy text.
 - **Đã cập nhật:**
-  - `api/search_bot.py`: Bỏ prefix số thứ tự `i.` trong hàm `send_daily_template()`.
-  - `api/collector.py`: Bỏ prefix số thứ tự `i.` trong biến `template_text`.
+  - `api/search_bot.py`: Bỏ prefix số thứ tự `i.` và tiêu đề phụ, gửi trực tiếp văn bản template Daily result bắt đầu từ `Daily result: DD/MM/YYYY`.
+  - `api/collector.py`: Bỏ prefix số thứ tự `i.` và tiêu đề phụ, gửi trực tiếp văn bản template Daily result.
   - `QLTC_GAS/13_TNI_CONSTRUCTION.gs`: Bỏ thẻ `<code>...</code>` trong hàm `handleTemplateCommand()` và xử lý slash command template của Construction Bot (`@8903841312`).
 
 ---

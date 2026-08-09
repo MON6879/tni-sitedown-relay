@@ -928,8 +928,7 @@ async def handle(data: dict):
                 )
                 await bot.send_message(
                     chat_id,
-                    f"📋 <b>Mẫu Daily Result</b>\n\n"
-                    f"{html.escape(template_text)}",
+                    template_text,
                     parse_mode="HTML"
                 )
                 return
