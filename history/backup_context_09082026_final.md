@@ -159,6 +159,17 @@
 
 ---
 
+## 📝 Loại Bỏ Khung `<pre><code>` Khỏi Tất Cả Các Mẫu Template (Plain Text Templates) (09/08/2026)
+- **Yêu cầu người dùng:** Loại bỏ toàn bộ thẻ `<pre><code>` bọc khung mã ở tất cả các lệnh lấy mẫu template (`/inventory`, `/daily`, `/order`, `/revoke`, `/move`, `/export`, `/done`, `/refuel`, `/plan`, `/request`, `/letter`, `/monitor`).
+- **Khắc phục:** Chuyển toàn bộ nội dung mẫu template sang dạng văn bản thô (Plain Text) định dạng HTML chuẩn. Người dùng có thể tự do bôi đen, chọn từng đoạn văn bản để copy và chỉnh sửa trực tiếp.
+- **Đã cập nhật đồng loạt:**
+  - `api/collector.py`
+  - `api/search_bot.py`
+  - `api/refuel_collector.py`
+- **Vercel Deployment:** Code mới đã được deploy trực tiếp lên Vercel (`tni-bot.vercel.app`), sẵn sàng hoạt động ngay lập tức!
+
+---
+
 ## 🔑 Hỗ Trợ Cú Pháp Tra Cứu Nhân Viên Bất Kỳ (Admin Lookup Slash Prefix Support) (09/08/2026)
 - **Giải thích cú pháp:**
   - `mydata`: Xem dữ liệu cá nhân của **chính ID Telegram người gõ**. (Nếu ID Telegram chưa được đăng ký trong tab Staff ➔ Báo `❌ No data for your ID`).

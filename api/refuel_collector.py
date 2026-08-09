@@ -221,9 +221,8 @@ def process_update(update: dict):
         if cmd == "/refuel":
             today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: Refueled Report</b>\n"
-                "<i>(Tap the code block below to copy)</i>\n\n"
-                f"<pre><code>DG Type\n"
+                "📝 <b>Template: Refueled Report</b>\n\n"
+                f"DG Type\n"
                 f"Date: {today_str}\n"
                 f"DG ID: TNIXXXX\n"
                 f"Team: Team X\n"
@@ -238,7 +237,7 @@ def process_update(update: dict):
                 f"Level %: \n"
                 f"Liter/cm - ()\n\n"
                 f"Actual Filled Qty (L): \n"
-                f"Partner price = </code></pre>"
+                f"Partner price = "
             )
             tg_reply(chat_id, reply_text)
             return
@@ -246,9 +245,8 @@ def process_update(update: dict):
         elif cmd == "/plan":
             tomorrow_str = (datetime.now(TZ_MM) + timedelta(days=1)).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: Refuel Plan</b>\n"
-                "<i>(Tap the code block below to copy)</i>\n\n"
-                f"<pre><code>Team X Plan refuel {tomorrow_str} : TNIXXXX 440L + TNIXXXX 220L</code></pre>"
+                "📝 <b>Template: Refuel Plan</b>\n\n"
+                f"Team X Plan refuel {tomorrow_str} : TNIXXXX 440L + TNIXXXX 220L"
             )
             tg_reply(chat_id, reply_text)
             return
@@ -256,9 +254,8 @@ def process_update(update: dict):
         elif cmd == "/request":
             tomorrow_str = (datetime.now(TZ_MM) + timedelta(days=1)).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: Refuel Request</b>\n"
-                "<i>(Tap the code block below to copy)</i>\n\n"
-                f"<pre><code>Team X request {tomorrow_str}: TNIXXXX: 440L + TNIXXXX: 220L</code></pre>"
+                "📝 <b>Template: Refuel Request</b>\n\n"
+                f"Team X request {tomorrow_str}: TNIXXXX: 440L + TNIXXXX: 220L"
             )
             tg_reply(chat_id, reply_text)
             return
@@ -266,12 +263,11 @@ def process_update(update: dict):
         elif cmd == "/letter":
             today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: Transport Letter</b>\n"
-                "<i>(Tap the code lines below to copy)</i>\n\n"
+                "📝 <b>Template: Transport Letter</b>\n\n"
                 "• Submit Letter:\n"
-                f"<pre><code>Letter Submit: {today_str}</code></pre>\n"
+                f"Letter Submit: {today_str}\n\n"
                 "• Approved Letter:\n"
-                f"<pre><code>Approved Letter: {today_str}</code></pre>"
+                f"Approved Letter: {today_str}"
             )
             tg_reply(chat_id, reply_text)
             return
@@ -279,9 +275,8 @@ def process_update(update: dict):
         elif cmd == "/monitor":
             today_str = datetime.now(TZ_MM).strftime("%d/%m/%Y")
             reply_text = (
-                "📝 <b>Template: FT Follow Monitor</b>\n"
-                "<i>(Tap the code block below to copy)</i>\n\n"
-                f"<pre><code>Name of FT staff member accompanying to supervise the quality of premium oil and ensure the correct quantity is poured according to the plan: Paung Aung Soe - {today_str} TNI0213 + 660L, TNI0129 + 660L</code></pre>"
+                "📝 <b>Template: FT Follow Monitor</b>\n\n"
+                f"Name of FT staff member accompanying to supervise the quality of premium oil and ensure the correct quantity is poured according to the plan: Paung Aung Soe - {today_str} TNI0213 + 660L, TNI0129 + 660L"
             )
             tg_reply(chat_id, reply_text)
             return

@@ -640,9 +640,8 @@ def send_daily_template(chat_id: int) -> None:
     template = "\n".join(lines)
     
     tg_send(chat_id,
-        f"📋 <b>Daily Result Template</b>\n"
-        f"Copy → Edit → Send back:\n\n"
-        f"<pre>{html.escape(template)}</pre>"
+        f"📋 <b>Daily Result Template</b>\n\n"
+        f"{html.escape(template)}"
     )
 
 def get_user_team_number(user_id: int) -> int | None:
@@ -828,9 +827,8 @@ def send_daily_plan_template(chat_id: int, team_num: int) -> None:
 
     template = get_plan_template_text(team_num)
     tg_send(chat_id,
-        f"📋 <b>Daily Plan Template (Team {team_num})</b>\n"
-        f"Copy → Edit → Send back:\n\n"
-        f"<pre>{html.escape(template)}</pre>"
+        f"📋 <b>Daily Plan Template (Team {team_num})</b>\n\n"
+        f"{html.escape(template)}"
     )
 
 _recent_help_sends = {}
