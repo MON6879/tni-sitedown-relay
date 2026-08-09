@@ -19,7 +19,7 @@
 | **Search Bot** (`@SEARCHTNITASKWOBOT`) | `https://tni-bot.vercel.app/api/search_bot` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@302`) | `api/search_bot.py` | `system_map.md`, `SYSTEM_DOC.md`, `AGENTS.md` |
 | **Refuel Collector & Plan Bot** | Apps Script Web App | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` (Version `@71`) | `api/refuel_collector.py`, `refuel_send.py`, `refuel_plan_report.py` | `system_map.md`, `SYSTEM_DOC.md` |
 | **Site Down Bot (Relay)** (`@tni_site_down_bot`) | `https://tni-bot.vercel.app/api/site_down_relay` | `AKfycbxVi0BGDW7B_KBxcSEdw3yuHB9Rs2BemQEYeKDwsybJQdmQv-_0HqyGHjpZI6jupxll/exec` | `api/site_down_relay.py`, `botlookup_relay.py` | `system_map.md`, `SYSTEM_DOC.md` |
-| **Construction Bot** (`@8903841312`) | Apps Script Web App | `AKfycbHraNPzUGVRNGvy-7_q4NyTiJSRUvlodCIjiJZJ00PaNMen-MpVjb4YTmyVex00mn6xQ/exec` | `.github/workflows/keepalive_construction.yml` | `system_map.md`, `SYSTEM_DOC.md` |
+| **Construction Bot** (`@8903841312`) | Apps Script Web App (merged into Main GAS @302) | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec` | `.github/workflows/keepalive_construction.yml` | `system_map.md`, `SYSTEM_DOC.md` |
 
 ---
 
@@ -91,7 +91,7 @@
 | **Main GAS Collector** | `@302` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` | `Team All Find - Sum WO` (`1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8`) | `MAIN_GAS_FALLBACK` |
 | **Refuel GAS** | `@71` | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` | `TNI_Refuel` (`1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM`) | `REFUEL_PLAN_GAS_URL` |
 | **Site Down GAS** | `@latest` | `AKfycbxVi0BGDW7B_KBxcSEdw3yuHB9Rs2BemQEYeKDwsybJQdmQv-_0HqyGHjpZI6jupxll` | `TNI SITE DOWN` (standalone) | `SD_APPS_SCRIPT_URL` (secret) |
-| **Construction Keepalive GAS** | `@latest` | `AKfycbHraNPzUGVRNGvy-7_q4NyTiJSRUvlodCIjiJZJ00PaNMen-MpVjb4YTmyVex00mn6xQ` | `13_TNI_CONSTRUCTION.gs` | `keepalive_construction.yml` |
+| **Construction Keepalive GAS** | `@302` (merged into Main GAS) | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` | `13_TNI_CONSTRUCTION.gs` | `keepalive_construction.yml` |
 | **Attendance Bot GAS** | `@41` | `AKfycbxoM2KgWFJ4pXaYYdE7bAelngrpVD335D1a9y6Ryusr7Wh7xEwTOG4rfpPTC7K_ZMaqlg` | `TNI attendance.js` | Direct deploy (Clasp) |
 
 ---

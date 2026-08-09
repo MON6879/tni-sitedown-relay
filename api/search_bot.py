@@ -1369,20 +1369,7 @@ class handler(BaseHTTPRequestHandler):
             raw    = self.rfile.read(length)
             data   = json.loads(raw)
 
-            # 1. Lọc trùng update_id (nếu Telegram có trôi request)
-            up_id = data.get("update_id")
-            if up_id:
-                if up_id in _processed_updates:
-                    logger.info(f"Skipping duplicate update_id {up_id}")
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(b'{"ok":true}')
-                    return
-                _processed_updates.add(up_id)
-                if len(_processed_updates) > 1000:
-                    _processed_updates.clear()
-
+            # ── Xử lý submit_plan (đồng bộ, cần response body) ──
             action = data.get("action")
             if action == "submit_plan":
                 chat_id = data.get("chat_id")
@@ -1396,27 +1383,36 @@ class handler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({"status": "ok"}).encode("utf-8"))
                     return
 
-            # 2. Xử lý logic TRƯỚC (Vercel kill function sau khi flush response)
-            try:
-                handle(data)
-            except Exception as ex:
-                logger.error(f"handle() error: {ex}")
-                try:
-                    import traceback
-                    tb = traceback.format_exc()
-                    msg_obj = data.get("message") or data.get("edited_message") or {}
-                    chat_id = msg_obj.get("chat", {}).get("id")
-                    if chat_id:
-                        tg_send(chat_id, f"⚠️ <b>Error:</b>\n<pre>{html.escape(tb[:2000])}</pre>")
-                except Exception:
-                    pass
-
-            # 3. Trả về 200 OK sau khi xử lý xong (Telegram chờ tối đa 60s)
+            # ══════════════════════════════════════════════════════════
+            # ⚡ CRITICAL: Trả HTTP 200 OK NGAY LẬP TỨC (~10ms)
+            #    để Telegram KHÔNG retry gửi lại cùng update.
+            #    Sau đó mới xử lý logic trong background thread.
+            #    Vercel Python runtime giữ process sống trong maxDuration (60s)
+            #    nên daemon thread vẫn chạy đủ sau khi flush response.
+            # ══════════════════════════════════════════════════════════
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(b'{"ok":true}')
+
+            # ── Xử lý Telegram update trong background ──
+            def _process_bg(update_data):
+                try:
+                    handle(update_data)
+                except Exception as ex:
+                    logger.error(f"handle() error: {ex}")
+                    try:
+                        import traceback
+                        tb = traceback.format_exc()
+                        msg_obj = update_data.get("message") or update_data.get("edited_message") or {}
+                        chat_id = msg_obj.get("chat", {}).get("id")
+                        if chat_id:
+                            tg_send(chat_id, f"⚠️ <b>Error:</b>\n<pre>{html.escape(tb[:2000])}</pre>")
+                    except Exception:
+                        pass
+
+            threading.Thread(target=_process_bg, args=(data,), daemon=True).start()
 
         except Exception as ex:
             logger.error(f"Webhook POST parse error: {ex}")
