@@ -178,6 +178,7 @@
   - `api/refuel_collector.py`: Bỏ toàn bộ dòng tiêu đề chú thích (`Template: ...`), gửi trực tiếp văn bản template (`/refuel`, `/plan`, `/request`, `/letter`, `/monitor`).
   - `QLTC_GAS/13_TNI_CONSTRUCTION.gs`: Bỏ thẻ `<code>...</code>` trong hàm `handleTemplateCommand()` và xử lý slash command template của Construction Bot (`@8903841312`).
   - `tni-search-cf/src/worker.js`: Đồng bộ 100% Cloudflare Worker, hỗ trợ `Daily report:`, bỏ toàn bộ tin nhắn `⏳ Loading...`, bỏ bọc khung `<pre>` và tiêu đề phụ.
+  - `tni_site_down_repo/telegram_bot.py`: Đồng bộ 100% `cmd_daily()`, loại bỏ toàn bộ tiêu đề rác `📋 Mẫu Daily Report`, bỏ số thứ tự `1. `, `2. `... và bỏ khung code triple backticks ``` để chỉ phản hồi thuần văn bản thô.
 
 ---
 
