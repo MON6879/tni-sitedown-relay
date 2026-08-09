@@ -1934,36 +1934,30 @@ async def main():
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
 
-    # ── 7d. Gửi NOTE reply dưới Report 4 / 4b trong mỗi nhóm Team — để daily_read_report.py track ai đọc ──
-    if control_note and pinned_report4_msgids:
-        logger.info(f"📝 Gửi Note reply → {len(pinned_report4_msgids)} nhóm...")
-        for cid_str, reply_to_id in pinned_report4_msgids.items():
-            sent_note_ok = False
-            # 1. Thử gửi qua Telethon nếu session khả dụng
-            if TELEGRAM_SESSION and TELEGRAM_API_ID:
-                try:
-                    async with TelegramClient(
-                        StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH
-                    ) as tg_note_client:
+    # ── 7d. Gửi NOTE reply dưới tên user @phongha79 (Telethon) ──
+    # BẮT BỘC gửi bằng tài khoản user @phongha79 để Telegram API (GetMessageReadParticipantsRequest)
+    # đếm được danh sách người đọc cho Report 6 (daily_read_report.py). Tin nhắn từ Bot KHÔNG đếm được người đọc!
+    if control_note and TELEGRAM_SESSION and TELEGRAM_API_ID and pinned_report4_msgids:
+        try:
+            async with TelegramClient(
+                StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH
+            ) as tg_note_client:
+                logger.info(f"📝 Gửi Note reply dưới tên user @phongha79 (Telethon) → {len(pinned_report4_msgids)} nhóm...")
+                for cid_str, reply_to_id in pinned_report4_msgids.items():
+                    try:
                         await tg_note_client.send_message(
                             entity=int(cid_str),
                             message=control_note,
                             reply_to=reply_to_id
                         )
-                        logger.info(f"  ✅ Note reply (Telethon) → {cid_str} (reply_to msg_id: {reply_to_id})")
-                        sent_note_ok = True
-                except Exception as note_send_err:
-                    logger.warning(f"  ⚠️ Note reply (Telethon) không thành công, fallback Bot API: {note_send_err}")
-
-            # 2. Fallback: Gửi bằng Bot API (100% luôn thành công, không phụ thuộc session)
-            if not sent_note_ok and SEND_BOT_TOKEN:
-                try:
-                    async with Bot(token=SEND_BOT_TOKEN) as bot_note:
-                        r_ok, r_ids = await send_msg(bot_note, int(cid_str), control_note, "NOTE_REPLY", reply_to=reply_to_id)
-                        if r_ok:
-                            logger.info(f"  ✅ Note reply (Bot API) → {cid_str} (reply_to msg_id: {reply_to_id})")
-                except Exception as note_bot_err:
-                    logger.error(f"  ❌ Note reply (Bot API) thất bại → {cid_str}: {note_bot_err}")
+                        logger.info(f"  ✅ Note reply (@phongha79) → {cid_str} (reply_to msg_id: {reply_to_id})")
+                        await asyncio.sleep(0.5)
+                    except Exception as note_send_err:
+                        logger.error(f"  ❌ Note reply (@phongha79) thất bại → {cid_str}: {note_send_err}")
+        except Exception as note_client_err:
+            logger.error(f"❌ Telethon Note client lỗi: {note_client_err}")
+    elif not TELEGRAM_SESSION:
+        logger.info("⚠️ TELEGRAM_SESSION not set — skip Note reply (must be sent by Telethon user @phongha79 for Report 6 read tracking)")
     elif not control_note:
         logger.info("No control_note — skip Note reply")
     elif not pinned_report4_msgids:
