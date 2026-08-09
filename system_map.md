@@ -1,18 +1,76 @@
 # TNI Bot System Map
 
 > [!IMPORTANT]
-> **Doc file nay TRUOC khi sua bat ky thu gi!**
+> **ĐỌC BẢN ĐỒ MA TRẬN PHỤ THUỘ LOGIC NÀY TRƯỚC KHI SỬA BẤT KỲ THÀNH PHẦN NÀO HỆ THỐNG!**
+
+---
+
+# 🗺️ BẢN ĐỒ MA TRẬN LIÊN KẾT PHỤ THUỘ LOGIC HỆ THỐNG (SYSTEM LOGIC DEPENDENCY MATRIX)
+
+> ⚠️ **NGUYÊN TẮC VÀNG:** KHI CẬP NHẬT BẤT KỲ MỘT THÀNH PHẦN NÀO, BẮT BUỘC PHẢI ĐỒNG BỘ NGUYÊN TỬ (ATOMIC SYNC) 100% CÁC THÀNH PHẦN LIÊN QUAN TRONG BẢN ĐỒ DƯỚI ĐÂY. TUYỆT ĐỐI KHÔNG SỬA RỜI RẠC ĐỂ TRÁNH "SỬA CÁI NÀY PHÁ CÁI KIA"!
+
+---
+
+### 🌐 1. Ma trận phụ thuộc Endpoints & Apps Script URLs:
+
+| Tên chức năng / Bot | Endpoint Webhook / Deployment | Apps Script Web App URL | Các file Python liên quan (Phải đồng bộ `MAIN_GAS_FALLBACK`) | Workflow / Docs liên quan (Phải đồng bộ) |
+|---|---|---|---|---|
+| **Main & Asset Collector Bot** (`@TNIASSETorderREQUEST_BOT`) | `https://tni-bot.vercel.app/api/collector` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@302`) | `api/collector.py`, `daily_read_report.py`, `daily_plan_report.py`, `daily_bod_assign.py`, `cron_send.py`, `backlog_send.py` | `system_map.md`, `SYSTEM_DOC.md`, `AGENTS.md` |
+| **Search Bot** (`@SEARCHTNITASKWOBOT`) | `https://tni-bot.vercel.app/api/search_bot` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@302`) | `api/search_bot.py` | `system_map.md`, `SYSTEM_DOC.md`, `AGENTS.md` |
+| **Refuel Collector & Plan Bot** | Apps Script Web App | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` (Version `@71`) | `api/refuel_collector.py`, `refuel_send.py`, `refuel_plan_report.py` | `system_map.md`, `SYSTEM_DOC.md` |
+| **Site Down Bot (Relay)** (`@tni_site_down_bot`) | `https://tni-bot.vercel.app/api/site_down_relay` | `AKfycbxVi0BGDW7B_KBxcSEdw3yuHB9Rs2BemQEYeKDwsybJQdmQv-_0HqyGHjpZI6jupxll/exec` | `api/site_down_relay.py`, `botlookup_relay.py` | `system_map.md`, `SYSTEM_DOC.md` |
+| **Construction Bot** (`@8903841312`) | Apps Script Web App | `AKfycbHraNPzUGVRNGvy-7_q4NyTiJSRUvlodCIjiJZJ00PaNMen-MpVjb4YTmyVex00mn6xQ/exec` | `.github/workflows/keepalive_construction.yml` | `system_map.md`, `SYSTEM_DOC.md` |
+
+---
+
+### ⏰ 2. Ma trận phụ thuộc Lịch gửi Báo cáo tự động (Cron Schedule Matrix):
+
+| Tên báo cáo | Giờ gửi MMT (Asia/Yangon UTC+6:30) | Biểu thức Cron GitHub (`.github/workflows/daily_reports.yml`) | Biểu thức `if:` từng Step (BẮT BUỘC KHỚP 100%) | Script Python thực thi | Nhóm Telegram nhận tin |
+|---|---|---|---|---|---|
+| **Báo cáo Sáng (Reports 1, 2, 3, 4)** | **05:45 AM MMT** | `15 23 * * *` (23:15 UTC) | `if: github.event.schedule == '15 23 * * *'` | `cron_send.py` | Teams 1..4, CONTROL, TECHDEP |
+| **Báo cáo Chiều (Reports 1, 2, 3, 4)** | **15:45 PM MMT** | `15 9 * * *` (09:15 UTC) | `if: github.event.schedule == '15 9 * * *'` | `cron_send.py` | Teams 1..4, CONTROL, TECHDEP |
+| **Báo cáo Kế hoạch (Report 5A / Daily Plan)** | **05:45 AM & 15:45 PM MMT** | `15 23 * * *` & `15 9 * * *` | `if: github.event.schedule == '15 23 * * *' \|\| github.event.schedule == '15 9 * * *'` | `daily_plan_report.py` | Teams 1..4, CONTROL |
+| **Báo cáo Lượt đọc (Report 6 / Read Status)** | **05:45 AM & 15:45 PM MMT** | `15 23 * * *` & `15 9 * * *` | `if: github.event.schedule == '15 23 * * *' \|\| github.event.schedule == '15 9 * * *'` | `daily_read_report.py` | Teams 1..4, CONTROL |
+
+---
+
+### 🔍 3. Ma trận Quy tắc Tra cứu Search Bot (`api/search_bot.py`):
+
+| Cú pháp gõ | Quy tắc nhận diện (Regex & Length) | Chức năng gọi | Chống lặp / Trùng lời thoại |
+|---|---|---|---|
+| `Info: TNIXXXX` hoặc `info: TNIXXXX` | `^\s*(?:/info\|info)[:\s]+\s*(TNI\d{4}(?:_\d+)?)\s*$` | Tra cứu **Site Info** (`full_info=True`) | Khóa `is_duplicate_search` (10s cooldown) |
+| `TNIXXXX` hoặc `TNIXXXX_01` | `^\s*(?:/tni\|/find\|tni)?[:\s]*\b(TNI\d{4}(?:_\d+)?)\s*$` | Tra cứu **Task & WO** (`full_info=False`) | Khóa `is_duplicate_search` (10s cooldown) |
+| Tin nhắn dài hơn (VD: `TNI0394 440L`, `TNI0394 door open`) | Có chứa từ ngữ thừa / Lời thoại công việc | **BỎ QUA KHÔNG SEARCH** (Skip 100%) | Tránh nhiễu chat nhóm công việc |
+
+---
+
+### 📋 4. Checklist BẮT BUỘC khi Cập nhật (Atomic Update Protocol):
+
+1. **Khi thay đổi Webhook / Apps Script Web App URL:**
+   * [x] Cập nhật URL mới vào `MAIN_GAS_FALLBACK` trong `api/collector.py`, `api/search_bot.py`, `daily_read_report.py`, `daily_plan_report.py`, `daily_bod_assign.py`, `cron_send.py`, `backlog_send.py`.
+   * [x] Cập nhật Vercel Environment Variables (`APPS_SCRIPT_URL`).
+   * [x] Cập nhật tài liệu [`system_map.md`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/system_map.md) và [`SYSTEM_DOC.md`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/SYSTEM_DOC.md).
+
+2. **Khi thay đổi Lịch Cron gửi báo cáo:**
+   * [x] Cập nhật biểu thức cron ở phần `on.schedule` của `.github/workflows/daily_reports.yml`.
+   * [x] Cập nhật CÙNG LÚC tất cả các biểu thức `if: github.event.schedule == ...` trong từng step của workflow.
+   * [x] Đồng bộ file workflow sang `tni_site_down_repo/.github/workflows/daily_reports.yml`.
+
+3. **Khi thay đổi Mã nguồn / Logic xử lý:**
+   * [x] Thực hiện đầy đủ **6 Bước Quy tắc "LƯU ĐI"** trong `AGENTS.md`.
 
 ---
 
 ## QUY TẮC LÀM VIỆC BẮT BUỘC & KHI NÓI "LƯU ĐI"
 
 > [!CAUTION]
-> **Khi người dùng nói "LƯU ĐI" hoặc sau mỗi lần sửa code — AI BẮT BUỘC thực hiện đủ 4 bước dứt điểm:**
-> 1. **Lưu dự phòng**: Tạo/cập nhật file `history/backup_context_DDMMYYYY_final.md` ghi nhận toàn bộ cấu hình, lịch cron và commit hash.
-> 2. **Đồng bộ trên máy**: Đồng bộ 100% tất cả các file Python (`search_bot.py`, `collector.py`, `cron_send.py`, `daily_read_report.py`, `daily_plan_report.py`, `daily_bod_assign.py`, `botlookup_relay.py`, `cable_report.py`, `tni_config.py`, `tg_utils.py`) giữa tất cả các thư mục cục bộ (`Task and WO`, `tni-search`, `tni-sitedown`, `tni_site_down_repo`).
-> 3. **Đồng bộ trên mây**: Commit & Push 100% tất cả các repository lên GitHub & Vercel (`phonghdpxd-cmd/tni-bot`, `MON6879/TNI-DONE`, `MON6879/tni-sitedown-relay`).
-> 4. **Dọn dẹp rác**: Xóa các file `.bak` tạm và bộ nhớ đệm `__pycache__` trên máy để tránh nạp lầm code cũ.
+> **Khi người dùng nói "LƯU ĐI" hoặc sau mỗi lần sửa code — AI BẮT BUỘC thực hiện đủ 6 bước dứt điểm:**
+> 1. **Bước 1:** Cập nhật snapshot backup context vào `history/backup_context_...md`.
+> 2. **Bước 2:** Đồng bộ mã nguồn Python/GS qua tất cả các repo cục bộ (`tni-bot` & `tni_site_down_repo`).
+> 3. **Bước 3:** Commit & Push lên GitHub (`phonghdpxd-cmd/tni-bot` & `phonghdpxd-cmd/TNI-SITE-DOWN`).
+> 4. **Bước 4:** Dọn dẹp sạch sẽ tất cả cache `__pycache__`.
+> 5. **Bước 5:** **Đồng bộ 100% tất cả logic liên quan (Full Logical Cross-Sync)** — Khi sửa Endpoint/URL/Cron Schedule/Tra cứu, phải đồng bộ tức thì tất cả các file code, workflow step condition, fallback variables và tài liệu docs liên quan.
+> 6. **Bước 6:** **Kiểm thử thực tế (Live Output Verification)** — Chạy test payload/script để xác nhận 0 lỗi phát sinh và phản hồi thực tế chính xác 100%.
 >
 > Không được dừng lại ở bất kỳ bước nào để tránh trôi code hay lặp lại lỗi!
 
