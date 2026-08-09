@@ -9,17 +9,29 @@ Chức năng:
   - Ảnh: gửi kèm báo cáo → lưu Drive qua GAS
   - /daily → gửi mẫu báo cáo
 """
-import os, re, io, json, html, time, asyncio, logging, requests, threading
+import os, re, io, json, html, time, asyncio, logging, requests, threading, sys
 import pandas as pd
 from http.server import BaseHTTPRequestHandler
 from datetime import datetime, timezone, timedelta
 
+# ── SSOT Engine Import ────────────────────────────────────────────────────────
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+try:
+    from tni_search_core import classify_query, is_duplicate_search
+except ImportError:
+    try:
+        from api.tni_search_core import classify_query, is_duplicate_search
+    except ImportError:
+        classify_query = None
+        is_duplicate_search = None
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-BOT_VERSION = "v3.9"
+BOT_VERSION = "v4.0"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
+TELEGRAM_SECRET_TOKEN = os.environ.get("TELEGRAM_SECRET_TOKEN", "").strip().strip("\ufeff")
 DAILY_APPS_SCRIPT_URL = os.environ.get("DAILY_APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 APPS_SCRIPT_URL       = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 SPREADSHEET_ID        = os.environ.get("SPREADSHEET_ID", "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8").strip().strip("\ufeff")
@@ -1291,13 +1303,17 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
+    # ── CLASSIFY QUERY VIA SSOT SEARCH ENGINE ─────────────────────────────────
+    classified = classify_query(text) if classify_query else None
+    action = classified.get("action") if classified else None
+    code = classified.get("code") if classified else None
+
     # ── 1. KEY "CLEAR": CLEAR TNIxxxx / /clear TNIxxxx — tra cứu Lịch sử Clear Site ──────────────
-    clear_match = re.search(r"^\s*(?:/clear|clear)[:\s]+\s*(TNI[A-Z0-9_]+)", text.strip(), re.IGNORECASE)
-    if clear_match:
-        tni = clear_match.group(1).upper()
-        if is_duplicate_search(chat_id, user_id, f"CLEAR:{tni}"):
+    if action == "CLEAR":
+        tni = code
+        if is_duplicate_search and is_duplicate_search(chat_id, user_id, f"CLEAR:{tni}"):
             return
-        logger.info(f"Clear site lookup: {tni} | chat={chat_id}")
+        logger.info(f"[SSOT Router] Clear site lookup: {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, f"CLEAR {tni}")
         try:
             message = lookup_clear_site(tni)
@@ -1308,16 +1324,12 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
-    # ── 2. KEY "INFO" & "TNI" SEARCH: Khóa kích hoạt nghiêm ngặt 100% ───────────────
-    text_clean = text.strip()
-
-    # Rule 1: Lệnh "Info: TNIxxxx" hoặc "/info TNIxxxx" — Khớp CHÍNH XÁC từ bắt đầu đến kết thúc (Không chứa thêm lời thoại)
-    info_match = re.match(r"^\s*(?:/info|info)[:\s]+\s*(TNI\d{4}(?:_\d+)?)\s*$", text_clean, re.IGNORECASE)
-    if info_match:
-        tni = info_match.group(1).upper()
-        if is_duplicate_search(chat_id, user_id, f"INFO:{tni}"):
+    # ── 2. KEY "INFO" SEARCH: /info TNIxxxx hoặc info: TNIxxxx ─────────────────────
+    if action == "INFO":
+        tni = code
+        if is_duplicate_search and is_duplicate_search(chat_id, user_id, f"INFO:{tni}"):
             return
-        logger.info(f"Unified Info lookup: {tni} | chat={chat_id}")
+        logger.info(f"[SSOT Router] Unified Info lookup: {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, f"Info:{tni}")
         try:
             result = perform_unified_tni_search(tni, full_info=True)   # Info: → Site+Cable+DIA only
@@ -1328,14 +1340,12 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Lookup error: {html.escape(str(err))}")
         return
 
-    # Rule 2: Lệnh tra cứu trạm "TNIxxxx" hoặc "TNIxxxx_01" hoặc "/tni TNIxxxx" hoặc "/find TNIxxxx"
-    # CHỈ SEARCH khi tin nhắn đúng độ dài mã trạm (TNI0394, TNI0394_01) — NẾU DÀI HƠN LÀ LỜI THOẠI / TRAO ĐỔI CÔNG VIỆC THÌ BỎ QUA KHÔNG SEARCH!
-    tni_match = re.match(r"^\s*(?:/tni|/find|tni)?[:\s]*\b(TNI\d{4}(?:_\d+)?)\s*$", text_clean, re.IGNORECASE)
-    if tni_match:
-        tni = tni_match.group(1).upper()
-        if is_duplicate_search(chat_id, user_id, f"TNI:{tni}"):
+    # ── 3. KEY "TNI" SEARCH: TNIxxxx / TNIxxxx_01 / /tni TNIxxxx ───────────────────
+    if action == "TNI":
+        tni = code
+        if is_duplicate_search and is_duplicate_search(chat_id, user_id, f"TNI:{tni}"):
             return
-        logger.info(f"Unified TNI lookup: {tni} | chat={chat_id}")
+        logger.info(f"[SSOT Router] Unified TNI lookup: {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, tni)
         try:
             result = perform_unified_tni_search(tni, full_info=False)  # TNI0122 → Task+WO only
@@ -1366,8 +1376,24 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", 0))
-            raw    = self.rfile.read(length)
-            data   = json.loads(raw)
+            if length > 2 * 1024 * 1024:  # 2MB Limit protection
+                logger.warning("Rejected POST request: Payload size exceeds 2MB limit.")
+                self.send_response(413)
+                self.end_headers()
+                self.wfile.write(b'{"error":"Payload Too Large"}')
+                return
+
+            if TELEGRAM_SECRET_TOKEN:
+                secret_header = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+                if secret_header != TELEGRAM_SECRET_TOKEN:
+                    logger.warning("Rejected POST request: Secret token mismatch.")
+                    self.send_response(403)
+                    self.end_headers()
+                    self.wfile.write(b'{"error":"Forbidden"}')
+                    return
+
+            raw  = self.rfile.read(length)
+            data = json.loads(raw)
 
             # ── Xử lý submit_plan (đồng bộ, cần response body) ──
             action = data.get("action")
