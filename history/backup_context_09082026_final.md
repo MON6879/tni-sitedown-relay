@@ -173,6 +173,8 @@
 ## 📋 Cập Nhật Định Dạng Mẫu Daily Result (Loại Bỏ Số Thứ Tự) (09/08/2026)
 - **Yêu cầu người dùng:** Bỏ các con số `1. `, `2. `, `3. `... ở đầu mỗi trường thông tin của mẫu `Daily result` để giao diện đơn giản, dễ chọn copy text.
 - **Đã cập nhật:**
+  - `api/search_bot.py`: Sửa dứt điểm lỗi tra cứu `Clear TNIxxxx` (như `Clear TNI0061` / `Clear TNI0035`): bổ sung `SD_SPREADSHEET_ID` (`1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow`) để `lookup_clear_site()` tải chuẩn dữ liệu từ tab `Search Site Clear` của bảng tính TNI SITE DOWN. Tự động quét 5 hàng tiêu đề đầu tiên để tìm đúng cột mã trạm và bổ sung `is_duplicate_search()` chống lặp kết quả.
+  - `tni-search-cf/src/worker.js`: Đồng bộ 100% `lookupClearSite()` quét 5 hàng tiêu đề đầu tiên.
   - `api/refuel_collector.py`: Khắc phục dứt điểm sự cố Refuel Bot không trả lời tin nhắn: cập nhật `REFUEL_PLAN_GAS_URL` sang deployment Apps Script mới nhất (`AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w`) và nâng cấp hàm `post_gas()` xử lý thành công mọi dạng phản hồi (`OK`/HTML/JSON) từ Apps Script để lập tức bắn tin nhắn trả lời xác nhận kèm tag `@PaingAung` lên nhóm.
   - `tni_site_down_repo/daily_read_report.py`: Bổ sung gọi hàm `delete_by_title_telethon()` trước khi gửi bản tin Báo cáo 6 (`📋 6. Report — Daily Note Read Report`). Tự động quét lịch sử nhóm và xóa sạch 100% tất cả bản tin Báo cáo 6 cũ trước khi đăng bản tin mới (lên lịch gửi lúc **20:30 PM MMT** hàng ngày).
   - `tni_site_down_repo/delete_old_helper.py`: Nâng cấp hàm `delete_by_title_telethon()` hỗ trợ Telethon direct delete fallback khi xóa tin cũ theo tiêu đề.

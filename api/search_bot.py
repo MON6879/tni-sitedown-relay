@@ -23,9 +23,14 @@ TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufe
 DAILY_APPS_SCRIPT_URL = os.environ.get("DAILY_APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 APPS_SCRIPT_URL       = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 SPREADSHEET_ID        = os.environ.get("SPREADSHEET_ID", "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8").strip().strip("\ufeff")
+SD_SPREADSHEET_ID     = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow"
 BASE_URL              = (
     f"https://docs.google.com/spreadsheets/d/"
     f"{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid="
+)
+SD_BASE_URL           = (
+    f"https://docs.google.com/spreadsheets/d/"
+    f"{SD_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid="
 )
 GID_SITE       = "1095689918"
 GID_TASK       = "1755404595"
@@ -43,13 +48,20 @@ TG_API   = f"https://api.telegram.org/bot{TOKEN if TOKEN else 'MISSING'}"
 # ── Daily fields cache ─────────────────────────────────────────────────────────
 DAILY_FIELDS_DEFAULT = [
     "Daily report",
-    "Transportation Used", "Full Name", "Detail WO", "Detail task",
-    "Name Site rescue", "Name Cell rescue", "Resuce Cable",
+    "Transportation Used",
+    "Full Name",
+    "Detail WO",
+    "Detail task",
+    "Name Site rescue",
+    "Name Cell rescue",
+    "Resuce Cable",
     "Name and detail Site repair alarm",
-    "Name Site follow partner refuel", "Other task",
+    "Name Site follow partner refuel",
+    "Other task",
     "Name and detail Site go busines trip start go",
     "Name and detail Site go busines trip end go",
-    "Km moto bike start", "Km moto bike the end",
+    "Km moto bike start",
+    "Km moto bike the end",
 ]
 DAILY_FIELDS_TTL = 600
 _daily_fields: list = []
@@ -337,12 +349,13 @@ _tni_team_sum_index = {}
 _index_last_built = 0.0
 _index_building = False
 
-def fetch_single_csv(gid: str) -> pd.DataFrame | None:
-    # Cache check — tránh fetch 2 lần (load_all_sheets + build_search_indexes)
-    cached = _csv_cache.get(gid)
-    if cached is not None and (time.time() - _csv_cache_ts.get(gid, 0)) < CSV_CACHE_TTL:
+def fetch_single_csv(gid: str, is_sd: bool = False) -> pd.DataFrame | None:
+    cache_key = f"{'sd_' if is_sd else ''}{gid}"
+    cached = _csv_cache.get(cache_key)
+    if cached is not None and (time.time() - _csv_cache_ts.get(cache_key, 0)) < CSV_CACHE_TTL:
         return cached
-    url = BASE_URL + str(gid)
+    base = SD_BASE_URL if is_sd else BASE_URL
+    url = base + str(gid)
     hdrs = {"User-Agent": "Mozilla/5.0"}
     for attempt in range(1, 3):
         try:
@@ -350,14 +363,14 @@ def fetch_single_csv(gid: str) -> pd.DataFrame | None:
             resp.raise_for_status()
             content = resp.content.decode("utf-8", errors="replace")
             df = pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
-            _csv_cache[gid] = df
-            _csv_cache_ts[gid] = time.time()
+            _csv_cache[cache_key] = df
+            _csv_cache_ts[cache_key] = time.time()
             return df
         except Exception as ex:
             logger.warning(f"fetch_single_csv retry {attempt}/2 [gid={gid}]: {ex}")
             if attempt < 2:
                 time.sleep(0.5)
-    return _csv_cache.get(gid)
+    return _csv_cache.get(cache_key)
 
 def safe(row, idx: int) -> str:
     if idx < len(row):
@@ -865,16 +878,20 @@ def lookup_clear_site(tni: str) -> str:
     """Tra cứu Lịch sử Clear Site từ tab Search Site Clear (GID_SITE_CLEAR)."""
     tni_u = tni.upper()
     try:
-        df = fetch_single_csv(GID_SITE_CLEAR)
+        df = fetch_single_csv(GID_SITE_CLEAR, is_sd=True)
         if df is None or df.empty or len(df) < 4:
             return f"❌ Search Site Clear sheet missing or empty."
 
-        row3 = df.iloc[3]
         col_idx = -1
-        for col in range(1, len(row3)):
-            val = str(row3.iloc[col]).strip().upper()
-            if val == tni_u:
-                col_idx = col
+        # Tìm cột chứa mã trạm trong các hàng tiêu đề (hàng 0, 1, 2, 3, 4)
+        for r_idx in range(min(5, len(df))):
+            row = df.iloc[r_idx]
+            for col in range(1, len(row)):
+                val = str(row.iloc[col]).strip().upper()
+                if val == tni_u:
+                    col_idx = col
+                    break
+            if col_idx >= 0:
                 break
 
         if col_idx < 0:
@@ -1278,6 +1295,8 @@ def handle(update: dict) -> None:
     clear_match = re.search(r"^\s*(?:/clear|clear)[:\s]+\s*(TNI[A-Z0-9_]+)", text.strip(), re.IGNORECASE)
     if clear_match:
         tni = clear_match.group(1).upper()
+        if is_duplicate_search(chat_id, user_id, f"CLEAR:{tni}"):
+            return
         logger.info(f"Clear site lookup: {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, f"CLEAR {tni}")
         try:
