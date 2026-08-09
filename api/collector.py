@@ -19,12 +19,20 @@ logger = logging.getLogger(__name__)
 COLLECTOR_BOT_TOKEN   = os.environ.get("COLLECTOR_BOT_TOKEN", "").strip().strip("\ufeff")
 APPS_SCRIPT_URL        = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 CABLE_APPS_SCRIPT_URL  = os.environ.get("CABLE_APPS_SCRIPT_URL", "").strip().lstrip('\ufeff')
+
+MAIN_GAS_FALLBACK = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+if not APPS_SCRIPT_URL or "AKfycbzGFdnE" in APPS_SCRIPT_URL:
+    APPS_SCRIPT_URL = MAIN_GAS_FALLBACK
+
 try:
     CABLE_CHAT_ID = int(os.environ.get("CABLE_CHAT_ID", "-5531350787").strip())
 except ValueError:
     CABLE_CHAT_ID = -5531350787
 
 MDG_APPS_SCRIPT_URL = os.environ.get("MDG_APPS_SCRIPT_URL", "").strip().lstrip('\ufeff')
+if not MDG_APPS_SCRIPT_URL or "AKfycbzGFdnE" in MDG_APPS_SCRIPT_URL:
+    MDG_APPS_SCRIPT_URL = APPS_SCRIPT_URL or MAIN_GAS_FALLBACK
+
 try:
     MDG_CHAT_ID = int(os.environ.get("MDG_CHAT_ID", "-5412512982").strip())
 except ValueError:

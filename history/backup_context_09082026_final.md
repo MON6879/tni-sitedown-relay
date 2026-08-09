@@ -106,4 +106,13 @@
   - Cập nhật toàn bộ các câu lệnh `if:` của các bước `Report 2`, `Reports 1, 2, 3, 4`, `Report 5A`, `Report 6`, `Cable Report`, `Refuel Request`, `Refuel Plan 1` sang `'15 9 * * *'`.
   - Đã chạy kích hoạt trực tiếp `backlog_send.py` và `cron_send.py` thủ công ngay lập tức để gửi đầy đủ các báo cáo 1, 2, 3, 4 chiều nay vào các nhóm Telegram!
 
+---
+
+## 🔧 Sửa lỗi 404 Asset & MDG Collector Apps Script Fallback URL (09/08/2026)
+- **Nguyên nhân:** Biến môi trường fallback cho `APPS_SCRIPT_URL` và `MDG_APPS_SCRIPT_URL` trong `api/collector.py` và `api/search_bot.py` trỏ vào URL cũ `AKfycbzGFdnE...` (bị Google lưu trữ/xóa 404) dẫn tới lỗi `404 Client Error: Not Found` khi nhân viên gửi báo cáo MDG / Inventory trong nhóm Telegram `6. TNI COLLECT MDG RUN`.
+- **Khắc phục:**
+  - Cập nhật tự động chuyển hướng `APPS_SCRIPT_URL` và `MDG_APPS_SCRIPT_URL` về Web App URL đang hoạt động của Main Apps Script: `https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec` (Version `@302`).
+  - Đã test ghi nhận báo cáo MDG trực tiếp qua `post_mdg_sheet` thành công 100% (`status: ok`, `ref: 00043`).
+
+
 

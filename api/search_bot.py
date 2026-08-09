@@ -799,7 +799,7 @@ def parse_plan_fields(text: str, chat_id: int | None = None, chat_title: str | N
 
 
 def store_daily_plan_to_sheet(date_str: str, team_str: str, content: str) -> dict:
-    url = DAILY_APPS_SCRIPT_URL or APPS_SCRIPT_URL or "https://script.google.com/macros/s/AKfycbzGFdnESGcSMt0Of7PrBIOHDXmuLCZsiraGv5iNzWrw4rjdxm8CGBDuVIP8pnPEkAULww/exec"
+    url = DAILY_APPS_SCRIPT_URL or APPS_SCRIPT_URL or "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
     try:
         r = requests.post(url, json={
             "action": "store_daily_plan",
