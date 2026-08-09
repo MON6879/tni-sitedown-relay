@@ -1,11 +1,9 @@
-name: Daily Plan Report (Report 5.1)
+name: "[LEGACY - DISABLED] Daily Plan Report (Report 5.1)"
 
+# ⚠️ SCHEDULE DISABLED — Report 5A/5B/5C now run from unified daily_reports.yml
+#    in public repo MON6879/tni-sitedown-relay.
+#    This legacy workflow is kept for manual debug only.
 on:
-  schedule:
-    - cron: '18 23 * * *'  # 05:48 AM Myanmar Time (UTC+6:30) -> 23:18 UTC
-    - cron: '18 9 * * *'   # 15:48 PM Myanmar Time (UTC+6:30) -> 09:18 UTC
-  repository_dispatch:
-    types: [run_daily_report, run_daily_plan_report]
   workflow_dispatch:
     inputs:
       mode:
@@ -31,7 +29,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run daily_plan_report.py (Online 100%)
+      - name: Run daily_plan_report.py (Manual Only)
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}

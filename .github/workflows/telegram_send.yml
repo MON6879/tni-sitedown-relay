@@ -1,11 +1,9 @@
-name: Telegram Daily Send
+name: "[LEGACY - DISABLED] Telegram Daily Send"
 
+# ⚠️ SCHEDULE DISABLED — All reports now run from unified daily_reports.yml
+#    in public repo MON6879/tni-sitedown-relay.
+#    This legacy workflow is kept for manual debug only.
 on:
-  schedule:
-    - cron: '8 23 * * *'   # 05:38 AM Myanmar Time (UTC+6:30) → 23:08 UTC
-    - cron: '8 9 * * *'    # 15:38 PM Myanmar Time (UTC+6:30) → 09:08 UTC
-  repository_dispatch:
-    types: [run_daily_report, run_telegram_send]
   workflow_dispatch:
 
 jobs:
@@ -35,6 +33,6 @@ jobs:
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
         run: |
-          python backlog_send.py || true
+          python backlog_send.py --now || true
           python cron_send.py || true
           python daily_read_report.py || true

@@ -1,10 +1,8 @@
-name: Refuel Plan Report 1 (05:39, 13:29, 21:14 MMT)
+name: "[LEGACY - DISABLED] Refuel Plan Report 1"
 
+# ⚠️ SCHEDULE DISABLED — Refuel reports now run from unified daily_reports.yml
+#    in public repo MON6879/tni-sitedown-relay.
 on:
-  schedule:
-    - cron: '9 23 * * *'   # 05:39 AM Myanmar Time (UTC+6:30) -> 23:09 UTC
-    - cron: '59 6 * * *'   # 13:29 PM Myanmar Time (UTC+6:30) -> 06:59 UTC
-    - cron: '44 14 * * *'  # 21:14 PM Myanmar Time (UTC+6:30) -> 14:44 UTC
   workflow_dispatch:
 
 jobs:
