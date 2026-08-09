@@ -1,8 +1,8 @@
 name: Construction Bot Keep-Alive + Search Cache (5 Mins)
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'  # Every 5 minutes
+  # Disabling 5-min cron to save 2000 free GitHub Actions minutes/month.
+  # Can be triggered manually or via workflow_dispatch.
   workflow_dispatch:
 
 jobs:
