@@ -3,7 +3,7 @@ name: 📊 3. Unified Daily Reports (Reports 1-6, Refuel, Cable)  # last-updated
 on:
   schedule:
     - cron: '15 23 * * *'  # 05:45 Myanmar / 23:15 UTC → Reports 1,2,3,4 Morning
-    - cron: '50 9 * * *'   # 16:20 Myanmar / 09:50 UTC → ALL Reports 1,2,3,4,5A,6 + Cable
+    - cron: '15 9 * * *'   # 15:45 Myanmar / 09:15 UTC → ALL Reports 1,2,3,4,5A,6 + Cable
     - cron: '55 22 * * *'  # 05:25 Myanmar / 22:55 UTC → 5.1 Morning
     - cron: '55 1 * * *'   # 08:25 Myanmar / 01:55 UTC → 5.1 Morning
     - cron: '20 3 * * *'   # 09:50 Myanmar / 03:20 UTC → 5.1 Morning
