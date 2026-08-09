@@ -847,6 +847,7 @@ def send_help_menu(chat_id: int) -> None:
 
 _recent_daily_submits = {}
 _recent_search_keys = {}
+_recent_update_ids = {}
 
 def is_duplicate_search(chat_id: int, user_id: int, query_key: str) -> bool:
     now = time.time()
@@ -953,6 +954,17 @@ def handle(update: dict) -> None:
     user_id    = user.get("id", 0)
     first_name = user.get("first_name", "")
 
+    # 🛑 BỎ QUA TIN NHẮN TRÙNG LẬP THEO UPDATE_ID
+    update_id = update.get("update_id")
+    if update_id:
+        now_ts = time.time()
+        if (now_ts - _recent_update_ids.get(update_id, 0)) < 15.0:
+            logger.info(f"Skipping duplicate update_id {update_id}")
+            return
+        _recent_update_ids[update_id] = now_ts
+        if len(_recent_update_ids) > 1000:
+            _recent_update_ids.clear()
+
     # 🛑 BỎ QUA TIN NHẮN TỪ BOT KHÁC HOẶC BẢN THÂN BOT
     if user.get("is_bot"):
         return
@@ -1032,10 +1044,14 @@ def handle(update: dict) -> None:
             return
 
         elif first_word == "daily":
+            if is_duplicate_search(chat_id, user_id, "DAILY"):
+                return
             send_daily_template(chat_id)
             return
 
         elif first_word in ("plan", "dailyplan"):
+            if is_duplicate_search(chat_id, user_id, f"PLAN:{text}"):
+                return
             team_num = None
             if rest:
                 team_arg = rest.upper()
