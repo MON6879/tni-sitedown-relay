@@ -963,8 +963,31 @@ def parse_plan_date(date_str: str) -> datetime | None:
     return None
 
 
+def deduplicate_plans_by_date(plans: list) -> list:
+    """
+    Tự động khử trùng các bản tin Plan có cùng ngày kế hoạch (plan_date) và cùng team.
+    Chỉ giữ lại duy nhất bản tin gửi mới nhất (latest row / latest timestamp),
+    nhằm tránh việc Team Leader gửi cập nhật kế hoạch bị nhân đôi tin nhắn hoặc sai số liệu thống kê.
+    """
+    if not plans:
+        return []
+    
+    latest_map = {}
+    for p in plans:
+        team = normalize_team(p.get("team", ""))
+        dt = parse_plan_date(p.get("date", ""))
+        if not dt:
+            continue
+        date_str = dt.strftime("%Y-%m-%d")
+        key = (team, date_str)
+        # Giữ bản tin mới nhất cho mỗi cặp (team, date_str)
+        latest_map[key] = p
+        
+    return list(latest_map.values())
+
+
 def build_plan_stats(plans: list, team_filter: str = None) -> dict:
-    """Build plan stats from plan list."""
+    """Build plan stats from plan list (automatically deduplicated by date)."""
     now = myanmar_now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     d1_start = today_start - timedelta(days=1)
@@ -974,7 +997,9 @@ def build_plan_stats(plans: list, team_filter: str = None) -> dict:
 
     stats = {"d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0, "today_plans": []}
 
-    for p in plans:
+    deduped_plans = deduplicate_plans_by_date(plans)
+
+    for p in deduped_plans:
         if team_filter:
             plan_team = normalize_team(p.get("team", ""))
             if plan_team != team_filter:
@@ -1006,10 +1031,11 @@ def build_plan_stats(plans: list, team_filter: str = None) -> dict:
 def find_plans_for_date(plans: list, target_date_str: str, team_filter: str = None) -> list:
     """
     Find all plans whose embedded date matches target_date_str (DD/MM/YYYY).
-    Optionally filter by team.
+    Optionally filter by team. Automatically deduplicated to return the latest plan.
     """
     results = []
-    for p in plans:
+    deduped_plans = deduplicate_plans_by_date(plans)
+    for p in deduped_plans:
         if team_filter:
             plan_team = normalize_team(p.get("team", ""))
             if plan_team != team_filter:
