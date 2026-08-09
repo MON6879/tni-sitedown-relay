@@ -337,13 +337,13 @@ def process_update(update: dict):
             reply_text = (
                 f"📋 <b>Letter Submit</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
                 f"📅 Date: <b>{result.get('date', ts)}</b>\n"
-                f"📢 {mention_tag} Who is assigned to follow monitor?"
+                f"📢 {mention_tag} Who is assigned to follow and monitor ?"
             )
         elif category == "LETTER_APPROVED":
             reply_text = (
                 f"✅ <b>Letter Approved</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
                 f"📅 Date: <b>{result.get('date', ts)}</b>\n"
-                f"📢 {mention_tag} Who is assigned to follow monitor?"
+                f"📢 {mention_tag} Who is assigned to follow and monitor ?"
             )
         else:
             def_id    = result.get("def", "")
@@ -357,7 +357,7 @@ def process_update(update: dict):
             reply_text = (
                 f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
                 f"Done 📅 {ts}\n"
-                f"📢 {mention_tag} Who is assigned to follow monitor?"
+                f"📢 {mention_tag} Who is assigned to follow and monitor ?"
             )
         tg_reply(chat_id, reply_text)
 
