@@ -121,6 +121,12 @@
 - **Quy tắc 2 (Lệnh Info):** Bắt đầu bằng `Info: TNIxxxx` hoặc `info: TNIxxxx` hoặc `/info TNIxxxx` (không chứa thêm văn bản thừa) ➔ Đưa vào tra cứu thông tin Site (`full_info=True`).
 - **Quy tắc 3 (Khóa Dedup Key 10s):** Tạo bộ đệm `is_duplicate_search(chat_id, user_id, query)` chặn 100% các request trùng lặp do Telegram retry hoặc người dùng gõ lặp lại trong 10 giây ➔ **Triệt tiêu lỗi gửi kết quả tìm kiếm lặp lại!**
 
+---
+
+## 📜 CHÍNH THỨC HÓA QUY TẮC 6 BƯỚC "LƯU ĐI" BẮT BUỘC (09/08/2026)
+- **Cập nhật AGENTS.md:** Đã bổ sung chính thức **Bước 5** (Đồng bộ 100% logic liên quan giữa code, workflow, env & docs) và **Bước 6** (Kiểm thử thực tế Live Output Verification) vào Quy tắc LƯU ĐI bắt buộc.
+- **Cam kết tuân thủ:** Mọi thao tác cập nhật hệ thống từ nay về sau BẮT BUỘC phải thực hiện đầy đủ 6 bước LƯU ĐI mà không được bỏ sót bất kỳ bước nào!
+
 
 
 
