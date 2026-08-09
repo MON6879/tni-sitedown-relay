@@ -169,84 +169,32 @@ function doPost(e) {
     }
     logToSheet_("Read " + staffList.length + " staff members from database.");
 
-    let geminiMatches = [];
-    let extractedImageName = "";
-    if (geminiApiKey) {
-      logToSheet_("Calling Gemini API for face matching and OCR...");
-      const geminiResult = identifyFaces_(imageBlob, staffList, geminiApiKey);
-      if (geminiResult) {
-        geminiMatches = geminiResult.matches || [];
-        extractedImageName = geminiResult.imageName || "";
-      }
-      logToSheet_("Gemini result: matches=" + JSON.stringify(geminiMatches) + ", extractedImageName=" + extractedImageName);
-    } else {
-      logToSheet_("No Gemini API Key configured. Skipping AI face recognition.");
-    }
-
-    if (!extractedImageName && msg.caption) {
-      extractedImageName = String(msg.caption).trim();
-    }
-
+    logToSheet_("Face recognition disabled — looking up staff directly by Telegram ID: " + senderId);
     const finalMatches = [];
 
-    // 1) Nếu AI nhận diện được khuôn mặt từ hình đối chiếu ở Cột O:
-    if (geminiMatches && geminiMatches.length > 0) {
-      for (let i = 0; i < geminiMatches.length; i++) {
-        const gMatch = geminiMatches[i];
-        const matchNameRaw = String(gMatch.name || "").trim();
-        if (!matchNameRaw || matchNameRaw.toLowerCase() === "tni" || matchNameRaw.toLowerCase() === "vcm") continue; // Bỏ chữ "TNI" / "VCM"
-
-        const dbStaff = staffList.find(s => 
-          (s.name && s.name.toLowerCase() === matchNameRaw.toLowerCase()) || 
-          (s.fullName && s.fullName.toLowerCase() === matchNameRaw.toLowerCase()) ||
-          (s.telegramId && s.telegramId === String(gMatch.telegramId))
-        );
-        if (dbStaff) {
-          const isAlreadyAdded = finalMatches.some(m => m.name.toLowerCase() === dbStaff.name.toLowerCase());
-          if (!isAlreadyAdded) {
-            finalMatches.push({
-              name: dbStaff.name,
-              fullName: dbStaff.fullName,
-              telegramId: senderId, // Col D luôn ghi ID Telegram người gửi
-              department: dbStaff.department
-            });
-          }
-        } else {
-          finalMatches.push({
-            name: matchNameRaw,
-            fullName: matchNameRaw,
-            telegramId: senderId,
-            department: ""
-          });
-        }
-      }
-    }
-
-    // 2) Dự phòng nếu AI chưa nhận diện được ai trên hình: Chỉ lấy thông tin nhân viên thật, BỎ HẲN TÊN "TNI"
-    if (finalMatches.length === 0) {
-      const senderStaff = staffList.find(s => s.telegramId === senderId && s.name.toLowerCase() !== "tni" && s.name.toLowerCase() !== "vcm");
-      if (senderStaff) {
-        finalMatches.push({
-          name: senderStaff.name,
-          fullName: senderStaff.fullName,
-          telegramId: senderId,
-          department: senderStaff.department
-        });
-      } else {
-        // Nếu tên Telegram người gửi trùng với watermark (TNI, VCM, Branch, Office...) -> để trống
-        const BLOCKED_NAMES = ["tni", "vcm", "office", "branch"];
-        const senderNameLow = senderName ? senderName.toLowerCase().trim() : "";
-        const isSafe = senderNameLow &&
-          !BLOCKED_NAMES.includes(senderNameLow) &&
-          !/^tni\d+/i.test(senderNameLow);
-        const safeName = isSafe ? senderName : "";
-        finalMatches.push({
-          name: safeName,
-          fullName: safeName,
-          telegramId: senderId,
-          department: ""
-        });
-      }
+    // Tra cứu trực tiếp thông tin nhân viên theo Telegram ID (senderId)
+    const senderStaff = staffList.find(s => String(s.telegramId) === String(senderId) && s.name.toLowerCase() !== "tni" && s.name.toLowerCase() !== "vcm");
+    if (senderStaff) {
+      finalMatches.push({
+        name: senderStaff.name,
+        fullName: senderStaff.fullName,
+        telegramId: senderId,
+        department: senderStaff.department
+      });
+    } else {
+      // Nếu chưa đăng ký Telegram ID trong danh sách staff, lấy tên Telegram hiển thị an toàn
+      const BLOCKED_NAMES = ["tni", "vcm", "office", "branch"];
+      const senderNameLow = senderName ? senderName.toLowerCase().trim() : "";
+      const isSafe = senderNameLow &&
+        !BLOCKED_NAMES.includes(senderNameLow) &&
+        !/^tni\d+/i.test(senderNameLow);
+      const safeName = isSafe ? senderName : "";
+      finalMatches.push({
+        name: safeName,
+        fullName: safeName,
+        telegramId: senderId,
+        department: ""
+      });
     }
 
     const attendanceSheet = ss.getSheetByName("List Attendance");
