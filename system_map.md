@@ -66,6 +66,59 @@
 
 ---
 
+### 🗂️ 6. Bản đồ Kiến trúc Repo (Repository Architecture Map):
+
+> [!CAUTION]
+> **AI BẮT BUỘC tra bảng này trước khi push bất kỳ file nào lên GitHub!**
+
+| Repo | Owner / URL | Loại | Chức năng chính | Khi nào push vào đây |
+|---|---|---|---|---|
+| `tni-bot` | `phonghdpxd-cmd/tni-bot` | Private | **Vercel API** (`api/search_bot.py`, `api/collector.py`, `api/refuel_collector.py`, `api/site_down_relay.py`) | Khi sửa bất kỳ file `api/*.py` (Vercel handler) |
+| `TNI-SITE-DOWN` | `phonghdpxd-cmd/TNI-SITE-DOWN` | Public | Public mirror cho `tni_site_down_repo/`, keepalive workflows, docs | Khi sửa `telegram_bot.py`, `botlookup_relay.py`, `keepalive_*.yml`, `docs/` |
+| `tni-sitedown-relay` | `MON6879/tni-sitedown-relay` | Public | **GitHub Actions CHÍNH**: `daily_reports.yml` (reports 1-6, refuel, plan, read) | Khi sửa `daily_reports.yml`, `cron_send.py`, `daily_read_report.py`, `daily_plan_report.py`, `refuel_plan_report.py`, `backlog_send.py` |
+
+> ⚠️ **NGUYÊN TẮC PHÂN CHIA:** Vercel API = `phonghdpxd-cmd/tni-bot`. GitHub Actions Reports = `MON6879/tni-sitedown-relay`. Mirror + Tools = `phonghdpxd-cmd/TNI-SITE-DOWN`.
+
+---
+
+### 📦 7. Registry Phiên bản Apps Script đang Live (Apps Script Version Registry):
+
+> [!IMPORTANT]
+> **Không bao giờ dùng URL Apps Script cũ đã hết hạn/404. Tra bảng này để lấy đúng URL đang hoạt động.**
+
+| Script | Phiên bản Live | Deployment ID (Prefix) | Spreadsheet / Project | Fallback var trong Python |
+|---|---|---|---|---|
+| **Main GAS Collector** | `@302` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` | `Team All Find - Sum WO` (`1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8`) | `MAIN_GAS_FALLBACK` |
+| **Refuel GAS** | `@71` | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` | `TNI_Refuel` (`1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM`) | `REFUEL_PLAN_GAS_URL` |
+| **Site Down GAS** | `@latest` | `AKfycbxVi0BGDW7B_KBxcSEdw3yuHB9Rs2BemQEYeKDwsybJQdmQv-_0HqyGHjpZI6jupxll` | `TNI SITE DOWN` (standalone) | `SD_APPS_SCRIPT_URL` (secret) |
+| **Construction Keepalive GAS** | `@latest` | `AKfycbHraNPzUGVRNGvy-7_q4NyTiJSRUvlodCIjiJZJ00PaNMen-MpVjb4YTmyVex00mn6xQ` | `13_TNI_CONSTRUCTION.gs` | `keepalive_construction.yml` |
+| **Attendance Bot GAS** | `@41` | `AKfycbxoM2KgWFJ4pXaYYdE7bAelngrpVD335D1a9y6Ryusr7Wh7xEwTOG4rfpPTC7K_ZMaqlg` | `TNI attendance.js` | Direct deploy (Clasp) |
+
+---
+
+### 🔀 8. Thứ tự Ưu tiên Handler Search Bot (Handler Priority Order in `api/search_bot.py`):
+
+> [!IMPORTANT]
+> **AI phải hiểu rõ thứ tự này để không thêm handler ở sai vị trí gây xung đột routing.**
+
+```
+Thứ tự xử lý từ cao xuống thấp (first-match wins):
+─────────────────────────────────────────────────
+1. update_id dedup check        → RETURN 200 ngay (chống Telegram retry)
+2. info_match                   → regex: ^info[:\s]+TNI\d{4}  → lookup_site_info()
+3. clear_match                  → regex: ^clear\s+TNI\d{4}    → lookup_clear_site()
+4. tni_match (EXACT LENGTH)     → regex: ^TNI\d{4}(_\d+)?$    → lookup_tni()
+5. notclose / waitcd            → /t1notclose, /t2waitcd, ...  → lookup_notclose()
+6. mydata / mysite / mydia      → admin lookup by Telegram ID  → get_staff_data()
+7. daily / plan / refuel        → template commands            → cmd_daily()
+8. Không khớp gì               → BỎ QUA (KHÔNG REPLY)
+─────────────────────────────────────────────────
+QUY TẮC VÀNG: Tin nhắn có TEXT DÀI HƠN mã trạm (TNI0394 440L, door open...)
+→ tni_match sẽ KHÔNG match (regex dùng $ anchor) → tự động bỏ qua, không cần filter riêng
+```
+
+---
+
 ## QUY TẮC LÀM VIỆC BẮT BUỘC & KHI NÓI "LƯU ĐI"
 
 > [!CAUTION]
@@ -107,6 +160,16 @@ AI phai tuan thu TUYET DOI - khong co ngoai le:
 ### 5. BAO CAO LOI THANH THAT
 - Loi do AI gay ra: thua nhan ngay, khong giai thich vong vo
 - Giai thich ro: loi o dau, tai sao, fix the nao
+
+### 6. QUY TAC ALWAYS-TWIN SYNC (Chong Sync Gap — Nguon goc #1 cua loi lap lai)
+> [!CAUTION]
+> **BAT BUOC: Bat ky logic nao ton tai o ca 2 file sau day PHAI duoc sua CUNG LUC, CUNG 1 COMMIT:**
+> - `api/search_bot.py` ↔ `tni_site_down_repo/telegram_bot.py`
+> - `.github/workflows/daily_reports.yml` (header cron) ↔ Tung step `if:` condition trong cung file
+> - `api/search_bot.py` regex ↔ `tni-search-cf/src/worker.js` regex
+>
+> **KHONG BAOGIO sua 1 file roi bo qua file kia. Neu quen = loi se lap lai!**
+> Sau moi lan sua, GREP ca 3 file noi tren de kiem tra da dong bo chua.
 
 ---
 
