@@ -146,14 +146,51 @@ function handleDailyAdd(body) {
   // Lấy header hàng 1 để map đúng cột
   const headers = sheet.getRange(1, COL_DATA_START, 1, NUM_DATA_COLS).getValues()[0];
 
-  // Build dataRow theo thứ tự header
-  const dataRow = headers.map(h => {
-    const key = String(h || "").trim();
-    if (!key) return "";
+  // Smart key alias mapping for Daily Report columns C..P (indices 0..13)
+  const KEY_ALIASES = [
+    ["daily result", "daily report", "date"],                                       // C: Daily Result
+    ["full name", "name", "ft name"],                                               // D: Full Name
+    ["transportation used", "transportation"],                                      // E: Transportation Used
+    ["site down", "site rescue", "rescue site down", "hot task rescue site down"],  // F: I. Hot task rescue Site down >24
+    ["cell rescue", "hot task cell rescue"],                                        // G: II Hot task Cell rescue
+    ["dg abnormal", "dg abnomal", "site repair alarm", "cable", "rescue cable"],     // H: III. Hot task Repair DG abnomal
+    ["dg run", "run>16h", "run >16h", "follow partner refuel"],                    // I: IV. Hot task Repair DG run>16H
+    ["other task", "hot task other"],                                               // J: V. Hot task other
+    ["detail wo", "wo"],                                                            // K: VII. Detail WO
+    ["detail task", "task"],                                                        // L: VII. Detail task
+    ["busines trip start", "start go"],                                             // M: Trip start
+    ["busines trip end", "end go"],                                                 // N: Trip end
+    ["km moto bike start", "km start"],                                             // O: Km start
+    ["km moto bike the end", "km end"]                                              // P: Km end
+  ];
+
+  // Helper: clean text for key matching (bỏ dấu 1., 2., I., VII. và khoảng trắng)
+  const cleanK = str => String(str || "").toLowerCase().replace(/^[\d\w\.\s]+::?/, "").replace(/^[0-9ivx]+\.\s*/i, "").trim();
+
+  // Build dataRow theo thứ tự header C..P
+  const dataRow = headers.map((h, idx) => {
+    const colHeaderClean = cleanK(h);
+    const colAliases     = KEY_ALIASES[idx] || [colHeaderClean];
+
+    // 1. Thử tìm giá trị trong fields khớp với bất kỳ alias nào của cột này
     for (const [k, v] of Object.entries(fields)) {
-      if (k.toLowerCase().includes(key.toLowerCase()) ||
-          key.toLowerCase().includes(k.toLowerCase())) {
-        return v || "";
+      const fieldKeyClean = cleanK(k);
+      const valStr        = String(v || "").trim();
+      if (!valStr) continue;
+
+      // Khớp alias hoăc khớp substring giữa header và field key
+      if (colAliases.some(alias => fieldKeyClean.includes(alias) || alias.includes(fieldKeyClean))) {
+        return valStr;
+      }
+    }
+
+    // 2. Fallback: So sánh trực tiếp k vs header
+    for (const [k, v] of Object.entries(fields)) {
+      const fieldKeyClean = cleanK(k);
+      const valStr        = String(v || "").trim();
+      if (!valStr) continue;
+      if (fieldKeyClean && (fieldKeyClean.includes(colHeaderClean) || colHeaderClean.includes(fieldKeyClean))) {
+        return valStr;
       }
     }
     return "";
