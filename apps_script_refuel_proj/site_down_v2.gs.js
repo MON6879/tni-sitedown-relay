@@ -94,8 +94,13 @@ function doPost(e) {
       return handleTelegramWebhook_(data);
     }
 
-    // ── Relay POST từ botlookup_relay.py (có action field) ──
+    // ── Relay POST (có action field) ──
     const action = data.action || "";
+
+    // Chuyển tiếp các tác vụ Refuel sang handler doPostRefuelPlan_ trong apps_script_refuel_plan.js
+    if (action === "collect_message" || action === "collect_photo" || action === "get_msg_id" || action === "set_msg_id" || action === "get_refuel_data") {
+      return doPostRefuelPlan_(e);
+    }
 
     if (action === "store_site_down") {
       // Ghi text từ botlookup_relay vào Col A (mỗi dòng = 1 ô)

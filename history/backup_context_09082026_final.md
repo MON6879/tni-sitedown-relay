@@ -88,3 +88,13 @@
 | **Site Down Relay** | `@tni_site_down_bot` | `https://tni-bot.vercel.app/api/site_down_relay` | `botlookup_relay.py` |
 | **Attendance Bot** | `@TNIATTENDANCE_BOT` | Apps Script Cloud (Version @41) | `apps_script_attendance/TNI attendance.js` |
 | **Construction Bot** | `@8903841312` (`10 TNI_SITE`) | Apps Script Web App Endpoint | `13_TNI_CONSTRUCTION.gs` |
+
+---
+
+## ⚡ Nâng cấp Smart Refuel Plan Parser (09/08/2026)
+- **Tự động bóc tách thông minh:**
+  - **Tên Đội (Team):** Nhận diện tất cả các dạng dính chữ/khoảng trắng/gạch nối/chữ hoa/chữ thường: `team02`, `Team03`, `Team-2`, `Team 2`, `TEAM 1`, `Team X`, `Aung Naing Refuel Team 2` → Chuẩn hóa thành `Team 2`, `Team 3`, v.v.
+  - **Ngày (Date):** Nhận diện linh hoạt dạng `dd/mm/yyyy`, `d/m/yyyy`, `dd.mm.yyyy`, `d.m.yyyy`, `dd-mm-yyyy` (ví dụ: `9/8/2026`, `10.08.2026`) → Chuẩn hóa thành `09/08/2026`, `10/08/2026`.
+  - **Cặp Trạm & Số lít (Site & Liters):** Bóc tách linh hoạt các trạm `TNIxxxx` và số lít đi kèm bất kể khoảng cách, dấu hai chấm, dấu gạch ngang, dấu cộng, chữ L hay lit/lít (`TNI0381 440L`, `TNI0008 220L`, `TNI0015: 440 L`, `TNI0099 - 440lit`).
+- **Deploy:** Google Apps Script `apps_script_refuel_proj` Version `@71`.
+
