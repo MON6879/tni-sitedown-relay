@@ -363,9 +363,9 @@ class RefuelData:
         if "Refueled" in wb.sheetnames:
             ws = wb["Refueled"]
             for r in range(2, ws.max_row + 1):
-                date_val = ws.cell(row=r, column=4).value
+                date_val = ws.cell(row=r, column=2).value
                 team_val = ws.cell(row=r, column=5).value  # col E: Team
-                site = ws.cell(row=r, column=6).value
+                site = ws.cell(row=r, column=4).value
                 qty = ws.cell(row=r, column=14).value       # col N: Actual Filled Qty(L)
                 ts = parse_datetime(ws.cell(row=r, column=17).value) or datetime.now(TZ_MM)
                 sender = ws.cell(row=r, column=18).value
