@@ -173,6 +173,7 @@
 ## 📋 Cập Nhật Định Dạng Mẫu Daily Result (Loại Bỏ Số Thứ Tự) (09/08/2026)
 - **Yêu cầu người dùng:** Bỏ các con số `1. `, `2. `, `3. `... ở đầu mỗi trường thông tin của mẫu `Daily result` để giao diện đơn giản, dễ chọn copy text.
 - **Đã cập nhật:**
+  - `tni_site_down_repo/telegram_bot.py`: Bổ sung xử lý `info_match` (cho lệnh `info: TNIxxxx` / `info TNIxxxx`) và thắt chặt regex `tni_match = re.match(r"^\s*(?:/tni|/find|tni)?[:\s]*\b(TNI\d{4}(?:_\d+)?)\s*$", ...)` để khi gõ `info: TNI0061` Bot chỉ trả về thông tin Hạ tầng (Site + Cable + DIA), không bao giờ bị trả nhầm kết quả Công việc (Task + WO).
   - `api/search_bot.py`: Sửa dứt điểm lỗi tra cứu `Clear TNIxxxx` (như `Clear TNI0061` / `Clear TNI0035`): bổ sung `SD_SPREADSHEET_ID` (`1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow`) để `lookup_clear_site()` tải chuẩn dữ liệu từ tab `Search Site Clear` của bảng tính TNI SITE DOWN. Tự động quét 5 hàng tiêu đề đầu tiên để tìm đúng cột mã trạm và bổ sung `is_duplicate_search()` chống lặp kết quả.
   - `tni-search-cf/src/worker.js`: Đồng bộ 100% `lookupClearSite()` quét 5 hàng tiêu đề đầu tiên.
   - `api/refuel_collector.py`: Khắc phục dứt điểm sự cố Refuel Bot không trả lời tin nhắn: cập nhật `REFUEL_PLAN_GAS_URL` sang deployment Apps Script mới nhất (`AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w`) và nâng cấp hàm `post_gas()` xử lý thành công mọi dạng phản hồi (`OK`/HTML/JSON) từ Apps Script để lập tức bắn tin nhắn trả lời xác nhận kèm tag `@PaingAung` lên nhóm.
