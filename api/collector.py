@@ -911,19 +911,20 @@ async def handle(data: dict):
                 date_s = now_mm.strftime("%d/%m/%Y")
                 template_text = (
                     f"Daily result: {date_s}\n"
-                    "1. Full Name:\n"
-                    "2. Transportation Used:\n"
-                    "3. I. Hot task rescue Site down >24:\n"
-                    "4. II Hot task Cell rescue:\n"
-                    "5. III. Hot task Repair DG abnormal:\n"
-                    "6. IV. Hot task Repair DG run>16H:\n"
-                    "7. V. Hot task other:\n"
-                    "8. VII. Detail WO:\n"
-                    "9. VII. Detail task:\n"
-                    "10. Name and detail Site go busines trip start go:\n"
-                    "11. Name and detail Site go busines trip end go:\n"
-                    "12. Km moto bike start:\n"
-                    "13. Km moto bike the end:"
+                    "Transportation Used:\n"
+                    "Full Name:\n"
+                    "Detail WO:\n"
+                    "Detail task:\n"
+                    "Name Site rescue:\n"
+                    "Name Cell rescue:\n"
+                    "Resuce Cable:\n"
+                    "Name and detail Site repair alarm:\n"
+                    "Name Site follow partner refuel:\n"
+                    "Other task:\n"
+                    "Name and detail Site go busines trip start go:\n"
+                    "Name and detail Site go busines trip end go:\n"
+                    "Km moto bike start:\n"
+                    "Km moto bike the end:"
                 )
                 await bot.send_message(
                     chat_id,
