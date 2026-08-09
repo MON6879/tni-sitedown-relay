@@ -6,9 +6,10 @@ Sau đó copy chuỗi đó vào GitHub Secret: TELEGRAM_SESSION
 
 Cách chạy:
     pip install telethon
-    python get_session.py
+    python scratch/get_session.py
 """
 
+import subprocess
 from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 
@@ -23,14 +24,28 @@ print()
 with TelegramClient(StringSession(), API_ID, API_HASH) as client:
     session_str = client.session.save()
 
+# Ghi ra file session_result.txt
+output_file = "session_result.txt"
+with open(output_file, "w", encoding="utf-8") as f:
+    f.write(session_str)
+
+# Tự động copy vào Clipboard (Windows)
+try:
+    subprocess.run(["clip"], input=session_str.encode("utf-8"), check=True)
+    clipboard_msg = "✅ ĐÃ TỰ ĐỘNG COPY VÀO CLIPBOARD (Bạn chỉ cần Ctrl + V để Dán)!"
+except Exception:
+    clipboard_msg = ""
+
 print()
 print("=" * 55)
-print("✅ SESSION STRING CỦA BẠN:")
+print("✅ SESSION STRING CỦA BẠN DƯỚI ĐÂY:")
 print("=" * 55)
 print()
 print(session_str)
 print()
 print("=" * 55)
-print("📋 COPY chuỗi trên và dán vào GitHub Secret:")
-print("   Tên secret: TELEGRAM_SESSION")
+if clipboard_msg:
+    print(clipboard_msg)
+print(f"📁 Chuỗi Session cũng đã được LƯU VÀO FILE: {output_file}")
+print("📋 Bạn có thể mở file session_result.txt để copy dễ dàng!")
 print("=" * 55)

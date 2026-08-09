@@ -70,10 +70,11 @@
 
 ### 8. ⏰ Khắc phục Lịch gửi 15:45 MMT & Tự động Ghim Note cho Report 4b (`cron_send.py` & `daily_reports.yml`)
 - **Chuẩn hóa khung giờ gửi:** Đã sửa lịch cron gửi báo cáo chiều trong `daily_reports.yml` từ `'50 9 * * *'` (16:20 MMT) thành **`'15 9 * * *'`** (đúng **15:45 PM MMT** / 09:15 UTC) tuân thủ tuyệt đối quy định 05:45 AM & 15:45 PM MMT.
-- **Tự động ghim & Bắt buộc phát Note reply dưới tên User `@phongha79`:**
-  - Đã bổ sung điều kiện nhận diện `"4b. Full Report"` trong `cron_send.py` (commit `fac267a`).
-  - `4b. Full Report` được tự động ghim (Pin Note).
-  - **Quy tắc bắt buộc:** Bản tin **Auto-Reply Note** (`control_note`) **BẮT BỘC PHẢI GỬI BẰNG TÀI KHOẢN USER TELETHON `@phongha79`** (commit `2ee3ba3`), không dùng Bot API. Lý do: Telegram API (`GetMessageReadParticipantsRequest`) chỉ hỗ trợ đếm người xem/đọc cho các tin nhắn được phát từ tài khoản User cá nhân. Nhờ đó Report 6 (`daily_read_report.py`) mới thống kê chính xác 100% ai đã đọc báo cáo nhóm.
+- **Loại bỏ bong bóng thông báo ghim tin nhắn hệ thống (Pin Notification Bubble):**
+  - Đã loại bỏ hoàn toàn lệnh `bot.pin_chat_message` trong `cron_send.py` (commit `1859ee8`).
+  - Hệ thống chỉ âm thầm lưu lại `msg_id` của bản tin `4b. Full Report` để tài khoản user `@phongha79` reply bản tin Note trực tiếp bên dưới.
+  - Loại bỏ hoàn toàn dòng thông báo rác hệ thống `2. TNI Auto Report Daily pinned "📓 4b. Full Report..."` hiển thị trên khung chat.
+  - Report 6 (`daily_read_report.py`) vẫn hoạt động và đếm lượt đọc chính xác 100%.
 
 ---
 
