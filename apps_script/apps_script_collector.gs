@@ -2108,7 +2108,12 @@ function handleGetTeamWoStats_() {
 
     const stats = {};
     for (const k of Object.keys(TEAM_LABELS)) {
-      stats[k] = { remain:0, closeMonth:0, fotClose:0, d0:0, d1:0, d2:0, engineers:0 };
+      stats[k] = {
+        remain: 0, closeMonth: 0, fotClose: 0,
+        d0: 0, d1: 0, d2: 0,
+        engineers: 0, waitCD: 0, cdNotYet: 0, closeRate: 0,
+        rankFromText: 0
+      };
     }
 
     // Parse header row 0 for report date range (cells may be Date objects)
@@ -2119,12 +2124,17 @@ function handleGetTeamWoStats_() {
     const hdr0 = fmtCell(raw[0][1]);  // period start e.g. "21/07/2026"
     const hdr1 = fmtCell(raw[0][2]);  // period end   e.g. "20/08/2026"
 
-    // Row 1 = Export time, Row 2 = empty, Rows 3+ = engineer rows
-    // NOTE: GID 133591305 contains both individual engineer rows AND one "Team leader N"
-    // summary row per team (col C = "Team leader 1" etc.).
-    // The summary row has team-TOTAL for closeMonth & fotClose (equal to sum of individuals),
-    // but its WO Remain is ADDITIONAL unassigned sites not in individual rows.
-    // Fix: skip summary row for closeMonth/fotClose/d-day (avoid 2×), include it for remain.
+    // v298: AUTHORITATIVE SOURCE = team leader summary row (col C = "Team leader N").
+    // The leader's WO text carries team-TOTAL for ALL metrics.
+    // Individual engineer rows are only used for engineer headcount.
+    //
+    // Key metrics from team leader text (Team 1 example):
+    //   "Wait CD : /22 + CD Not Yet Close : /39 => Day /19 of the Month = /47 WO Close
+    //    <> 3Day: 2/0/1 <=> /377 WO Remain => /WO /Overdue /FOT /NOT /Close: /151"
+    //   → G (FOT/WO Close) = 47, P (Remain WO) = 377, N (Overdue FOT) = 151,
+    //     A (CD Not Yet Close) = 39, Wait CD = 22
+    //   → Total WO = G + P = 47 + 377 = 424
+
     for (let i = 3; i < raw.length; i++) {
       const teamRaw  = String(raw[i][0] || "").trim();
       const username = String(raw[i][2] || "").trim();
@@ -2145,21 +2155,35 @@ function handleGetTeamWoStats_() {
         const m = woText.match(pattern);
         return m ? parseInt(m[1], 10) : 0;
       }
+      function giAll(re) {
+        // Sum ALL occurrences (handles T2 "Sub" sub-section)
+        let total = 0, m;
+        const g = new RegExp(re.source, "g");
+        while ((m = g.exec(woText)) !== null) total += parseInt(m[1], 10);
+        return total;
+      }
 
-      // Remain: sum ALL rows (individual + team leader summary)
-      s.remain += gi(/\/(\d+) WO Remain/);
-
-      // closeMonth, fotClose, 3-day: ONLY from individual engineer rows (not the summary row)
-      if (!isLeaderSummary) {
-        s.engineers++;
-        s.closeMonth += gi(/Day \/\d+ of the month= \/(\d+) WO Close/);
-        s.fotClose   += gi(/\/WO \/Overdue \/FOT \/NOT \/Close: \/(\d+)/);
-        const m3 = woText.match(/3Day: (\d+) \/(\d+) \/(\d+)/);
-        if (m3) {
+      if (isLeaderSummary) {
+        // Read ALL team metrics from this authoritative summary row
+        s.closeMonth = giAll(/\/(\d+) WO Close/);
+        s.remain     = giAll(/\/(\d+) WO Remain/);
+        s.fotClose   = gi(/\/WO \/Overdue \/FOT \/NOT \/Close: \/(\d+)/);
+        s.waitCD     = gi(/Wait CD : \/(\d+)/);
+        s.cdNotYet   = gi(/CD Not Yet Close : \/(\d+)/);
+        const rm = woText.match(/Close: \/(\d+(?:\.\d+)?)%/);
+        s.closeRate  = rm ? parseFloat(rm[1]) : 0;
+        s.rankFromText = gi(/Rank: \/(\d+)/);
+        // 3-day close: sum all "3Day: D2 /D1 /D0" occurrences (includes Sub sections)
+        const re3 = /3Day: (\d+) \/(\d+) \/(\d+)/g;
+        let m3;
+        while ((m3 = re3.exec(woText)) !== null) {
           s.d2 += parseInt(m3[1], 10);
           s.d1 += parseInt(m3[2], 10);
           s.d0 += parseInt(m3[3], 10);
         }
+      } else {
+        // Individual engineer row: count headcount only
+        s.engineers++;
       }
     }
 
@@ -2181,24 +2205,28 @@ function handleGetTeamWoStats_() {
     const ranks = [];
     for (const k of Object.keys(TEAM_LABELS)) {
       const s = stats[k];
-      const total = s.remain + s.closeMonth;
-      const pct   = total > 0 ? Math.round(s.closeMonth / total * 100) : 0;
-      ranks.push({ k: k, pct: pct });
+      const total = s.closeMonth + s.remain;   // G + P = Total WO
+      // Use close rate from leader text (accurate) if available, else compute
+      const pct = s.closeRate > 0 ? Math.round(s.closeRate) : (total > 0 ? Math.round(s.closeMonth / total * 100) : 0);
+      ranks.push({ k: k, pct: s.closeRate > 0 ? s.closeRate : pct, rankT: s.rankFromText });
       result[k] = {
         name:          TEAM_LABELS[k],
         region:        TEAM_REGIONS[k],
         engineers:     s.engineers,
-        totalAssigned: total,
-        fotClose:      s.fotClose,
-        closeMonth:    s.closeMonth,
-        remain:        s.remain,
+        totalAssigned: total,        // G + P
+        fotClose:      s.closeMonth, // G = WO Close (period)
+        remain:        s.remain,     // P = Remain WO
+        overdueF:      s.fotClose,   // N = Remain Overdue (Overdue FOT not closed)
+        waitCD:        s.waitCD,     // Wait CD
+        cdNotYet:      s.cdNotYet,   // A = CD Not Yet Close
         d0: s.d0, d1: s.d1, d2: s.d2,
         pct:           pct,
-        metTarget:     pct >= 50
+        closeRate:     s.closeRate,
+        metTarget:     s.closeRate >= 50
       };
     }
 
-    // Compute ranks (highest % = rank 1)
+    // Rank by close rate (highest = rank 1); if closeRate from text available use it for accurate sort
     ranks.sort(function(a,b){ return b.pct - a.pct; });
     ranks.forEach(function(r, i) { result[r.k].rank = i + 1; });
 
