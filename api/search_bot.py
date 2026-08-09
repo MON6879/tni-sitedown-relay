@@ -855,6 +855,19 @@ def send_help_menu(chat_id: int) -> None:
         parse_mode="HTML")
 
 _recent_daily_submits = {}
+_recent_search_keys = {}
+
+def is_duplicate_search(chat_id: int, user_id: int, query_key: str) -> bool:
+    now = time.time()
+    dedup = f"{chat_id}:{user_id}:{query_key.upper()}"
+    last_time = _recent_search_keys.get(dedup, 0)
+    if (now - last_time) < 10.0:  # 10s cooldown cho cùng query trong cùng chat
+        logger.info(f"Skipping duplicate search for key {dedup}")
+        return True
+    _recent_search_keys[dedup] = now
+    if len(_recent_search_keys) > 500:
+        _recent_search_keys.clear()
+    return False
 
 def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None:
     now_ts = time.time()
@@ -1233,20 +1246,6 @@ def handle(update: dict) -> None:
             logger.error(f"Clear lookup error [{tni}]: {err}")
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
-
-_recent_search_keys = {}
-
-def is_duplicate_search(chat_id: int, user_id: int, query_key: str) -> bool:
-    now = time.time()
-    dedup = f"{chat_id}:{user_id}:{query_key.upper()}"
-    last_time = _recent_search_keys.get(dedup, 0)
-    if (now - last_time) < 10.0:  # 10s cooldown cho cùng query trong cùng chat
-        logger.info(f"Skipping duplicate search for key {dedup}")
-        return True
-    _recent_search_keys[dedup] = now
-    if len(_recent_search_keys) > 500:
-        _recent_search_keys.clear()
-    return False
 
     # ── 2. KEY "INFO" & "TNI" SEARCH: Khóa kích hoạt nghiêm ngặt 100% ───────────────
     text_clean = text.strip()

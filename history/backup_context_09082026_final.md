@@ -133,6 +133,13 @@
 - **Đã rà soát & cập nhật:** Bổ sung biến kiểm tra & chuyển hướng `MAIN_GAS_FALLBACK` (`AKfycbz-NZlBk8q2...` Version `@302`) cho **TOÀN BỘ** các script Python trong hệ thống (`daily_plan_report.py`, `daily_bod_assign.py`, `cron_send.py`, `backlog_send.py`, `daily_read_report.py`, `api/collector.py`, `api/search_bot.py`).
 - **Triệt tiêu nguy cơ lệch version:** Đảm bảo không bao giờ bị trôi về version cũ hoặc bị thiếu đồng bộ URL như sự cố Asset Collector trước đó.
 
+---
+
+## 🔧 Sửa lỗi Phạm vi Khai báo Hàm `is_duplicate_search` (Search Bot Deployment Fix) (09/08/2026)
+- **Nguyên nhân:** Khai báo hàm `is_duplicate_search` bị nằm nhầm bên trong thân hàm `handle()` làm xuất hiện câu lệnh `return False` sớm, khiến Search Bot thoát hàm trước khi kịp tới khối code tra cứu `TNIXXXX` / `Info: TNIXXXX` (dẫn tới Bot không phản hồi các câu gõ `tni0129` hay `Info: TNI0129`).
+- **Khắc phục:** Đã chuyển `is_duplicate_search` và `_recent_search_keys` ra phạm vi toàn cục (global scope). Đã test trực tiếp `handle({'text': 'TNI0129'})` thành công 100%.
+- **Vercel Deployment:** Code mới đã được deploy trực tiếp lên Vercel (`tni-bot.vercel.app`), Bot đã hoạt động trơn tru ngay lập tức!
+
 
 
 
