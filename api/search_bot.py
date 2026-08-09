@@ -1189,12 +1189,12 @@ def handle(update: dict) -> None:
         if chat_type == "private":
             team_code = team_match.group(1).upper()
             logger.info(f"Team lookup: {team_code} | chat={chat_id}")
-            tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)}</b> data...")
             log_search_bg(first_name or str(user_id), user_id, team_code)
             try:
                 messages = lookup_team(team_code)
-                for msg_txt in messages:
-                    tg_send(chat_id, msg_txt)
+                full_text = f"📋 <b>{team_code} Summary</b> ({len(messages)} items)\n\n" + "\n\n".join(messages)
+                for chunk in split_messages(full_text):
+                    tg_send(chat_id, chunk)
             except Exception as err:
                 logger.error(f"Team lookup error [{team_code}]: {err}")
                 tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
@@ -1205,12 +1205,12 @@ def handle(update: dict) -> None:
     if nc_match:
         team_code = nc_match.group(1).upper()
         logger.info(f"NotClose lookup: {team_code} | chat={chat_id}")
-        tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)} Not Close</b> data...")
         log_search_bg(first_name or str(user_id), user_id, f"{team_code}notclose")
         try:
             messages = lookup_notclose(team_code)
-            for msg_txt in messages:
-                tg_send(chat_id, msg_txt)
+            full_text = f"📑 <b>{team_code} NOT CLOSE</b> ({len(messages)} WOs)\n\n" + "\n\n".join(messages)
+            for chunk in split_messages(full_text):
+                tg_send(chat_id, chunk)
         except Exception as err:
             logger.error(f"NotClose lookup error [{team_code}]: {err}")
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
@@ -1221,12 +1221,12 @@ def handle(update: dict) -> None:
     if wc_match:
         team_code = wc_match.group(1).upper()
         logger.info(f"WaitCD lookup: {team_code} | chat={chat_id}")
-        tg_send(chat_id, f"⏳ Loading <b>{html.escape(team_code)} Wait CD</b> data...")
         log_search_bg(first_name or str(user_id), user_id, f"{team_code}waitcd")
         try:
             messages = lookup_waitcd(team_code)
-            for msg_txt in messages:
-                tg_send(chat_id, msg_txt)
+            full_text = f"⏳ <b>{team_code} WAIT CD</b> ({len(messages)} WOs)\n\n" + "\n\n".join(messages)
+            for chunk in split_messages(full_text):
+                tg_send(chat_id, chunk)
         except Exception as err:
             logger.error(f"WaitCD lookup error [{team_code}]: {err}")
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
@@ -1237,11 +1237,11 @@ def handle(update: dict) -> None:
     if clear_match:
         tni = clear_match.group(1).upper()
         logger.info(f"Clear site lookup: {tni} | chat={chat_id}")
-        tg_send(chat_id, f"⏳ Loading clear data for <b>{html.escape(tni)}</b>...")
         log_search_bg(first_name or str(user_id), user_id, f"CLEAR {tni}")
         try:
             message = lookup_clear_site(tni)
-            tg_send(chat_id, message)
+            for chunk in split_messages(message):
+                tg_send(chat_id, chunk)
         except Exception as err:
             logger.error(f"Clear lookup error [{tni}]: {err}")
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")

@@ -140,6 +140,16 @@
 - **Khắc phục:** Đã chuyển `is_duplicate_search` và `_recent_search_keys` ra phạm vi toàn cục (global scope). Đã test trực tiếp `handle({'text': 'TNI0129'})` thành công 100%.
 - **Vercel Deployment:** Code mới đã được deploy trực tiếp lên Vercel (`tni-bot.vercel.app`), Bot đã hoạt động trơn tru ngay lập tức!
 
+---
+
+## 📦 Gộp Tin Nhắn Kết Quả Tra Cứu Search Bot (Fix Lỗi Nhảy Chat Telegram) (09/08/2026)
+- **Nguyên nhân:** Khi tra cứu danh sách nhiều WO (như `/t1notclose`, `/t2waitcd`, `/t1`), Bot cũ gửi từng WO dưới dạng 1 tin nhắn riêng lẻ (39 WO ➔ gửi 39-40 tin nhắn liên tiếp) làm Telegram phát thông báo nổ liên tục và giao diện chat bị giật/nhảy (pop & jump).
+- **Khắc phục:**
+  - Xóa bỏ các tin nhắn phụ `⏳ Loading...`.
+  - Gộp tất cả các dòng kết quả thành 1 khối văn bản duy nhất có tiêu đề tổng hợp (ví dụ: `📑 T1 NOT CLOSE (39 WOs)`).
+  - Tự động gom tin nhắn vào **1 tin duy nhất** (hoặc tối đa 2 tin nếu độ dài vượt quá 4096 ký tự) nhờ hàm `split_messages()`.
+  - **Kết quả:** 39 WO trước đây gửi 40 tin ➔ Giờ chỉ gửi **đúng 2 tin duy nhất**, giao diện chat vô cùng êm ái, phẳng phiu!
+
 
 
 
