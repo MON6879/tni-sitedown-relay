@@ -34,7 +34,10 @@ from telethon.tl.functions.messages import (
 API_ID         = int(os.environ.get("TELEGRAM_API_ID", "0"))
 API_HASH       = os.environ.get("TELEGRAM_API_HASH", "")
 SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
-GAS_URL        = os.environ.get("APPS_SCRIPT_URL", "")
+MAIN_GAS_FALLBACK = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+GAS_URL = os.environ.get("APPS_SCRIPT_URL", "").strip()
+if not GAS_URL or "AKfycbzGFdnE" in GAS_URL:
+    GAS_URL = MAIN_GAS_FALLBACK
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
