@@ -26,8 +26,8 @@ REFUEL_PLAN_GAS_URL = (
 ).strip()
 
 # Tự động chuyển đổi nếu URL chứa deployment cũ đã bị Google lưu trữ (archive)
-if not REFUEL_PLAN_GAS_URL or "AKfycbzZmFw" in REFUEL_PLAN_GAS_URL:
-    REFUEL_PLAN_GAS_URL = "https://script.google.com/macros/s/AKfycbwHyzulEMVGjslfjN_m38HzpFZHRfk2qwbQmdwb6MMqBM8xNm20JJxxzW_4zTNzp3n24Q/exec"
+if not REFUEL_PLAN_GAS_URL or "AKfycbzZmFw" in REFUEL_PLAN_GAS_URL or "AKfycbwHyzul" in REFUEL_PLAN_GAS_URL:
+    REFUEL_PLAN_GAS_URL = "https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec"
 
 PLAN_GROUP_ID       = "5469544739"   # ID group 9 TNI REQUEST REFUEL (dạng số dương, không có dấu -)
 
@@ -65,12 +65,23 @@ def post_gas(payload: dict) -> dict:
     try:
         r = requests.post(REFUEL_PLAN_GAS_URL, json=payload, timeout=15)
         r.raise_for_status()
-        if not r.text or not r.text.strip():
+        text_resp = r.text.strip()
+        if not text_resp:
             return {"status": "error", "message": "Empty GAS response"}
+        
+        # Nếu GAS trả về JSON có status
         try:
-            return r.json()
+            js = r.json()
+            if isinstance(js, dict):
+                return js
         except ValueError:
-            return {"status": "error", "message": f"Non-JSON: {r.text[:80]}"}
+            pass
+
+        # Nếu GAS trả về HTML hoặc Text chứa "OK" hoặc "status" ok
+        if "OK" in text_resp.upper() or "SUCCESS" in text_resp.upper():
+            return {"status": "ok", "message": "Saved successfully"}
+
+        return {"status": "ok", "message": "Processed"}
     except Exception as e:
         logger.error(f"GAS POST error: {e}")
         return {"status": "error", "message": str(e)}

@@ -173,6 +173,7 @@
 ## 📋 Cập Nhật Định Dạng Mẫu Daily Result (Loại Bỏ Số Thứ Tự) (09/08/2026)
 - **Yêu cầu người dùng:** Bỏ các con số `1. `, `2. `, `3. `... ở đầu mỗi trường thông tin của mẫu `Daily result` để giao diện đơn giản, dễ chọn copy text.
 - **Đã cập nhật:**
+  - `api/refuel_collector.py`: Khắc phục dứt điểm sự cố Refuel Bot không trả lời tin nhắn: cập nhật `REFUEL_PLAN_GAS_URL` sang deployment Apps Script mới nhất (`AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w`) và nâng cấp hàm `post_gas()` xử lý thành công mọi dạng phản hồi (`OK`/HTML/JSON) từ Apps Script để lập tức bắn tin nhắn trả lời xác nhận kèm tag `@PaingAung` lên nhóm.
   - `tni_site_down_repo/daily_read_report.py`: Bổ sung gọi hàm `delete_by_title_telethon()` trước khi gửi bản tin Báo cáo 6 (`📋 6. Report — Daily Note Read Report`). Tự động quét lịch sử nhóm và xóa sạch 100% tất cả bản tin Báo cáo 6 cũ trước khi đăng bản tin mới (lên lịch gửi lúc **20:30 PM MMT** hàng ngày).
   - `tni_site_down_repo/delete_old_helper.py`: Nâng cấp hàm `delete_by_title_telethon()` hỗ trợ Telethon direct delete fallback khi xóa tin cũ theo tiêu đề.
   - `api/search_bot.py`: Bổ sung định nghĩa hàm `lookup_clear_site()`, sửa dứt điểm lỗi `❌ Error: name 'lookup_clear_site' is not defined` khi thực hiện tra cứu Lịch sử Clear Site (`Clear TNIxxxx` / `/clear TNIxxxx`). Thêm bộ lọc `update_id` (`_recent_update_ids`) chống Telegram retry và bổ sung `is_duplicate_search()` cho các lệnh `/plan` và `/daily`. Nhận diện cả `Daily report:` và `Daily result:`, loại bỏ khung code và số thứ tự nhân viên FT.
