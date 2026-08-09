@@ -1234,15 +1234,30 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
         return
 
-    # ── 2. KEY "INFO" & "TNI" SEARCH: Hợp nhất 100% cho Info: TNIxxxx, TNIxxxx, /tni, /info, /find ───────────────
-    text_clean = text.strip()
-    text_l = text_clean.lower()
+_recent_search_keys = {}
 
-    # Kiểm tra xem có lệnh Info: TNIxxxx hoặc /info TNIxxxx hay không
-    info_match = re.search(r"^\s*(?:/info|info)[:\s]+\s*(TNI[A-Z0-9_]+)", text_clean, re.IGNORECASE)
+def is_duplicate_search(chat_id: int, user_id: int, query_key: str) -> bool:
+    now = time.time()
+    dedup = f"{chat_id}:{user_id}:{query_key.upper()}"
+    last_time = _recent_search_keys.get(dedup, 0)
+    if (now - last_time) < 10.0:  # 10s cooldown cho cùng query trong cùng chat
+        logger.info(f"Skipping duplicate search for key {dedup}")
+        return True
+    _recent_search_keys[dedup] = now
+    if len(_recent_search_keys) > 500:
+        _recent_search_keys.clear()
+    return False
+
+    # ── 2. KEY "INFO" & "TNI" SEARCH: Khóa kích hoạt nghiêm ngặt 100% ───────────────
+    text_clean = text.strip()
+
+    # Rule 1: Lệnh "Info: TNIxxxx" hoặc "/info TNIxxxx" — Khớp CHÍNH XÁC từ bắt đầu đến kết thúc (Không chứa thêm lời thoại)
+    info_match = re.match(r"^\s*(?:/info|info)[:\s]+\s*(TNI\d{4}(?:_\d+)?)\s*$", text_clean, re.IGNORECASE)
     if info_match:
         tni = info_match.group(1).upper()
-        logger.info(f"Unified Info/TNI lookup: {tni} | chat={chat_id}")
+        if is_duplicate_search(chat_id, user_id, f"INFO:{tni}"):
+            return
+        logger.info(f"Unified Info lookup: {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, f"Info:{tni}")
         try:
             result = perform_unified_tni_search(tni, full_info=True)   # Info: → Site+Cable+DIA only
@@ -1253,20 +1268,13 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"❌ Lookup error: {html.escape(str(err))}")
         return
 
-    # Kiểm tra lệnh TNIxxxx / /tni TNIxxxx / /find TNIxxxx
-    if text_l.startswith("tni") or text_l.startswith("/tni") or text_l.startswith("/find"):
-        if text_l.startswith("/tni") or text_l.startswith("/find"):
-            parts = text_clean.split(maxsplit=1)
-            if len(parts) > 1:
-                text_clean = parts[1].strip()
-            else:
-                return
-
-        tni_list = re.findall(r"TNI[A-Z0-9_]{4,10}", text_clean, re.IGNORECASE)
-        if not tni_list:
+    # Rule 2: Lệnh tra cứu trạm "TNIxxxx" hoặc "TNIxxxx_01" hoặc "/tni TNIxxxx" hoặc "/find TNIxxxx"
+    # CHỈ SEARCH khi tin nhắn đúng độ dài mã trạm (TNI0394, TNI0394_01) — NẾU DÀI HƠN LÀ LỜI THOẠI / TRAO ĐỔI CÔNG VIỆC THÌ BỎ QUA KHÔNG SEARCH!
+    tni_match = re.match(r"^\s*(?:/tni|/find|tni)?[:\s]*\b(TNI\d{4}(?:_\d+)?)\s*$", text_clean, re.IGNORECASE)
+    if tni_match:
+        tni = tni_match.group(1).upper()
+        if is_duplicate_search(chat_id, user_id, f"TNI:{tni}"):
             return
-
-        tni = tni_list[0].upper()
         logger.info(f"Unified TNI lookup: {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, tni)
         try:
