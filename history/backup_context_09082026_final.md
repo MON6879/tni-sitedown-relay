@@ -68,6 +68,15 @@
 
 ---
 
+### 8. ⏰ Khắc phục Lịch gửi 15:45 MMT & Tự động Ghim Note cho Report 4b (`cron_send.py` & `daily_reports.yml`)
+- **Chuẩn hóa khung giờ gửi:** Đã sửa lịch cron gửi báo cáo chiều trong `daily_reports.yml` từ `'50 9 * * *'` (16:20 MMT) thành **`'15 9 * * *'`** (đúng **15:45 PM MMT** / 09:15 UTC) tuân thủ tuyệt đối quy định 05:45 AM & 15:45 PM MMT.
+- **Tự động ghim & Trả lời Note cho Report 4b:**
+  - Đã bổ sung điều kiện nhận diện `"4b. Full Report"` trong `cron_send.py` (commit `fac267a`).
+  - `4b. Full Report` được tự động ghim (Pin Note) và thu thập `msg_id` để bắn bản tin **Auto-Reply Note** (`control_note`) trực tiếp dưới bản tin 4b.
+  - Đảm bảo Report 6 (`daily_read_report.py`) theo dõi và đếm được chính xác 100% ai đã đọc báo cáo nhóm.
+
+---
+
 ### 📋 Webhook & Registry cố định
 
 | Bot Name | Telegram Username | Webhook / Dispatch Endpoint | Source Location |
