@@ -175,6 +175,7 @@
 - **Đã cập nhật:**
   - `api/search_bot.py`: Bỏ prefix số thứ tự `i.` trong hàm `send_daily_template()`.
   - `api/collector.py`: Bỏ prefix số thứ tự `i.` trong biến `template_text`.
+  - `QLTC_GAS/13_TNI_CONSTRUCTION.gs`: Bỏ thẻ `<code>...</code>` trong hàm `handleTemplateCommand()` và xử lý slash command template của Construction Bot (`@8903841312`).
 
 ---
 
