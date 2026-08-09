@@ -16,6 +16,12 @@
 
 ---
 
+# 📥 STRICT DATA COLLECTION RULE: NEWEST DATA ALWAYS INSERTED AT THE VERY TOP
+
+> ⚠️ **QUY TẮC BẮT BUỘC THU THẬP DỮ LIỆU**: MỌI BỘ THU THẬP THÔNG TIN (MDG REPORT, INVENTORY, REFUEL REQUEST, DAILY REPORT, DAILY PLAN, READ GROUP LOGS, V.V.) KHI GHI VÀO GOOGLE SHEETS BẮT BUỘC PHẢI CHÈN DỮ LIỆU MỚI LÊN ĐẦU BẢNG TÍNH (DÒNG 2, NGAY BÊN DƯỚI HÀNG TIÊU ĐỀ HEADER ROW 1 DÙNG `insertRowsBefore(2, ...)` HOẶC RECORD DÒNG 2). TUYỆT ĐỐI KHÔNG ĐƯỢC NỐI DỮ LIỆU VÀO CUỐI BẢNG TÍNH (`appendRow`) LÀM NGƯỜI DÙNG PHẢI KÉO XUỐNG DƯỚI!
+
+---
+
 ## 📌 1. Bản đồ Webhook Cố Định (Strict Endpoint Registry)
 
 Mọi thao tác cài đặt hoặc khôi phục Webhook Telegram đều phải đối chiếu chính xác 100% với danh sách sau:

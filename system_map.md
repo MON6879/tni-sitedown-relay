@@ -61,6 +61,11 @@
 
 ---
 
+### 📥 5. Quy tắc Thu thập Dữ liệu (Newest Data at Top Standard):
+> Mọi chức năng thu thập dữ liệu (MDG Run, Inventory, Refuel, Daily Report, Daily Plan, Read Group) khi lưu vào Google Sheets **BẮT BUỘC PHẢI CHÈN VÀO DÒNG 2 (NGAY DƯỚI HEADER ROW 1)**. Tuyệt đối không append vào cuối sheet để người dùng mở sheet là thấy ngay dữ liệu mới nhất mà không cần kéo xuống dưới!
+
+---
+
 ## QUY TẮC LÀM VIỆC BẮT BUỘC & KHI NÓI "LƯU ĐI"
 
 > [!CAUTION]

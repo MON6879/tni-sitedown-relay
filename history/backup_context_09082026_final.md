@@ -150,6 +150,13 @@
   - Tự động gom tin nhắn vào **1 tin duy nhất** (hoặc tối đa 2 tin nếu độ dài vượt quá 4096 ký tự) nhờ hàm `split_messages()`.
   - **Kết quả:** 39 WO trước đây gửi 40 tin ➔ Giờ chỉ gửi **đúng 2 tin duy nhất**, giao diện chat vô cùng êm ái, phẳng phiu!
 
+---
+
+## 📥 CHÍNH THỨC HÓA QUY TẮC THU THẬP DỮ LIỆU: LUÔN CHÈN DỮ LIỆU MỚI LÊN ĐẦU (09/08/2026)
+- **Quy tắc hệ thống:** Mọi bộ thu thập dữ liệu (MDG Run, Inventory, Refuel, Daily Report, Daily Plan, Read Group, v.v.) khi ghi vào Google Sheets **BẮT BUỘC PHẢI CHÈN VÀO DÒNG 2 (NGAY DƯỚI HEADER ROW 1)**.
+- **Mục tiêu:** Giúp người dùng khi mở bất kỳ Google Sheet nào lên cũng thấy ngay dữ liệu mới nhất nằm ngay trên cùng mà không cần cuộn xuống tận cùng của Sheet.
+- **Cập nhật Docs:** Đã ghi nhận nguyên tắc này vào [`AGENTS.md`](file:///d:/6.%20AI/1.%20QLTC/AGENTS.md) và [`system_map.md`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/system_map.md).
+
 
 
 
