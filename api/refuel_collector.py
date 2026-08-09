@@ -26,8 +26,8 @@ REFUEL_PLAN_GAS_URL = (
 ).strip()
 
 # Tự động chuyển đổi nếu URL chứa deployment cũ đã bị Google lưu trữ (archive)
-if not REFUEL_PLAN_GAS_URL or "AKfycbzZmFw" in REFUEL_PLAN_GAS_URL or "AKfycbwHyzul" in REFUEL_PLAN_GAS_URL:
-    REFUEL_PLAN_GAS_URL = "https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec"
+if not REFUEL_PLAN_GAS_URL or "AKfycbzZmFw" in REFUEL_PLAN_GAS_URL or "AKfycbwHyzul" in REFUEL_PLAN_GAS_URL or "AKfycbwi3J0" in REFUEL_PLAN_GAS_URL:
+    REFUEL_PLAN_GAS_URL = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
 
 PLAN_GROUP_ID       = "5469544739"   # ID group 9 TNI REQUEST REFUEL (dạng số dương, không có dấu -)
 
@@ -332,7 +332,7 @@ def process_update(update: dict):
     now    = datetime.now(TZ_MM)
     result = post_gas({
         "action":   "collect_message",
-        "group_id": chat_id,
+        "group_id": f"-{norm_chat_id}",
         "text":     text,
         "sender":   sender,
         "sender_id": sender_id,
