@@ -8,7 +8,7 @@ Routing:
 
 Webhook URL: https://tni-bot.vercel.app/api/collector
 """
-import os, re, json, asyncio, logging, requests, html, base64
+import os, re, json, asyncio, logging, requests, html, base64, time
 from http.server import BaseHTTPRequestHandler
 from telegram import Bot, Update
 from datetime import datetime, timezone, timedelta
@@ -51,36 +51,96 @@ CABLE_FIELDS_LIST   = [
     "team name", "wo", "materials list",
 ]
 _keywords_cache = None
+_config_templates_cache = None
+_config_templates_ts = 0
+_last_daily_sync_date = ""
 
-def get_keywords() -> list:
-    """Load keywords from Config sheet col A (text before ':'), cache result."""
-    global _keywords_cache
-    if _keywords_cache is not None:
-        return _keywords_cache
+def fetch_config_templates(force: bool = False) -> dict:
+    """Fetch Column A (A2:A) from 'Config' tab (gid=1236389870) in Google Sheet 1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8.
+    Automatically refreshes at 01:08 AM MMT daily or when cache is >30 minutes old.
+    """
+    global _config_templates_cache, _config_templates_ts, _last_daily_sync_date, _keywords_cache
+    now = time.time()
+    now_mm = datetime.now(TZ_MM)
+    today_str = now_mm.strftime("%Y-%m-%d")
+    
+    # Check if 01:08 AM MMT has passed today and we haven't synced for today yet
+    is_sync_time = (now_mm.hour == 1 and now_mm.minute >= 8) or (now_mm.hour > 1)
+    need_daily_sync = is_sync_time and (_last_daily_sync_date != today_str)
+
+    if not force and not need_daily_sync and _config_templates_cache and (now - _config_templates_ts < 1800):
+        return _config_templates_cache
+
     try:
         url = (
             "https://docs.google.com/spreadsheets/d/"
             "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
-            "/gviz/tq?tqx=out:csv&gid=1236389870&tq=select+A+limit+30"
+            "/gviz/tq?tqx=out:csv&gid=1236389870&tq=select+A"
         )
         resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         import csv, io
         rows = list(csv.reader(io.StringIO(resp.text)))
-        kws = []
-        for row in rows[1:]:  # skip header
+        lines = []
+        mapping = {}
+        keywords = []
+        for row in rows[1:]:  # Skip Header 'Field Name'
             val = (row[0] if row else "").strip()
-            if ":" in val:
-                kw = val.split(":")[0].strip().lower()
-                if kw and kw not in kws:
-                    kws.append(kw)
-        if kws:
-            _keywords_cache = kws
-            logger.info(f"Keywords from Config: {kws}")
-            return kws
+            if val:
+                lines.append(val)
+                if ":" in val:
+                    kw = val.split(":")[0].strip().lower()
+                    mapping[kw] = val
+                    if kw not in keywords:
+                        keywords.append(kw)
+                else:
+                    first_word = val.split()[0].strip().lower()
+                    mapping[first_word] = val
+                    if first_word not in keywords:
+                        keywords.append(first_word)
+        if lines:
+            _config_templates_cache = {"all": lines, "map": mapping}
+            _config_templates_ts = now
+            _keywords_cache = keywords
+            if is_sync_time:
+                _last_daily_sync_date = today_str
+            logger.info(f"Loaded {len(lines)} templates from Config sheet A2:A")
+            return _config_templates_cache
     except Exception as e:
-        logger.warning(f"Config keyword load failed: {e}, using defaults")
-    _keywords_cache = KEYWORDS_DEFAULT
-    return _keywords_cache
+        logger.warning(f"Config templates load failed: {e}")
+
+    if _config_templates_cache:
+        return _config_templates_cache
+    return {"all": [], "map": {}}
+
+def get_keywords() -> list:
+    """Load keywords from Config sheet col A (text before ':'), cache result."""
+    data = fetch_config_templates()
+    if data and data.get("map"):
+        return list(data["map"].keys())
+    return KEYWORDS_DEFAULT
+
+def get_template_text(cmd_name: str) -> str:
+    """Find matching template for command name from Config sheet Column A2:A."""
+    data = fetch_config_templates()
+    lines = data.get("all", [])
+    mapping = data.get("map", {})
+    
+    clean_cmd = cmd_name.lstrip("/").strip().lower()
+    
+    # 1. Exact match in mapping
+    if clean_cmd in mapping:
+        return mapping[clean_cmd]
+        
+    # 2. Match lines starting with command name (e.g. /inventory -> all "Inventory..." lines)
+    matching = [line for line in lines if line.lower().startswith(clean_cmd)]
+    if matching:
+        return "\n".join(matching)
+        
+    # 3. Fallback: all lines if /template or /all
+    if clean_cmd in ("template", "templates", "all", "help"):
+        return "\n".join(lines) if lines else ""
+
+    return ""
 
 
 
@@ -931,63 +991,19 @@ async def handle(data: dict):
                     parse_mode="HTML"
                 )
                 return
-            elif cmd == "/inventory":
-                await bot.send_message(
-                    chat_id,
-                    "Inventory fuel:\n"
-                    "DG ID: TNIXXXX\n"
-                    "Fuel cm: \n"
-                    "Fuel %: \n"
-                    "Fuel level: \n"
-                    "Kwh: \n"
-                    "Rh: \n"
-                    "Note: ",
-                    parse_mode="HTML"
-                )
-                return
-            elif cmd == "/order" and chat_id != MDG_CHAT_ID:
-                await bot.send_message(
-                    chat_id,
-                    "Order: TNIXXXX [Description/Item detail]",
-                    parse_mode="HTML"
-                )
-                return
-            elif cmd == "/revoke" and chat_id != MDG_CHAT_ID:
-                await bot.send_message(
-                    chat_id,
-                    "Revoke: TNIXXXX [Description/Reason]",
-                    parse_mode="HTML"
-                )
-                return
-            elif cmd == "/move" and chat_id != MDG_CHAT_ID:
-                await bot.send_message(
-                    chat_id,
-                    "Move: TNIXXXX [From station A to station B]",
-                    parse_mode="HTML"
-                )
-                return
-            elif cmd == "/export" and chat_id != MDG_CHAT_ID:
-                await bot.send_message(
-                    chat_id,
-                    "Export: TNIXXXX [Detail]",
-                    parse_mode="HTML"
-                )
-                return
-            elif cmd == "/done" and chat_id != MDG_CHAT_ID:
-                await bot.send_message(
-                    chat_id,
-                    "Done: #XXXXX [Action taken]",
-                    parse_mode="HTML"
-                )
-                return
-            elif cmd == "/find" and chat_id != MDG_CHAT_ID:
-                await bot.send_message(
-                    chat_id,
-                    "🔍 <b>How to Search:</b>\n\n"
-                    "Just send the site code (e.g. <code>TNI0001</code>) or staff name directly to the bot to search for tasks, WOs, or site details.",
-                    parse_mode="HTML"
-                )
-                return
+            else:
+                tpl_txt = get_template_text(cmd)
+                if tpl_txt:
+                    await bot.send_message(chat_id, tpl_txt, parse_mode="HTML")
+                    return
+                elif cmd == "/find" and chat_id != MDG_CHAT_ID:
+                    await bot.send_message(
+                        chat_id,
+                        "🔍 <b>How to Search:</b>\n\n"
+                        "Just send the site code (e.g. <code>TNI0001</code>) or staff name directly to the bot to search for tasks, WOs, or site details.",
+                        parse_mode="HTML"
+                    )
+                    return
 
         # ── Done ──────────────────────────────────────────────────────────
         if re.match(r"^done\b", text, re.IGNORECASE):
