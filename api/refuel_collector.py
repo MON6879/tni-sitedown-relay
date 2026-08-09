@@ -309,12 +309,12 @@ def process_update(update: dict):
 
     tl_tag = f"@{sender_user}" if sender_user else f"<a href='tg://user?id={sender_id}'>{sender}</a>"
 
-    # Tự động gán tag Team Leader theo số Team trong báo cáo
+    # Tự động gán tag Team Leader theo số Team trong báo cáo (Chỉ tag Team Leader, bỏ tag người gửi)
     text_u = text.upper()
     if "TEAM 1" in text_u or "TEAM01" in text_u or "TEAM 01" in text_u:
-        mention_tag = f"@PaingAung {tl_tag}" if sender_user != "PaingAung" else tl_tag
+        mention_tag = "@PaingAung"
     elif "TEAM 2" in text_u or "TEAM02" in text_u or "TEAM 02" in text_u:
-        mention_tag = f"@AungNaing {tl_tag}" if sender_user != "AungNaing" else tl_tag
+        mention_tag = "@AungNaing"
     else:
         mention_tag = tl_tag
 
@@ -337,13 +337,13 @@ def process_update(update: dict):
             reply_text = (
                 f"📋 <b>Letter Submit</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
                 f"📅 Date: <b>{result.get('date', ts)}</b>\n"
-                f"📢 {mention_tag} Who is assigned to follow and supervise?"
+                f"📢 {mention_tag} Who is assigned to follow monitor?"
             )
         elif category == "LETTER_APPROVED":
             reply_text = (
                 f"✅ <b>Letter Approved</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
                 f"📅 Date: <b>{result.get('date', ts)}</b>\n"
-                f"📢 {mention_tag} Who is assigned to follow and supervise?"
+                f"📢 {mention_tag} Who is assigned to follow monitor?"
             )
         else:
             def_id    = result.get("def", "")
@@ -357,7 +357,7 @@ def process_update(update: dict):
             reply_text = (
                 f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
                 f"Done 📅 {ts}\n"
-                f"📢 {mention_tag} Who is assigned to follow and supervise?"
+                f"📢 {mention_tag} Who is assigned to follow monitor?"
             )
         tg_reply(chat_id, reply_text)
 

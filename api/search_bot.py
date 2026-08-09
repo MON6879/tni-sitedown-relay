@@ -861,6 +861,40 @@ def is_duplicate_search(chat_id: int, user_id: int, query_key: str) -> bool:
         _recent_search_keys.clear()
     return False
 
+def lookup_clear_site(tni: str) -> str:
+    """Tra cứu Lịch sử Clear Site từ tab Search Site Clear (GID_SITE_CLEAR)."""
+    tni_u = tni.upper()
+    try:
+        df = fetch_single_csv(GID_SITE_CLEAR)
+        if df is None or df.empty or len(df) < 4:
+            return f"❌ Search Site Clear sheet missing or empty."
+
+        row3 = df.iloc[3]
+        col_idx = -1
+        for col in range(1, len(row3)):
+            val = str(row3.iloc[col]).strip().upper()
+            if val == tni_u:
+                col_idx = col
+                break
+
+        if col_idx < 0:
+            return f"❌ Not found <b>{html.escape(tni_u)}</b> in Clear Site sheet."
+
+        lines = [f"🔍 <b>Clear History for {html.escape(tni_u)}</b>", "━━━━━━━━━━━━━━━━━━━━"]
+        for r in range(len(df)):
+            row = df.iloc[r]
+            val = safe(row, col_idx)
+            label = str(row.iloc[0]).strip() if len(row) > 0 else ""
+
+            if not val or val.lower() in ("nan", "-", ""):
+                continue
+            if label and label.lower() != "nan":
+                lines.append(f"• <b>{html.escape(label)}:</b> {html.escape(val)}")
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error(f"lookup_clear_site error [{tni_u}]: {e}")
+        return f"❌ Error loading clear site data: {html.escape(str(e)[:80])}"
+
 def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None:
     now_ts = time.time()
     dedup_key = f"{user_id}:{text.strip()[:60]}"
