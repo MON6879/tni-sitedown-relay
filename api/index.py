@@ -270,8 +270,17 @@ def send_to_sheet(payload):
         return None
 
 
-# ── Core message handler ──────────────────────────────────────────────────
 def handle(data):
+    try:
+        from api.search_bot import handle as search_bot_handle
+        return search_bot_handle(data)
+    except Exception as ex:
+        try:
+            from search_bot import handle as search_bot_handle
+            return search_bot_handle(data)
+        except Exception:
+            logger.error(f"Delegate search_bot_handle failed: {ex}")
+    
     msg = data.get("message") or data.get("edited_message")
     if not msg:
         return
