@@ -132,7 +132,7 @@ async def main():
                 txt = (msg.message or "").lower()
                 if "/down_" in txt or "auto_nocpro_bot" in txt:
                     down_cmds.append(msg)
-                if "auto report nocpro" in txt or "site down (not include" in txt:
+                if "auto report nocpro" in txt or "site down" in txt or "auto-generated report" in txt or "nocpro" in txt:
                     auto_reports.append(msg)
 
             # Lấy 3 lệnh /down_ gần đây nhất trong nhóm
