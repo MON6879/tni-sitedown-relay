@@ -1,4 +1,4 @@
-name: "\U0001F682 5-Min Train — Unified Keepalive + All Reports"
+name: "🚂 5-Min Train — Unified Keepalive + All Reports"
 # ═══════════════════════════════════════════════════════════════
 # 🚂 ĐOÀN TÀU 5 PHÚT — UNIFIED SCHEDULER
 # ═══════════════════════════════════════════════════════════════
@@ -57,7 +57,7 @@ jobs:
       # 4. Main GAS Backend (@302) — giữ Apps Script quota active
       # 5. Auto Copy Paste GAS — giữ active
       # Khi thêm hệ thống mới: thêm 1 dòng curl ở đây (~1s/endpoint, max ~150 endpoints)
-      - name: "\U0001F3E5 Toa 0 — Keepalive Ping All Endpoints"
+      - name: "🏥 Toa 0 — Keepalive Ping All Endpoints"
         run: |
           echo "🚂 Train tick: $(TZ='Asia/Yangon' date '+%Y-%m-%d %H:%M:%S MMT')"
 
@@ -82,7 +82,7 @@ jobs:
       # 🕐 SCHEDULE CHECK — Xác định toa nào cần chạy
       # ═══════════════════════════════════════════════
       # Tolerance: ±2 phút (GitHub Actions cron có thể delay)
-      - name: "\U0001F550 Schedule Check — Determine Active Train Cars"
+      - name: "🕐 Schedule Check — Determine Active Train Cars"
         id: sched
         run: |
           MMT=$(TZ='Asia/Yangon' date '+%H:%M')
@@ -205,7 +205,7 @@ jobs:
       # 🤖 Engine: Bot API (SEND_BOT + REPORT_TASK_BOT + TECHNICAL_DEP_BOT)
       # ⏰ Schedule: 05:48, 15:48 Myanmar
       # ═══════════════════════════════════════════════
-      - name: "\U0001F4CA Toa 1+11 — Reports 1,2,3,4 + BOD Assign"
+      - name: "📊 Toa 1+11 — Reports 1,2,3,4 + BOD Assign"
         if: |
           steps.sched.outputs.r1234 == 'true' ||
           (github.event_name == 'workflow_dispatch' && (
@@ -230,7 +230,7 @@ jobs:
       # 📱 Engine: Telethon + Bot API
       # ⏰ Schedule: 05:58, 15:58 Myanmar
       # ═══════════════════════════════════════════════
-      - name: "\U0001F4CB Toa 3 — Report 5A Plan EOD"
+      - name: "📋 Toa 3 — Report 5A Plan EOD"
         if: |
           steps.sched.outputs.p5a == 'true' ||
           (github.event_name == 'workflow_dispatch' && inputs.report_type == 'Report 5A - Plan EOD')
@@ -247,7 +247,7 @@ jobs:
       # 📱 Engine: Telethon + Bot API
       # ⏰ Schedule: 21:03 Myanmar
       # ═══════════════════════════════════════════════
-      - name: "\U0001F4CB Toa 4 — Report 5B Plan Update"
+      - name: "📋 Toa 4 — Report 5B Plan Update"
         if: |
           steps.sched.outputs.p5b == 'true' ||
           (github.event_name == 'workflow_dispatch' && inputs.report_type == 'Report 5B - Plan Update')
@@ -264,7 +264,7 @@ jobs:
       # 📱 Engine: Telethon + Bot API
       # ⏰ Schedule: 05:28, 08:28, 09:53, 15:23, 19:03, 22:03 Myanmar
       # ═══════════════════════════════════════════════
-      - name: "\U0001F4CB Toa 5 — Report 5C Plan Morning/Evening"
+      - name: "📋 Toa 5 — Report 5C Plan Morning/Evening"
         if: |
           steps.sched.outputs.p5c == 'true' ||
           (github.event_name == 'workflow_dispatch' && inputs.report_type == 'Report 5C - Plan Morning')
@@ -281,7 +281,7 @@ jobs:
       # 📱 Engine: Telethon
       # ⏰ Schedule: 14:03, 16:03, 17:18, 19:08, 20:33 Myanmar
       # ═══════════════════════════════════════════════
-      - name: "\U0001F4D6 Toa 6 — Report 6 Read Report"
+      - name: "📖 Toa 6 — Report 6 Read Report"
         if: |
           steps.sched.outputs.r6 == 'true' ||
           (github.event_name == 'workflow_dispatch' && inputs.report_type == 'Report 6 - Daily Note Read Report')
@@ -298,7 +298,7 @@ jobs:
       # 🤖 Engine: Bot API (COLLECTOR_BOT)
       # ⏰ Schedule: 05:53, 15:53 Myanmar
       # ═══════════════════════════════════════════════
-      - name: "\U0001F50C Toa 7 — Cable Daily Report"
+      - name: "🔌 Toa 7 — Cable Daily Report"
         if: |
           steps.sched.outputs.cable == 'true' ||
           (github.event_name == 'workflow_dispatch' && inputs.report_type == 'Task - Cable Daily Report')
@@ -393,7 +393,7 @@ jobs:
       # ═══════════════════════════════════════════════
       # 🔍 CHECK READ STATUS (Manual only)
       # ═══════════════════════════════════════════════
-      - name: "\U0001F50D Task — Check Read Status"
+      - name: "🔍 Task — Check Read Status"
         if: github.event_name == 'workflow_dispatch' && inputs.report_type == 'Task - Check Read Status'
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
