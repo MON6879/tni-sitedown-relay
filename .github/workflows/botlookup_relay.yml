@@ -2,7 +2,7 @@ name: Botlookup Relay
 
 on:
   schedule:
-    - cron: '6,36 * * * *'   # Chạy lúc :06 và :36 MMT (6 phút sau khi NocPro update lúc :00 & :30)
+    - cron: '3,33 * * * *'   # Chạy đúng phút :03 và :33 MMT (14:03, 14:33, 15:03...)
   workflow_dispatch:
     inputs:
       skip_delay:
