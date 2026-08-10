@@ -23,10 +23,16 @@ INFO_RE = re.compile(r"^\s*(?:/info|info)[:\s]+\s*(TNI\d{4}(?:_\d+)?)\s*$", re.I
 # 2. Clear Match: /clear TNI0061 or clear TNI0061
 CLEAR_RE = re.compile(r"^\s*(?:/clear|clear)[:\s]+\s*(TNI\d{4}(?:_\d+)?)\s*$", re.IGNORECASE)
 
-# 3. TNI Match: /tni TNI0061 or TNI0061 (Exact anchor ^ ... $, rejects noise like 'TNI0061 440L')
+# 3. Not Close Match: /t1notclose, t1notclose, t1_notclose, t1 not close, /t4notclose
+NOTCLOSE_RE = re.compile(r"^\s*/?(T[1-4])[\s_]?(not[\s_]?close|notclose)\s*$", re.IGNORECASE)
+
+# 4. Wait CD Match: /t1waitcd, t1waitcd, t1_waitcd, t1 wait cd, /t4waitcd
+WAITCD_RE = re.compile(r"^\s*/?(T[1-4])[\s_]?(wait[\s_]?cd|waitcd)\s*$", re.IGNORECASE)
+
+# 5. TNI Match: /tni TNI0061 or TNI0061 (Exact anchor ^ ... $, rejects noise like 'TNI0061 440L')
 TNI_RE = re.compile(r"^\s*(?:/tni|/find|tni)?[:\s]*\b(TNI\d{4}(?:_\d+)?)\s*$", re.IGNORECASE)
 
-# 4. Admin / Staff Lookup Match: mydata 123456, /mysite 123456
+# 6. Admin / Staff Lookup Match: mydata 123456, /mysite 123456
 ADMIN_LOOKUP_RE = re.compile(r"^\s*/?(my\S+)\s+(\d{6,12})\s*$", re.IGNORECASE)
 
 # ── DEDUPLICATION CACHE ENGINE ────────────────────────────────────────────────
@@ -60,8 +66,8 @@ def classify_query(text: str) -> dict:
     Classify input text according to canonical priority order.
     Returns dict:
       {
-        "action": "INFO" | "CLEAR" | "TNI" | "ADMIN_LOOKUP" | "IGNORE",
-        "code": extracted_tni_or_id,
+        "action": "INFO" | "CLEAR" | "NOTCLOSE" | "WAITCD" | "TNI" | "ADMIN_LOOKUP" | "IGNORE",
+        "code": extracted_tni_or_team_code_or_id,
         "raw_text": text
       }
     """
@@ -70,7 +76,7 @@ def classify_query(text: str) -> dict:
         
     clean_text = text.strip()
     
-    # Priority 1: INFO MATCH (info: TNIxxxx) -> Site/Cable/DIA info
+    # Priority 1: INFO MATCH (info: TNIxxxx) -> Site/Cable/GPON/DIA info
     m_info = INFO_RE.match(clean_text)
     if m_info:
         return {"action": "INFO", "code": m_info.group(1).upper(), "raw_text": clean_text}
@@ -79,13 +85,23 @@ def classify_query(text: str) -> dict:
     m_clear = CLEAR_RE.match(clean_text)
     if m_clear:
         return {"action": "CLEAR", "code": m_clear.group(1).upper(), "raw_text": clean_text}
+
+    # Priority 3: NOT CLOSE MATCH (/t1notclose, t4notclose) -> Open WOs
+    m_nc = NOTCLOSE_RE.match(clean_text)
+    if m_nc:
+        return {"action": "NOTCLOSE", "code": m_nc.group(1).upper(), "raw_text": clean_text}
+
+    # Priority 4: WAIT CD MATCH (/t1waitcd, t4waitcd) -> Wait CD WOs
+    m_wc = WAITCD_RE.match(clean_text)
+    if m_wc:
+        return {"action": "WAITCD", "code": m_wc.group(1).upper(), "raw_text": clean_text}
         
-    # Priority 3: TNI MATCH (TNIxxxx exact) -> Task & WO details
+    # Priority 5: TNI MATCH (TNIxxxx exact) -> Task & WO details
     m_tni = TNI_RE.match(clean_text)
     if m_tni:
         return {"action": "TNI", "code": m_tni.group(1).upper(), "raw_text": clean_text}
         
-    # Priority 4: ADMIN / STAFF LOOKUP (mydata <ID>)
+    # Priority 6: ADMIN / STAFF LOOKUP (mydata <ID>)
     m_admin = ADMIN_LOOKUP_RE.match(clean_text)
     if m_admin:
         return {

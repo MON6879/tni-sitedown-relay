@@ -471,16 +471,36 @@ def trigger_bg_index_refresh():
     t.start()
 
 def format_task_wo(raw: str) -> str:
-    """Render col H content thành HTML sạch — hỗ trợ 2 định dạng:
-       1. Old pre-formatted (có ─────): strip header/footer, giữ nội dung.
-       2. Raw /Alarm: <+> /Task: <+> /WO: format: parse thành emoji sections."""
+    """Render col H content thành HTML sạch cho Toa 1 (Task & WO).
+       Loại bỏ 100% phần 'Site Info' nếu có trong chuỗi thô."""
     e = html.escape
     if not raw:
         return ""
 
-    # ── Format 1: Old pre-formatted (🔍 TNI...\n─────\n📍 Site Info\n...\n─────) ──
-    if "\u2500\u2500\u2500\u2500\u2500" in raw:      # ─────
-        lines = raw.split("\n")
+    raw_clean = raw
+    if "📍 Site Info" in raw_clean or "📍 <b>Site Info</b>" in raw_clean or "🏢 Site" in raw_clean:
+        task_pos = raw_clean.find("📋")
+        wo_pos = raw_clean.find("🔧")
+        alarm_pos = raw_clean.find("🔔")
+        positions = [p for p in (task_pos, wo_pos, alarm_pos) if p != -1]
+        if positions:
+            raw_clean = raw_clean[min(positions):].strip()
+        else:
+            lines = []
+            skip = False
+            for line in raw_clean.split("\n"):
+                if "Site Info" in line or "🏢 Site" in line:
+                    skip = True
+                elif skip and ("Task" in line or "WO" in line or "Alarm" in line):
+                    skip = False
+                    lines.append(line)
+                elif not skip:
+                    lines.append(line)
+            raw_clean = "\n".join(lines).strip()
+
+    # ── Format 1: Pre-formatted có ───── ──
+    if "\u2500\u2500\u2500\u2500\u2500" in raw_clean:      # ─────
+        lines = raw_clean.split("\n")
         content_lines = []
         in_content = False
         for line in lines:
@@ -490,34 +510,35 @@ def format_task_wo(raw: str) -> str:
                 else:
                     break
             elif in_content:
-                content_lines.append(line)
+                if "Site Info" not in line:
+                    content_lines.append(line)
         if content_lines:
             return e("\n".join(content_lines).strip())
 
-    # ── Format 2: Raw /Alarm: <+> /Task: ... <+> /WO: ... ──
-    if "<+>" in raw:
-        sections = raw.split("<+>")
+    # ── Format 2: Raw /Alarm: ... <+> /Task: ... <+> /WO: ... ──
+    if "<+>" in raw_clean or "/Task:" in raw_clean or "/WO:" in raw_clean:
+        sections = raw_clean.split("<+>")
         parts = []
         for sec in sections:
             sec = sec.strip()
-            if sec.startswith("/Alarm:"):
-                content = sec[7:].strip()
+            if "/Alarm:" in sec:
+                content = sec[sec.find("/Alarm:") + 7:].strip()
                 if content:
                     parts.append(f"🔔 <b>Alarm:</b> {e(content[:300])}")
-            elif sec.startswith("/Task:"):
-                content = sec[6:].strip()
+            elif "/Task:" in sec:
+                content = sec[sec.find("/Task:") + 6:].strip()
                 if content and content.lower() not in ("no see", ""):
                     tasks = [t.strip() for t in content.split("/") if t.strip()]
                     parts.append("📋 <b>Task:</b>\n" + "\n".join(f"• {e(t[:150])}" for t in tasks[:5]))
-            elif sec.startswith("/WO:"):
-                content = sec[4:].strip()
+            elif "/WO:" in sec:
+                content = sec[sec.find("/WO:") + 4:].strip()
                 if content:
                     wos = [w.strip() for w in content.split("/") if w.strip()]
                     parts.append("🔧 <b>WO:</b>\n" + "\n".join(f"• {e(w[:150])}" for w in wos[:3]))
-        return "\n".join(parts) if parts else e(raw[:500])
+        if parts:
+            return "\n".join(parts)
 
-    # ── Format 3: Unknown — escape và cắt bớt ──
-    return e(raw[:500])
+    return e(raw_clean[:500])
 
 
 def perform_unified_tni_search(tni: str, full_info: bool = False) -> str:
@@ -1307,6 +1328,40 @@ def handle(update: dict) -> None:
     classified = classify_query(text) if classify_query else None
     action = classified.get("action") if classified else None
     code = classified.get("code") if classified else None
+
+    # ── TOA 3: NOT CLOSE SEARCH (/t1notclose, t4notclose...) ──────────────────
+    if action == "NOTCLOSE":
+        team_code = code
+        if is_duplicate_search and is_duplicate_search(chat_id, user_id, f"NOTCLOSE:{team_code}"):
+            return
+        logger.info(f"[SSOT Router] NotClose lookup: {team_code} | chat={chat_id}")
+        log_search_bg(first_name or str(user_id), user_id, f"{team_code}notclose")
+        try:
+            messages = lookup_notclose(team_code)
+            full_text = f"📑 <b>{team_code} NOT CLOSE</b> ({len(messages)} WOs)\n\n" + "\n\n".join(messages)
+            for chunk in split_messages(full_text):
+                tg_send(chat_id, chunk)
+        except Exception as err:
+            logger.error(f"NotClose lookup error [{team_code}]: {err}")
+            tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
+        return
+
+    # ── TOA 4: WAIT CD SEARCH (/t1waitcd, t4waitcd...) ────────────────────────
+    if action == "WAITCD":
+        team_code = code
+        if is_duplicate_search and is_duplicate_search(chat_id, user_id, f"WAITCD:{team_code}"):
+            return
+        logger.info(f"[SSOT Router] WaitCD lookup: {team_code} | chat={chat_id}")
+        log_search_bg(first_name or str(user_id), user_id, f"{team_code}waitcd")
+        try:
+            messages = lookup_waitcd(team_code)
+            full_text = f"⏳ <b>{team_code} WAIT CD</b> ({len(messages)} WOs)\n\n" + "\n\n".join(messages)
+            for chunk in split_messages(full_text):
+                tg_send(chat_id, chunk)
+        except Exception as err:
+            logger.error(f"WaitCD lookup error [{team_code}]: {err}")
+            tg_send(chat_id, f"❌ Error: {html.escape(str(err)[:80])}")
+        return
 
     # ── 1. KEY "CLEAR": CLEAR TNIxxxx / /clear TNIxxxx — tra cứu Lịch sử Clear Site ──────────────
     if action == "CLEAR":
