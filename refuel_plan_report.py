@@ -656,16 +656,31 @@ def report_5(data: RefuelData):
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
+    # Preprocess sys.argv to split '21' into '2' '1' if present
+    new_argv = []
+    for arg in sys.argv:
+        if arg == "21":
+            new_argv.extend(["2", "1"])
+        else:
+            new_argv.append(arg)
+    sys.argv = new_argv
+
     parser = argparse.ArgumentParser(description="TNI Refuel Plan Reports")
-    parser.add_argument("--report", type=int, choices=[1, 2, 3, 4, 5], nargs="+",
-                        help="Report numbers (1, 2, 5). Omit to run default.")
+    parser.add_argument("--report", type=int, choices=[1, 2, 3, 4, 5, 21], nargs="+",
+                        help="Report numbers (1, 2, 3, 4, 5). Omit to run default.")
     args = parser.parse_args()
 
     # Tải và parse dữ liệu trước khi chạy báo cáo
     download_spreadsheet()
     data = RefuelData()
 
-    reports_to_run = args.report if args.report else [1, 2]
+    raw_reports = args.report if args.report else [1, 2]
+    reports_to_run = []
+    for r in raw_reports:
+        if r == 21:
+            reports_to_run.extend([2, 1])
+        else:
+            reports_to_run.append(r)
 
     if 1 in reports_to_run or 3 in reports_to_run:
         report_1(data)
