@@ -57,11 +57,12 @@ jobs:
       # 4. Main GAS Backend (@302) — giữ Apps Script quota active
       # 5. Auto Copy Paste GAS — giữ active
       # Khi thêm hệ thống mới: thêm 1 dòng curl ở đây (~1s/endpoint, max ~150 endpoints)
-      - name: "🏥 Toa 0 — Keepalive Ping All Endpoints"
+      - name: "🏥 Toa 0 — Keepalive Ping All Endpoints & Webhooks"
         run: |
           echo "🚂 Train tick: $(TZ='Asia/Yangon' date '+%Y-%m-%d %H:%M:%S MMT')"
 
           echo "1️⃣ Search Bot (Vercel)..."
+          curl -s -f "https://api.telegram.org/bot8606383435:AAEstcN4Om6_9ZAjs4OoFV2uVlRALgae2Ac/setWebhook?url=https://tni-bot.vercel.app/api/search_bot" || true
           curl -s -f "https://tni-bot.vercel.app/api/search_bot?action=reset" || true
 
           echo "2️⃣ Asset Collector (Vercel)..."
@@ -69,6 +70,7 @@ jobs:
 
           echo "3️⃣ Site Down Relay (Vercel)..."
           curl -s -f "https://tni-sitedown.vercel.app/api/site_down_relay" || true
+          curl -s -f "https://api.telegram.org/bot8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI/setWebhook?url=https://tni-sitedown.vercel.app/api/site_down_relay" || true
 
           echo "4️⃣ Main GAS Backend..."
           curl -s -L "https://script.google.com/macros/s/AKfycbwHyzulEMVGjslfjN_m38HzpFZHRfk2qwbQmdwb6MMqBM8xNm20JJxxzW_4zTNzp3n24Q/exec?action=ping" || true
