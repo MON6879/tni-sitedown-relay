@@ -6168,19 +6168,52 @@ Team04>> 2Box</td>
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      // 🚆 CHUYẾN TÀU SỐ 4: Dynamic Auto-Sync between Cards (Hình 1) and Chart (Hình 2)
+      function parseCardNum(selector, defaultVal) {
+        const el = document.querySelector(selector);
+        if (!el) return defaultVal;
+        const txt = el.textContent.replace(/[^0-9]/g, '');
+        return txt ? parseInt(txt, 10) : defaultVal;
+      }
+
+      // Tự động đọc số liệu thực tế từ 4 Thẻ Team Leader (Hình 1)
+      const t1Total = parseCardNum('.tag-t1-card .total-wo', 394);
+      const t1Close = parseCardNum('.tag-t1-card .close-wo', 72);
+      const t1Remain = parseCardNum('.tag-t1-card .remain-wo', 322);
+      const t1Overdue = parseCardNum('.tag-t1-card .overdue-wo', 151);
+      const t1Cd = parseCardNum('.tag-t1-card .cd-wo', 41);
+
+      const t2Total = parseCardNum('.tag-t2-card .total-wo', 209);
+      const t2Close = parseCardNum('.tag-t2-card .close-wo', 119);
+      const t2Remain = parseCardNum('.tag-t2-card .remain-wo', 90);
+      const t2Overdue = parseCardNum('.tag-t2-card .overdue-wo', 24);
+      const t2Cd = parseCardNum('.tag-t2-card .cd-wo', 23);
+
+      const t3Total = parseCardNum('.tag-t3-card .total-wo', 95);
+      const t3Close = parseCardNum('.tag-t3-card .close-wo', 32);
+      const t3Remain = parseCardNum('.tag-t3-card .remain-wo', 63);
+      const t3Overdue = parseCardNum('.tag-t3-card .overdue-wo', 14);
+      const t3Cd = parseCardNum('.tag-t3-card .cd-wo', 3);
+
+      const t4Total = parseCardNum('.tag-t4-card .total-wo', 103);
+      const t4Close = parseCardNum('.tag-t4-card .close-wo', 81);
+      const t4Remain = parseCardNum('.tag-t4-card .remain-wo', 22);
+      const t4Overdue = parseCardNum('.tag-t4-card .overdue-wo', 0);
+      const t4Cd = parseCardNum('.tag-t4-card .cd-wo', 2);
+
       const ctx = document.getElementById('woChart')?.getContext('2d');
       if (ctx) {
-        new Chart(ctx, {
+        window.woChartInstance = new Chart(ctx, {
           type: 'bar',
           plugins: [ChartDataLabels],
           data: {
             labels: ['Team 1 Dawei', 'Team 2 Myeik', 'Team 3 Bokpyin', 'Team 4 Kawthoung'],
             datasets: [
-              { label: 'Total WO', data: [392, 189, 87, 92], backgroundColor: '#38BDF8', borderRadius: 6 },
-              { label: 'FOT Close', data: [61, 57, 21, 56], backgroundColor: '#10B981', borderRadius: 6 },
-              { label: 'Remain WO', data: [331, 132, 66, 36], backgroundColor: '#F59E0B', borderRadius: 6 },
-              { label: 'Remain Overdue', data: [144, 30, 12, 0], backgroundColor: '#EA580C', borderRadius: 6 },
-              { label: 'CD Not Close', data: [32, 0, 2, 3], backgroundColor: '#A855F7', borderRadius: 6 }
+              { label: 'Total WO', data: [t1Total, t2Total, t3Total, t4Total], backgroundColor: '#38BDF8', borderRadius: 6 },
+              { label: 'FOT Close', data: [t1Close, t2Close, t3Close, t4Close], backgroundColor: '#10B981', borderRadius: 6 },
+              { label: 'Remain WO', data: [t1Remain, t2Remain, t3Remain, t4Remain], backgroundColor: '#F59E0B', borderRadius: 6 },
+              { label: 'Remain Overdue', data: [t1Overdue, t2Overdue, t3Overdue, t4Overdue], backgroundColor: '#EA580C', borderRadius: 6 },
+              { label: 'CD Not Close', data: [t1Cd, t2Cd, t3Cd, t4Cd], backgroundColor: '#A855F7', borderRadius: 6 }
             ]
           },
           options: {
@@ -6197,7 +6230,7 @@ Team04>> 2Box</td>
             },
             scales: {
               x: { ticks: { color: '#94A3B8', font: { weight: '600' } } },
-              y: { ticks: { color: '#94A3B8' }, max: 440 }
+              y: { ticks: { color: '#94A3B8' }, max: Math.max(t1Total, t2Total, t3Total, t4Total) + 50 }
             }
           }
         });
