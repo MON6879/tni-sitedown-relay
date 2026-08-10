@@ -1487,7 +1487,7 @@ async def main():
     logger.info(f"🚀 Cron send start – {now_str}")
 
     # ── 1. Read full sheet ──
-    resp = requests.get(SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+    resp = requests.get(SHEET_URL, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}, timeout=30)
     resp.raise_for_status()
     df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str, on_bad_lines="skip")
     logger.info(f"Sheet: {len(df)} total rows (including headers)")
