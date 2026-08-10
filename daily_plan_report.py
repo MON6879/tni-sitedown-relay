@@ -1650,7 +1650,12 @@ async def run_morning():
     """Run morning report mode."""
     now = myanmar_now()
     now_str = now.strftime("%d/%m/%Y %H:%M")
-    date_str = now.strftime("%d/%m/%Y")
+    # Sau 14:00 MMT trong ngày → Tự động nhảy cộng +1 ngày để làm Plan cho ngày mai
+    if now.hour >= 14:
+        target_date = now + timedelta(days=1)
+    else:
+        target_date = now
+    date_str = target_date.strftime("%d/%m/%Y")
     delete_prefix = "PLAN_MRN"
 
     logger.info(f"🚀 Daily Plan Report (Morning) start – {now_str}")
