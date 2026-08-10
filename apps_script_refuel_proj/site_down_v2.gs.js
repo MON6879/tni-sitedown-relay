@@ -680,8 +680,11 @@ function addKeywordIcons(text, teamKey) {
      return "\n" + icon + " " + keyword + " " + dataStr;
   });
 
-  // 6. Link down line
-  s = s.replace(/(?:<|\s|>|\|)*(Link down:)/gi, "\n🔗 $1");
+  // 6. Link down line: lấy nguyên khối giữa | ... | làm 1 dòng duy nhất với 1 icon 🔗
+  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(Link down:)\s*([^\n\|]*)/gi, function(match, keyword, dataStr) {
+     let c = dataStr.replace(/[*_`]/g, "").trim();
+     return "\n🔗 " + keyword + " " + c;
+  });
 
   // 7. Duty line
   s = s.replace(/(?:<|\s|>|\|)*(Duty:)/gi, "\n🕒 $1");

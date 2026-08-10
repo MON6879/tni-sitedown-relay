@@ -743,13 +743,16 @@ function addKeywordIcons(text) {
   s = s.replace(/(?:^|\n|\s*)(Dont\s+Forget)/gi, "\n🔥 Dont Forget");
   s = s.replace(/(?:^|\n|\s*)>(?:\s*)(Cell down:)/gi, "\n🔴 Cell down:");
   s = s.replace(/(?:^|\n|\s*)>(?:\s*)(DG Abnormal:)/gi, "\n⚙️ DG Abnormal:");
-  s = s.replace(/(?:^|\n|\s*)>(?:\s*)(Link down:)/gi, "\n🔗 Link down:");
   s = s.replace(/(?:^|\n|\s*)>(?:\s*)(Duty:)/gi, "\n🕒 Duty:");
   s = s.replace(/\|\s*(DG Abnormal:)/gi, "\n⚙️ DG Abnormal:");
-  s = s.replace(/\|\s*(Link down:)/gi, "\n🔗 Link down:");
   s = s.replace(/\|\s*(Cell down:)/gi, "\n🔴 Cell down:");
   s = s.replace(/\|\s*(Duty:)/gi, "\n🕒 Duty:");
   s = s.replace(/(?:^|\s)(Duty:)/gi, "\n🕒 Duty:");
+
+  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(Link down:)\s*([^\n\|]*)/gi, function(match, keyword, dataStr) {
+     let c = dataStr.replace(/[*_`]/g, "").trim();
+     return "\n🔗 " + keyword + " " + c;
+  });
 
   s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(DG Run>16H:)\s*([^\n\|]*)/gi, function(match, keyword, dataStr) {
      let c = dataStr.replace(/[*_]/g, "").trim();
