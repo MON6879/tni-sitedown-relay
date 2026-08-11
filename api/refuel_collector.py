@@ -320,12 +320,21 @@ def process_update(update: dict):
 
     tl_tag = f"@{sender_user}" if sender_user else f"<a href='tg://user?id={sender_id}'>{sender}</a>"
 
-    # Tự động gán tag Team Leader theo số Team trong báo cáo (Chỉ tag Team Leader, bỏ tag người gửi)
-    text_u = text.upper()
-    if "TEAM 1" in text_u or "TEAM01" in text_u or "TEAM 01" in text_u:
-        mention_tag = "@PaingAung"
-    elif "TEAM 2" in text_u or "TEAM02" in text_u or "TEAM 02" in text_u:
-        mention_tag = "@AungNaing"
+    # Tự động gán tag Team Leader theo số Team trong báo cáo (Tag đúng 4 Đội trưởng, không tag nhân viên/đối tác)
+    import re
+    team_m = re.search(r'\bteam[\s_\-]*0*([1-4])\b', text, re.IGNORECASE)
+    if team_m:
+        t_num = team_m.group(1)
+        if t_num == "1":
+            mention_tag = "@PaingAung"      # Team 1 Leader: Paing Aung Soe
+        elif t_num == "2":
+            mention_tag = "@NayMyoThu"      # Team 2 Leader: Nay Myo Thu
+        elif t_num == "3":
+            mention_tag = "@PyaePhyoZaw"    # Team 3 Leader: Pyae Phyo Zaw
+        elif t_num == "4":
+            mention_tag = "@NaingMyoHtun"   # Team 4 Leader: Naing Myo Htun
+        else:
+            mention_tag = tl_tag
     else:
         mention_tag = tl_tag
 
