@@ -2016,99 +2016,47 @@ function handleStoreSiteDownDirect(body) {
 }
 
 // ════════════════════════════════════════════════════════════
-// NOTE: relayBotlookupToTNI() lives in site_down_notify.gs (ONLY)
-// DO NOT add a duplicate here — GAS shares global namespace!
-// ════════════════════════════════════════════════════════════
-// GET NOTE B2:B5 — Đọc nội dung B2:B5 từ SD Sheet
-// Trả về plain text để botlookup_relay.py gửi từ @Phongha79
-// URL: APPS_SCRIPT_URL?action=get_note_b2b5
-// ════════════════════════════════════════════════════════════
-function getNoteB2B5() {
-  try {
-    // Inline constant — không dùng SD_SHEET_ID từ site_down_notify.gs
-    var SD_SHEET_ID_LOCAL  = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
-    var SD_SHEET_GID_LOCAL = 0;
-
-    var ss = SpreadsheetApp.openById(SD_SHEET_ID_LOCAL);
-
-    // Tìm sheet theo GID, fallback về sheet đầu tiên
-    var sheet = null;
-    var allSheets = ss.getSheets();
-    for (var si = 0; si < allSheets.length; si++) {
-      if (allSheets[si].getSheetId() === SD_SHEET_GID_LOCAL) {
-        sheet = allSheets[si];
-        break;
-      }
-    }
-    if (!sheet) sheet = ss.getSheets()[0];
-    if (!sheet) return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
-
-    var values = sheet.getRange("B2:B5").getValues();
-    var lines  = values
-      .map(function(row) { return row[0].toString().trim(); })
-      .filter(function(line) { return line.length > 0; });
-
-    return ContentService
-      .createTextOutput(lines.join("\n"))
-      .setMimeType(ContentService.MimeType.TEXT);
-  } catch(e) {
-    Logger.log("[getNoteB2B5] ❌ " + e.message);
-    return ContentService.createTextOutput("").setMimeType(ContentService.MimeType.TEXT);
-  }
-}
-
-
-
-// ═══════════════════════════════════════════════════════════════
-// GET TEAM WO STATS — real-time team summary for executive dashboard
-// GET ?action=get_team_wo_stats
-// ═══════════════════════════════════════════════════════════════
-function handleGetTeamWoStats_() {
-  try {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
-
-    // The engineer data sheet is at GID 133591305 (read by drGatherData as DR_REPORT_GID).
-    // NOTE: Do NOT search by name "Dashboard Report" — that is the VISUAL OUTPUT sheet (different format).
-    let rptSh = ss.getSheets().find(function(s) {
-      return String(s.getSheetId()) === "133591305";
-    });
-
-    // Fallback: scan sheets for the one whose 4th row, col A starts with "MYT_TNI_TEAM"
-    if (!rptSh) {
-      for (const sh of ss.getSheets()) {
-        if (sh.getLastRow() >= 4) {
-          try {
-            const probe = String(sh.getRange(4, 1).getValue()).trim();
-            if (probe.startsWith("MYT_TNI_TEAM")) { rptSh = sh; break; }
-          } catch(e2) { /* skip */ }
-        }
-      }
-    }
-
-    if (!rptSh || rptSh.getLastRow() < 4)
-      return json({ status: "error", message: "Engineer data sheet not found (GID 133591305). Run drStep1_BuildTables first." });
-
-    const raw = rptSh.getRange(1, 1, rptSh.getLastRow(), 5).getValues();
-    // Debug: log which sheet was found
-    const sheetDebug = rptSh.getName() + " (id=" + rptSh.getSheetId() + ", rows=" + rptSh.getLastRow() + ")";
-
-    // ── v301: CONFIRMED GID = 1840482617 "Sum all WO Team"
-    // Row 53=Team1, 54=Team2, 55=Team3, 56=Team4
-    // Confirmed cell values (Team 1 example): G=66, P=327, N=151, A=39, J=2, K=0, L=7
     const GID_SUM = "1840482617";
     const TEAM_ORDER = ["team1", "team2", "team3", "team4"];
-    const chartG = {};  // G col(7)  = Total FOT Close
-    const chartP = {};  // P col(16) = Remain WO (CD not yet Close)
-    const chartN = {};  // N col(14) = Overdue FOT not closed
-    const chartA = {};  // A col(1)  = CD Not Yet Close
-    const chartJ = {};  // J col(10) = 3-day: closes on day-1 (yesterday)
-    const chartK = {};  // K col(11) = 3-day: closes on day-2
-    const chartL = {};  // L col(12) = 3-day: closes on day-3
+    const chartG = {};  // G col(6)  = Total FOT Close
+    const chartP = {};  // P col(15) = Remain WO (CD not yet Close)
+    const chartN = {};  // N col(13) = Overdue FOT not closed
+    const chartA = {};  // A col(0)  = CD Not Yet Close
+    const chartJ = {};  // J col(9)  = 3-day: closes on day-1 (11/08)
+    const chartK = {};  // K col(10) = 3-day: closes on day-2 (10/08)
+    const chartL = {};  // L col(11) = 3-day: closes on day-3 (09/08)
+    const chartM = {};  // M col(12) = Plan for next date (12/08)
+    let dynamicDateLabel = "";
+    let dynamicPlanLabel = "";
+
     try {
       const sumSh = ss.getSheets().find(function(s) {
         return String(s.getSheetId()) === GID_SUM;
       });
       if (sumSh && sumSh.getLastRow() >= 56) {
+        // Read row 2 headers for J, K, L, M
+        const hdrRow2 = sumSh.getRange(2, 1, 1, 16).getValues()[0];
+        const rawHdrJ = fmtCell(hdrRow2[9]);   // Col J header e.g. "Close at: 11/08/26"
+        const rawHdrK = fmtCell(hdrRow2[10]);  // Col K header e.g. "Close at: 10/08/26"
+        const rawHdrL = fmtCell(hdrRow2[11]);  // Col L header e.g. "Close at: 09/08/26"
+        const rawHdrM = fmtCell(hdrRow2[12]);  // Col M header e.g. "Plan: 12/08/26"
+
+        // Format dynamic labels
+        const dJStr = (rawHdrJ.match(/(\d{2}\/\d{2})/)||[,"11/08"])[1];
+        const dKStr = (rawHdrK.match(/(\d{2}\/\d{2})/)||[,"10/08"])[1];
+        const dLStr = (rawHdrL.match(/(\d{2}\/\d{2})/)||[,"09/08"])[1];
+        const dMStr = (rawHdrM.match(/(\d{2}\/\d{2}(?:\/\d{2,4})?)/)||[,"12/08/2026"])[1];
+
+        const yrStr = Utilities.formatDate(new Date(), "Asia/Rangoon", "yyyy");
+        const fullMDate = dMStr.includes("/") && dMStr.split("/").length === 3 ? dMStr : dMStr + "/" + yrStr;
+        dynamicPlanLabel = "🎯 Plan " + fullMDate + " (M):";
+
+        const mJ = dJStr.split("/")[0];
+        const mK = dKStr.split("/")[0];
+        const mL = dLStr.split("/")[0];
+        const mMonth = (dJStr.split("/")[1] || "08");
+        dynamicDateLabel = mJ + "/" + mK + "/" + mL + "-" + mMonth + "-" + yrStr;
+
         // Read rows 53-56, cols A(1) to P(16)
         const sumRng = sumSh.getRange(53, 1, 4, 16).getValues();
         for (let r = 0; r < 4; r++) {
@@ -2118,9 +2066,10 @@ function handleGetTeamWoStats_() {
           const pv = row[15];  // col P (index 15) = Remain WO
           const nv = row[13];  // col N (index 13) = Overdue FOT
           const av = row[0];   // col A (index 0)  = CD Not Yet Close
-          const jv = row[9];   // col J (index 9)  = day-1 closes
-          const kv = row[10];  // col K (index 10) = day-2 closes
-          const lv = row[11];  // col L (index 11) = day-3 closes
+          const jv = row[9];   // col J (index 9)  = day-1 closes (11/08)
+          const kv = row[10];  // col K (index 10) = day-2 closes (10/08)
+          const lv = row[11];  // col L (index 11) = day-3 closes (09/08)
+          const mv = row[12];  // col M (index 12) = Plan WOs (12/08)
           if (typeof gv === "number") chartG[tk] = gv;
           if (typeof pv === "number") chartP[tk] = pv;
           if (typeof nv === "number") chartN[tk] = nv;
@@ -2128,6 +2077,7 @@ function handleGetTeamWoStats_() {
           if (typeof jv === "number") chartJ[tk] = jv;
           if (typeof kv === "number") chartK[tk] = kv;
           if (typeof lv === "number") chartL[tk] = lv;
+          if (typeof mv === "number") chartM[tk] = mv;
         }
       }
     } catch(eSum) {
@@ -2154,7 +2104,7 @@ function handleGetTeamWoStats_() {
     for (const k of Object.keys(TEAM_LABELS)) {
       stats[k] = {
         remain: 0, closeMonth: 0, fotClose: 0,
-        d0: 0, d1: 0, d2: 0,
+        d0: 0, d1: 0, d2: 0, planM: 0,
         engineers: 0, waitCD: 0, cdNotYet: 0, closeRate: 0,
         rankFromText: 0
       };
@@ -2167,17 +2117,6 @@ function handleGetTeamWoStats_() {
     }
     const hdr0 = fmtCell(raw[0][1]);  // period start e.g. "21/07/2026"
     const hdr1 = fmtCell(raw[0][2]);  // period end   e.g. "20/08/2026"
-
-    // v298: AUTHORITATIVE SOURCE = team leader summary row (col C = "Team leader N").
-    // The leader's WO text carries team-TOTAL for ALL metrics.
-    // Individual engineer rows are only used for engineer headcount.
-    //
-    // Key metrics from team leader text (Team 1 example):
-    //   "Wait CD : /22 + CD Not Yet Close : /39 => Day /19 of the Month = /47 WO Close
-    //    <> 3Day: 2/0/1 <=> /377 WO Remain => /WO /Overdue /FOT /NOT /Close: /151"
-    //   → G (FOT/WO Close) = 47, P (Remain WO) = 377, N (Overdue FOT) = 151,
-    //     A (CD Not Yet Close) = 39, Wait CD = 22
-    //   → Total WO = G + P = 47 + 377 = 424
 
     for (let i = 3; i < raw.length; i++) {
       const teamRaw  = String(raw[i][0] || "").trim();
@@ -2232,12 +2171,7 @@ function handleGetTeamWoStats_() {
     }
 
     // Date label — format: "JJ/KK/LL-MM-YYYY" where J=day-1, K=day-2, L=day-3
-    // Matches user-visible format: "08/07/06-08-2026" (yesterday/2daysago/3daysago)
     const now     = new Date();
-    const DR_TZ2  = "Asia/Rangoon";
-    const d0Date  = new Date(now.getTime() - 1*86400000);  // J = yesterday
-    const d1Date  = new Date(now.getTime() - 2*86400000);  // K = 2 days ago
-    const d2Date  = new Date(now.getTime() - 3*86400000);  // L = 3 days ago
     function fmtDay(d)  { return Utilities.formatDate(d, DR_TZ2, "dd"); }
     function fmtMY(d)   { return Utilities.formatDate(d, DR_TZ2, "MM/yyyy"); }
     // e.g. "08/07/06-08-2026" (J-date/K-date/L-date then -month-year)
