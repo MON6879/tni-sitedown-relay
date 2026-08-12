@@ -836,24 +836,36 @@ def get_plan_template_text(team_num: int) -> str:
         return f"Error: {str(e)}"
 
 def is_daily_plan(text: str) -> bool:
-    """Detect plan message: text has explicit plan keyword ('daily plan', 'i. hot task', 'plan for', etc.) and date."""
+    """
+    Detect Daily Plan message submitted by Team Leaders.
+    Structure: Starts with/Contains 'Daily Plan: DD/MM/YYYY', 'Team X', 'I. Hot task'.
+    """
     if not text:
         return False
     text_l = text.lower()
+
+    # Blacklist of bot outputs/reports to avoid self-triggering
     if any(kw in text_l for kw in (
         "5.1 report", "5. report", "4. report", "report 4", "refuel plan",
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
-        "plans for ", "plan updated", "plan saved", "ref:dp-", "đã lưu",
+        "plan updated", "plan saved", "ref:dp-", "đã lưu",
         "tni personal find task", "ft result daily", "personal find task", "find task + wo",
         "submitted ✓", "submitted v", "not yet submitted"
     )):
         return False
 
-    has_plan = any(kw in text_l for kw in ("daily plan", "i. hot task", "hot task", "plan for", "plan:", "kế hoạch", "list name ft"))
-    has_date = bool(re.search(r'\b\d{1,2}[\/\.-]\d{1,2}(?:[\/\.-]\d{2,4})?\b', text))
-    return has_plan or ("hot task" in text_l and "list name ft" in text_l) or (any(f"team {i}" in text_l for i in range(1,6)) and "daily plan" in text_l)
+    # Standard Team Leader Plan structure check
+    has_daily_plan_hdr = bool(re.search(r'daily\s*plan|plan\s*for|kế\s*hoạch', text_l))
+    has_hot_task       = "i. hot task" in text_l or "hot task" in text_l
+    has_team           = bool(re.search(r'\bteam\s*0?[1-5]\b|\bt[1-5]\b', text_l))
+    has_date           = bool(re.search(r'\b\d{1,2}[\/\.-]\d{1,2}(?:[\/\.-]\d{2,4})?\b', text))
+
+    if (has_daily_plan_hdr and (has_date or has_team or has_hot_task)) or (has_hot_task and (has_team or "list name ft" in text_l)):
+        return True
+
+    return False
 
 
 def parse_plan_fields(text: str, chat_id: int | None = None, chat_title: str | None = None) -> tuple:
