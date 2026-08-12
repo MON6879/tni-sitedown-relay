@@ -47,7 +47,9 @@ def classify(text: str) -> str | None:
     # Letter Approved: "letter" + "approved"
     if "letter" in t and "approved" in t:
         return "LETTER_APPROVED"
-    if "team" in t and "plan" in t:
+    # PLAN: message must START with "Team <number/id> Plan" (case-insensitive)
+    import re
+    if re.match(r'^team[\s_\-]*\w*\s*plan\b', t):
         return "PLAN"
     if "request" in t:
         return "REQUEST"
