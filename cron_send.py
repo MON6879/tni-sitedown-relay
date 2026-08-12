@@ -2001,36 +2001,8 @@ async def main():
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
 
-    # ── 7d. Gửi NOTE reply dưới tên user @phongha79 (Telethon) ──
-    # BẮT BỘC gửi bằng tài khoản user @phongha79 để Telegram API (GetMessageReadParticipantsRequest)
-    # đếm được danh sách người đọc cho Report 6 (daily_read_report.py). Tin nhắn từ Bot KHÔNG đếm được người đọc!
-    if control_note and TELEGRAM_SESSION and TELEGRAM_API_ID and pinned_report4_msgids:
-        try:
-            async with TelegramClient(
-                StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH
-            ) as tg_note_client:
-                logger.info(f"📝 Gửi Note reply dưới tên user @phongha79 (Telethon) → {len(pinned_report4_msgids)} nhóm...")
-                for cid_str, reply_to_id in pinned_report4_msgids.items():
-                    try:
-                        await tg_note_client.send_message(
-                            entity=int(cid_str),
-                            message=control_note,
-                            reply_to=reply_to_id
-                        )
-                        logger.info(f"  ✅ Note reply (@phongha79) → {cid_str} (reply_to msg_id: {reply_to_id})")
-                        await asyncio.sleep(0.5)
-                    except Exception as note_send_err:
-                        logger.error(f"  ❌ Note reply (@phongha79) thất bại → {cid_str}: {note_send_err}")
-        except Exception as note_client_err:
-            logger.error(f"❌ Telethon Note client lỗi: {note_client_err}")
-    elif not TELEGRAM_SESSION:
-        logger.info("⚠️ TELEGRAM_SESSION not set — skip Note reply (must be sent by Telethon user @phongha79 for Report 6 read tracking)")
-    elif not control_note:
-        logger.info("No control_note — skip Note reply")
-    elif not pinned_report4_msgids:
-        logger.info("No pinned Report 4/4b msg_ids — skip Note reply")
-
     # ── 8. Gửi Báo cáo Asset 4c độc lập tới CONTROL SITE & các Team ──
+    report_4c_msgids = {}
     if asset_msg and SEND_BOT_TOKEN:
         logger.info("--- Gửi Asset Progress 4c độc lập → CONTROL SITE & Teams ---")
         try:
@@ -2050,9 +2022,42 @@ async def main():
                         res_t, t_ids = await send_msg(asset_bot, gid, team_asset_msg, f"TEAM_ASSET_PROGRESS_4C_{team_key}")
                         if res_t and t_ids and APPS_SCRIPT_URL:
                             save_msgids(APPS_SCRIPT_URL, f"CRON_ASSET_{team_key}", t_ids)
-            logger.info("✅ Standalone Asset Progress 4c sent to CONTROL SITE & Teams")
+                            report_4c_msgids[str(gid)] = t_ids[-1]  # Lưu ID tin 4c để Note reply vào
+            logger.info(f"✅ Standalone Asset Progress 4c sent to CONTROL SITE & Teams ({len(report_4c_msgids)} groups)")
         except Exception as e:
             logger.error(f"❌ Standalone Asset Progress 4c failed: {e}")
+
+    # Ưu tiên reply vào tin 4c, fallback vào 4b
+    target_reply_msgids = report_4c_msgids if report_4c_msgids else pinned_report4_msgids
+
+    # ── 9. Gửi NOTE reply dưới tên user @phongha79 (Telethon) TRẢ LỜI CHO TIN 4C ──
+    # BẮT BỘC gửi bằng tài khoản user @phongha79 để Telegram API (GetMessageReadParticipantsRequest)
+    # đếm được danh sách người đọc cho Report 6 (daily_read_report.py). Tin nhắn từ Bot KHÔNG đếm được người đọc!
+    if control_note and TELEGRAM_SESSION and TELEGRAM_API_ID and target_reply_msgids:
+        try:
+            async with TelegramClient(
+                StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH
+            ) as tg_note_client:
+                logger.info(f"📝 Gửi Note reply dưới tên user @phongha79 (Telethon) TRẢ LỜI CHO 4C → {len(target_reply_msgids)} nhóm...")
+                for cid_str, reply_to_id in target_reply_msgids.items():
+                    try:
+                        await tg_note_client.send_message(
+                            entity=int(cid_str),
+                            message=control_note,
+                            reply_to=reply_to_id
+                        )
+                        logger.info(f"  ✅ Note reply (@phongha79) → {cid_str} (reply_to 4c msg_id: {reply_to_id})")
+                        await asyncio.sleep(0.5)
+                    except Exception as note_send_err:
+                        logger.error(f"  ❌ Note reply (@phongha79) thất bại → {cid_str}: {note_send_err}")
+        except Exception as note_client_err:
+            logger.error(f"❌ Telethon Note client lỗi: {note_client_err}")
+    elif not TELEGRAM_SESSION:
+        logger.info("⚠️ TELEGRAM_SESSION not set — skip Note reply (must be sent by Telethon user @phongha79 for Report 6 read tracking)")
+    elif not control_note:
+        logger.info("No control_note — skip Note reply")
+    elif not target_reply_msgids:
+        logger.info("No target_reply_msgids — skip Note reply")
 
     if mgmt_report and SEND_BOT_TOKEN:
         logger.info("--- Gửi mgmt_report (tổng hợp TL) → CONTROL SITE (-5251698940) ---")
