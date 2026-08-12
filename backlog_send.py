@@ -298,11 +298,34 @@ async def main():
             t_name = TEAM_NAMES[t_num]
             logger.info(f"--- Bắt đầu gửi báo cáo cho {t_name} ({chat_id}) ---")
 
-            # Xóa tin nhắn cũ của backlog_send.py trước khi gửi mới
+            # Xóa tin nhắn cũ của tất cả các kịch bản báo cáo (Telethon + multi-key GAS) trước khi gửi mới
+            TELEGRAM_SESSION = os.getenv("TELEGRAM_SESSION", "")
+            TELEGRAM_API_ID = int(os.getenv("TELEGRAM_API_ID", "0")) if os.getenv("TELEGRAM_API_ID", "").isdigit() else 0
+            TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "")
+
+            if SEND_BOT_TOKEN and TELEGRAM_SESSION and TELEGRAM_API_ID:
+                try:
+                    from telethon import TelegramClient
+                    from telethon.sessions import StringSession
+                    from delete_old_helper import delete_by_title_telethon
+                    async with TelegramClient(StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH) as tg_client:
+                        for title_pfx in [
+                            "📋 1. Report — Daily Backlog",
+                            "📋 2. Report — Daily Backlog",
+                            "📋 3. Report — Main DG Material Need",
+                            "📋 4. Report — Daily EOD Task & Stats",
+                            "📓 4b. Full Report"
+                        ]:
+                            await delete_by_title_telethon(tg_client, SEND_BOT_TOKEN, chat_id, title_pfx)
+                except Exception as tg_err:
+                    logger.warning(f"Telethon delete-by-title error for {t_name}: {tg_err}")
+
             if APPS_SCRIPT_URL:
                 try:
                     from delete_old_helper import delete_old_messages_bot
                     delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, CHATID_TO_KEY[chat_id])
+                    delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, f"CRON_TEAM_T{t_num}")
+                    delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, f"CRON_ASSET_T{t_num}")
                 except Exception as ex:
                     logger.warning(f"Lỗi khi xóa tin nhắn cũ của {t_name}: {ex}")
 
@@ -403,6 +426,7 @@ async def main():
                 try:
                     from delete_old_helper import save_msgids
                     save_msgids(APPS_SCRIPT_URL, CHATID_TO_KEY[chat_id], sent_msg_ids)
+                    save_msgids(APPS_SCRIPT_URL, f"CRON_TEAM_T{t_num}", sent_msg_ids)
                 except Exception as ex:
                     logger.warning(f"Lỗi khi lưu tin nhắn mới của {t_name}: {ex}")
 

@@ -1922,12 +1922,17 @@ async def main():
         # Tiêu đề từng loại tin → map (chat_id, title_prefix)
         delete_tasks = []
         for del_cid in CHATID_TO_KEY.keys():
+            delete_tasks.append((del_cid, "📋 1. Report — Daily Backlog"))
+            delete_tasks.append((del_cid, "📋 2. Report — Daily Backlog"))
+            delete_tasks.append((del_cid, "📋 3. Report — Main DG Material Need"))
             delete_tasks.append((del_cid, "📋 4. Report — Daily EOD Task & Stats"))
             delete_tasks.append((del_cid, "📓 4b. Full Report"))
+            delete_tasks.append((del_cid, "📋 5. Report — Daily Plan"))
         delete_tasks += [
             (str(CONTROL_CHAT_ID), "📋 1. Report — Technical Dept Task Progress"),
             (str(CONTROL_CHAT_ID), "📋 8. Report — Technical Dep Assign to Team"),
             (str(CONTROL_CHAT_ID), "📋 4. Report — TL Comparison"),
+            (str(CONTROL_CHAT_ID), "📋 5. Report — Daily Plan"),
             (str(CONTROL_CHAT_ID), "📋 1. BOD"),   # BOD report nếu có
         ]
         try:
@@ -1943,6 +1948,7 @@ async def main():
             if APPS_SCRIPT_URL:
                 for del_cid, del_key in CHATID_TO_KEY.items():
                     delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
+                    delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, f"BACKLOG_TEAM_T{del_key[-2:]}")
                 for del_cid, del_key in CHATID_TO_KEY_FULL.items():
                     delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
                 delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_CONTROL")
@@ -1952,6 +1958,7 @@ async def main():
         # Fallback nếu không có Telethon session
         for del_cid, del_key in CHATID_TO_KEY.items():
             delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
+            delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, f"BACKLOG_TEAM_T{del_key[-2:]}")
         for del_cid, del_key in CHATID_TO_KEY_FULL.items():
             delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
         delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_CONTROL")
