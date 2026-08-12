@@ -1768,7 +1768,11 @@ async def main():
             member_blocks = []
             for prefix, name, content in tl_list:
                 if content:
-                    member_blocks.append(f"🟧 {content}")
+                    if "/LostTARGET" in content or "/losttarget" in content.lower():
+                        tl_color = "🔴 🟧"
+                    else:
+                        tl_color = "🟢 🟧"
+                    member_blocks.append(f"{tl_color} {content}")
             for prefix, name, content in ft_list:
                 if content:
                     if "/LostTARGET" in content or "/losttarget" in content.lower():
