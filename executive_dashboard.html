@@ -617,27 +617,31 @@
         function set(id, val) { var el=$id(id); if(el) el.textContent=val; }
         function setHTML(id, val) { var el=$id(id); if(el) el.innerHTML=val; }
 
-        function applyTeam(key, d, dateLabel, planLabel) {
+        function applyTeam(key, d, dateLabel, planLabel, targetPct) {
           var p = PREFIX[key];
-          var met = d.metTarget;
+          var tgt = targetPct || d.targetPct || 75;
+          var met = d.metTarget !== undefined ? d.metTarget : (d.pct >= tgt);
           var rankColor = met ? 'var(--emerald)' : (d.rank <= 2 ? 'var(--amber)' : 'var(--rose)');
-          var rankText = 'Rank #' + d.rank + ' (' + d.pct + '%/50% ' + (met ? '✅ Meet Target' : '❌ Not Meet Target') + ')';
+          var rankText = 'Rank #' + d.rank + ' (' + d.pct + '%/' + tgt + '% ' + (met ? '✅ Meet Target' : '❌ Not Meet Target') + ')';
 
           set(p+'-engineers', d.engineers);
           set(p+'-assigned', d.totalAssigned + ' WOs');
           set(p+'-fot', d.fotClose + ' WOs');
           set(p+'-close', (d.overdueF || 0) + ' WOs');
           set(p+'-remain', d.remain + ' WOs');
-          var valPlanM = d.planM !== undefined ? d.planM : (key==='team1'?42: (key==='team2'?12: (key==='team3'?8:3)));
+          var valPlanM = d.planM !== undefined ? d.planM : (key==='team1'?49: (key==='team2'?15: (key==='team3'?8:3)));
           set(p+'-planlabel', planLabel || d.planLabel || '🎯 Plan 12/08/2026 (M):');
           set(p+'-planm', valPlanM + ' WOs');
           
           var dateStr = dateLabel || d.dateLabel || '11/10/09-08-2026';
           set(p+'-datelabel', dateStr + ':');
 
-          var valD0 = d.d0 !== undefined ? d.d0 : (key==='team1'?0: (key==='team2'?1: (key==='team3'?1:4)));
+          var valD0 = d.d0 !== undefined ? d.d0 : (key==='team1'?1: (key==='team2'?0: (key==='team3'?0:0)));
           var valD1 = d.d1 !== undefined ? d.d1 : (key==='team1'?7: (key==='team2'?14: (key==='team3'?5:14)));
-          var valD2 = d.d2 !== undefined ? d.d2 : (key==='team1'?1: (key==='team2'?0: (key==='team3'?0:0)));
+          var valD2 = d.d2 !== undefined ? d.d2 : (key==='team1'?0: (key==='team2'?1: (key==='team3'?1:4)));
+
+          set(p+'-waitcd', (d.waitCD || 0) + ' WOs');
+          set(p+'-cdnotyet', (d.cdNotYet || 0) + ' WOs');
 
           set(p+'-d2', valD2);
           set(p+'-d1', valD1);
@@ -668,7 +672,7 @@
         }
 
         function loadTeamStats() {
-          fetch(CSV_URL)
+          fetch(CSV_URL + '&t=' + Date.now())
             .then(function(r){
               if(!r.ok) throw new Error('CSV status '+r.status);
               return r.text();
@@ -676,6 +680,10 @@
             .then(function(csvText){
               var rows = parseCSV(csvText);
               if (rows.length < 56) throw new Error('CSV rows insufficient ('+rows.length+')');
+
+              var rawTgt = (rows[0] && rows[0][5]) ? rows[0][5] : '75%';
+              var mTgt = rawTgt.match(/(\d+)/);
+              var targetPct = mTgt ? parseInt(mTgt[1], 10) : 75;
 
               var hdr2 = rows[1] || [];
               var rawJ = hdr2[9] || '11/08';
@@ -703,8 +711,10 @@
               for (var idx = 0; idx < 4; idx++) {
                 var tk = tKeys[idx];
                 var row = rows[52 + idx] || [];
-                var cdNotYet = parseInt((row[0]||'0').replace(/[^\d]/g,''), 10) || 0;
+                var cdNotYet  = parseInt((row[0]||'0').replace(/[^\d]/g,''), 10) || 0;
+                var waitCD    = parseInt((row[5]||'0').replace(/[^\d]/g,''), 10) || 0;
                 var fotClose  = parseInt((row[6]||'0').replace(/[^\d]/g,''), 10) || 0;
+                var rawPct    = (row[8]||'').replace(/[^\d]/g,'');
                 var d2Close   = parseInt((row[9]||'0').replace(/[^\d]/g,''), 10) || 0;
                 var d1Close   = parseInt((row[10]||'0').replace(/[^\d]/g,''), 10) || 0;
                 var d0Close   = parseInt((row[11]||'0').replace(/[^\d]/g,''), 10) || 0;
@@ -713,7 +723,9 @@
                 var remainWO  = parseInt((row[15]||'0').replace(/[^\d]/g,''), 10) || 0;
 
                 var totalAssigned = fotClose + remainWO;
-                var pct = totalAssigned > 0 ? Math.round((fotClose / totalAssigned) * 100) : 0;
+                var calcPct = totalAssigned > 0 ? Math.round((fotClose / totalAssigned) * 100) : 0;
+                var pct = rawPct ? parseInt(rawPct, 10) : calcPct;
+                var metTarget = pct >= targetPct;
 
                 teamData[tk] = {
                   name: (tk==='team1'?'Team 1 Dawei':(tk==='team2'?'Team 2 Myeik':(tk==='team3'?'Team 3 Bokpyin':'Team 4 Kawthoung'))),
@@ -722,11 +734,11 @@
                   fotClose: fotClose,
                   remain: remainWO,
                   overdueF: overdueF,
-                  waitCD: (tk==='team1'?23:(tk==='team2'?8:(tk==='team3'?3:2))),
+                  waitCD: waitCD,
                   cdNotYet: cdNotYet,
                   planM: planM,
                   d0: d0Close, d1: d1Close, d2: d2Close,
-                  pct: pct, closeRate: pct, metTarget: (pct >= 50)
+                  pct: pct, closeRate: pct, targetPct: targetPct, metTarget: metTarget
                 };
                 tRanks.push({ k: tk, pct: pct });
               }
@@ -735,7 +747,7 @@
               tRanks.forEach(function(r, i){ teamData[r.k].rank = i + 1; });
 
               tKeys.forEach(function(k){
-                applyTeam(k, teamData[k], dateLabel, planLabel);
+                applyTeam(k, teamData[k], dateLabel, planLabel, targetPct);
               });
 
               var now = new Date();

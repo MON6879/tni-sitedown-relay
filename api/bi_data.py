@@ -74,17 +74,25 @@ def get_bi_stats():
     # Fallback default values
     date_label = "11/10/09-08-2026"
     plan_label = "🎯 Plan 12/08/2026 (M):"
+    target_pct = 75
 
     team_data = {
-        "team1": {"totalAssigned": 337, "fotClose": 42, "remain": 295, "overdueF": 161, "waitCD": 23, "cdNotYet": 16, "planM": 42, "d0": 1, "d1": 7, "d2": 0},
-        "team2": {"totalAssigned": 207, "fotClose": 120, "remain": 87, "overdueF": 24, "waitCD": 8, "cdNotYet": 24, "planM": 12, "d0": 0, "d1": 14, "d2": 1},
-        "team3": {"totalAssigned": 95, "fotClose": 32, "remain": 63, "overdueF": 13, "waitCD": 3, "cdNotYet": 8, "planM": 8, "d0": 0, "d1": 5, "d2": 1},
-        "team4": {"totalAssigned": 103, "fotClose": 81, "remain": 22, "overdueF": 0, "waitCD": 2, "cdNotYet": 4, "planM": 3, "d0": 0, "d1": 14, "d2": 4},
+        "team1": {"totalAssigned": 367, "fotClose": 72, "remain": 295, "overdueF": 161, "waitCD": 23, "cdNotYet": 16, "planM": 49, "d0": 1, "d1": 7, "d2": 0, "pct": 18},
+        "team2": {"totalAssigned": 207, "fotClose": 120, "remain": 87, "overdueF": 24, "waitCD": 8, "cdNotYet": 24, "planM": 15, "d0": 0, "d1": 14, "d2": 1, "pct": 56},
+        "team3": {"totalAssigned": 95, "fotClose": 33, "remain": 62, "overdueF": 13, "waitCD": 0, "cdNotYet": 8, "planM": 8, "d0": 0, "d1": 5, "d2": 1, "pct": 36},
+        "team4": {"totalAssigned": 107, "fotClose": 85, "remain": 22, "overdueF": 0, "waitCD": 0, "cdNotYet": 4, "planM": 3, "d0": 0, "d1": 14, "d2": 4, "pct": 82},
     }
 
     try:
         rows = fetch_sum_all_sheet()
         logger.info(f"Fetched Sum all WO Team sheet: {len(rows)} rows")
+
+        # Parse Target Need Complete percentage from Row 1 Cell F1 (index 0, col 5)
+        if len(rows) > 0 and len(rows[0]) > 5:
+            raw_target = str(rows[0][5]).strip()
+            m_tgt = re.search(r"(\d+)", raw_target)
+            if m_tgt:
+                target_pct = int(m_tgt.group(1))
 
         if len(rows) >= 2:
             hdr_row2 = rows[1]
@@ -120,7 +128,15 @@ def get_bi_stats():
                 row = rows[row_i]
                 if len(row) >= 16:
                     cd_not_yet = parse_int(row[0])   # Col A (0)
-                    fot_close  = parse_int(row[6])   # Col G (6)
+                    wait_cd    = parse_int(row[5])   # Col F (5)  = Wait CD Total
+                    fot_close  = parse_int(row[6])   # Col G (6)  = Total FOT Close
+                    sheet_rank = parse_int(row[7])   # Col H (7)  = Rank
+                    
+                    # Col I (8) = % Complete (e.g. '18%')
+                    raw_pct    = str(row[8]).strip() if len(row) > 8 else ""
+                    m_pct      = re.search(r"(\d+)", raw_pct)
+                    sheet_pct  = int(m_pct.group(1)) if m_pct else 0
+
                     d2_close   = parse_int(row[9])   # Col J (9)  = 11/08
                     d1_close   = parse_int(row[10])  # Col K (10) = 10/08
                     d0_close   = parse_int(row[11])  # Col L (11) = 09/08
@@ -129,18 +145,22 @@ def get_bi_stats():
                     remain_wo  = parse_int(row[15])  # Col P (15)
 
                     total_assigned = fot_close + remain_wo
+                    calc_pct = round((fot_close / total_assigned * 100)) if total_assigned > 0 else 0
+                    final_pct = sheet_pct if sheet_pct > 0 else calc_pct
 
                     team_data[tk] = {
                         "totalAssigned": total_assigned,
                         "fotClose": fot_close,
                         "remain": remain_wo,
                         "overdueF": overdue_f,
-                        "waitCD": team_data[tk].get("waitCD", 0),
+                        "waitCD": wait_cd,
                         "cdNotYet": cd_not_yet,
                         "planM": plan_m,
                         "d0": d0_close,  # Col L (09/08)
                         "d1": d1_close,  # Col K (10/08)
                         "d2": d2_close,  # Col J (11/08)
+                        "pct": final_pct,
+                        "sheetRank": sheet_rank,
                     }
     except Exception as err:
         logger.error(f"Error parsing Sum all WO Team sheet: {err}")
@@ -151,8 +171,7 @@ def get_bi_stats():
     for tk in TEAM_ORDER:
         d = team_data[tk]
         tot = d["totalAssigned"]
-        fot = d["fotClose"]
-        pct = round((fot / tot * 100)) if tot > 0 else 0
+        pct = d.get("pct", 0)
         ranks.append({"key": tk, "pct": pct})
 
         result[tk] = {
@@ -160,7 +179,7 @@ def get_bi_stats():
             "region": TEAM_REGIONS[tk],
             "engineers": TEAM_ENGINEERS[tk],
             "totalAssigned": tot,
-            "fotClose": fot,
+            "fotClose": d["fotClose"],
             "remain": d["remain"],
             "overdueF": d["overdueF"],
             "waitCD": d["waitCD"],
@@ -171,7 +190,8 @@ def get_bi_stats():
             "d2": d["d2"],
             "pct": pct,
             "closeRate": float(pct),
-            "metTarget": pct >= 50,
+            "targetPct": target_pct,
+            "metTarget": pct >= target_pct,
         }
 
     ranks.sort(key=lambda x: x["pct"], reverse=True)
@@ -184,9 +204,11 @@ def get_bi_stats():
         "period": "21/07/2026 – 20/08/2026",
         "dateLabel": date_label,
         "planLabel": plan_label,
+        "targetPct": target_pct,
         "sheetFound": "Sum all WO Team (GID 1840482617)",
         "data": result,
     }
+
 
 
 class handler(BaseHTTPRequestHandler):
