@@ -1882,20 +1882,6 @@ async def main():
             (0, detail_msg, CONTROL_CHAT_ID, "TECHDEP_DETAIL")
         )
 
-    # ── 7d. Gửi STANDALONE BÁO CÁO 3.1 Asset progress for material (Tách độc lập 100%) ──
-    if asset_msg and SEND_BOT_TOKEN:
-        logger.info("[Cron] Queuing 3.1 Asset progress for material report...")
-        # 1. Bắn tin tổng hợp 3.1 vào CONTROL_CHAT_ID (-5251698940)
-        groups.setdefault(SEND_BOT_TOKEN, []).append(
-            (0, asset_msg, CONTROL_CHAT_ID, "ASSET_PROGRESS_31")
-        )
-        # 2. Bắn tin chi tiết cho từng Team (T1, T2, T3, T4)
-        for gid, team_key in GID_TO_TEAM.items():
-            team_asset_msg = build_team_asset_msg(team_key, now_str, asset_data)
-            if team_asset_msg:
-                groups.setdefault(SEND_BOT_TOKEN, []).append(
-                    (0, team_asset_msg, str(gid), "TEAM_ASSET_PROGRESS_31")
-                )
 
     # ── Mapping chat_id → GAS key để delete-old / save-new ──
     CHATID_TO_KEY = {
@@ -2041,14 +2027,14 @@ async def main():
     elif not pinned_report4_msgids:
         logger.info("No pinned Report 4/4b msg_ids — skip Note reply")
 
-    # ── 8. Gửi Báo cáo Asset 3.1 độc lập tới CONTROL SITE & các Team ──
+    # ── 8. Gửi Báo cáo Asset 4c độc lập tới CONTROL SITE & các Team ──
     if asset_msg and SEND_BOT_TOKEN:
-        logger.info("--- Gửi Asset Progress 3.1 độc lập → CONTROL SITE & Teams ---")
+        logger.info("--- Gửi Asset Progress 4c độc lập → CONTROL SITE & Teams ---")
         try:
             async with Bot(token=SEND_BOT_TOKEN) as asset_bot:
                 if APPS_SCRIPT_URL:
                     delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_ASSET_CONTROL")
-                res, a_ids = await send_msg(asset_bot, CONTROL_CHAT_ID, asset_msg, "ASSET_PROGRESS_31")
+                res, a_ids = await send_msg(asset_bot, CONTROL_CHAT_ID, asset_msg, "ASSET_PROGRESS_4C")
                 if res and a_ids and APPS_SCRIPT_URL:
                     save_msgids(APPS_SCRIPT_URL, "CRON_ASSET_CONTROL", a_ids)
                 
@@ -2058,12 +2044,12 @@ async def main():
                     if team_asset_msg:
                         if APPS_SCRIPT_URL:
                             delete_old_messages_bot(SEND_BOT_TOKEN, gid, APPS_SCRIPT_URL, f"CRON_ASSET_{team_key}")
-                        res_t, t_ids = await send_msg(asset_bot, gid, team_asset_msg, f"TEAM_ASSET_PROGRESS_31_{team_key}")
+                        res_t, t_ids = await send_msg(asset_bot, gid, team_asset_msg, f"TEAM_ASSET_PROGRESS_4C_{team_key}")
                         if res_t and t_ids and APPS_SCRIPT_URL:
                             save_msgids(APPS_SCRIPT_URL, f"CRON_ASSET_{team_key}", t_ids)
-            logger.info("✅ Standalone Asset Progress 3.1 sent to CONTROL SITE & Teams")
+            logger.info("✅ Standalone Asset Progress 4c sent to CONTROL SITE & Teams")
         except Exception as e:
-            logger.error(f"❌ Standalone Asset Progress 3.1 failed: {e}")
+            logger.error(f"❌ Standalone Asset Progress 4c failed: {e}")
 
     if mgmt_report and SEND_BOT_TOKEN:
         logger.info("--- Gửi mgmt_report (tổng hợp TL) → CONTROL SITE (-5251698940) ---")
