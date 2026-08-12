@@ -269,9 +269,10 @@ async def main():
                         break
                     txt = msg.message.strip()
                     txt_lower = txt.lower()
-                    if ("letter" in txt_lower and "submit" in txt_lower) or \
-                       ("government approved" in txt_lower) or \
-                       ("approved the letter" in txt_lower):
+                    import re
+                    is_letter_submit = bool(re.search(r'^\s*(letter\s*submit|submit\s*letter)\s*[:\-]', txt_lower, re.M) or re.search(r'^\s*(letter\s*submit|submit\s*letter)\b.*\d{1,2}[/\-\.]\d{1,2}', txt_lower, re.M))
+                    is_letter_approved = bool(re.search(r'^\s*(approved\s*letter|letter\s*approved)\s*[:\-]', txt_lower, re.M) or re.search(r'^\s*(approved\s*letter|letter\s*approved)\b.*\d{1,2}[/\-\.]\d{1,2}', txt_lower, re.M) or ("government approved" in txt_lower and ":" in txt_lower))
+                    if is_letter_submit or is_letter_approved:
                         sender_id = str(msg.sender_id) if msg.sender_id else ""
                         try:
                             sender_entity = await client.get_entity(msg.sender_id)

@@ -47,12 +47,12 @@ def classify(text: str) -> str | None:
     if "dg type" in t or "actual filled qty" in t:
         return "REFUELED"
 
-    # 3. LETTER_SUBMIT (bắt buộc dạng tiêu đề "Letter Submit:" hoặc đầu dòng "Letter Submit"/"Submit Letter")
-    if re.search(r'^\s*(letter\s*submit|submit\s*letter)\b', t, re.M) or re.search(r'\b(letter\s*submit|submit\s*letter)\s*:', t):
+    # 3. LETTER_SUBMIT (bắt buộc đúng Template "Letter Submit:" / "Submit Letter:" có dấu hai chấm/gạch nối hoặc ngày tháng)
+    if re.search(r'^\s*(letter\s*submit|submit\s*letter)\s*[:\-]', t, re.M) or re.search(r'^\s*(letter\s*submit|submit\s*letter)\b.*\d{1,2}[/\-\.]\d{1,2}', t, re.M):
         return "LETTER_SUBMIT"
 
-    # 4. LETTER_APPROVED (bắt buộc dạng tiêu đề "Letter Approved:" hoặc đầu dòng "Approved Letter"/"Letter Approved")
-    if re.search(r'^\s*(approved\s*letter|letter\s*approved)\b', t, re.M) or re.search(r'\b(approved\s*letter|letter\s*approved)\s*:', t):
+    # 4. LETTER_APPROVED (bắt buộc đúng Template "Approved Letter:" / "Letter Approved:" có dấu hai chấm/gạch nối hoặc ngày tháng)
+    if re.search(r'^\s*(approved\s*letter|letter\s*approved)\s*[:\-]', t, re.M) or re.search(r'^\s*(approved\s*letter|letter\s*approved)\b.*\d{1,2}[/\-\.]\d{1,2}', t, re.M):
         return "LETTER_APPROVED"
 
     # 5. PLAN (bắt buộc dòng đầu "Team X Plan" hoặc "Plan refuel")
