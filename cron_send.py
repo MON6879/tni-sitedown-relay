@@ -534,11 +534,20 @@ def build_no_search_list(team_key: str, report_data: dict, no_id_members: dict |
 
 
 ACTION_SQUARES = {
-    "export": "🟦",
-    "import": "🟩",
-    "return": "🟨",
-    "transfer": "🟧",
-    "collect": "🟪",
+    "order": "🟦",                  # 🟦 Xanh dương (Order)
+    "revoke": "🟨",                 # 🟨 Vàng (Revoke)
+    "export": "🟩",                 # 🟩 Xanh lá (Export)
+    "import": "🟩",                 # 🟩 Xanh lá (Import)
+    "move": "🟧",                   # 🟧 Cam (Move)
+    "transfer": "🟧",               # 🟧 Cam (Transfer)
+    "destroys": "🟥",               # 🟥 Đỏ (Destroys)
+    "destroy": "🟥",                # 🟥 Đỏ (Destroy)
+    "loss": "🟫",                   # 🟫 Nâu (Loss fuel)
+    "inventory oil": "🟪",          # 🟪 Tím (Inventory oil)
+    "inventory water": "⬜",        # ⬜ Trắng (Inventory water coolant)
+    "coolant": "⬜",                # ⬜ Trắng (Coolant)
+    "return": "🟨",                 # 🟨 Vàng (Return)
+    "collect": "🟪",                # 🟪 Tím (Collect)
 }
 
 def get_action_square(at_name: str) -> str:
@@ -546,7 +555,7 @@ def get_action_square(at_name: str) -> str:
     for k, sq in ACTION_SQUARES.items():
         if k in clean:
             return sq
-    return "🟦"
+    return "🔹"
 
 def build_asset_msg(now_str, asset_data):
     """Build compact asset stats message with 3-day/7-day/month."""
@@ -559,10 +568,10 @@ def build_asset_msg(now_str, asset_data):
     grand = asset_data.get("grandTotal", {})
 
     TEAM_SHORT = {
-        "MYT_TNI_TEAM01_Dawei": "Team1(Dawei)",
-        "MYT_TNI_TEAM02_Myeik": "Team2(Myeik)",
-        "MYT_TNI_TEAM03_Bokpyin": "Team3(Bokpyin)",
-        "MYT_TNI_TEAM04_Kawthoung": "Team4(Kawthoung)",
+        "MYT_TNI_TEAM01_Dawei": "🟠 Team1(Dawei)",
+        "MYT_TNI_TEAM02_Myeik": "🔵 Team2(Myeik)",
+        "MYT_TNI_TEAM03_Bokpyin": "🟢 Team3(Bokpyin)",
+        "MYT_TNI_TEAM04_Kawthoung": "🟡 Team4(Kawthoung)",
     }
 
     def fmt(s):
