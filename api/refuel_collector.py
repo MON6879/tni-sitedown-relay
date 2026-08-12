@@ -35,27 +35,38 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))
 
 
 def classify(text: str) -> str | None:
-    """Phân loại tin nhắn theo keyword."""
-    t = text.lower()
-    if ("name of ft staff member" in t and "supervise" in t) or "follow monitor" in t or "follow moniter" in t or "supervise" in t:
-        return "FT_MONITOR"
-    if "dg type" in t:
-        return "REFUELED"
-    # Letter Submit: "letter" + "submit"/"submitted"
-    if "letter" in t and ("submit" in t or "submitted" in t):
-        return "LETTER_SUBMIT"
-    # Letter Approved: "letter" + "approved"
-    if "letter" in t and "approved" in t:
-        return "LETTER_APPROVED"
-    # PLAN: message must START with "Team <number/id> Plan" (case-insensitive)
+    """Phân loại tin nhắn báo cáo chính xác, loại bỏ 100% tin nhắn trao đổi thông thường (casual chat)."""
     import re
-    if re.match(r'^team[\s_\-]*\w*\s*plan\b', t):
-        return "PLAN"
-    if "request" in t:
-        return "REQUEST"
-    # Fallback cho báo cáo FT monitor có mã TNI và số lít L
-    if "tni" in t and ("l" in t or "+" in t):
+    t = text.lower().strip()
+
+    # 1. FT_MONITOR (báo cáo FT giám sát)
+    if ("name of ft staff member" in t and "supervise" in t) or re.search(r'\bfollow\s*monit?er?\b', t):
         return "FT_MONITOR"
+
+    # 2. REFUELED (báo cáo đã đổ xăng thực tế - phải có 'dg type' hoặc 'actual filled qty')
+    if "dg type" in t or "actual filled qty" in t:
+        return "REFUELED"
+
+    # 3. LETTER_SUBMIT (bắt buộc dạng tiêu đề "Letter Submit:" hoặc đầu dòng "Letter Submit"/"Submit Letter")
+    if re.search(r'^\s*(letter\s*submit|submit\s*letter)\b', t, re.M) or re.search(r'\b(letter\s*submit|submit\s*letter)\s*:', t):
+        return "LETTER_SUBMIT"
+
+    # 4. LETTER_APPROVED (bắt buộc dạng tiêu đề "Letter Approved:" hoặc đầu dòng "Approved Letter"/"Letter Approved")
+    if re.search(r'^\s*(approved\s*letter|letter\s*approved)\b', t, re.M) or re.search(r'\b(approved\s*letter|letter\s*approved)\s*:', t):
+        return "LETTER_APPROVED"
+
+    # 5. PLAN (bắt buộc dòng đầu "Team X Plan" hoặc "Plan refuel")
+    if re.search(r'^\s*team[\s_\-]*\w*\s*plan\b', t, re.M) or re.search(r'^\s*plan\s*refuel\b', t, re.M) or re.search(r'\bteam[\s_\-]*0*[1-4]\s*plan\b', t):
+        return "PLAN"
+
+    # 6. REQUEST (bắt buộc dòng đầu "Team X Request" hoặc "Request refuel")
+    if re.search(r'^\s*team[\s_\-]*\w*\s*request\b', t, re.M) or re.search(r'^\s*request\s*refuel\b', t, re.M) or re.search(r'\bteam[\s_\-]*0*[1-4]\s*request\b', t):
+        return "REQUEST"
+
+    # 7. Fallback cho báo cáo FT monitor có mã TNI và số lít L kèm từ khóa monitor/supervise
+    if "tni" in t and ("l" in t or "+" in t) and ("monitor" in t or "supervise" in t):
+        return "FT_MONITOR"
+
     return None
 
 
