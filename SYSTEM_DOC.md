@@ -1,5 +1,5 @@
 # TNI Bot System Documentation
-> **Last Updated:** 30/07/2026 13:42 Myanmar  
+> **Last Updated:** 12/08/2026 08:05 Myanmar  
 > **Maintainer:** Phong Ha Duc  
 > **Repo:** github.com/phonghdpxd-cmd/tni-bot
 
@@ -363,4 +363,88 @@ To prevent resource exhaustion and monitor usage limits, the system operates und
 ### 3. Telegram API Rate Limits
 - **Limits:** Max 30 messages/second to different chats; max 20 messages/minute within a single group.
 - **Controls:** Telethon API calls in our Python scripts use `asyncio.sleep(0.3)` between individual chat/user checks to prevent rate limiting issues.
+
+---
+
+## 🔐 Strict Message Classification Rules (v468 — All Collectors)
+
+> **Last Updated:** 12/08/2026 — Verified & fixed in v466→v468  
+> ⚠️ **MANDATORY**: Any AI or developer modifying collector logic MUST read and follow this section before making changes.
+
+### 📌 Core Principle: Strict First-Line + Before-Colon Keyword
+
+All message classifiers use **two-layer strict matching**:
+1. **First line only** — classification keyword must appear in the **first line** of the message (not anywhere in the body).
+2. **Before the colon** — the keyword must appear **before the first `:` character** on that first line (e.g., `Order: ...` → keyword is `order`, `Move 12/...:` → keyword is `move`).
+
+This prevents false positives where field values like `previous status: Order Pending` in a message body accidentally trigger the wrong collector type.
+
+---
+
+### 📋 Full Classification Rule Table (All Bots & Collectors)
+
+| # | Bot / Group | Message Type | Classification Rule | Status |
+|---|---|---|---|---|
+| 1 | `@TNI_FUEL` | REFUELED | Body contains `dg type` **or** `actual filled qty` (any line) | ✅ Strict |
+| 2 | `@TNI_FUEL` | PLAN | **First line**: matches `Team X Plan ...` **or** `Plan refuel ...` | ✅ Strict |
+| 3 | `@TNI_FUEL` | REQUEST | **First line**: matches `Team X Request ...` **or** `Request refuel ...` | ✅ Strict |
+| 4 | `@TNI_FUEL` | LETTER_SUBMIT | `Letter Submit:` **or** `Submit Letter:` + date on first/second line | ✅ Strict |
+| 5 | `@TNI_FUEL` | LETTER_APPROVED | `Approved Letter:` **or** `Letter Approved:` + date | ✅ Strict |
+| 6 | `@TNI_FUEL` | FT_MONITOR | Body contains `name of ft staff member` **and** `supervise` | ✅ Strict |
+| 7 | `@TNIASSETorderREQUEST_BOT` | Order/Revoke/Move/Done/Export... | **First line, before `:`**: keyword must be `order`, `revoke`, `move`, `done`, `export`, `cancel`, `return`, `lost`, `broken`, `update`, `inventory`, `mdg` | ✅ Fixed v468 |
+| 8 | Asset Bot (MDG Group) | INVENTORY | Body contains `inventory fuel` **and** `dg id: tni` | ✅ Strict |
+| 9 | Asset Bot (MDG Group) | MDG RUN | Body contains `mdg` **and** `site id: tni` | ✅ Strict |
+| 10 | Site Down Relay | LETTER | Strict regex: header keyword + `:` + date pattern | ✅ Fixed v467 |
+| 11 | GAS Router | All types | Strict regex matching (no partial body scan) | ✅ Fixed v467 |
+
+---
+
+### 🔑 Code Reference: Asset Bot `is_collector_msg()` (v468)
+
+The canonical implementation in [`api/collector.py`](../api/collector.py) uses:
+
+```python
+def is_collector_msg(text: str) -> bool:
+    """
+    Strict: keyword must appear BEFORE the first ':' on the FIRST line.
+    e.g. 'Order: ...' → 'order' before ':' ✅
+         'Previous Status: Order ...' → 'previous status' before ':' ❌ (not a collector keyword)
+    """
+    first_line = text.strip().splitlines()[0] if text.strip() else ""
+    before_colon = first_line.split(":")[0].strip().lower()
+    COLLECTOR_KEYWORDS = {
+        "order", "revoke", "move", "done", "export",
+        "cancel", "return", "lost", "broken", "update",
+        "inventory", "mdg"
+    }
+    return any(kw in before_colon for kw in COLLECTOR_KEYWORDS)
+```
+
+---
+
+### 🚫 Anti-Pattern: What NOT To Do
+
+```python
+# ❌ WRONG — scans entire message body, causes false positives
+if "order" in text.lower():
+    ...
+
+# ❌ WRONG — only checks first line but not "before colon"
+if text.strip().lower().startswith("order"):
+    ...
+
+# ✅ CORRECT — first line + before-colon keyword (v468 standard)
+before_colon = text.strip().splitlines()[0].split(":")[0].strip().lower()
+if any(kw in before_colon for kw in COLLECTOR_KEYWORDS):
+    ...
+```
+
+---
+
+### ✅ Test Coverage (v468)
+
+All 16 test cases in `scratch/test_collector_classify.py` must pass before any classifier change is merged:
+- **True Positive tests**: `Order: ...`, `Move 12/05:`, `Revoke: ...`, etc. → `is_collector_msg()` returns `True`
+- **False Positive tests**: Messages where `order`, `move`, etc. appear only in body fields → returns `False`
+- Run: `python scratch/test_collector_classify.py` from repo root
 
