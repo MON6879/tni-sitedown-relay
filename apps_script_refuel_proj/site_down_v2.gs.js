@@ -875,13 +875,11 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
 
 // ── Build Tin 2 tổng hợp cho CONTROL ────────────────────────
 function buildAwAzControlMessage(ts, awaz) {
-  // NGHIỆP VỤ: T3 Bokpyin hiện KHÔNG gửi vào CONTROL vì nhóm CONTROL
-  // chỉ theo dõi T1/T2/T4. Khi cần thêm T3, bỏ comment dòng bên dưới.
   const teamDefs = [
-    { key: "T1", label: "Team 1 Dawei",     emoji: "🔵", col: 0 },
-    { key: "T2", label: "Team 2 Myeik",     emoji: "🟡", col: 1 },
-    // { key: "T3", label: "Team 3 Bokpyin",   emoji: "🟢", col: 2 }, // bỏ comment nếu cần gửi T3 → CONTROL
-    { key: "T4", label: "Team 4 Kawthoung", emoji: "🔴", col: 3 },
+    { key: "T1", label: "Team 1 Dawei",     emoji: "🟠", col: 0 },
+    { key: "T2", label: "Team 2 Myeik",     emoji: "🔵", col: 1 },
+    { key: "T3", label: "Team 3 Bokpyin",   emoji: "🟢", col: 2 },
+    { key: "T4", label: "Team 4 Kawthoung", emoji: "🟡", col: 3 },
   ];
   const numRows = awaz.length;
   const lines   = [];
