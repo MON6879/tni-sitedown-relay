@@ -1756,86 +1756,82 @@ async def main():
             tl_list = [(p, n, c) for p, n, c, is_tl in members if is_tl]
             ft_list = [(p, n, c) for p, n, c, is_tl in members if not is_tl]
 
-            # Control: chỉ TL, thu thập metrics + full col D
+            # Control: thu thập metrics TL
             for prefix, name, content in tl_list:
                 if content:
                     m = parse_tl_metrics(content)
                     if m:
                         all_tl_metrics.append(m)
 
-            # ── Tin 4a: Báo cáo Tóm tắt (Summary) gửi từng nhóm Team ──
-            team_lines_indiv = [
-                f"📋 4a. Report — Daily EOD Task & Stats — {t_name}",
-                f"📅 {now_str}",
-                f"📌 Today's EOD summary of tasks completed, close rate, rank and search stats.",
-                "━━━━━━━━━━━━━━━━━━━━"
-            ]
-
-            emp_rows = []
-            for prefix, name, content in ft_list:
-                if content:
-                    m = parse_emp_metrics(content)
-                    if m:
-                        emp_rows.append(m)
-
-            if emp_rows:
-                team_lines_indiv.append("─" * 20)
-                team_lines_indiv.append("👷 FT Staff Summary:")
-                team_lines_indiv.append("Name | Rk | Site | Mo | 7D | 3Day | OVD | Task")
-                team_lines_indiv.append("─" * 38)
-                for em in emp_rows:
-                    team_lines_indiv.append(
-                        f"{em['color']} {em['name_short']}: "
-                        f"Rk/{em['rank']} Site/{em['site']} "
-                        f"Mo/{em['wo_month']} 7D/{em['wo_7day']} "
-                        f"3D:{em['three_day']} "
-                        f"OVD/{em['overdue']} "
-                        f"Task:{em['task_assign']}/{em['task_close']}"
-                    )
-
-            # Thống kê Search riêng cho từng Team (Asset đã tách thành 3.1)
-            team_search = build_team_search_section(team_key, report_data, now_str, no_id_members)
-            tl_search = build_tl_search_section(team_key, report_data, no_id_members)
-            no_search = build_no_search_list(team_key, report_data, no_id_members)
-
-            if team_search or tl_search or no_search:
-                team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
-            if team_search:
-                team_lines_indiv.append(team_search)
-            if tl_search:
-                team_lines_indiv.append(tl_search)
-            if no_search:
-                team_lines_indiv.append(no_search)
-
-            team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
-            team_lines_indiv.append(f"👥 Total: {len(members)} members")
-
-            team_msg = "\n".join(team_lines_indiv)
-            groups.setdefault(SEND_BOT_TOKEN, []).append(
-                (0, team_msg, str(gid), "TEAM_GROUP")
-            )
-
-            # ── Tin 4b: Full Report (Nội dung cột D chi tiết) ──
-            full_lines = [
-                f"📓 4b. Full Report — {t_name}",
-                f"📅 {now_str}",
-                "━" * 22,
-            ]
+            # ── BÁO CÁO TẠI GHẾ (1 TEAM = NGHỆ THUẬT CHIA KHỐI 10 NGƯỜI / TIN — KHÔNG NGẮT NỬA CHỪNG) ──
+            # Tạo danh sách các khối (member blocks)
+            member_blocks = []
             for prefix, name, content in tl_list:
                 if content:
-                    full_lines.append(f"🟧 {content}")
-                    full_lines.append("─" * 18)
+                    member_blocks.append(f"🟧 {content}")
             for prefix, name, content in ft_list:
                 if content:
                     nv_color = "🔴" if "/LostTARGET" in content else "🟢"
-                    full_lines.append(f"{nv_color} {content}")
-                    full_lines.append("─" * 18)
-            full_lines.append("━" * 22)
+                    member_blocks.append(f"{nv_color} {content}")
 
-            full_msg = "\n".join(full_lines)
-            groups.setdefault(SEND_BOT_TOKEN, []).append(
-                (0, full_msg, str(gid), "TEAM_GROUP_FULL")
-            )
+            # Đã gom xong toàn bộ khối nhân viên (không nén, nguyên vẹn Cột D)
+            # Bây giờ chia khối theo số lượng người (10 người / tin nhắn) hoặc tối đa 3000 ký tự
+            MEMBERS_PER_CHUNK = 10
+            chunks = []
+            cur_chunk = []
+            cur_len = 0
+
+            for mb in member_blocks:
+                mb_len = len(mb)
+                # Nếu đã đủ 10 người hoặc thêm người này sẽ > 3000 chars ➔ Ngắt sang tin mới!
+                if len(cur_chunk) >= MEMBERS_PER_CHUNK or (cur_len + mb_len > 3000 and cur_chunk):
+                    chunks.append(cur_chunk)
+                    cur_chunk = [mb]
+                    cur_len = mb_len
+                else:
+                    cur_chunk.append(mb)
+                    cur_len += mb_len
+            if cur_chunk:
+                chunks.append(cur_chunk)
+
+            total_parts = len(chunks)
+            for idx, chk in enumerate(chunks, 1):
+                part_title = f"📋 4. Report — Daily EOD Task & Stats — {t_name}"
+                if total_parts > 1:
+                    part_title += f" (Phần {idx}/{total_parts})"
+
+                p_lines = [
+                    part_title,
+                    f"📅 {now_str}",
+                    "━━━━━━━━━━━━━━━━━━━━"
+                ]
+                for mb in chk:
+                    p_lines.append(mb)
+                    p_lines.append("─" * 20)
+
+                # Chỉ gắn phần Search stats và Total vào Part cuối cùng
+                if idx == total_parts:
+                    team_search = build_team_search_section(team_key, report_data, now_str, no_id_members)
+                    tl_search = build_tl_search_section(team_key, report_data, no_id_members)
+                    no_search = build_no_search_list(team_key, report_data, no_id_members)
+
+                    if team_search or tl_search or no_search:
+                        p_lines.append("━━━━━━━━━━━━━━━━━━━━")
+                    if team_search:
+                        p_lines.append(team_search)
+                    if tl_search:
+                        p_lines.append(tl_search)
+                    if no_search:
+                        p_lines.append(no_search)
+
+                    p_lines.append("━━━━━━━━━━━━━━━━━━━━")
+                    p_lines.append(f"👥 Total: {len(members)} members")
+
+                team_msg = "\n".join(p_lines)
+                groups.setdefault(SEND_BOT_TOKEN, []).append(
+                    (0, team_msg, str(gid), f"TEAM_GROUP_P{idx}")
+                )
+
         # Build và gửi bảng so sánh TL vào CONTROL
         grp_msg = build_tl_comparison(all_tl_metrics, now_str)
         if grp_msg:
