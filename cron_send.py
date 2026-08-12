@@ -1764,18 +1764,17 @@ async def main():
                         all_tl_metrics.append(m)
 
             # ── BÁO CÁO TẠI GHẾ (1 TEAM = NGHỆ THUẬT CHIA KHỐI 10 NGƯỜI / TIN — KHÔNG NGẮT NỬA CHỪNG) ──
-            # Tạo danh sách các khối (member blocks) kèm chấm màu lặp lại cố định theo Team
-            COLOR_PALETTE = ["🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤", "⚪"]
+            # Tạo danh sách các khối (member blocks): 🔴 cho /LostTARGET, 🟢 cho Met target
             member_blocks = []
             for prefix, name, content in tl_list:
                 if content:
                     member_blocks.append(f"🟧 {content}")
-            for i, (prefix, name, content) in enumerate(ft_list):
+            for prefix, name, content in ft_list:
                 if content:
-                    if "/LostTARGET" in content:
+                    if "/LostTARGET" in content or "/losttarget" in content.lower():
                         nv_color = "🔴"
                     else:
-                        nv_color = COLOR_PALETTE[i % len(COLOR_PALETTE)]
+                        nv_color = "🟢"
                     member_blocks.append(f"{nv_color} {content}")
 
             # Đã gom xong toàn bộ khối nhân viên (không nén, nguyên vẹn Cột D)
