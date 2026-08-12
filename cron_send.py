@@ -1896,13 +1896,6 @@ async def main():
                 groups.setdefault(SEND_BOT_TOKEN, []).append(
                     (0, team_asset_msg, str(gid), "TEAM_ASSET_PROGRESS_31")
                 )
-        # 2. Bắn tin chi tiết cho từng Team (T1, T2, T3, T4)
-        for gid, team_key in GID_TO_TEAM.items():
-            team_asset_msg = build_team_asset_msg(team_key, now_str, asset_data)
-            if team_asset_msg:
-                groups.setdefault(SEND_BOT_TOKEN, []).append(
-                    (0, team_asset_msg, str(gid), "TEAM_ASSET_PROGRESS_31")
-                )
 
     # ── Mapping chat_id → GAS key để delete-old / save-new ──
     CHATID_TO_KEY = {
