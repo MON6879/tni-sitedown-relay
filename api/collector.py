@@ -385,29 +385,54 @@ def parse_plan_fields(text: str) -> tuple:
 
 # ── Detect collector keyword in message ───────────────────────────────────
 def is_collector_msg(text: str) -> bool:
-    """Match keyword at start of any line, case-insensitive, with or without ':', or via slash command."""
+    """
+    Strict match: keyword phải nằm ở DÒNG ĐẦU TIÊN và phải đứng TRƯỚC dấu ':'.
+    Ví dụ hợp lệ:
+        Order: 12/08/2026 ...
+        Revoke: TNI0210 ...
+        Move:
+        /order
+    Ví dụ KHÔNG hợp lệ (chat bình thường):
+        Let me order something
+        We should move that asset
+        can you export this?
+    """
     if not text:
         return False
-    # 🛑 LOẠI BỎ DAILY RESULT VÀ DAILY PLAN (Do Search bot @SEARCHTNITASKWOBOT xử lý)
+
+    # 🛑 LOẠI BỎ DAILY RESULT VÀ DAILY PLAN (Do Search bot xử lý)
     text_l = text.lower()
     if "daily result" in text_l or "daily plan" in text_l:
         return False
 
-    # Xử lý lệnh dạng /order hoặc /order@TNIASSETOrderREQUEST_BOT
     clean_text = text.strip()
+
+    # ── Xử lý lệnh slash /order hoặc /order@bot ──
     if clean_text.startswith("/"):
-        # Lấy tên lệnh bỏ qua phần @botusername
         cmd_m = re.match(r'^/([a-zA-Z0-9_]+)(?:@[a-zA-Z0-9_]+)?(?:\s+(.*))?$', clean_text, re.DOTALL)
         if cmd_m:
             cmd = cmd_m.group(1).lower()
-            rest = cmd_m.group(2) or ""
-            clean_text = f"{cmd} {rest}".strip()
+            # Slash command hợp lệ nếu là keyword đã biết
+            for k in get_keywords():
+                if cmd == k.replace(" ", "_") or cmd == k.replace(" ", ""):
+                    return True
+        return False
 
-    lower = clean_text.lower()
+    # ── Chỉ kiểm tra DÒNG ĐẦU TIÊN ──
+    first_line = clean_text.splitlines()[0].strip().lower()
+
     for k in get_keywords():
-        pattern = r'(?:^|\n)\s*' + re.escape(k) + r'(?:\s*[:\s]|\s*$)'
-        if re.search(pattern, lower):
+        k_esc = re.escape(k)
+        # Keyword phải đứng ĐẦU dòng, và ngay sau keyword là ':' hoặc khoảng trắng + ký tự khác (không phải chữ cái liên tiếp)
+        # Pattern: ^<keyword>\s*: hoặc ^<keyword>\s+\S (có nội dung sau)
+        # Không cho phép: "let me order" hay "We can move"
+        if re.match(r'^\s*' + k_esc + r'\s*[:\-]', first_line):
             return True
+        if re.match(r'^\s*' + k_esc + r'\s+\d', first_line):   # keyword + ngày tháng/số
+            return True
+        if re.match(r'^\s*' + k_esc + r'\s*$', first_line):    # keyword đứng một mình
+            return True
+
     return False
 
 
