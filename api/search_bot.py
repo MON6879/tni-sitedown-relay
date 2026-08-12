@@ -839,15 +839,15 @@ def is_daily_plan(text: str) -> bool:
         "comparison of plan for", "auto report", "plan stats:", "report — daily plan",
         "crosscheck", "plan tomorrow status", "plan vs actual", "eod summary",
         "shows detailed site assignments", "tasks grouped by department", "recent plans",
-        "plans for ", "plan updated", "plan saved", "ref:", "ref:dp-", "đã lưu",
+        "plans for ", "plan updated", "plan saved", "ref:dp-", "đã lưu",
         "tni personal find task", "ft result daily", "personal find task", "find task + wo",
         "submitted ✓", "submitted v", "not yet submitted"
     )):
         return False
 
-    has_plan = any(kw in text_l for kw in ("daily plan", "i. hot task", "hot task", "plan for", "plan:", "kế hoạch"))
+    has_plan = any(kw in text_l for kw in ("daily plan", "i. hot task", "hot task", "plan for", "plan:", "kế hoạch", "list name ft"))
     has_date = bool(re.search(r'\b\d{1,2}[\/\.-]\d{1,2}(?:[\/\.-]\d{2,4})?\b', text))
-    return has_plan and has_date
+    return has_plan or ("hot task" in text_l and "list name ft" in text_l) or (any(f"team {i}" in text_l for i in range(1,6)) and "daily plan" in text_l)
 
 
 def parse_plan_fields(text: str, chat_id: int | None = None, chat_title: str | None = None) -> tuple:
@@ -1214,13 +1214,13 @@ def handle(update: dict) -> None:
     if not text:
         return
 
-    # ── SITE DOWN V2 RELAY ──────────────────────────────────────────────────
+    # ── SITE DOWN V2 RELAY (Bypass for Daily Plan to prevent 15s HTTP timeout) ──
     text_l = text.lower()
-    if "site down" in text_l or "cell down" in text_l or "dg abnormal" in text_l or "dg run>16h" in text_l or "down_tni" in text_l:
+    if not is_daily_plan(text) and any(kw in text_l for kw in ("site down", "cell down", "dg abnormal", "dg run>16h", "down_tni")):
         sd_url = "https://script.google.com/macros/s/AKfycbxVi0BGDW7B_KBxcSEdw3yuHB9Rs2BemQEYeKDwsybJQdmQv-_0HqyGHjpZI6jupxll/exec"
         logger.info(f"[SD Relay] Forwarding Site Down report update to Apps Script...")
         try:
-            requests.post(sd_url, json=update, timeout=15)
+            requests.post(sd_url, json=update, timeout=3)
         except Exception as e:
             logger.error(f"[SD Relay] Forward error: {e}")
 
