@@ -1640,19 +1640,16 @@ async def main():
     # ── 6. Build management report: TL summaries + Technical Dept only ──
     # BOD/Manager chỉ nhận TL Reports + Technical Dept
     mgmt_parts = [
-        f"📋 4. Report — Daily EOD Task & Stats — Summary",
+        f"📋 4a. Report — Daily EOD Task & Stats — Summary",
         f"📅 {now_str}",
-        f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
+        f"📌 Today's EOD summary of tasks completed, close rate, rank and search stats.",
         "━━━━━━━━━━━━━━━━━━━━"
     ]
-    # search_msg và asset_msg gửi KÈM với mgmt_report
+    # search_msg gửi KÈM với mgmt_report (Asset 3.1 tách thành tin 3.1 độc lập)
     if search_msg:
         mgmt_parts.append("━" * 20)
         mgmt_parts.append(search_msg)
-    if asset_msg:
-        mgmt_parts.append("━" * 20)
-        mgmt_parts.append(asset_msg)
-    # CONTROL NOTE đã được bỏ khỏi tin bot và phát riêng bằng @phongha79
+
     mgmt_report = "\n".join(mgmt_parts)
 
     # Chat ID nhóm "5 TNI TECHNICA DEP CONTROL SITE"
@@ -1727,7 +1724,7 @@ async def main():
                 tech_messages.append((name, content))
             continue
 
-    # ── 7a. Gộp tin nhắn 4 Team → Báo cáo Consolidated gửi vào Control & Gửi riêng từng Team ──
+    # ── 7a. Gộp tin nhắn 4 Team → Báo cáo 4a (Summary) & 4b (Full) gửi riêng từng Team ──
     if SEND_BOT_TOKEN:
         t_names = {
             "MYT_TNI_TEAM01_Dawei": "Team 1 Dawei",
@@ -1766,18 +1763,14 @@ async def main():
                     if m:
                         all_tl_metrics.append(m)
 
-            # ── 2. Tạo báo cáo chi tiết gửi riêng vào từng nhóm Team (giữ nguyên cột D đầy đủ) ──
+            # ── Tin 4a: Báo cáo Tóm tắt (Summary) gửi từng nhóm Team ──
             team_lines_indiv = [
-                f"📋 4. Report — Daily EOD Task & Stats — {t_name}",
+                f"📋 4a. Report — Daily EOD Task & Stats — {t_name}",
                 f"📅 {now_str}",
-                f"📌 Today's EOD summary of tasks completed, close rate, rank, asset and search stats.",
+                f"📌 Today's EOD summary of tasks completed, close rate, rank and search stats.",
                 "━━━━━━━━━━━━━━━━━━━━"
             ]
-            # Note sẽ được gửi riêng dưới tên @phongha79 (Telethon reply) sau khi pin Report 4
-            # TL đã có đầy đủ trong Report 4b — không lặp lại ở Report 4
 
-            # NV: parse_emp_metrics → compact 1 dòng với 🔺 prefix
-            # Không dedup — mỗi dòng sheet = 1 người (name = nv_ROW — luôn unique)
             emp_rows = []
             for prefix, name, content in ft_list:
                 if content:
@@ -1788,7 +1781,6 @@ async def main():
             if emp_rows:
                 team_lines_indiv.append("─" * 20)
                 team_lines_indiv.append("👷 FT Staff Summary:")
-                # Header gợi nhớ
                 team_lines_indiv.append("Name | Rk | Site | Mo | 7D | 3Day | OVD | Task")
                 team_lines_indiv.append("─" * 38)
                 for em in emp_rows:
@@ -1801,27 +1793,19 @@ async def main():
                         f"Task:{em['task_assign']}/{em['task_close']}"
                     )
 
-            # Thêm thống kê Asset và Search riêng cho từng Team
-            team_asset = build_team_asset_section(team_key, asset_data)
+            # Thống kê Search riêng cho từng Team (Asset đã tách thành 3.1)
             team_search = build_team_search_section(team_key, report_data, now_str, no_id_members)
             tl_search = build_tl_search_section(team_key, report_data, no_id_members)
             no_search = build_no_search_list(team_key, report_data, no_id_members)
 
-
-            if team_asset or team_search or tl_search or no_search:
+            if team_search or tl_search or no_search:
                 team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
-            if team_asset:
-                team_lines_indiv.append(team_asset)
-            if team_asset and (team_search or tl_search or no_search):
-                team_lines_indiv.append("────────────────────")
             if team_search:
                 team_lines_indiv.append(team_search)
             if tl_search:
                 team_lines_indiv.append(tl_search)
             if no_search:
                 team_lines_indiv.append(no_search)
-
-            # NOTE đã hiển thị ở đầu message — không lặp lại cuối
 
             team_lines_indiv.append("━━━━━━━━━━━━━━━━━━━━")
             team_lines_indiv.append(f"👥 Total: {len(members)} members")
@@ -1831,22 +1815,19 @@ async def main():
                 (0, team_msg, str(gid), "TEAM_GROUP")
             )
 
-            # ── Message 2: Nguyên nội dung cột D (gửi sau bản phân tích) ──
+            # ── Tin 4b: Full Report (Nội dung cột D chi tiết) ──
             full_lines = [
                 f"📓 4b. Full Report — {t_name}",
                 f"📅 {now_str}",
                 "━" * 22,
             ]
-            # TL full col D
             for prefix, name, content in tl_list:
                 if content:
                     full_lines.append(f"🟧 {content}")
                     full_lines.append("─" * 18)
-            # NV full col D — không dedup, thêm màu đầu dòng theo LostTARGET
             for prefix, name, content in ft_list:
                 if content:
                     nv_color = "🔴" if "/LostTARGET" in content else "🟢"
-
                     full_lines.append(f"{nv_color} {content}")
                     full_lines.append("─" * 18)
             full_lines.append("━" * 22)
@@ -1901,13 +1882,20 @@ async def main():
             (0, detail_msg, CONTROL_CHAT_ID, "TECHDEP_DETAIL")
         )
 
-    # ── 7d. Gửi STANDALONE BÁO CÁO 3.1 Asset progress for material → CONTROL & TEAMS ──
+    # ── 7d. Gửi STANDALONE BÁO CÁO 3.1 Asset progress for material (Tách độc lập 100%) ──
     if asset_msg and SEND_BOT_TOKEN:
         logger.info("[Cron] Queuing 3.1 Asset progress for material report...")
         # 1. Bắn tin tổng hợp 3.1 vào CONTROL_CHAT_ID (-5251698940)
         groups.setdefault(SEND_BOT_TOKEN, []).append(
             (0, asset_msg, CONTROL_CHAT_ID, "ASSET_PROGRESS_31")
         )
+        # 2. Bắn tin chi tiết cho từng Team (T1, T2, T3, T4)
+        for gid, team_key in GID_TO_TEAM.items():
+            team_asset_msg = build_team_asset_msg(team_key, now_str, asset_data)
+            if team_asset_msg:
+                groups.setdefault(SEND_BOT_TOKEN, []).append(
+                    (0, team_asset_msg, str(gid), "TEAM_ASSET_PROGRESS_31")
+                )
         # 2. Bắn tin chi tiết cho từng Team (T1, T2, T3, T4)
         for gid, team_key in GID_TO_TEAM.items():
             team_asset_msg = build_team_asset_msg(team_key, now_str, asset_data)
@@ -1942,12 +1930,18 @@ async def main():
             delete_tasks.append((del_cid, "📋 2. Report — Daily Backlog"))
             delete_tasks.append((del_cid, "📋 3. Report — Main DG Material Need"))
             delete_tasks.append((del_cid, "📋 4. Report — Daily EOD Task & Stats"))
+            delete_tasks.append((del_cid, "📋 4a. Report — Daily EOD Task & Stats"))
             delete_tasks.append((del_cid, "📓 4b. Full Report"))
+            delete_tasks.append((del_cid, "📦 3.1 Asset progress for material"))
+            delete_tasks.append((del_cid, "3.1 Asset progress for material"))
             delete_tasks.append((del_cid, "📋 5. Report — Daily Plan"))
         delete_tasks += [
             (str(CONTROL_CHAT_ID), "📋 1. Report — Technical Dept Task Progress"),
             (str(CONTROL_CHAT_ID), "📋 8. Report — Technical Dep Assign to Team"),
             (str(CONTROL_CHAT_ID), "📋 4. Report — TL Comparison"),
+            (str(CONTROL_CHAT_ID), "📋 4a. Report — Daily EOD Task & Stats"),
+            (str(CONTROL_CHAT_ID), "📦 3.1 Asset progress for material"),
+            (str(CONTROL_CHAT_ID), "3.1 Asset progress for material"),
             (str(CONTROL_CHAT_ID), "📋 5. Report — Daily Plan"),
             (str(CONTROL_CHAT_ID), "📋 1. BOD"),   # BOD report nếu có
         ]
