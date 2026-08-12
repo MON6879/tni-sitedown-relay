@@ -163,12 +163,13 @@ async def delete_by_title_telethon(
             if not msg.text:
                 continue
 
-            # Xóa các tin Note chỉ đạo gửi từ @phongha79 (revoke=True xóa hẳn không để khung xanh)
+            # Xóa các tin Note chỉ đạo gửi từ @phongha79 (Telethon revoke=True kèm delay 0.4s tránh Spam Lock)
             if "Note: Above are the end-of-day work results" in msg.text:
                 try:
                     await client.delete_messages(cid, [msg.id], revoke=True)
                     deleted += 1
                     print(f"[delete_title] 🗑️ Xóa hẳn Note msg_id={msg.id} (revoke=True)")
+                    await asyncio.sleep(0.4)
                 except Exception as ex:
                     print(f"[delete_title] ⚠️ Xóa Note lỗi: {ex}")
                 continue
@@ -184,23 +185,23 @@ async def delete_by_title_telethon(
             if not first_line_clean.startswith(title_pfx_clean):
                 continue
 
-            # Xóa hẳn cho mọi người qua Telethon revoke=True + Bot API fallback
+            # Xóa tin của Bot qua Bot API trước (tránh dùng tài khoản user xóa tin Bot gây FloodWait)
             try:
-                await client.delete_messages(cid, [msg.id], revoke=True)
-                deleted += 1
-                print(f"[delete_title] 🗑️ Xóa hẳn msg_id={msg.id} ('{title_prefix[:35]}...')")
-            except Exception:
-                # Fallback xóa qua Bot API
-                try:
-                    resp = requests.post(
-                        f"https://api.telegram.org/bot{bot_token}/deleteMessage",
-                        json={"chat_id": cid, "message_id": msg.id},
-                        timeout=10,
-                    )
-                    if resp.json().get("ok"):
-                        deleted += 1
-                except Exception as ex:
-                    print(f"[delete_title] ❌ delete msg_id={msg.id}: {ex}")
+                resp = requests.post(
+                    f"https://api.telegram.org/bot{bot_token}/deleteMessage",
+                    json={"chat_id": cid, "message_id": msg.id},
+                    timeout=10,
+                )
+                if resp.json().get("ok"):
+                    deleted += 1
+                    print(f"[delete_title] 🗑️ Bot API xóa msg_id={msg.id} ('{title_prefix[:35]}...')")
+                else:
+                    # Fallback xóa qua Telethon nếu Bot API lỗi
+                    await client.delete_messages(cid, [msg.id], revoke=True)
+                    deleted += 1
+                    await asyncio.sleep(0.4)
+            except Exception as ex:
+                print(f"[delete_title] ❌ delete msg_id={msg.id}: {ex}")
     except Exception as ex:
         print(f"[delete_title] ❌ iter_messages({cid}): {ex}")
 
