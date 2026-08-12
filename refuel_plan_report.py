@@ -494,9 +494,7 @@ def report_1(data: RefuelData):
     print("✅ Report 1 sent.")
 
 
-def report_3(data: RefuelData):
-    """Alias cho report_1 để tương thích với các script cũ."""
-    report_1(data)
+
 
 
 def report_2(data: RefuelData):
@@ -610,58 +608,6 @@ def report_2(data: RefuelData):
     print("✅ Report 2 sent.")
 
 
-def report_3(data: RefuelData):
-    """
-    Report 3: Read Need Refuel sheet, cells AB1:AB5 (Column AB).
-    Sends the exact site refuel request summary formatted to Telegram group.
-    Scheduled at: 05:08 AM, 08:38 AM, 16:38 PM (Myanmar UTC+6:30).
-    """
-    print("⛽ Generating Report 3 — Need Request Refuel (Sheet Need Refuel, Col AB)...")
-    now = datetime.now(TZ_MM)
-    today_str = now.strftime("%d/%m/%Y")
-    time_str = now.strftime("%H:%M")
-
-    raw_lines = []
-    try:
-        wb = openpyxl.load_workbook(XLSX_FILE_PATH, data_only=True)
-        if "Need Refuel" in wb.sheetnames:
-            ws = wb["Need Refuel"]
-            for r in range(1, 10):
-                val = ws.cell(row=r, column=28).value  # Col AB = 28
-                if val is not None and str(val).strip():
-                    raw_lines.append(str(val).strip())
-    except Exception as e:
-        print(f"❌ Error reading Need Refuel AB column: {e}", file=sys.stderr)
-
-    if not raw_lines:
-        raw_lines = ["/Need request Refuel: /0 Site", "No sites pending request."]
-
-    lines = [
-        f"🔄 <b>[Report 3] NEED REQUEST REFUEL LIST — {today_str}</b>",
-        f"⏰ {time_str} Myanmar",
-        ""
-    ]
-
-    for line in raw_lines:
-        if line.startswith("/Need request Refuel") or "Refuel" in line:
-            lines.append(f"📋 <b>{line}</b>\n")
-        elif "+" in line:
-            sites = [s.strip() for s in line.split("+") if s.strip()]
-            chunked = []
-            for i in range(0, len(sites), 3):
-                group = sites[i:i+3]
-                if i + 3 < len(sites):
-                    chunked.append(" + ".join(group) + " +")
-                else:
-                    chunked.append(" + ".join(group))
-            lines.append("<code>" + "\n".join(chunked) + "</code>")
-        else:
-            lines.append(f"<code>{line}</code>")
-
-    lines.append("\n🤖 <i>Auto report — Refuel Plan System</i>")
-
-    tg_send("\n".join(lines), "report3")
-    print("✅ Report 3 sent.")
 
 
 def report_4(data: RefuelData):
@@ -720,7 +666,7 @@ def main():
     sys.argv = new_argv
 
     parser = argparse.ArgumentParser(description="TNI Refuel Plan Reports")
-    parser.add_argument("--report", type=int, choices=[1, 2, 3, 4, 5, 21], nargs="+",
+    parser.add_argument("--report", type=int, choices=[1, 2, 4, 5, 21], nargs="+",
                         help="Report numbers (1, 2, 3, 4, 5). Omit to run default.")
     args = parser.parse_args()
 
@@ -740,8 +686,7 @@ def main():
         report_1(data)
     if 2 in reports_to_run or 4 in reports_to_run:
         report_2(data)
-    if 3 in reports_to_run:
-        report_3(data)
+
     if 5 in reports_to_run:
         report_5(data)
 
