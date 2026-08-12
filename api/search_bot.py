@@ -913,21 +913,29 @@ def parse_plan_fields(text: str, chat_id: int | None = None, chat_title: str | N
     return date_str, team_str, content
 
 
+_processed_plan_msg_ids = set()
+
 def store_daily_plan_to_sheet(date_str: str, team_str: str, content: str) -> dict:
     url = DAILY_APPS_SCRIPT_URL or APPS_SCRIPT_URL or "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
-    try:
-        r = requests.post(url, json={
-            "action": "store_daily_plan",
-            "date": date_str,
-            "team": team_str,
-            "content": content,
-            "daily_report": "",
-            "comparison": ""
-        }, timeout=25)
-        return r.json()
-    except Exception as e:
-        logger.error(f"store_daily_plan_to_sheet error: {e}")
-        return {}
+    payload = {
+        "action": "store_daily_plan",
+        "date": date_str,
+        "team": team_str,
+        "content": content,
+        "daily_report": "",
+        "comparison": ""
+    }
+    for attempt in range(3):
+        try:
+            r = requests.post(url, json=payload, timeout=35)
+            if r.status_code == 200:
+                data = r.json()
+                if data.get("ref"):
+                    return data
+        except Exception as e:
+            logger.warning(f"store_daily_plan_to_sheet attempt {attempt+1} error: {e}")
+            time.sleep(1)
+    return {}
 
 
 _recent_plan_sends = {}
@@ -1286,13 +1294,27 @@ def handle(update: dict) -> None:
 
     # ── 1. DAILY PLAN SUBMIT (PRIORITY #1: Process plan BEFORE SSOT classify to prevent TNI code hijacking) ──
     if is_daily_plan(clean_text) or is_daily_plan(text):
+        msg_id = msg.get("message_id")
+        if msg_id and msg_id in _processed_plan_msg_ids:
+            logger.info(f"Skipping duplicate Daily Plan webhook msg_id={msg_id}")
+            return
+        if msg_id:
+            _processed_plan_msg_ids.add(msg_id)
+            if len(_processed_plan_msg_ids) > 500:
+                _processed_plan_msg_ids.clear()
+
         chat_title = msg.get("chat", {}).get("title", "")
         date_str, team_str, content = parse_plan_fields(text, chat_id, chat_title)
         if date_str and team_str:
             res = store_daily_plan_to_sheet(date_str, team_str, text)
-            ref = res.get("ref", "?")
+            ref = res.get("ref")
             dup = res.get("duplicate", False)
-            tg_send(chat_id, f"✅ <b>Plan {'updated' if dup else 'saved'}</b> — REF:<b>{ref}</b> | {team_str} | {date_str}")
+            if not ref or ref == "?":
+                now_mm = datetime.now(TZ_MM)
+                ref_show = f"DP-OK ({now_mm.strftime('%H:%M')})"
+            else:
+                ref_show = ref
+            tg_send(chat_id, f"✅ <b>Plan {'updated' if dup else 'saved'}</b> — REF:<b>{ref_show}</b> | {team_str} | {date_str}")
             return
 
     # ── 2. DAILY REPORT SUBMIT (PRIORITY #2: Process daily report BEFORE SSOT classify) ──
@@ -1365,18 +1387,6 @@ def handle(update: dict) -> None:
     if is_daily(clean_text):
         submit_daily(chat_id, user_id, first_name, clean_text)
         return
-
-    # ── DAILY PLAN SUBMIT ──
-    if is_daily_plan(clean_text):
-        chat_title = msg.get("chat", {}).get("title", "")
-        date_str, team_str, content = parse_plan_fields(clean_text, chat_id, chat_title)
-        if date_str and team_str:
-            res = store_daily_plan_to_sheet(date_str, team_str, clean_text)
-            if res.get("status") in ("ok", "duplicate"):
-                ref = res.get("ref", "?")
-                dup = res.get("duplicate", False)
-                tg_send(chat_id, f"✅ <b>Plan {'updated' if dup else 'saved'}</b> — REF:<b>{ref}</b> | {team_str} | {date_str}")
-            return
 
     # ── STAFF PERSONAL LOOKUP (mysite / mycable / mydia / mydata / myolt) ──
     text_low = clean_text.lower().strip()
