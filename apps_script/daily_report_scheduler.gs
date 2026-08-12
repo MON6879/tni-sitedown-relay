@@ -23,16 +23,16 @@ function relayDailyReports() {
   const myanmarHour = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "H"), 10);
   const myanmarMin  = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "m"), 10);
 
-  // 1. 06:55–07:25 Myanmar → dispatch plan_morning (07:00)
-  const isPlanMrnTime = (myanmarHour === 6 && myanmarMin >= 55) || (myanmarHour === 7 && myanmarMin <= 25);
+  // 1. 05:55–06:25 Myanmar → dispatch plan_morning (06:03 AM MMT)
+  const isPlanMrnTime = (myanmarHour === 5 && myanmarMin >= 55) || (myanmarHour === 6 && myanmarMin <= 25);
   if (isPlanMrnTime) {
     runOnceToday("DAILY_PLAN_MRN_DATE_", function() {
       return triggerDailyWorkflow("plan_morning");
     });
   }
 
-  // 2. 16:05–16:35 Myanmar → gửi Task Remain & dispatch plan_eod, bod_assign, daily_task (16:10)
-  const isEodReportTime = (myanmarHour === 16 && myanmarMin >= 5 && myanmarMin <= 35);
+  // 2. 18:25–18:55 Myanmar → gửi Task Remain & dispatch plan_eod (18:38 PM MMT)
+  const isEodReportTime = (myanmarHour === 18 && myanmarMin >= 25 && myanmarMin <= 55);
   if (isEodReportTime) {
     runOnceToday("DAILY_PLAN_EOD_DATE_", function() {
       return triggerDailyWorkflow("plan_eod");
@@ -57,15 +57,15 @@ function relayDailyReports() {
     });
   }
 
-  // 5. 20:55–21:25 Myanmar → dispatch plan_update (21:00)
-  const isPlanUpdTime = (myanmarHour === 20 && myanmarMin >= 55) || (myanmarHour === 21 && myanmarMin <= 25);
+  // 5. 18:55–19:25 Myanmar → dispatch plan_update (19:08 PM MMT)
+  const isPlanUpdTime = (myanmarHour === 18 && myanmarMin >= 55) || (myanmarHour === 19 && myanmarMin <= 25);
   if (isPlanUpdTime) {
     runOnceToday("DAILY_PLAN_UPD_DATE_", function() {
       return triggerDailyWorkflow("plan_update");
     });
   }
 
-  // 6. 08:55–09:25 Myanmar → dispatch Refuel Plan Report 2 (09:00)
+  // 6. 08:55–09:25 Myanmar → dispatch Refuel Plan Report 2 (09:00 AM MMT)
   const isRefuelPlan9 = (myanmarHour === 8 && myanmarMin >= 55) || (myanmarHour === 9 && myanmarMin <= 25);
   if (isRefuelPlan9) {
     runOnceToday("REFUEL_PLAN_R2_9_DATE_", function() {
@@ -73,7 +73,7 @@ function relayDailyReports() {
     });
   }
 
-  // 7. 12:55–13:25 Myanmar → dispatch Refuel Plan Report 2 (13:00)
+  // 7. 12:55–13:25 Myanmar → dispatch Refuel Plan Report 2 (13:08 PM MMT)
   const isRefuelPlan13 = (myanmarHour === 12 && myanmarMin >= 55) || (myanmarHour === 13 && myanmarMin <= 25);
   if (isRefuelPlan13) {
     runOnceToday("REFUEL_PLAN_R2_13_DATE_", function() {
@@ -81,8 +81,8 @@ function relayDailyReports() {
     });
   }
 
-  // 8. 19:55–20:25 Myanmar → dispatch Refuel Plan Report 2 (20:00)
-  const isRefuelPlan20 = (myanmarHour === 19 && myanmarMin >= 55) || (myanmarHour === 20 && myanmarMin <= 25);
+  // 8. 20:25–20:55 Myanmar → dispatch Refuel Plan Report 2 (20:43 PM MMT)
+  const isRefuelPlan20 = (myanmarHour === 20 && myanmarMin >= 25 && myanmarMin <= 55);
   if (isRefuelPlan20) {
     runOnceToday("REFUEL_PLAN_R2_20_DATE_", function() {
       return triggerDailyWorkflow("Report 2 - Progress Sent Plan");
