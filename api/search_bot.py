@@ -721,16 +721,22 @@ def is_daily(text: str) -> bool:
     if not text:
         return False
     text_l = text.lower()
+    
+    # 🛑 1. CHẶN HẲN BÀI PLAN: Bài Plan của Team Leader BẮT BỘC bị loại trừ 100%
+    if is_daily_plan(text):
+        return False
     if any(kw in text_l for kw in ("daily plan", "plan:", "kế hoạch", "i. hot task", "above are the end-of-day", "auto report", "ref:dp-", "đã lưu", "team leader assign")):
         return False
-    
-    # Từ khóa nhận dạng chính xác bài nộp Daily Result của kỹ thuật viên
+
+    # 🟢 2. TỪ KHÓA NHẬN DẠNG CẤU TRÚC CHUẨN BÀI NỘP DAILY RESULT CỦA KỸ THUẬT VIÊN FT
     has_daily_kw = any(kw in text_l for kw in (
-        "daily result", "daily result:", "1. transportation used", "transportation used",
-        "transportation", "detail wo:", "detail task:", "1. full name", "full name", "daily report"
+        "daily result", "daily result:", "daily report", "transportation used",
+        "transportation", "detail wo:", "detail task:", "full name",
+        "name site rescue", "name cell rescue", "resuce cable", "site repair alarm",
+        "partner refuel", "other task:"
     ))
-    has_date = bool(re.search(r'\b\d{1,2}[/\.-]\d{1,2}[/\.-]\d{2,4}\b', text))
-    return has_daily_kw and has_date
+    
+    return has_daily_kw
 
 
 def get_copy_markup(chat_id: int, team_arg: str, text_label: str) -> dict:

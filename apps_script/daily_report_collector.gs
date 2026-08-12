@@ -196,6 +196,15 @@ function handleDailyAdd(body) {
     return "";
   });
 
+  // 📅 ÉP NGÀY CHUẨN: Cột C (Daily Result Date) nếu không tìm thấy trong bài sẽ tự động lấy ngày hôm nay (dd/MM/yyyy)
+  if (!dataRow[0] || !dataRow[0].trim()) {
+    dataRow[0] = Utilities.formatDate(new Date(), TIMEZONE, "dd/MM/yyyy");
+  }
+  // 👤 ÉP TÊN CHUẨN: Cột D (Full Name) nếu rỗng sẽ tự động lấy tên Telegram User Name
+  if ((!dataRow[1] || !dataRow[1].trim()) && userName) {
+    dataRow[1] = userName;
+  }
+
   // ✅ BẢO VỆ CHỐNG DÒNG RỖNG: Kiểm tra nếu không có dữ liệu nội dung → Bỏ qua không chèn dòng trống
   const hasContent = dataRow.some(val => String(val || "").trim().length > 0);
   if (!hasContent) {
