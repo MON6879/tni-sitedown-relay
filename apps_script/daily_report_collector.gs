@@ -247,8 +247,43 @@ function handleDailyAdd(body) {
     props.deleteProperty(pKey);
   }
 
+  // 🔄 AUTO-SYNC: Đẩy kết quả Daily Result sang Cột E (Daily Report) & Cột F (Comparison) trong tab "Team leader assign Plan"
+  syncResultToPlanTab_(ss, row[2], userName || tgId, row[3]);
+
   Logger.log("✅ Daily row added to row 2: REF:" + ref + " tgId=" + tgId);
   return jsonOut({ status: "ok", row: 2, ref: ref, name: userName || tgId });
+}
+
+/**
+ * Tự động đồng bộ Daily Result sang Cột E (Daily Report) & F (Comparison) của tab "Team leader assign Plan".
+ */
+function syncResultToPlanTab_(ss, dateStr, userNameStr, reportSummary) {
+  try {
+    const planSheet = ss.getSheetByName(DAILY_PLAN_TAB);
+    if (!planSheet || planSheet.getLastRow() < 2) return;
+    
+    const lastRow = planSheet.getLastRow();
+    const data = planSheet.getRange(2, 1, lastRow - 1, 6).getValues();
+    const targetDate = parseDateToDDMMYYYY_(dateStr) || parseDateToDDMMYYYY_(Utilities.formatDate(new Date(), TIMEZONE, "dd/MM/yyyy"));
+    const summaryClean = String(reportSummary || "").trim();
+    if (!summaryClean) return;
+
+    for (let i = 0; i < data.length; i++) {
+      const rowDate = parseDateToDDMMYYYY_(data[i][1].toString().trim());
+      if (rowDate === targetDate) {
+        const rowIdx = i + 2;
+        const existingRep = planSheet.getRange(rowIdx, 5).getValue().toString().trim();
+        const appendText = "• " + (userNameStr || "NV") + ": " + summaryClean.substring(0, 150);
+        const newRep = existingRep ? (existingRep + "\n" + appendText) : appendText;
+        planSheet.getRange(rowIdx, 5).setValue(newRep); // Ghi Cột E (Daily Report)
+        planSheet.getRange(rowIdx, 6).setValue("✅ SYNCED (" + Utilities.formatDate(new Date(), TIMEZONE, "HH:mm") + ")"); // Ghi Cột F (Comparison)
+        Logger.log("✅ Auto-synced Result to Plan tab row " + rowIdx);
+        break;
+      }
+    }
+  } catch (e) {
+    Logger.log("⚠️ syncResultToPlanTab_ error: " + e.message);
+  }
 }
 
 // ================================================================
