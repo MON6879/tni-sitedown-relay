@@ -589,7 +589,7 @@ def build_asset_msg(now_str, asset_data):
 
     PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15"]
 
-    lines = [f"3.1 Asset progress for material – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
+    lines = [f"📦 4c. Asset progress for material – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
 
     for tm in teams:
         tm_short = TEAM_SHORT.get(tm, tm)
@@ -712,7 +712,7 @@ def build_team_asset_msg(team_key, now_str, asset_data):
             team_total[k] += s.get(k, 0)
 
     lines = [
-        f"3.1 Asset progress for material – {t_name} – {now_str}",
+        f"📦 4c. Asset progress for material – {t_name} – {now_str}",
         "━━━━━━━━━━━━━━━━━━━━"
     ] + key_lines + [
         f"   📅 {fmt_period(team_total)}"
@@ -1925,6 +1925,8 @@ async def main():
             delete_tasks.append((del_cid, "📋 4. Report — Daily EOD Task & Stats"))
             delete_tasks.append((del_cid, "📋 4a. Report — Daily EOD Task & Stats"))
             delete_tasks.append((del_cid, "📓 4b. Full Report"))
+            delete_tasks.append((del_cid, "📦 4c. Asset progress for material"))
+            delete_tasks.append((del_cid, "4c. Asset progress for material"))
             delete_tasks.append((del_cid, "📦 3.1 Asset progress for material"))
             delete_tasks.append((del_cid, "3.1 Asset progress for material"))
             delete_tasks.append((del_cid, "📋 5. Report — Daily Plan"))
@@ -1933,6 +1935,8 @@ async def main():
             (str(CONTROL_CHAT_ID), "📋 8. Report — Technical Dep Assign to Team"),
             (str(CONTROL_CHAT_ID), "📋 4. Report — TL Comparison"),
             (str(CONTROL_CHAT_ID), "📋 4a. Report — Daily EOD Task & Stats"),
+            (str(CONTROL_CHAT_ID), "📦 4c. Asset progress for material"),
+            (str(CONTROL_CHAT_ID), "4c. Asset progress for material"),
             (str(CONTROL_CHAT_ID), "📦 3.1 Asset progress for material"),
             (str(CONTROL_CHAT_ID), "3.1 Asset progress for material"),
             (str(CONTROL_CHAT_ID), "📋 5. Report — Daily Plan"),

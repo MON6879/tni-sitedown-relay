@@ -105,7 +105,7 @@ def delete_old_messages_bot(bot_token: str, chat_id, gas_url: str, key: str) -> 
 # ── Telethon delete ─────────────────────────────────────────────
 
 async def delete_old_messages_telethon(client, chat_id, gas_url: str, key: str) -> int:
-    """Xóa tất cả tin cũ của key. Dùng Telethon client. Returns số tin đã xóa."""
+    """Xóa tất cả tin cũ của key. Dùng Telethon client với revoke=True (xóa hẳn cho mọi người)."""
     old_ids = get_old_msgids(gas_url, key)
     if not old_ids:
         return 0
@@ -113,20 +113,18 @@ async def delete_old_messages_telethon(client, chat_id, gas_url: str, key: str) 
     remaining_ids = []
     for mid in old_ids:
         try:
-            await client.delete_messages(chat_id, [mid])
+            await client.delete_messages(chat_id, [mid], revoke=True)
             count += 1
-            print(f"[delete_old] 🗑️ msg_id={mid} → {chat_id}")
+            print(f"[delete_old] 🗑️ msg_id={mid} → {chat_id} (revoke=True)")
         except Exception as ex:
             err_str = str(ex).lower()
-            # Nếu tin nhắn không tồn tại hoặc đã bị xóa trước đó, coi như thành công
             if "not found" in err_str or "invalid" in err_str:
                 count += 1
-                print(f"[delete_old] 🗑️ msg_id={mid} đã được xóa trước đó (không tìm thấy)")
+                print(f"[delete_old] 🗑️ msg_id={mid} đã được xóa trước đó")
             else:
                 remaining_ids.append(mid)
                 print(f"[delete_old] ⚠️ msg_id={mid}: {ex}")
 
-    # Cập nhật lại các ID chưa xóa được lên GAS
     save_msgids(gas_url, key, remaining_ids)
     print(f"[delete_old] 📊 {key}: xóa {count}/{len(old_ids)}")
     return count
@@ -150,18 +148,8 @@ async def delete_by_title_telethon(
     search_limit: int = 300,
 ) -> int:
     """
-    Dùng Telethon để tìm TẤT CẢ tin cũ từ bot có cùng tiêu đề,
-    sau đó xóa chúng qua Bot API (bot xóa tin của chính mình).
-
-    Args:
-        client       : Telethon TelegramClient đã connect
-        bot_token    : Token bot đã gửi tin (dùng để xóa)
-        chat_id      : Chat ID (int hoặc str)
-        title_prefix : Tiền tố dòng đầu tiên của tin cần xóa
-        search_limit : Số tin gần nhất cần scan (mặc định 300)
-
-    Returns:
-        Số tin đã xóa thành công.
+    Dùng Telethon tìm TẤT CẢ tin cũ cùng tiêu đề hoặc tin Note,
+    sau đó xóa hẳn cho mọi người với revoke=True.
     """
     bot_id = _get_bot_user_id(bot_token)
     if not bot_id:
@@ -172,35 +160,47 @@ async def delete_by_title_telethon(
 
     try:
         async for msg in client.iter_messages(cid, limit=search_limit):
-            # Lọc theo sender_id (không cần Telethon cache entity của bot)
-            if msg.sender_id != bot_id:
-                continue
             if not msg.text:
                 continue
-            first_line = msg.text.split("\n")[0].strip()
-            # Telethon render <b>text</b> thành **text** — strip trước khi so sánh
-            first_line_clean = first_line.replace("**", "").replace("__", "").strip()
-            if not first_line_clean.startswith(title_prefix):
-                continue
-            # Xóa qua Bot API
-            try:
-                resp = requests.post(
-                    f"https://api.telegram.org/bot{bot_token}/deleteMessage",
-                    json={"chat_id": cid, "message_id": msg.id},
-                    timeout=10,
-                )
-                result = resp.json()
-                if result.get("ok"):
+
+            # Xóa các tin Note chỉ đạo gửi từ @phongha79 (revoke=True xóa hẳn không để khung xanh)
+            if "Note: Above are the end-of-day work results" in msg.text:
+                try:
+                    await client.delete_messages(cid, [msg.id], revoke=True)
                     deleted += 1
-                    print(f"[delete_title] 🗑️ Xóa msg_id={msg.id} ('{title_prefix[:35]}...')")
-                else:
-                    desc = result.get("description", "")
-                    if "message to delete not found" in desc.lower():
-                        deleted += 1  # Đã xóa trước rồi — coi như ok
-                    else:
-                        print(f"[delete_title] ⚠️ msg_id={msg.id}: {desc}")
-            except Exception as ex:
-                print(f"[delete_title] ❌ delete msg_id={msg.id}: {ex}")
+                    print(f"[delete_title] 🗑️ Xóa hẳn Note msg_id={msg.id} (revoke=True)")
+                except Exception as ex:
+                    print(f"[delete_title] ⚠️ Xóa Note lỗi: {ex}")
+                continue
+
+            # Lọc theo sender_id của Bot
+            if msg.sender_id != bot_id:
+                continue
+
+            first_line = msg.text.split("\n")[0].strip()
+            first_line_clean = first_line.replace("**", "").replace("__", "").replace("📦", "").strip()
+            title_pfx_clean = title_prefix.replace("📦", "").strip()
+
+            if not first_line_clean.startswith(title_pfx_clean):
+                continue
+
+            # Xóa hẳn cho mọi người qua Telethon revoke=True + Bot API fallback
+            try:
+                await client.delete_messages(cid, [msg.id], revoke=True)
+                deleted += 1
+                print(f"[delete_title] 🗑️ Xóa hẳn msg_id={msg.id} ('{title_prefix[:35]}...')")
+            except Exception:
+                # Fallback xóa qua Bot API
+                try:
+                    resp = requests.post(
+                        f"https://api.telegram.org/bot{bot_token}/deleteMessage",
+                        json={"chat_id": cid, "message_id": msg.id},
+                        timeout=10,
+                    )
+                    if resp.json().get("ok"):
+                        deleted += 1
+                except Exception as ex:
+                    print(f"[delete_title] ❌ delete msg_id={msg.id}: {ex}")
     except Exception as ex:
         print(f"[delete_title] ❌ iter_messages({cid}): {ex}")
 
