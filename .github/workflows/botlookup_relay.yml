@@ -1,8 +1,6 @@
-name: Botlookup Relay
+name: Botlookup Relay (Manual Trigger Only - Scheduled by Train 5min)
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'   # Chạy liên tục mỗi 5 phút để không bao giờ bị trễ cửa sổ :03 và :33 MMT
   workflow_dispatch:
     inputs:
       skip_delay:
@@ -36,5 +34,3 @@ jobs:
           SD_BOTLOOKUP_CHAT_ID:   ${{ secrets.SD_BOTLOOKUP_CHAT_ID }}
           SKIP_DELAY:             '1'
         run: python botlookup_relay.py
-
-
