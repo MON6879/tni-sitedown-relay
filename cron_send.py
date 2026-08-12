@@ -80,22 +80,28 @@ def safe(row, idx):
         return ""
 
 
-def call_apps_script(payload, timeout=30):
-    """Call Apps Script and return JSON response."""
+def call_apps_script(payload, timeout=120, retries=3):
+    """Call Apps Script and return JSON response with retry logic."""
     if not APPS_SCRIPT_URL:
         return {}
-    try:
-        resp = requests.post(APPS_SCRIPT_URL, json=payload, timeout=timeout)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        logger.error(f"Apps Script error: {e}")
-        return {}
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.post(APPS_SCRIPT_URL, json=payload, timeout=timeout)
+            resp.raise_for_status()
+            res_json = resp.json()
+            if isinstance(res_json, dict) and res_json.get("status") == "ok":
+                return res_json
+            logger.warning(f"Apps Script attempt {attempt}/{retries} non-ok: {res_json}")
+        except Exception as e:
+            logger.warning(f"Apps Script attempt {attempt}/{retries} error: {e}")
+            if attempt < retries:
+                time.sleep(2)
+    return {}
 
 
 def get_asset_stats():
     """Get asset stats from Apps Script."""
-    data = call_apps_script({"action": "get_asset_stats"}, timeout=120)
+    data = call_apps_script({"action": "get_asset_stats"}, timeout=120, retries=3)
     if data.get("status") != "ok":
         logger.warning(f"get_asset_stats failed: {data.get('message', 'unknown')}")
         return {}
@@ -105,13 +111,14 @@ def get_asset_stats():
 def get_report_data():
     """Get search stats from Apps Script (employees, leaders, teamSummary, grandTotal)."""
     try:
-        data = call_apps_script({"action": "get_report_data"}, timeout=35)
+        data = call_apps_script({"action": "get_report_data"}, timeout=120, retries=3)
         if isinstance(data, dict) and data.get("status") == "ok":
             return data
         logger.warning(f"get_report_data returned non-ok: {data}")
     except Exception as ex:
         logger.error(f"get_report_data exception: {ex}")
     return {}
+
 
 
 def build_search_summary(now_str, report_data):
