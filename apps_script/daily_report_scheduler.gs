@@ -49,10 +49,22 @@ function relayDailyReports() {
     });
   }
 
-  // 4. 20:25–20:55 Myanmar → dispatch daily_read_report (20:30)
-  const isReadReportTime = (myanmarHour === 20 && myanmarMin >= 25 && myanmarMin <= 55);
-  if (isReadReportTime) {
-    runOnceToday("DAILY_READ_REPORT_DATE_", function() {
+  // 4. Report 6 (Read Status Report - 08:48 AM, 14:58 PM, 19:38 PM MMT)
+  const isReadReport8  = (myanmarHour === 8 && myanmarMin >= 35 && myanmarMin <= 59);
+  const isReadReport14 = (myanmarHour === 14 && myanmarMin >= 45 && myanmarMin <= 59);
+  const isReadReport19 = (myanmarHour === 19 && myanmarMin >= 25 && myanmarMin <= 55);
+  if (isReadReport8) {
+    runOnceToday("DAILY_READ_REPORT_8_", function() {
+      return triggerDailyWorkflow("read_report");
+    });
+  }
+  if (isReadReport14) {
+    runOnceToday("DAILY_READ_REPORT_14_", function() {
+      return triggerDailyWorkflow("read_report");
+    });
+  }
+  if (isReadReport19) {
+    runOnceToday("DAILY_READ_REPORT_19_", function() {
       return triggerDailyWorkflow("read_report");
     });
   }
