@@ -47,7 +47,7 @@ def classify(text: str) -> str | None:
     # Letter Approved: "letter" + "approved"
     if "letter" in t and "approved" in t:
         return "LETTER_APPROVED"
-    if "plan" in t:
+    if "team" in t and "plan" in t:
         return "PLAN"
     if "request" in t:
         return "REQUEST"
