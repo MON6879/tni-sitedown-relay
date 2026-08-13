@@ -326,6 +326,51 @@ def format_and_send_report(rows: list[str]) -> list[int]:
     return sent_ids
 
 
+def fetch_cell_o1() -> str:
+    """Tải động giá trị ô O1 (Cột O, Dòng 1) từ tab gid=201295323 của Google Sheets Refuel."""
+    csv_url = "https://docs.google.com/spreadsheets/d/1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM/export?format=csv&gid=201295323"
+    try:
+        resp = requests.get(csv_url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
+        resp.raise_for_status()
+        resp.encoding = "utf-8"
+        reader = list(csv.reader(io.StringIO(resp.text)))
+        if reader and len(reader[0]) >= 15 and reader[0][14].strip():
+            return reader[0][14].strip()
+    except Exception as e:
+        print(f"⚠️ Error fetching cell O1: {e}", file=sys.stderr)
+    return "@Raja HO @Sunil @Sunil Fuel @Aung Naing Refuel Team Sent Plan and Sent result refuel before go out Site. Team leader assign follow template who go to monitor refuel @Paing Aung @Naing @Myint Ko Ko Aung @MinPaing_VCM Nay Myo @Pyae Phyo Zaw @thureinnaing"
+
+
+def send_note_reply_as_phongha79(reply_to_msg_id: int):
+    """Gửi Note reply bằng tài khoản user @Phongha79 (Telethon) TRẢ LỜI BÁO CÁO DẦU cho Report 6 theo dõi."""
+    tele_session = os.getenv("TELEGRAM_SESSION", "").strip()
+    api_id = os.getenv("TELEGRAM_API_ID", "").strip()
+    api_hash = os.getenv("TELEGRAM_API_HASH", "").strip()
+
+    if not (tele_session and api_id and api_hash):
+        print("⚠️ TELEGRAM_SESSION not set — skipping Telethon Note reply", file=sys.stderr)
+        return
+
+    note_text = fetch_cell_o1()
+    if not note_text:
+        return
+
+    import asyncio
+    from telethon import TelegramClient
+    from telethon.sessions import StringSession
+
+    async def _send():
+        async with TelegramClient(StringSession(tele_session), int(api_id), api_hash) as client:
+            cid = int(REFUEL_CHAT_ID) if str(REFUEL_CHAT_ID).startswith("-") else REFUEL_CHAT_ID
+            await client.send_message(cid, note_text, reply_to=reply_to_msg_id)
+            print(f"📝 Note reply (@Phongha79) sent to {cid} replying to #{reply_to_msg_id}")
+
+    try:
+        asyncio.run(_send())
+    except Exception as err:
+        print(f"⚠️ Error sending Note reply as @Phongha79: {err}", file=sys.stderr)
+
+
 def main():
     print(f"⛽ Refuel Report — {datetime.now(TZ_MM).strftime('%d/%m/%Y %H:%M')} Myanmar")
 
@@ -340,7 +385,11 @@ def main():
         sys.exit(1)
 
     # Gửi báo cáo (xóa tin cũ tự động qua tg_send_fresh)
-    format_and_send_report(rows)
+    sent_ids = format_and_send_report(rows)
+    
+    # Gửi Note reply bằng tài khoản user @Phongha79 (lấy nội dung từ ô O1)
+    if sent_ids:
+        send_note_reply_as_phongha79(sent_ids[-1])
 
 
 if __name__ == "__main__":
