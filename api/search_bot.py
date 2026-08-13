@@ -1552,14 +1552,17 @@ def handle(update: dict) -> None:
         tni = code
         if is_duplicate_search and is_duplicate_search(chat_id, user_id, f"INFO:{tni}"):
             return
-        logger.info(f"[SSOT Router] Unified Info lookup: {tni} | chat={chat_id}")
+        logger.info(f"[SSOT Router] Detailed Info lookup (Ghế Info): {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, f"Info:{tni}")
         try:
-            result = perform_unified_tni_search(tni, full_info=True)   # Info: → Site+Cable+DIA only
+            # Ghế Info: Gọi lookup_construction_site để lấy đầy đủ chi tiết hạ tầng công trình & kỹ thuật
+            result = lookup_construction_site(tni)
+            if not result or "No construction data" in result or "No data found" in result:
+                result = perform_unified_tni_search(tni, full_info=True)
             for chunk in split_messages(result):
                 tg_send(chat_id, chunk)
         except Exception as err:
-            logger.error(f"Unified search error [{tni}]: {err}")
+            logger.error(f"Detailed Info lookup error [{tni}]: {err}")
             tg_send(chat_id, f"❌ Lookup error: {html.escape(str(err))}")
         return
 
