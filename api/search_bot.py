@@ -624,8 +624,8 @@ def perform_unified_tni_search(tni: str, full_info: bool = False) -> str:
         if formatted:
             lines.append(formatted)
 
-    # 2. Dữ liệu Site Info, Cable, GPON, DIA thô nguyên bản nếu có (0 icon)
-    if has_info:
+    # 2. Dữ liệu Site Info, Cable, GPON, DIA (Chỉ hiển thị khi full_info=True [Ghế Info] hoặc khi không có Task/WO)
+    if has_info and (full_info or not has_tasks):
         if info.get("site") and info['site'].strip():
             lines.append(linkify_text(info['site'].strip()))
         if info.get("cable") and info['cable'].strip():
@@ -1555,9 +1555,9 @@ def handle(update: dict) -> None:
         logger.info(f"[SSOT Router] Detailed Info lookup (Ghế Info): {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, f"Info:{tni}")
         try:
-            # Ghế Info: Gọi lookup_construction_site để lấy đầy đủ chi tiết hạ tầng công trình & kỹ thuật
+            # Ghế Info: Gọi lookup_construction_site trước, nếu không có công trình thì chuyển sang Thông tin Hạ tầng đầy đủ (Site, Cable, GPON, DIA)
             result = lookup_construction_site(tni)
-            if not result or "No construction data" in result or "No data found" in result:
+            if not result or result.startswith("❌"):
                 result = perform_unified_tni_search(tni, full_info=True)
             for chunk in split_messages(result):
                 tg_send(chat_id, chunk)
