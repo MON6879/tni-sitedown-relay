@@ -1508,8 +1508,7 @@ def handle(update: dict) -> None:
         log_search_bg(first_name or str(user_id), user_id, f"{team_code}notclose")
         try:
             messages = lookup_notclose(team_code)
-            full_text = f"📑 <b>{team_code} NOT CLOSE</b> ({len(messages)} WOs)\n\n" + "\n\n".join(messages)
-            for chunk in split_messages(full_text):
+            for chunk in messages:
                 tg_send(chat_id, chunk)
         except Exception as err:
             logger.error(f"NotClose lookup error [{team_code}]: {err}")
@@ -1525,8 +1524,7 @@ def handle(update: dict) -> None:
         log_search_bg(first_name or str(user_id), user_id, f"{team_code}waitcd")
         try:
             messages = lookup_waitcd(team_code)
-            full_text = f"⏳ <b>{team_code} WAIT CD</b> ({len(messages)} WOs)\n\n" + "\n\n".join(messages)
-            for chunk in split_messages(full_text):
+            for chunk in messages:
                 tg_send(chat_id, chunk)
         except Exception as err:
             logger.error(f"WaitCD lookup error [{team_code}]: {err}")
