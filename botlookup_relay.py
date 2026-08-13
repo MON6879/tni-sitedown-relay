@@ -135,7 +135,8 @@ async def main():
                 is_mine = (msg.sender_id == me.id) or getattr(msg, 'out', False)
                 if is_mine and "/down_tni" in txt:
                     my_down_cmds.append(msg)
-                if "auto report nocpro" in txt or "site down" in txt or "auto-generated report" in txt or "nocpro" in txt:
+                # Kiểm tra ĐÚNG 2 KEY CHUẨN: "Auto Report NocPro" + "Site down (not include long time site down)"
+                if "auto report nocpro" in txt and ("site down (not include long time site down)" in txt or "site down" in txt):
                     auto_reports.append(msg)
 
             # Lấy 3 lệnh /down_tni gần đây nhất do nick này gửi
