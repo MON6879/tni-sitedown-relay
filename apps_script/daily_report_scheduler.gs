@@ -23,7 +23,7 @@ function relayDailyReports() {
   const myanmarHour = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "H"), 10);
   const myanmarMin  = parseInt(Utilities.formatDate(new Date(), "Asia/Rangoon", "m"), 10);
 
-  // 1. 05:55–06:25 Myanmar → dispatch plan_morning (06:03 AM MMT)
+  // 1. 05:55–06:25 Myanmar → dispatch plan_morning (06:06 AM MMT)
   const isPlanMrnTime = (myanmarHour === 5 && myanmarMin >= 55) || (myanmarHour === 6 && myanmarMin <= 25);
   if (isPlanMrnTime) {
     runOnceToday("DAILY_PLAN_MRN_DATE_", function() {
