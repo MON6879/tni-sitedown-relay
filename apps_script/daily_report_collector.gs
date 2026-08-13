@@ -526,33 +526,9 @@ function handleStoreDailyPlan(body) {
     // Normalize team string to "Team N" canonical form
     const teamNorm = team.replace(/team\s*0?/i, "Team ").trim();
 
-    // Dedup: same date + team? (compare normalized forms on both sides)
     const lastRow = sheet.getLastRow();
-    if (lastRow >= 2) {
-      const existing = sheet.getRange(2, 2, lastRow - 1, 2).getValues();
-      for (let i = 0; i < existing.length; i++) {
-        const exDateRaw = existing[i][0].toString().trim();
-        const exTeamRaw = existing[i][1].toString().trim();
-        const exDate = parseDateToDDMMYYYY_(exDateRaw);
-        const exTeam = exTeamRaw.replace(/team\s*0?/i, "Team ").trim();
-        if (exDate === date && exTeam.toLowerCase() === teamNorm.toLowerCase()) {
-          const rowIdx = i + 2;
-          const refVal = sheet.getRange(rowIdx, 1).getValue();
-          if (report)     sheet.getRange(rowIdx, 5).setValue(report);
-          if (comparison) sheet.getRange(rowIdx, 6).setValue(comparison);
-          if (content)    sheet.getRange(rowIdx, 4).setValue(content);
-          sheet.getRange(rowIdx, 2).setValue(date);
 
-          // Sắp xếp lại toàn bộ bảng: Mới nhất luôn ở TRÊN CÙNG (REF giảm dần)
-          if (sheet.getLastRow() >= 2) {
-            sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).sort({ column: 1, ascending: false });
-          }
-          return jsonOut({ status: "ok", message: "Updated existing", ref: refVal, duplicate: true });
-        }
-      }
-    }
-
-    // Tính REF bằng cách quét max existing
+    // Compute max existing REF across the sheet (e.g. DP-164 -> max 164)
     let maxRef = 0;
     if (lastRow >= 2) {
       const refValues = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
@@ -564,18 +540,39 @@ function handleStoreDailyPlan(body) {
         }
       }
     }
-    const ref = "DP-" + String(maxRef + 1).padStart(3, "0");
+    const nextRef = "DP-" + String(maxRef + 1).padStart(3, "0");
 
-    // Chèn dòng mới tại dòng 2 (newest first)
-    sheet.insertRowBefore(2);
-    sheet.getRange(2, 1, 1, 6).setValues([[ref, date, team, content, report, comparison]]);
+    // Dedup: same date + team?
+    if (lastRow >= 2) {
+      const existing = sheet.getRange(2, 2, lastRow - 1, 2).getValues();
+      for (let i = 0; i < existing.length; i++) {
+        const exDateRaw = existing[i][0].toString().trim();
+        const exTeamRaw = existing[i][1].toString().trim();
+        const exDate = parseDateToDDMMYYYY_(exDateRaw);
+        const exTeam = exTeamRaw.replace(/team\s*0?/i, "Team ").trim();
+        if (exDate === date && exTeam.toLowerCase() === teamNorm.toLowerCase()) {
+          const rowIdx = i + 2;
+          let refVal = sheet.getRange(rowIdx, 1).getValue().toString().trim();
+          if (!refVal || refVal === "DP-OK" || refVal === "?") {
+            refVal = nextRef;
+            sheet.getRange(rowIdx, 1).setValue(refVal).setFontWeight("bold").setHorizontalAlignment("center");
+          }
+          if (report)     sheet.getRange(rowIdx, 5).setValue(report);
+          if (comparison) sheet.getRange(rowIdx, 6).setValue(comparison);
+          if (content)    sheet.getRange(rowIdx, 4).setValue(content);
+          sheet.getRange(rowIdx, 2).setValue(date);
 
-    // Sắp xếp lại toàn bộ bảng: Mới nhất luôn ở TRÊN CÙNG (REF giảm dần)
-    if (sheet.getLastRow() >= 2) {
-      sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).sort({ column: 1, ascending: false });
+          return jsonOut({ status: "ok", message: "Updated existing", ref: refVal, duplicate: true });
+        }
+      }
     }
 
-    return jsonOut({ status: "ok", ref: ref });
+    // Insert new row at Row 2 (newest first, under header Row 1)
+    sheet.insertRowBefore(2);
+    sheet.getRange(2, 1, 1, 6).setValues([[nextRef, date, teamNorm, content, report, comparison]]);
+    sheet.getRange(2, 1).setFontWeight("bold").setHorizontalAlignment("center");
+
+    return jsonOut({ status: "ok", ref: nextRef });
   } catch (err) {
     return jsonOut({ status: "error", message: err.message });
   }
