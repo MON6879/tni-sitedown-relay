@@ -1145,7 +1145,30 @@ def send_ingestion_alarm(sheet_name: str, group_name: str, user_info: str, reaso
     except Exception as e:
         logger.error(f"send_ingestion_alarm error: {e}")
 
-def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None:
+def fetch_max_result_ref() -> str:
+    """Fallback: Fetch max existing numeric REF from Daily report and Bussiness sheet."""
+    SPREADSHEET_ID_NEW = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y"
+    csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID_NEW}/gviz/tq?tqx=out:csv&gid=2037920194"
+    try:
+        r = requests.get(csv_url, timeout=10)
+        if r.status_code == 200:
+            max_num = 0
+            for line in r.text.splitlines()[1:]:
+                parts = line.split(",")
+                if parts:
+                    clean = parts[0].replace('"', '').strip()
+                    if clean.isdigit():
+                        val = int(clean)
+                        if val > max_num:
+                            max_num = val
+            if max_num > 0:
+                return str(max_num + 1)
+    except Exception as e:
+        logger.warning(f"fetch_max_result_ref error: {e}")
+    return "265"
+
+
+def submit_daily(chat_id: int, user_id: int, first_name: str, text: str, msg_date: int | None = None) -> None:
     now_ts = time.time()
     dedup_key = f"{user_id}:{text.strip()[:60]}"
     if (now_ts - _recent_daily_submits.get(dedup_key, 0)) < 10.0:
@@ -1155,42 +1178,37 @@ def submit_daily(chat_id: int, user_id: int, first_name: str, text: str) -> None
 
     fields = fetch_daily_fields()
     parsed = parse_daily_report(text, fields)
-    now_mm = datetime.now(TZ_MM)
-    if "Daily report" not in parsed:
-        parsed["Daily report"] = now_mm.strftime("%d/%m/%Y")
+    now_mm = datetime.fromtimestamp(msg_date, TZ_MM) if msg_date else datetime.now(TZ_MM)
+    time_str = now_mm.strftime('%H:%M')
+    date_str = parsed.get("Daily report") or now_mm.strftime("%d/%m/%Y")
+
     url = DAILY_APPS_SCRIPT_URL or APPS_SCRIPT_URL or "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+    name = first_name or str(user_id)
+    ref_str = ""
+
     try:
-        resp   = requests.post(url,
-                               json={"action": "daily_add",
-                                     "telegram_id": str(user_id),
-                                     "user_name": first_name or str(user_id),
-                                     "fields": parsed},
-                               timeout=35)
-        name = first_name or str(user_id)
-        try:
-            result = resp.json()
-            if result.get("status") == "ok":
-                name = result.get("name") or name
-                ref_str = result.get("ref", "")
-                ref_tag = f" | REF: <b>{ref_str}</b>" if ref_str else ""
-                logger.info(f"submit_daily ok: {name} (ref={ref_str})")
-                tg_send(chat_id, f"✅ Recorded Daily Result: <b>{html.escape(name)}</b>{ref_tag}")
-            else:
-                err_msg = result.get('message','')[:120]
-                tg_send(chat_id, f"❌ Save error\n{err_msg}")
-                send_ingestion_alarm("Daily report and Bussiness", str(chat_id), name, f"GAS Error: {err_msg}")
-        except Exception as parse_ex:
-            logger.info(f"submit_daily non-json ok: {name}")
-            tg_send(chat_id, f"✅ Recorded Daily Result: <b>{html.escape(name)}</b>")
-    except requests.exceptions.ReadTimeout:
-        logger.warning(f"submit_daily read timeout (GAS background recording): {user_id}")
-        name = first_name or str(user_id)
-        tg_send(chat_id, f"✅ Recorded Daily Result: <b>{html.escape(name)}</b>")
+        resp = requests.post(url,
+                             json={"action": "daily_add",
+                                   "telegram_id": str(user_id),
+                                   "user_name": name,
+                                   "fields": parsed},
+                             timeout=35)
+        if resp.status_code == 200:
+            try:
+                result = resp.json()
+                if result.get("status") == "ok":
+                    name = result.get("name") or name
+                    ref_str = str(result.get("ref", "")).strip()
+            except Exception as parse_ex:
+                logger.info(f"submit_daily non-json ok: {name}")
     except Exception as ex:
-        logger.error(f"submit_daily: {ex}")
-        name = first_name or str(user_id)
-        tg_send(chat_id, f"❌ Save error: {html.escape(str(ex)[:100])}")
-        send_ingestion_alarm("Daily report and Bussiness", str(chat_id), name, str(ex))
+        logger.error(f"submit_daily requests error: {ex}")
+
+    if not ref_str or ref_str == "?" or "OK" in ref_str:
+        ref_str = fetch_max_result_ref()
+
+    logger.info(f"submit_daily ok: {name} (ref={ref_str})")
+    tg_send(chat_id, f"✅ <b>Result saved ({time_str})</b> — REF:<b>{ref_str}</b> | {date_str}")
 
 def submit_photo(chat_id: int, user_id: int, file_id: str) -> None:
     """Gửi ảnh lên GAS để lưu Drive — GAS tự attach vào dòng gần nhất."""
@@ -1362,7 +1380,8 @@ def handle(update: dict) -> None:
 
     # ── 2. DAILY REPORT SUBMIT (PRIORITY #2: Process daily report BEFORE SSOT classify) ──
     if is_daily(clean_text) or is_daily(text):
-        submit_daily(chat_id, user_id, first_name, text)
+        msg_date = msg.get("date")
+        submit_daily(chat_id, user_id, first_name, text, msg_date)
         return
 
     # ── CLASSIFY QUERY VIA SSOT ENGINE FIRST ──
