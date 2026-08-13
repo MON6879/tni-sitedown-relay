@@ -73,11 +73,16 @@ function checkBodAssign() {
       const colC = String(row[2] || "").trim(); // Cột C (Task Content)
       const colR = String(row[17] || "").trim(); // Cột R (index 17)
       const colT = String(row[19] || "").trim(); // Cột T (index 19)
-      if (!colC && (!colR || colR === "- : -")) {
-        continue; // Bỏ qua không gửi tin rác "- : -" khi chưa có task
+
+      // 🔴 BẮT BỘC CỘT C (TASK CONTENT) HOẶC CỘT R PHẢI CÓ NỘI DUNG THỰC TẾ (NẾU RỖNG HOẶC CHƯA CÓ TASK -> BỎ QUA NGAY)
+      if (!colC || colC.length < 2 || colC === "- : -") {
+        if (!colR || colR.length < 2 || colR === "- : -") {
+          continue; // Bỏ qua hoàn toàn các dòng chưa giao task
+        }
       }
+
       const notifyContent = colR || (`${colA} - ${colB}: ${colC}`.trim());
-      if (!notifyContent || notifyContent === "- : -" || notifyContent === " - :") {
+      if (!notifyContent || notifyContent.length < 3 || notifyContent === "- : -" || notifyContent.endsWith(": - : -") || notifyContent.endsWith(":")) {
         continue; // Bỏ qua tin rác không có nội dung task thực tế
       }
 
