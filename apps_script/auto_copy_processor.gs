@@ -242,18 +242,20 @@ function runAutoCopyProcessor(bypassTimeGate) {
             const numRowsToRead = delLastRow - delStartRow + 1;
             const delData = delSh.getRange(delStartRow, delColNum, numRowsToRead, 1).getValues();
             let deletedCount = 0;
-            // Duyệt từ dưới lên để xóa toàn bộ hàng (giúp tránh lệch chỉ số dòng khi xóa)
-            // Lệnh deleteRow() xóa cả hàng trực tiếp nên miễn nhiễm hoàn toàn với quy tắc Validation,
-            // đồng thời bảo toàn công thức ARRAYFORMULA ở dòng tiêu đề (do chỉ xóa dòng >= delStartRow)
+            const rowsToDelete = [];
+
             for (let r = numRowsToRead - 1; r >= 0; r--) {
               if (String(delData[r][0]).trim() === deleteValCond) {
-                const rowNum = r + delStartRow;
-                try {
-                  delSh.deleteRow(rowNum);
-                  deletedCount++;
-                } catch (delErr) {
-                  Logger.log("  ⚠️ Lỗi khi xóa dòng " + rowNum + ": " + delErr.message);
-                }
+                rowsToDelete.push(r + delStartRow);
+              }
+            }
+
+            for (let d = 0; d < rowsToDelete.length; d++) {
+              try {
+                delSh.deleteRow(rowsToDelete[d]);
+                deletedCount++;
+              } catch (delErr) {
+                Logger.log("  ⚠️ Lỗi khi xóa dòng " + rowsToDelete[d] + ": " + delErr.message);
               }
             }
             Logger.log("  🗑️ Đã xóa thành công: " + deletedCount + " dòng có '" + deleteValCond + "' tại '" + delInfo.sheetName + "' cột " + delColLetter);
