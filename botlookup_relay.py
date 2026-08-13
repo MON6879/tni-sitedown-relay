@@ -218,10 +218,35 @@ async def main():
                     print(f"[{myanmar_now()}] Fallback: lay tin moi nhat ({len(msg.message)} ky tu) - dung lai")
                     break  # Chi lay 1 tin moi nhat, khong lay them
 
+        # Smart Retry Stage 2: Nếu chưa có tin nhắn sau WAIT_REPLY_SEC (25s), chờ thêm 10s và quét lại lần 2
+        if not bot_messages:
+            print(f"[{myanmar_now()}] ⏳ Chưa nhận phản hồi — Chờ thêm 10s (Smart Retry Stage 2)...")
+            await asyncio.sleep(10)
+            try:
+                history2 = await client(GetHistoryRequest(
+                    peer=source, limit=50,
+                    offset_date=None, offset_id=0,
+                    max_id=0, min_id=0, add_offset=0, hash=0,
+                ))
+                all_after2 = [msg for msg in history2.messages if msg.date >= send_time]
+                for msg in reversed(all_after2):
+                    s_name = ""
+                    if msg.sender_id:
+                        try:
+                            s = await client.get_entity(msg.sender_id)
+                            s_name = getattr(s, "username", "") or ""
+                        except Exception: pass
+                    if s_name.lower() == BOT_USERNAME.lower() and msg.message:
+                        bot_messages.append(msg.message)
+                        print(f"[{myanmar_now()}] ✅ Smart Retry thành công! Tìm thấy tin bot ({len(msg.message)} ký tự)")
+                        break
+            except Exception as retry_ex:
+                print(f"[{myanmar_now()}] ⚠️ Smart Retry error: {retry_ex}")
+
         gas_url = os.environ.get("SD_APPS_SCRIPT_URL") or os.environ.get("APPS_SCRIPT_URL") or ""
 
         if not bot_messages:
-            err = f"[{myanmar_now()}] @{BOT_USERNAME} khong phan hoi trong {WAIT_REPLY_SEC}s"
+            err = f"[{myanmar_now()}] @{BOT_USERNAME} khong phan hoi trong 35s (Stage 1 + 2)"
             print(err)
             await client.send_message(TARGET_CHAT_ID, err)
 
