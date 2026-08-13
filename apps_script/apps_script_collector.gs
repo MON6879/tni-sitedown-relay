@@ -2015,7 +2015,8 @@ function handleStoreSiteDownDirect(body) {
   }
 }
 
-// ════════════════════════════════════════════════════════════
+function handleGetAssetStats(ss) {
+  try {
     const GID_SUM = "1840482617";
     const TEAM_ORDER = ["team1", "team2", "team3", "team4"];
     const chartG = {};  // G col(6)  = Total FOT Close
@@ -2759,6 +2760,11 @@ function fixAllMismatchedConfigs() {
   } catch (e) {
     return "Error: " + e.message;
   }
+}
+
+function json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 
