@@ -61,11 +61,11 @@ def in_active_window() -> bool:
 
 
 def is_target_relay_window() -> bool:
-    """Check if current Myanmar minute is strictly within :03-:08 or :33-:38 MMT."""
+    """Check if current Myanmar minute is within :03-:12 or :33-:42 MMT (handles GitHub Action delays up to 9 mins)."""
     tz = timezone(timedelta(hours=6, minutes=30))
     now = datetime.now(tz)
     m = now.minute
-    return (3 <= m <= 8) or (33 <= m <= 38)
+    return (3 <= m <= 12) or (33 <= m <= 42)
 
 
 async def main():
