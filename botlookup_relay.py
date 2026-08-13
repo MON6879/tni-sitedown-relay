@@ -11,6 +11,7 @@ import os
 import random
 import re
 import requests
+import sys
 from datetime import datetime, timezone, timedelta
 
 from telethon import TelegramClient
