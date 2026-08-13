@@ -333,21 +333,32 @@ def process_update(update: dict):
 
     tl_tag = f"@{sender_user}" if sender_user else f"<a href='tg://user?id={sender_id}'>{sender}</a>"
 
-    # Tự động gán tag Team Leader theo số Team trong báo cáo (Tag đúng 4 Đội trưởng, không tag nhân viên/đối tác)
+    # Tự động gán tag Team Leader theo số Team hoặc mã Site trong báo cáo (Tag đúng 4 Đội trưởng, không tag nhân viên/đối tác)
     import re
     team_m = re.search(r'\bteam[\s_\-]*0*([1-4])\b', text, re.IGNORECASE)
-    if team_m:
-        t_num = team_m.group(1)
-        if t_num == "1":
-            mention_tag = "@PaingAung"      # Team 1 Leader: Paing Aung Soe
-        elif t_num == "2":
-            mention_tag = "@NayMyoThu"      # Team 2 Leader: Nay Myo Thu
-        elif t_num == "3":
-            mention_tag = "@PyaePhyoZaw"    # Team 3 Leader: Pyae Phyo Zaw
-        elif t_num == "4":
-            mention_tag = "@NaingMyoHtun"   # Team 4 Leader: Naing Myo Htun
-        else:
-            mention_tag = tl_tag
+    t_num = team_m.group(1) if team_m else None
+    
+    if not t_num:
+        site_m = re.search(r'\bTNI0*(\d{1,4})\b', text, re.IGNORECASE)
+        if site_m:
+            site_no = int(site_m.group(1))
+            if site_no <= 200:
+                t_num = "1"
+            elif site_no <= 400:
+                t_num = "2"
+            elif site_no <= 600:
+                t_num = "3"
+            else:
+                t_num = "4"
+
+    if t_num == "1":
+        mention_tag = "@PaingAung"      # Team 1 Leader: Paing Aung Soe
+    elif t_num == "2":
+        mention_tag = "@NayMyoThu"      # Team 2 Leader: Nay Myo Thu
+    elif t_num == "3":
+        mention_tag = "@PyaePhyoZaw"    # Team 3 Leader: Pyae Phyo Zaw
+    elif t_num == "4":
+        mention_tag = "@NaingMyoHtun"   # Team 4 Leader: Naing Myo Htun
     else:
         mention_tag = tl_tag
 
@@ -362,36 +373,37 @@ def process_update(update: dict):
     })
     logger.info(f"[{category}] sender={sender} | GAS={result.get('status')} def={result.get('def','')}")
 
-    # Gửi reply xác nhận khi ghi thành công kèm câu hỏi tiếng Anh tag Team Leader
+    # Gửi reply xác nhận khi ghi thành công
     if result.get("status") == "ok":
         ts = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
 
         if category == "LETTER_SUBMIT":
             reply_text = (
                 f"📋 <b>Letter Submit</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
-                f"📅 Date: <b>{result.get('date', ts)}</b>\n"
-                f"📢 {mention_tag} Who is assigned to follow and monitor ?"
+                f"📅 Date: <b>{result.get('date', ts)}</b>"
             )
         elif category == "LETTER_APPROVED":
             reply_text = (
                 f"✅ <b>Letter Approved</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
-                f"📅 Date: <b>{result.get('date', ts)}</b>\n"
-                f"📢 {mention_tag} Who is assigned to follow and monitor ?"
+                f"📅 Date: <b>{result.get('date', ts)}</b>"
             )
         else:
             def_id    = result.get("def", "")
             cat_label = {
-                "PLAN":    "Plan refuel",
-                "REQUEST": "Team request",
-                "REFUELED":"Refueled",
+                "PLAN":       "Plan refuel",
+                "REQUEST":    "Team request",
+                "REFUELED":   "Refueled",
                 "FT_MONITOR": "FT follow monitor",
             }.get(category, category)
 
             reply_text = (
                 f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
-                f"Done 📅 {ts}\n"
-                f"📢 {mention_tag} Who is assigned to follow and monitor ?"
+                f"Done 📅 {ts}"
             )
+            # CHỈ KHI LÀ BÁO CÁO PLAN REFUEL MỚI HỎI CÂU HỎI VÀ TAG TEAM LEADER
+            if category == "PLAN":
+                reply_text += f"\n📢 {mention_tag} Who is assigned to follow and monitor ?"
+
         tg_reply(chat_id, reply_text)
 
 
