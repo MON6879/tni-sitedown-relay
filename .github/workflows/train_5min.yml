@@ -143,13 +143,13 @@ jobs:
           #  15:53 → Cable + Refuel Request (🤖 Bot API)
           check_time 15 53 && CABLE=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 7+8: Cable + Refuel Req"
 
-          # ═══════ 🚨 HOURLY SITE DOWN RELAY (Phút :03 đến :12 & :33 đến :42 MMT Window — 100% Never Loss Safety) ═══════
-          # Khóa khoảng từ phút 03-12 (ca :03) và 33-42 (ca :33) MMT để 100% không bao giờ trượt tin nếu GitHub Action delay 5-7 phút
+          # ═══════ 🚨 HOURLY SITE DOWN RELAY (Phút :03 đến :20 & :33 đến :50 MMT Window — 100% Never Loss Safety) ═══════
+          # Khóa khoảng từ phút 03-20 (ca :03) và 33-50 (ca :33) MMT để 100% không bao giờ trượt tin nếu GitHub Action delay tới 17 phút
           local_M=$((10#$M))
-          if [ $local_M -ge 3 -a $local_M -le 12 ] || [ $local_M -ge 33 -a $local_M -le 42 ]; then
+          if [ $local_M -ge 3 -a $local_M -le 20 ] || [ $local_M -ge 33 -a $local_M -le 50 ]; then
             BOTLOOKUP_RELAY=true
             NEED_PYTHON=true
-            echo "🚃 Toa Site Down Relay: Executing botlookup_relay.py for window :03-:12 / :33-:42 MMT (current min: $M)"
+            echo "🚃 Toa Site Down Relay: Executing botlookup_relay.py for window :03-:20 / :33-:50 MMT (current min: $M)"
           fi
 
           # ═══════ 🌙 EVENING BLOCK (17:00-22:30) ═══════
