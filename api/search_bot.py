@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 BOT_VERSION = "v4.0"
 
 # ── Config ────────────────────────────────────────────────────────────────────
-TOKEN                 = os.environ.get("TELEGRAM_TOKEN", "").strip().strip("\ufeff")
+TOKEN = (os.environ.get("TELEGRAM_TOKEN") or os.environ.get("BOT_TOKEN") or os.environ.get("SEARCH_BOT_TOKEN") or "8606383435:AAEstcN4Om6_9ZAjs4OoFV2uVlRALgae2Ac").strip().strip("\ufeff")
 TELEGRAM_SECRET_TOKEN = os.environ.get("TELEGRAM_SECRET_TOKEN", "").strip().strip("\ufeff")
 DAILY_APPS_SCRIPT_URL = os.environ.get("DAILY_APPS_SCRIPT_URL", "").strip().strip("\ufeff")
 APPS_SCRIPT_URL       = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\ufeff")

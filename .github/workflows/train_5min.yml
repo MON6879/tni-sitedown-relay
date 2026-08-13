@@ -2,17 +2,17 @@ name: "🚂 5-Min Train — Unified Keepalive + All Reports"
 # ═══════════════════════════════════════════════════════════════
 # 🚂 ĐOÀN TÀU 5 PHÚT — UNIFIED SCHEDULER
 # ═══════════════════════════════════════════════════════════════
-# Cron: 3/5 = phút :03,:08,:13,:18,:23,:28,:33,:38,:43,:48,:53,:58
-# Offset 3 tránh nghẽn phút tròn (:00,:05,:10,:15,:20,:25,:30,:35,:40,:45,:50,:55)
+# Cron: 1/5 = phút :06,:11,:16,:21,:26,:31,:36,:41,:46,:51,:56,:01 MMT
+# Offset 6/1 tránh nghẽn phút tròn (:00,:05,:10,:15,:20,:25,:30,:35,:40,:45,:50,:55)
 #
-# MMT ticks (UTC+6:30): :33,:38,:43,:48,:53,:58,:03,:08,:13,:18,:23,:28
+# MMT ticks (UTC+6:30): :36,:41,:46,:51,:56,:01,:06,:11,:16,:21,:26,:31
 #
 # 📋 TRAIN MANIFEST — Xem TRAIN_MANIFEST.md để biết lịch trình đầy đủ
-# last-updated: 2026-08-10
+# last-updated: 2026-08-13
 
 on:
   schedule:
-    - cron: '3/5 * * * *'   # Every 5 min offset 3 (non-peak minutes)
+    - cron: '1/5 * * * *'   # Every 5 min offset 1 (fires at :06, :11, :16, :21, :26, :31, :36, :41, :46, :51, :56, :01 MMT)
   workflow_dispatch:
     inputs:
       report_type:
