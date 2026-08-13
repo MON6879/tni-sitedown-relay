@@ -361,7 +361,7 @@ def process_update(update: dict):
     now    = datetime.now(TZ_MM)
     result = post_gas({
         "action":   "collect_message",
-        "group_id": f"-{norm_chat_id}",
+        "group_id": PLAN_GROUP_ID,
         "text":     text,
         "sender":   sender,
         "sender_id": sender_id,
@@ -370,7 +370,7 @@ def process_update(update: dict):
     logger.info(f"[{category}] sender={sender} | GAS={result.get('status')} def={result.get('def','')}")
 
     # ── GỬI REPLY XÁC NHẬN KHI GHI THÀNH CÔNG (TÁCH BIỆT 100% GHẾ RIÊNG KHÔNG BAO GIỜ NHẦM) ──
-    if result.get("status") == "ok":
+    if result.get("status") != "error":
         ts     = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
         def_id = result.get("def", "")
 
