@@ -163,16 +163,10 @@ jobs:
           check_time 19 08 && P5B=true && NEED_PYTHON=true && echo "🚃 Toa 4: Report 5 Daily Plan Update (19:08 MMT)"
           #  19:38 → Report 6 Read Report (Ca 3) (📱 Telethon)
           check_time 19 38 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (19:38 MMT)"
-          #  21:33 → Refuel Plan (Report 2 Cấp Dầu - Ca 2) (📱 Telethon)
-          check_time 21 33 && REFUEL_P1=true && REFUEL_P2=true && REFUEL_P21=true && NEED_PYTHON=true && echo "🚃 Refuel Plan (21:33 MMT)"
+          #  21:33 → Refuel Plan All Reports (Reports 1, 2, 2.1, 4, 5) (📱 Telethon)
+          check_time 21 33 && REFUEL_P1=true && REFUEL_P2=true && REFUEL_P21=true && REFUEL_P4=true && NEED_PYTHON=true && echo "🚃 Refuel Plan All Reports (21:33 MMT)"
           #  22:03 → Plan 5C Evening
           check_time 22 03 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Evening"
-          #  22:08 → Refuel Plan 1
-          check_time 22 08 && REFUEL_P1=true && NEED_PYTHON=true && echo "🚃 Toa 9: Refuel Plan 1"
-          #  22:13 → Refuel Plan 2 + 2.1
-          check_time 22 13 && REFUEL_P2=true && REFUEL_P21=true && NEED_PYTHON=true && echo "🚃 Toa 10: Refuel Plan 2+2.1"
-          #  22:18 → Refuel Plan 4
-          check_time 22 18 && REFUEL_P4=true && NEED_PYTHON=true && echo "🚃 Toa 11: Refuel Plan 4"
 
           # Output all flags
           echo "need_python=$NEED_PYTHON" >> $GITHUB_OUTPUT
