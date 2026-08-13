@@ -956,6 +956,27 @@ def store_daily_plan_to_sheet(date_str: str, team_str: str, content: str) -> dic
     return {}
 
 
+def fetch_max_plan_ref() -> str:
+    """Fallback: Fetch max existing DP-xxx from Sheet and return next REF (e.g. DP-165)."""
+    SPREADSHEET_ID_PLAN = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y"
+    csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID_PLAN}/gviz/tq?tqx=out:csv&gid=1934147618"
+    try:
+        r = requests.get(csv_url, timeout=10)
+        if r.status_code == 200:
+            max_num = 0
+            for line in r.text.splitlines()[1:]:
+                m = re.search(r'DP-(\d+)', line)
+                if m:
+                    val = int(m.group(1))
+                    if val > max_num:
+                        max_num = val
+            if max_num > 0:
+                return f"DP-{str(max_num + 1).zfill(3)}"
+    except Exception as e:
+        logger.warning(f"fetch_max_plan_ref error: {e}")
+    return "DP-165"
+
+
 _recent_plan_sends = {}
 _recent_plan_msg_hashes = {}
 
@@ -1327,12 +1348,16 @@ def handle(update: dict) -> None:
             res = store_daily_plan_to_sheet(date_str, team_str, text)
             ref = res.get("ref")
             dup = res.get("duplicate", False)
-            if not ref or ref == "?":
-                now_mm = datetime.now(TZ_MM)
-                ref_show = f"DP-OK ({now_mm.strftime('%H:%M')})"
+            if not ref or ref == "?" or "OK" in str(ref):
+                ref_show = fetch_max_plan_ref()
             else:
                 ref_show = ref
-            tg_send(chat_id, f"✅ <b>Plan {'updated' if dup else 'saved'}</b> — REF:<b>{ref_show}</b> | {team_str} | {date_str}")
+
+            msg_date = msg.get("date")
+            now_mm = datetime.fromtimestamp(msg_date, TZ_MM) if msg_date else datetime.now(TZ_MM)
+            time_str = now_mm.strftime('%H:%M')
+
+            tg_send(chat_id, f"✅ <b>Plan {'updated' if dup else 'saved'} ({time_str})</b> — REF:<b>{ref_show}</b> | {date_str}")
             return
 
     # ── 2. DAILY REPORT SUBMIT (PRIORITY #2: Process daily report BEFORE SSOT classify) ──
