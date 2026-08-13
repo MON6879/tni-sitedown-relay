@@ -35,37 +35,33 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))
 
 
 def classify(text: str) -> str | None:
-    """Phân loại tin nhắn báo cáo chính xác, loại bỏ 100% tin nhắn trao đổi thông thường (casual chat)."""
+    """Phân loại tin nhắn báo cáo chính xác 100%, bắt buộc đúng từ khóa đầu tiên (Keyword)."""
     import re
     t = text.lower().strip()
 
-    # 1. FT_MONITOR (báo cáo FT giám sát)
-    if ("name of ft staff member" in t and "supervise" in t) or re.search(r'\bfollow\s*monit?er?\b', t):
+    # 1. FT_MONITOR: Bắt buộc đúng cụm từ khóa chuẩn bắt đầu bằng 'Name of FT staff member accompanying to supervise'
+    if re.search(r'^\s*name\s+of\s+ft\s+staff\s+member\s+accompanying\s+to\s+supervise\b', t):
         return "FT_MONITOR"
 
     # 2. REFUELED (báo cáo đã đổ xăng thực tế - phải có 'dg type' hoặc 'actual filled qty')
     if "dg type" in t or "actual filled qty" in t:
         return "REFUELED"
 
-    # 3. LETTER_SUBMIT (bắt buộc đúng Template "Letter Submit:" / "Submit Letter:" có dấu hai chấm/gạch nối hoặc ngày tháng)
+    # 3. LETTER_SUBMIT (bắt buộc đúng Template "Letter Submit:" / "Submit Letter:")
     if re.search(r'^\s*(letter\s*submit|submit\s*letter)\s*[:\-]', t, re.M) or re.search(r'^\s*(letter\s*submit|submit\s*letter)\b.*\d{1,2}[/\-\.]\d{1,2}', t, re.M):
         return "LETTER_SUBMIT"
 
-    # 4. LETTER_APPROVED (bắt buộc đúng Template "Approved Letter:" / "Letter Approved:" có dấu hai chấm/gạch nối hoặc ngày tháng)
+    # 4. LETTER_APPROVED (bắt buộc đúng Template "Approved Letter:" / "Letter Approved:")
     if re.search(r'^\s*(approved\s*letter|letter\s*approved)\s*[:\-]', t, re.M) or re.search(r'^\s*(approved\s*letter|letter\s*approved)\b.*\d{1,2}[/\-\.]\d{1,2}', t, re.M):
         return "LETTER_APPROVED"
 
-    # 5. PLAN (bắt buộc dòng đầu "Team X Plan" hoặc "Plan refuel")
+    # 5. PLAN (bắt buộc "Team X Plan" hoặc "Plan refuel")
     if re.search(r'^\s*team[\s_\-]*\w*\s*plan\b', t, re.M) or re.search(r'^\s*plan\s*refuel\b', t, re.M) or re.search(r'\bteam[\s_\-]*0*[1-4]\s*plan\b', t):
         return "PLAN"
 
-    # 6. REQUEST (bắt buộc dòng đầu "Team X Request" hoặc "Request refuel")
+    # 6. REQUEST (bắt buộc "Team X Request" hoặc "Request refuel")
     if re.search(r'^\s*team[\s_\-]*\w*\s*request\b', t, re.M) or re.search(r'^\s*request\s*refuel\b', t, re.M) or re.search(r'\bteam[\s_\-]*0*[1-4]\s*request\b', t):
         return "REQUEST"
-
-    # 7. Fallback cho báo cáo FT monitor có mã TNI và số lít L kèm từ khóa monitor/supervise
-    if "tni" in t and ("l" in t or "+" in t) and ("monitor" in t or "supervise" in t):
-        return "FT_MONITOR"
 
     return None
 
@@ -400,9 +396,6 @@ def process_update(update: dict):
                 f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
                 f"Done 📅 {ts}"
             )
-            # CHỈ KHI LÀ BÁO CÁO PLAN REFUEL MỚI HỎI CÂU HỎI VÀ TAG TEAM LEADER
-            if category == "PLAN":
-                reply_text += f"\n📢 {mention_tag} Who is assigned to follow and monitor ?"
 
         tg_reply(chat_id, reply_text)
 
