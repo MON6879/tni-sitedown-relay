@@ -443,7 +443,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 _csv_cache = {}
 _csv_cache_ts = {}
-CSV_CACHE_TTL = 120  # 2 phút cache sống
+CSV_CACHE_TTL = 600  # 10 phút cache sống — tra cứu tức thì < 0.05s
 
 _tni_info_index = {}
 _tni_team_sum_index = {}
@@ -471,23 +471,20 @@ def fetch_single_csv(gid: str, is_sd: bool = False) -> pd.DataFrame | None:
     base = SD_BASE_URL if is_sd else BASE_URL
     url = base + str(gid)
     hdrs = {"User-Agent": "Mozilla/5.0"}
-    for attempt in range(1, 3):
-        try:
-            resp = requests.get(url, headers=hdrs, timeout=3.5, allow_redirects=True)
-            resp.raise_for_status()
-            content = resp.content.decode("utf-8", errors="replace")
-            df = pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
-            _csv_cache[cache_key] = df
-            _csv_cache_ts[cache_key] = time.time()
-            return df
-        except Exception as ex:
-            logger.warning(f"fetch_single_csv retry {attempt}/2 [gid={gid}]: {ex}")
-            if cached is not None:
-                logger.info(f"Returning stale cache for gid={gid} due to fetch error")
-                return cached
-            if attempt < 2:
-                time.sleep(0.1)
-    return _csv_cache.get(cache_key)
+    try:
+        resp = requests.get(url, headers=hdrs, timeout=2.0, allow_redirects=True)
+        resp.raise_for_status()
+        content = resp.content.decode("utf-8", errors="replace")
+        df = pd.read_csv(io.StringIO(content), header=None, dtype=str, on_bad_lines="skip")
+        _csv_cache[cache_key] = df
+        _csv_cache_ts[cache_key] = time.time()
+        return df
+    except Exception as ex:
+        logger.warning(f"fetch_single_csv error [gid={gid}]: {ex}")
+        if cached is not None:
+            logger.info(f"Returning stale cache for gid={gid}")
+            return cached
+        return _csv_cache.get(cache_key)
 
 def safe(row, idx: int) -> str:
     if idx < len(row):
