@@ -16,10 +16,13 @@ from datetime import datetime, timezone, timedelta
 from telethon import TelegramClient
 from telethon.tl.functions.messages import GetHistoryRequest
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # ── Cấu hình ──────────────────────────────────────────────────────
-API_ID         = int(os.environ["TELEGRAM_API_ID"])
-API_HASH       = os.environ["TELEGRAM_API_HASH"]
-SESSION_STRING = os.environ["TELEGRAM_SESSION"]
+API_ID         = int(os.environ.get("TELEGRAM_API_ID", "0"))
+API_HASH       = os.environ.get("TELEGRAM_API_HASH", "")
+SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
 
 SOURCE_GROUP   = "Botlookup"
 COMMAND        = "/down_tni@auto_nocpro_bot"
