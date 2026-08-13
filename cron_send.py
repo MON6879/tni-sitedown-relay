@@ -6,7 +6,7 @@ Dùng 3 bot theo dải row trong sheet Task remain (gid=133591305):
   Row 60-74: SEND_BOT + compiled report (management)
   Row 75-87: @TNITECHINICALDEPREPORT_BOT (technical dept)
 """
-import asyncio, io, logging, os, re, requests, pandas as pd
+import asyncio, csv, io, logging, os, re, requests, pandas as pd
 from datetime import datetime, timezone, timedelta
 from telegram import Bot
 from telethon import TelegramClient
@@ -174,7 +174,21 @@ def get_note_from_sheet() -> str:
 
 
 def get_control_note_from_sheet() -> str:
-    """Read H1:H3 from Config tab (GID 1236389870)."""
+    """Fetch cell O1 from Sheet 1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM (gid=201295323), fallback to Config tab H1:H3."""
+    refuel_note_url = "https://docs.google.com/spreadsheets/d/1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM/gviz/tq?tqx=out:csv&gid=201295323"
+    try:
+        resp = requests.get(refuel_note_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+        if resp.status_code == 200:
+            reader = list(csv.reader(io.StringIO(resp.text)))
+            if reader and len(reader[0]) > 14:
+                val = reader[0][14].strip()
+                if val and val.lower() not in ("nan", "none", ""):
+                    logger.info("Successfully fetched Control Note from Cell O1 of Refuel Sheet")
+                    return val
+    except Exception as e:
+        logger.warning(f"Error fetching O1 note from Refuel Sheet: {e}")
+
+    # Fallback to Config tab
     try:
         resp = requests.get(CONFIG_SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
         resp.raise_for_status()
