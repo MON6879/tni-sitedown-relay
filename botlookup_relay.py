@@ -201,10 +201,7 @@ async def main():
             if sender_uname.lower() == BOT_USERNAME.lower() and msg.message:
                 bot_messages.append(msg.message)
                 print(f"[{myanmar_now()}] Bot tin #{len(bot_messages)}: {len(msg.message)} ky tu")
-            else:
-                if msg.sender_id != me.id:
-                    print(f"[{myanmar_now()}] STOP: nguoi khac gui (sender_id={msg.sender_id})")
-                    break
+            # Không dừng loop khi có tài khoản thứ 2 hoặc người khác gửi tin nhắn — tiếp tục gom đủ tin từ @auto_nocpro_bot
 
         if not found_command:
             print(f"[{myanmar_now()}] Khong tim thay lenh /down_tni -> fallback: lay tin bot MOI NHAT sau send_time")
