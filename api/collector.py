@@ -997,32 +997,7 @@ async def handle(data: dict):
                         parse_mode="HTML"
                     )
                 return
-            elif cmd == "/daily":
-                now_mm = datetime.now(TZ_MM)
-                date_s = now_mm.strftime("%d/%m/%Y")
-                template_text = (
-                    f"Daily result: {date_s}\n"
-                    "Transportation Used:\n"
-                    "Full Name:\n"
-                    "Detail WO:\n"
-                    "Detail task:\n"
-                    "Name Site rescue:\n"
-                    "Name Cell rescue:\n"
-                    "Resuce Cable:\n"
-                    "Name and detail Site repair alarm:\n"
-                    "Name Site follow partner refuel:\n"
-                    "Other task:\n"
-                    "Name and detail Site go busines trip start go:\n"
-                    "Name and detail Site go busines trip end go:\n"
-                    "Km moto bike start:\n"
-                    "Km moto bike the end:"
-                )
-                await bot.send_message(
-                    chat_id,
-                    template_text,
-                    parse_mode="HTML"
-                )
-                return
+
             else:
                 tpl_txt = get_template_text(cmd)
                 if tpl_txt:
