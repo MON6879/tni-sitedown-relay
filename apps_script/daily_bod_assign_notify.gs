@@ -73,9 +73,13 @@ function checkBodAssign() {
       const colC = String(row[2] || "").trim(); // Cột C (Task Content)
       const colR = String(row[17] || "").trim(); // Cột R (index 17)
       const colT = String(row[19] || "").trim(); // Cột T (index 19)
-      const colU = String(row[20] || "").trim(); // Cột U (index 20)
-
+      if (!colC && (!colR || colR === "- : -")) {
+        continue; // Bỏ qua không gửi tin rác "- : -" khi chưa có task
+      }
       const notifyContent = colR || (`${colA} - ${colB}: ${colC}`.trim());
+      if (!notifyContent || notifyContent === "- : -" || notifyContent === " - :") {
+        continue; // Bỏ qua tin rác không có nội dung task thực tế
+      }
 
       // 1. Quét gửi Control
       if (notifyContent && sentControlRows.indexOf(rowNum) === -1) {
