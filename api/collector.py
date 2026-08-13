@@ -30,8 +30,8 @@ except ValueError:
     CABLE_CHAT_ID = -5531350787
 
 MDG_APPS_SCRIPT_URL = os.environ.get("MDG_APPS_SCRIPT_URL", "").strip().lstrip('\ufeff')
-if not MDG_APPS_SCRIPT_URL or "AKfycbzGFdnE" in MDG_APPS_SCRIPT_URL:
-    MDG_APPS_SCRIPT_URL = APPS_SCRIPT_URL or MAIN_GAS_FALLBACK
+if not MDG_APPS_SCRIPT_URL or "AKfycbzGFdnE" in MDG_APPS_SCRIPT_URL or "AKfycbzZmFw" in MDG_APPS_SCRIPT_URL:
+    MDG_APPS_SCRIPT_URL = MAIN_GAS_FALLBACK
 
 try:
     MDG_CHAT_ID = int(os.environ.get("MDG_CHAT_ID", "-5412512982").strip())
@@ -206,18 +206,22 @@ def post_cable_photo(payload: dict):
 
 
 def post_mdg_sheet(payload: dict):
-    """POST JSON to MDG Apps Script Web App."""
-    if not MDG_APPS_SCRIPT_URL:
-        logger.error("MDG_APPS_SCRIPT_URL not set.")
-        return {"status": "error", "message": "MDG_APPS_SCRIPT_URL not configured"}
+    """POST JSON to MDG Apps Script Web App with automatic fallback."""
+    url = MDG_APPS_SCRIPT_URL or MAIN_GAS_FALLBACK
     try:
-        resp = requests.post(MDG_APPS_SCRIPT_URL, json=payload, timeout=30)
+        resp = requests.post(url, json=payload, timeout=30)
         resp.raise_for_status()
         logger.info(f"MDG Apps Script response: {resp.text[:300]}")
         return resp.json()
     except Exception as e:
-        logger.error(f"MDG Apps Script POST error: {e}")
-        return {"status": "error", "message": str(e)}
+        logger.error(f"MDG Apps Script POST error ({url}): {e} -> Retrying with MAIN_GAS_FALLBACK")
+        try:
+            resp = requests.post(MAIN_GAS_FALLBACK, json=payload, timeout=30)
+            resp.raise_for_status()
+            logger.info(f"MDG Apps Script fallback response: {resp.text[:300]}")
+            return resp.json()
+        except Exception as retry_err:
+            return {"status": "error", "message": str(retry_err)}
 
 
 def post_mdg_photo(payload: dict):
