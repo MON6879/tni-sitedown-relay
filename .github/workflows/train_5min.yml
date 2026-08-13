@@ -448,7 +448,7 @@ jobs:
       - name: "🚨 Toa Site Down Relay — Bot Lookup Relay"
         if: |
           steps.sched.outputs.botlookup_relay == 'true' ||
-          (github.event_name == 'workflow_dispatch' && inputs.report_type == 'Task - Bot Lookup Relay')
+          (github.event_name == 'workflow_dispatch')
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
@@ -457,4 +457,5 @@ jobs:
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
           REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}
           SD_BOTLOOKUP_CHAT_ID: ${{ secrets.SD_BOTLOOKUP_CHAT_ID }}
-        run: python botlookup_relay.py
+          FORCE_RUN: '1'
+        run: python botlookup_relay.py --force

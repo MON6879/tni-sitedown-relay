@@ -35,4 +35,5 @@ jobs:
           REFUEL_APPS_SCRIPT_URL: ${{ secrets.REFUEL_APPS_SCRIPT_URL }}
           SD_BOTLOOKUP_CHAT_ID:   ${{ secrets.SD_BOTLOOKUP_CHAT_ID }}
           SKIP_DELAY:             '1'
-        run: python botlookup_relay.py
+          FORCE_RUN:              '1'
+        run: python botlookup_relay.py --force
