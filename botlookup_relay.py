@@ -80,7 +80,7 @@ async def main():
     if not is_target_relay_window():
         tz = timezone(timedelta(hours=6, minutes=30))
         now = datetime.now(tz)
-        print(f"[{myanmar_now()}] ⏭️ Bỏ qua ca chạy lúc {now.strftime('%H:%M')} MMT (Chỉ chạy đúng cửa sổ :03-:08 và :33-:38 MMT để không bao giờ trễ tin).")
+        print(f"[{myanmar_now()}] ⏭️ Bỏ qua ca chạy lúc {now.strftime('%H:%M')} MMT (Chỉ chạy đúng cửa sổ :06-:25 và :36-:55 MMT để không bao giờ trễ tin).")
         return
 
     # ── 2. Kết nối Telegram ───────────────────────────────────────
