@@ -1,6 +1,8 @@
 name: Botlookup Relay (Manual Trigger Only - Scheduled by Train 5min)
 
 on:
+  schedule:
+    - cron: '3/30 * * * *'   # Every 30 min at :03 and :33 MMT
   workflow_dispatch:
     inputs:
       skip_delay:
