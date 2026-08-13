@@ -61,10 +61,7 @@ def in_active_window() -> bool:
 
 
 def is_target_relay_window() -> bool:
-    """Check if current Myanmar minute is within :03-:08 or :33-:38 MMT (ensures 30-min data is NEVER lost even if GitHub runner delays 2-3 mins)."""
-    import sys
-    if "--force" in sys.argv or os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
-        return True
+    """Check if current Myanmar minute is strictly within :03-:08 or :33-:38 MMT."""
     tz = timezone(timedelta(hours=6, minutes=30))
     now = datetime.now(tz)
     m = now.minute
