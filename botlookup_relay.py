@@ -127,31 +127,35 @@ async def main():
             # Lấy tất cả tin nhắn dạng lệnh /down_ và tất cả tin nhắn chứa Auto Report NocPro (xếp từ cũ -> mới)
             messages = list(reversed(pre_history.messages))
             
-            down_cmds = []
+            my_down_cmds = []
             auto_reports = []
 
             for msg in messages:
                 txt = (msg.message or "").lower()
-                if "/down_" in txt or "auto_nocpro_bot" in txt:
-                    down_cmds.append(msg)
+                is_mine = (msg.sender_id == me.id) or getattr(msg, 'out', False)
+                if is_mine and "/down_tni" in txt:
+                    my_down_cmds.append(msg)
                 if "auto report nocpro" in txt or "site down" in txt or "auto-generated report" in txt or "nocpro" in txt:
                     auto_reports.append(msg)
 
-            # Lấy 3 lệnh /down_ gần đây nhất trong nhóm
-            if len(down_cmds) >= 3:
-                last_3_cmds = down_cmds[-3:]
+            # Lấy 3 lệnh /down_tni gần đây nhất do nick này gửi
+            if len(my_down_cmds) >= 3:
+                last_3_cmds = my_down_cmds[-3:]
                 third_last_cmd_date = last_3_cmds[0].date
                 
                 # Có bất kỳ tin "Auto Report NocPro" nào xuất hiện từ sau lệnh thứ 3 gần nhất không?
                 has_nocpro_reply_after = any(r.date >= third_last_cmd_date for r in auto_reports)
 
-                print(f"[{myanmar_now()}] 🔍 Pre-check: Lấy 3 lệnh /down_ gần nhất ({len(down_cmds)} tổng cộng) | Phản hồi 'Auto Report NocPro' sau lệnh thứ 3: {'Có' if has_nocpro_reply_after else 'Không'}")
+                # Bảo hiểm thoát Deadlock: Nếu quá 35 phút chưa gửi bản tin mới -> Tự động thử lại
+                newest_cmd_age_min = (datetime.now(timezone.utc) - my_down_cmds[-1].date).total_seconds() / 60.0
 
-                if not has_nocpro_reply_after:
-                    print(f"[{myanmar_now()}] ⚠️ Bot công ty đang LỖI (kể từ 3 lệnh /down_ gần nhất chưa có tin 'Auto Report NocPro' xuất hiện). BỎ QUA GỬI MỚI để không làm loãng nhóm!")
+                print(f"[{myanmar_now()}] 🔍 Pre-check: Lấy 3 lệnh /down_tni gần nhất của nick này | Phản hồi 'Auto Report NocPro': {'Có' if has_nocpro_reply_after else 'Không'} | Lệnh cuối cách đây: {newest_cmd_age_min:.1f} phút")
+
+                if not has_nocpro_reply_after and newest_cmd_age_min < 35:
+                    print(f"[{myanmar_now()}] ⚠️ Bot công ty chưa phản hồi 3 lệnh /down_tni gần nhất của nick này. BỎ QUA GỬI MỚI để không làm loãng nhóm!")
                     return
                 else:
-                    print(f"[{myanmar_now()}] 🟢 Đã có tin 'Auto Report NocPro'! Bot công ty đã sửa xong. Tiếp tục gửi lệnh cào dữ liệu...")
+                    print(f"[{myanmar_now()}] 🟢 Tiếp tục gửi lệnh cào dữ liệu...")
         except Exception as pre_ex:
             print(f"[{myanmar_now()}] ⚠️ Pre-check error (vẫn tiếp tục): {pre_ex}")
 
