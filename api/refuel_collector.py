@@ -369,34 +369,71 @@ def process_update(update: dict):
     })
     logger.info(f"[{category}] sender={sender} | GAS={result.get('status')} def={result.get('def','')}")
 
-    # Gửi reply xác nhận khi ghi thành công
+    # ── GỬI REPLY XÁC NHẬN KHI GHI THÀNH CÔNG (TÁCH BIỆT 100% GHẾ RIÊNG KHÔNG BAO GIỜ NHẦM) ──
     if result.get("status") == "ok":
-        ts = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
+        ts     = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
+        def_id = result.get("def", "")
 
-        if category == "LETTER_SUBMIT":
+        # 💺 GHẾ 1: DÀNH RIÊNG CHO BÁO CÁO KẾ HOẠCH DẦU (PLAN REFUEL — DUY NHẤT CÓ CÂU HỎI VÀ TAG LEADER)
+        if category == "PLAN":
             reply_text = (
-                f"📋 <b>Letter Submit</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
-                f"📅 Date: <b>{result.get('date', ts)}</b>"
+                f"<b>Plan refuel</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
+                f"Done 📅 {ts}\n"
+                f"📢 {mention_tag} Who is assigned to follow and monitor ?"
             )
-        elif category == "LETTER_APPROVED":
-            reply_text = (
-                f"✅ <b>Letter Approved</b> ✅ Recorded — 🪪 <code>{result.get('def', '')}</code>\n"
-                f"📅 Date: <b>{result.get('date', ts)}</b>"
-            )
-        else:
-            def_id    = result.get("def", "")
-            cat_label = {
-                "PLAN":       "Plan refuel",
-                "REQUEST":    "Team request",
-                "REFUELED":   "Refueled",
-                "FT_MONITOR": "FT follow monitor",
-            }.get(category, category)
+            tg_reply(chat_id, reply_text)
+            return
 
+        # 💺 GHẾ 2: DÀNH RIÊNG CHO BÁO CÁO FT FOLLOW MONITOR
+        if category == "FT_MONITOR":
             reply_text = (
-                f"<b>{cat_label}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
+                f"<b>FT follow monitor</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
                 f"Done 📅 {ts}"
             )
+            tg_reply(chat_id, reply_text)
+            return
 
+        # 💺 GHẾ 3: DÀNH RIÊNG CHO BÁO CÁO ĐÃ ĐỔ XĂNG THỰC TẾ (REFUELED)
+        if category == "REFUELED":
+            reply_text = (
+                f"<b>Refueled</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
+                f"Done 📅 {ts}"
+            )
+            tg_reply(chat_id, reply_text)
+            return
+
+        # 💺 GHẾ 4: DÀNH RIÊNG CHO BÁO CÁO YÊU CẦU ĐỘI (TEAM REQUEST)
+        if category == "REQUEST":
+            reply_text = (
+                f"<b>Team request</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
+                f"Done 📅 {ts}"
+            )
+            tg_reply(chat_id, reply_text)
+            return
+
+        # 💺 GHẾ 5: DÀNH RIÊNG CHO ĐƠN TRÌNH LETTER SUBMIT
+        if category == "LETTER_SUBMIT":
+            reply_text = (
+                f"📋 <b>Letter Submit</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
+                f"📅 Date: <b>{result.get('date', ts)}</b>"
+            )
+            tg_reply(chat_id, reply_text)
+            return
+
+        # 💺 GHẾ 6: DÀNH RIÊNG CHO ĐƠN DUYỆT LETTER APPROVED
+        if category == "LETTER_APPROVED":
+            reply_text = (
+                f"✅ <b>Letter Approved</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
+                f"📅 Date: <b>{result.get('date', ts)}</b>"
+            )
+            tg_reply(chat_id, reply_text)
+            return
+
+        # 💺 GHẾ 7: FALLBACK CHUNG CHO CÁC MẪU ĐƠN KHÁC
+        reply_text = (
+            f"<b>{category}</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
+            f"Done 📅 {ts}"
+        )
         tg_reply(chat_id, reply_text)
 
 
