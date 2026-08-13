@@ -351,16 +351,15 @@ function runAutoCopyProcessor(bypassTimeGate) {
               }
 
               let copiedCount = 0;
+              const rowsToAppend = [];
               for (let r = 0; r < condData.length; r++) {
                 if (String(condData[r][0]).trim() === sourceValCond) {
                   const srcRowNum = r + finalStartRow;
                   let rowValues;
                   let hasCircularError = false;
                   
-                  // Đọc giá trị dòng nguồn — bắt lỗi vòng lặp (Circular Reference)
                   try {
                     rowValues = srcSh.getRange(srcRowNum, startCol, 1, numCols).getValues();
-                    // Nếu ô nào chứa lỗi Error (VD: #REF!, #CIRC!), đánh dấu đỏ và ghi log
                     const flatVals = rowValues[0];
                     for (let v = 0; v < flatVals.length; v++) {
                       const vStr = String(flatVals[v]).trim();
@@ -384,7 +383,6 @@ function runAutoCopyProcessor(bypassTimeGate) {
                   }
                   
                   if (hasCircularError) {
-                    // Bôi đỏ cột A và B dòng lỗi trong sheet nguồn
                     srcSh.getRange(srcRowNum, 1, 1, 2).setBackground("#FF5252");
                     const errMsg = "⚠️ Lỗi vòng lặp/công thức tại sheet '" + srcInfo.sheetName + "' dòng " + srcRowNum + " (Cấu hình dòng #" + rowIdx + ")";
                     errorRows.push(errMsg);
@@ -392,14 +390,15 @@ function runAutoCopyProcessor(bypassTimeGate) {
                     continue;
                   }
                   
-                  // Tìm dòng trống tiếp theo dựa theo cột dán đích
-                  const tgtNextRow = findNextEmptyRowInCol_(tgtSh, targetStartCol, targetStartRow);
-                  
-                  // Ghi dữ liệu dạng Paste 123 (values only — giữ nguyên công thức nguồn)
-                  tgtSh.getRange(tgtNextRow, targetStartCol, 1, numCols).setValues(rowValues);
+                  rowsToAppend.push(rowValues[0]);
                   copiedCount++;
-                  Logger.log("  ✅ Đã copy dòng " + srcRowNum + " sang sheet đích dòng " + tgtNextRow);
                 }
+              }
+
+              if (rowsToAppend.length > 0) {
+                const tgtNextRow = findNextEmptyRowInCol_(tgtSh, targetStartCol, targetStartRow);
+                tgtSh.getRange(tgtNextRow, targetStartCol, rowsToAppend.length, numCols).setValues(rowsToAppend);
+                Logger.log("  ✅ Đã copy hàng loạt " + rowsToAppend.length + " dòng sang sheet đích từ dòng " + tgtNextRow);
               }
               Logger.log("  📊 Hoàn thành copy: " + copiedCount + " dòng.");
               

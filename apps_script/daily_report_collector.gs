@@ -572,6 +572,20 @@ function handleStoreDailyPlan(body) {
     sheet.getRange(2, 1, 1, 6).setValues([[nextRef, date, teamNorm, content, report, comparison]]);
     sheet.getRange(2, 1).setFontWeight("bold").setHorizontalAlignment("center");
 
+    // Dual-Sync sang Bảng tính thứ 2 (Cable Collect Data / Search Sheet 1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8)
+    try {
+      const secSs = SpreadsheetApp.openById("1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8");
+      let secSheet = secSs.getSheetByName(DAILY_PLAN_TAB);
+      if (secSheet) {
+        secSheet.insertRowBefore(2);
+        secSheet.getRange(2, 1, 1, 6).setValues([[nextRef, date, teamNorm, content, report, comparison]]);
+        secSheet.getRange(2, 1).setFontWeight("bold").setHorizontalAlignment("center");
+        Logger.log("[Dual-Sync] Successfully written " + nextRef + " to Secondary Sheet 1Etd2PmbY5Lg...");
+      }
+    } catch(secErr) {
+      Logger.log("[Dual-Sync] Warning secondary sheet write: " + secErr.message);
+    }
+
     return jsonOut({ status: "ok", ref: nextRef });
   } catch (err) {
     return jsonOut({ status: "error", message: err.message });
