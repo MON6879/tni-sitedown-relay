@@ -11,6 +11,25 @@
 
 ---
 
+### 🏛️ 0. PHÂN ĐỊNH TRÁCH NHIỆM: GITHUB ACTIONS vs GOOGLE APPS SCRIPT (GAS)
+
+> ⚡ **NGUYÊN TẮC CỐT LÕI**: GAS chịu trách nhiệm các tác vụ nội bộ bảng tính / Cloud Webhook; GITHUB ACTIONS chịu trách nhiệm chạy các kịch bản Python tự động, Telethon User Session và điều phối Đoàn tàu 5 phút.
+
+| Phân hệ | Thành phần đảm nhiệm | File / Script thực thi | Nơi chạy & Trigger | Nhiệm vụ chính |
+|---|---|---|---|---|
+| 🟢 **GAS NATIVE** | **Auto Copy & Delete** | `auto_copy_processor.gs` | Google Cloud (Trigger 15 phút) | Đồng bộ 27 rule tự động giữa các Google Sheets |
+| 🟢 **GAS NATIVE** | **Construction Bot 10** | `13_TNI_CONSTRUCTION.gs` | Google Cloud (Webhook Telegram) | Nhận báo cáo thi công, tải ảnh vào Google Drive, chèn dòng 3 |
+| 🟢 **GAS NATIVE** | **Báo cáo Chiều 17:30** | `auto_send_17h30.gs` / `telegram_report_bot.gs` | Google Cloud (Trigger 17:30 MMT) | Gửi báo cáo tiến độ công việc cho Leader & Manager qua Bot API |
+| 🟢 **GAS NATIVE** | **Sheet Backend API** | `apps_script_collector.gs`, `site_down_v2.gs` | Google Cloud (Web App Endpoint) | Ghi nhận dữ liệu vào Google Sheets (luôn chèn dòng 2) |
+| 🔵 **GITHUB ACTIONS** | **Toa 0 Keepalive** | `train_5min.yml` | GitHub (`MON6879` — mỗi 5 phút) | Sưởi ấm Vercel API & khóa khôi phục `setWebhook` 6 Bot |
+| 🔵 **GITHUB ACTIONS** | **Reports 1, 2, 3, 4 + BOD** | `cron_send.py`, `daily_bod_assign.py` | GitHub (`MON6879` — 05:48 & 15:48 MMT) | Báo cáo công việc hàng ngày 4 Team & BOD Assign (Dung sai ±4p) |
+| 🔵 **GITHUB ACTIONS** | **Report 5A, 5B, 5C (Plan)** | `daily_plan_report.py` | GitHub (`MON6879` — theo lịch 7 mốc) | Báo cáo Kế hoạch Ngày/EOD/Update (Dung sai ±4p) |
+| 🔵 **GITHUB ACTIONS** | **Report 6 (Read Status)** | `daily_read_report.py` | GitHub (`MON6879` — 08:48, 14:58, 17:18, 19:41) | Báo cáo xác nhận đọc Note qua Telethon (Dung sai ±4p) |
+| 🔵 **GITHUB ACTIONS** | **Cable & Refuel Reports** | `cable_report.py`, `refuel_plan_report.py` | GitHub (`MON6879` — theo lịch) | Báo cáo Cáp đứt và Kế hoạch cấp dầu máy phát |
+| 🔵 **GITHUB ACTIONS** | **Site Down Relay Độc lập** | `botlookup_relay.yml` / `botlookup_relay.py` | GitHub (`MON6879` — cron `3,33 * * * *` UTC) | Cào dữ liệu trạm sập NOC Pro bằng Telethon lúc :06 & :36 MMT |
+
+---
+
 ### 🌐 1. Ma trận phụ thuộc Endpoints & Apps Script URLs:
 
 | Tên chức năng / Bot | Endpoint Webhook / Deployment | Apps Script Web App URL | Các file Python liên quan (Phải đồng bộ `MAIN_GAS_FALLBACK`) | Workflow / Docs liên quan (Phải đồng bộ) |
