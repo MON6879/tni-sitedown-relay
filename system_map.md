@@ -24,6 +24,7 @@
 ---
 
 ### ⏰ 2. Ma trận phụ thuộc Lịch gửi Báo cáo tự động (Cron Schedule Matrix):
+> 🛡️ **Cơ chế chống trôi tin (v581)**: Hàm `check_time()` trong `train_5min.yml` thiết lập dung sai **`DIFF <= 4` (±4 phút)** so với giờ đích để đảm bảo 100% bắt được đúng giờ kể cả khi GitHub Actions bị trễ hàng đợi 3–4 phút.
 
 | Tên báo cáo | Giờ gửi MMT (Asia/Yangon UTC+6:30) | Cấu hình `train_5min.yml` (`cron: '1/5 * * * *'`) | Check Time (Hàm `check_time`) | Script Python thực thi | Nhóm Telegram nhận tin |
 |---|---|---|---|---|---|
