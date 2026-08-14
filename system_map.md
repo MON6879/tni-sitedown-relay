@@ -25,12 +25,17 @@
 
 ### ⏰ 2. Ma trận phụ thuộc Lịch gửi Báo cáo tự động (Cron Schedule Matrix):
 
-| Tên báo cáo | Giờ gửi MMT (Asia/Yangon UTC+6:30) | Biểu thức Cron GitHub (`.github/workflows/daily_reports.yml`) | Biểu thức `if:` từng Step (BẮT BUỘC KHỚP 100%) | Script Python thực thi | Nhóm Telegram nhận tin |
+| Tên báo cáo | Giờ gửi MMT (Asia/Yangon UTC+6:30) | Cấu hình `train_5min.yml` (`cron: '1/5 * * * *'`) | Check Time (Hàm `check_time`) | Script Python thực thi | Nhóm Telegram nhận tin |
 |---|---|---|---|---|---|
-| **Báo cáo Sáng (Reports 1, 2, 3, 4)** | **05:45 AM MMT** | `15 23 * * *` (23:15 UTC) | `if: github.event.schedule == '15 23 * * *'` | `cron_send.py` | Teams 1..4, CONTROL, TECHDEP |
-| **Báo cáo Chiều (Reports 1, 2, 3, 4)** | **15:45 PM MMT** | `15 9 * * *` (09:15 UTC) | `if: github.event.schedule == '15 9 * * *'` | `cron_send.py` | Teams 1..4, CONTROL, TECHDEP |
-| **Báo cáo Kế hoạch (Report 5A / Daily Plan)** | **05:45 AM & 15:45 PM MMT** | `15 23 * * *` & `15 9 * * *` | `if: github.event.schedule == '15 23 * * *' \|\| github.event.schedule == '15 9 * * *'` | `daily_plan_report.py` | Teams 1..4, CONTROL |
-| **Báo cáo Lượt đọc (Report 6 / Read Status)** | **05:45 AM & 15:45 PM MMT** | `15 23 * * *` & `15 9 * * *` | `if: github.event.schedule == '15 23 * * *' \|\| github.event.schedule == '15 9 * * *'` | `daily_read_report.py` | Teams 1..4, CONTROL |
+| **Báo cáo Sáng (Reports 1, 2, 3, 4)** | **05:48 AM MMT** | Toa 1, 2, 3, 4 (Teams 1 to 4) | 05:48 MMT | `cron_send.py` | Teams 1..4, CONTROL, TECHDEP |
+| **Báo cáo Chiều (Reports 1, 2, 3, 4)** | **15:48 PM MMT** | Toa 1, 2, 3, 4 (Teams 1 to 4) | 15:48 MMT | `cron_send.py` | Teams 1..4, CONTROL, TECHDEP |
+| **Báo cáo Kế hoạch EOD (Report 5A)** | **18:41 PM MMT** | Toa Report 5A EOD | 18:41 MMT | `daily_plan_report.py` | Teams 1..4, CONTROL |
+| **Báo cáo Kế hoạch Update (Report 5B)** | **19:11 PM MMT** | Toa Report 5B Update | 19:11 MMT | `daily_plan_report.py` | Teams 1..4, CONTROL |
+| **Báo cáo Kế hoạch Sáng (Report 5C)** | **06:06, 08:28, 09:56, 15:26, 22:06 MMT** | Toa Report 5C Morning | `06:06`, `08:28`, `09:56`, `15:26`, `22:06` MMT | `daily_plan_report.py` | Teams 1..4, CONTROL |
+| **Báo cáo Lượt đọc (Report 6)** | **08:48, 14:58, 17:18, 19:41 MMT** | Toa Report 6 Read | `08:48`, `14:58`, `17:18`, `19:41` MMT | `daily_read_report.py` | Teams 1..4, CONTROL |
+| **Cable Report** | **05:56, 15:56 MMT** | Toa Cable | 05:56, 15:56 MMT | `cable_report.py` | CABLE Group |
+| **Refuel Request Report** | **05:48, 05:56, 07:06, 13:06, 15:56 MMT** | Toa Refuel Request | `05:48`, `05:56`, `07:06`, `13:06`, `15:56` MMT | `refuel_plan_report.py` | REFUEL Group |
+| **Site Down Relay** | **Mỗi giờ (:06-:25 & :36-:55)** | Toa Botlookup Relay | `:06-:25` và `:36-:55` MMT window | `botlookup_relay.py` | CONTROL |
 
 ---
 
@@ -52,9 +57,9 @@
    * [x] Cập nhật tài liệu [`system_map.md`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/system_map.md) và [`SYSTEM_DOC.md`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/SYSTEM_DOC.md).
 
 2. **Khi thay đổi Lịch Cron gửi báo cáo:**
-   * [x] Cập nhật biểu thức cron ở phần `on.schedule` của `.github/workflows/daily_reports.yml`.
-   * [x] Cập nhật CÙNG LÚC tất cả các biểu thức `if: github.event.schedule == ...` trong từng step của workflow.
-   * [x] Đồng bộ file workflow sang `tni_site_down_repo/.github/workflows/daily_reports.yml`.
+   * [x] Cập nhật mốc giờ trong hàm `check_time` của các file workflow tương ứng hoặc `.github/workflows/train_5min.yml`.
+   * [x] Đảm bảo cấu hình thời gian chạy theo các Toa trong `train_5min.yml`.
+   * [x] Đồng bộ file workflow sang `tni_site_down_repo/.github/workflows/train_5min.yml`.
 
 3. **Khi thay đổi Mã nguồn / Logic xử lý:**
    * [x] Thực hiện đầy đủ **6 Bước Quy tắc "LƯU ĐI"** trong `AGENTS.md`.
@@ -75,7 +80,7 @@
 |---|---|---|---|---|
 | `tni-bot` | `phonghdpxd-cmd/tni-bot` | Private | **Vercel API** (`api/search_bot.py`, `api/collector.py`, `api/refuel_collector.py`, `api/site_down_relay.py`) | Khi sửa bất kỳ file `api/*.py` (Vercel handler) |
 | `TNI-SITE-DOWN` | `phonghdpxd-cmd/TNI-SITE-DOWN` | Public | Public mirror cho `tni_site_down_repo/`, keepalive workflows, docs | Khi sửa `telegram_bot.py`, `botlookup_relay.py`, `keepalive_*.yml`, `docs/` |
-| `tni-sitedown-relay` | `MON6879/tni-sitedown-relay` | Public | **GitHub Actions CHÍNH**: `daily_reports.yml` (reports 1-6, refuel, plan, read) | Khi sửa `daily_reports.yml`, `cron_send.py`, `daily_read_report.py`, `daily_plan_report.py`, `refuel_plan_report.py`, `backlog_send.py` |
+| `tni-sitedown-relay` | `MON6879/tni-sitedown-relay` | Public | **GitHub Actions CHÍNH**: `train_5min.yml` và `botlookup_relay.yml` | Khi sửa `train_5min.yml`, `cron_send.py`, `daily_read_report.py`, `daily_plan_report.py`, `refuel_plan_report.py`, `backlog_send.py`, `botlookup_relay.yml` |
 
 > ⚠️ **NGUYÊN TẮC PHÂN CHIA:** Vercel API = `phonghdpxd-cmd/tni-bot`. GitHub Actions Reports = `MON6879/tni-sitedown-relay`. Mirror + Tools = `phonghdpxd-cmd/TNI-SITE-DOWN`.
 
@@ -165,7 +170,7 @@ AI phai tuan thu TUYET DOI - khong co ngoai le:
 > [!CAUTION]
 > **BAT BUOC: Bat ky logic nao ton tai o ca 2 file sau day PHAI duoc sua CUNG LUC, CUNG 1 COMMIT:**
 > - `api/search_bot.py` ↔ `tni_site_down_repo/telegram_bot.py`
-> - `.github/workflows/daily_reports.yml` (header cron) ↔ Tung step `if:` condition trong cung file
+> - `.github/workflows/train_5min.yml` (Unified 5-minute train) ↔ Các logic check_time trong từng Toa
 > - `api/search_bot.py` regex ↔ `tni-search-cf/src/worker.js` regex
 >
 > **KHONG BAOGIO sua 1 file roi bo qua file kia. Neu quen = loi se lap lai!**
@@ -174,6 +179,11 @@ AI phai tuan thu TUYET DOI - khong co ngoai le:
 ---
 
 ## 📅 CHANGELOG
+
+### 14/08/2026 — v576: Session Lock Alert
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `botlookup_relay.py` | Thêm Session Lock Alert | Cảnh báo khi Telethon session bị khóa để người dùng biết cách xử lý |
 
 ### 07/08/2026 — v358: Fix critical crash search bot im lặng
 | File | Thay đổi | Lý do |
@@ -186,8 +196,8 @@ AI phai tuan thu TUYET DOI - khong co ngoai le:
 ### 03/08/2026 — ĐÓNG BĂNG: Gộp hết Reports + Thu thập vào MON6879
 | File | Thay đổi | Lý do |
 |---|---|---|
-| `phonghdpxd-cmd/tni-bot` `.github/workflows/` | **XÓA 7 workflows trùng lặp**: `keepalive_search_bot.yml` (4,320 phút/tháng), `botlookup_relay.yml` (2,160 phút/tháng), `refuel_report.yml` (trùng), `refuel_plan_report_1.yml`, `refuel_plan_report_2.yml`, `daily_plan_report.yml`, `daily_read_report.yml`. Giữ `telegram_send.yml` (manual) + `tni_search_bot.yml` (disabled) | Tất cả reports đã chạy trên MON6879 `daily_reports.yml`. Workflows trên phonghdpxd-cmd là **trùng lặp**, ngốn ~7,200 phút/tháng vượt quota 360% |
-| `MON6879/tni-sitedown-relay` `.github/workflows/` | **XÓA 2 workflows trùng**: `sitedown_keepalive.yml` (4,320 phút/tháng), `botlookup_relay.yml` (2,160 phút/tháng trùng với `daily_reports.yml`) | Tiết kiệm ~6,480 phút/tháng. Botlookup đã chạy trong `botlookup_relay.yml` riêng (mỗi 30 phút) |
+| `phonghdpxd-cmd/tni-bot` `.github/workflows/` | **XÓA 7 workflows trùng lặp**: `keepalive_search_bot.yml` (4,320 phút/tháng), `botlookup_relay.yml` (2,160 phút/tháng), `refuel_report.yml` (trùng), `refuel_plan_report_1.yml`, `refuel_plan_report_2.yml`, `daily_plan_report.yml`, `daily_read_report.yml`. Giữ `telegram_send.yml` (manual) + `tni_search_bot.yml` (disabled) | Tất cả reports đã chạy trên MON6879 `train_5min.yml`. Workflows trên phonghdpxd-cmd là **trùng lặp**, ngốn ~7,200 phút/tháng vượt quota 360% |
+| `MON6879/tni-sitedown-relay` `.github/workflows/` | **XÓA 2 workflows trùng**: `sitedown_keepalive.yml` (4,320 phút/tháng), `botlookup_relay.yml` (2,160 phút/tháng trùng với `train_5min.yml`) | Tiết kiệm ~6,480 phút/tháng. Botlookup đã chạy trong `botlookup_relay.yml` riêng. |
 | `MON6879/tni-sitedown-relay` | Chuyển repo sang **PUBLIC** → GitHub Actions **MIỄN PHÍ KHÔNG GIỚI HẠN** | Quota 2,000 phút/tháng cho PRIVATE repos không đủ (tổng ~12,270 phút/tháng). PUBLIC = 0 chi phí |
 | Kiến trúc | **phonghdpxd-cmd**: chỉ Vercel (Collector + Search Bot). **MON6879**: tất cả GitHub Actions (Reports 1-6, Refuel, Cable, Botlookup, Search Logger) | Quy tắc: 1 nơi chạy reports duy nhất, không trùng lặp |
 
@@ -198,8 +208,8 @@ AI phai tuan thu TUYET DOI - khong co ngoai le:
 | `tni_site_down_repo/site_down_v2.gs` | CONTROL nhận C1..C3 (Header/Duty) và C10:C (Chi tiết site), bỏ qua từng Team Total. Bỏ hoàn toàn `editMessageText`, luôn xóa tin nhắn cũ (`deleteOldMessages_`) và gửi tin nhắn mới với mốc giờ hiện tại | Giao diện CONTROL đẹp gọn, bong bóng tin nhắn Telegram hiển thị đúng mốc thời gian cập nhật hiện tại |
 | `tni_site_down_repo/site_down_v2.gs` | Bổ sung icon 🔥 `Dont Forget` và 🕒 `Duty:` vào `addKeywordIcons()`, đưa tất cả icon tiêu đề về đầu dòng (`\n`). `checkAwAz()` dùng mốc Ngày/Giờ (`tsKey`) làm key so sánh tránh nhảy tin liên tục do công thức lẻ phút | Giao diện rõ ràng thoáng mắt, chống gửi trùng lặp 100% |
 | `telegram_bot.py` | Cập nhật xử lý lỗi HTTP 401 Unauthorized thân thiện khi Google Sheet ở chế độ Restricted. Hướng dẫn đổi quyền Chia sẻ sang Viewer | Giúp người dùng biết cách mở lại quyền cho Bot tra cứu dữ liệu |
-| `.github/workflows/daily_reports.yml` | Chuyển lịch chạy báo cáo định kỳ cuối ca chiều từ 17:20/17:30 về đúng **16:00 giờ Myanmar (`30 9 * * *` UTC)** | Gửi báo cáo định kỳ đúng khung giờ 16:00 theo yêu cầu |
-| `.github/workflows/` | Dọn dẹp triệt để `daily_reports.yml` và `botlookup_relay.yml` khỏi repo `phonghdpxd-cmd`, chỉ duy nhất repo `MON6879/tni-sitedown-relay` chạy tự động | Chặn hoàn toàn việc gửi 2 tin trùng lặp do 2 bot GitHub chạy song song |
+| `.github/workflows/train_5min.yml` | Unified 5-minute train (`cron: '1/5 * * * *'`) thay thế cho `daily_reports.yml` với logic check_time | Gửi báo cáo định kỳ đúng khung giờ theo yêu cầu |
+| `.github/workflows/` | Dọn dẹp triệt để khỏi repo `phonghdpxd-cmd`, chỉ duy nhất repo `MON6879/tni-sitedown-relay` chạy tự động | Chặn hoàn toàn việc gửi 2 tin trùng lặp do 2 bot GitHub chạy song song |
 | `.github/workflows/` & Repository Settings | Chuyển cả 2 repository `phonghdpxd-cmd/tni-bot` và `MON6879/tni-sitedown-relay` về **PRIVATE** | Bảo mật mã nguồn 100%, tận dụng 2.000 phút Private của tài khoản mới |
 
 ### 21/07/2026
@@ -248,7 +258,7 @@ Tabs: `Plan refuel` | `Team request` | `Refueled` | `Lettel Progress` | `Templat
 | `cron_send.py` | Điều kiện lọc row 4-59: bắt buộc **cột A có tên team VÀ cột D có nội dung** | Team Leader không có cột A vẫn lọt qua filter |
 | `cron_send.py` | **Viết lại `parse_emp`**: trích `Site: /N <> Day:...3Day Close: X/X/X` — bỏ danh sách TNI dài và dep stats cuối | Control hiện `Site: *0* <=> rank: *0*` |
 | `cron_send.py` | **Style emoji**: TL=🟧 (cố định), NV=trơn (không emoji), Tech Dept=vuông màu mỗi dept | Dễ đọc hơn, bỏ xanh/xanh lá luân phiên |
-| `.github/workflows/daily_reports.yml` | Thêm cron tự động `30 10 * * *` UTC = **17:00 Myanmar** cho `daily_task`; tách riêng cable_report giữ `0 11` UTC | daily_task trước chỉ chạy tay |
+| `.github/workflows/train_5min.yml` | Thêm cron tự động `30 10 * * *` UTC = **17:00 Myanmar** cho `daily_task`; tách riêng cable_report giữ `0 11` UTC | daily_task trước chỉ chạy tay |
 | `SYSTEM_DOC.md` | Cập nhật giờ `cron_send.py`: 17:30 → 17:00 Myanmar, UTC 11:00 → 10:30 | Đồng bộ với workflow |
 
 ### 04/07/2026
@@ -309,13 +319,13 @@ Trong `apps_script_collector.js`:
 | 70+ | Departments... | Finance/M&E/PM... | — | — | — |
 | **75-87** | **Technical Dept** | Department names | Nội dung từ Input task | **Telegram ID** | `@TNITECHINICALDEPREPORT_BOT` |
 
-### Cá nhân nhận báo cáo DM trực tiếp (site_down_notify.gs)
+### Cá nhân nhận báo cáo DM trực tiếp (site_down_v2.gs)
 
 | Người | Telegram | Chat ID cá nhân | Nhận gì |
 |---|---|---|---|
 | **TNI** (Ha Duc Phong) | @Phongha79 | `6859790680` | Tin1 + Tin2 FULL (giống CONTROL) — qua DM cá nhân |
 
-> **Ghi chú**: `SD_PERSONAL_IDS` trong `site_down_notify.gs` — danh sách Chat ID nhận DM cá nhân, độc lập với group. Thêm/xóa người ở đây để điều chỉnh.
+> **Ghi chú**: `SD_PERSONAL_IDS` trong `site_down_v2.gs` — danh sách Chat ID nhận DM cá nhân, độc lập với group. Thêm/xóa người ở đây để điều chỉnh.
 
 ### Row 60-74 (Management) nhận:
 1. 📦 Asset stats (Order/Revoke/Export... per team) + 3Day/7Day/Month
@@ -399,12 +409,8 @@ Trong `apps_script_collector.js`:
 
 | Workflow | File | Schedule | Script |
 |---|---|---|---|
-| **Daily Task Reminder (17:00 Myanmar)** | `daily_reports.yml` (`daily_task`) | `30 10 * * *` UTC = **17:00 Myanmar** | `backlog_send.py` + `cron_send.py` |
-| **Cable Daily Report (17:30 Myanmar)** | `daily_reports.yml` (`cable_report`) | `0 11 * * *` UTC = 17:30 Myanmar | `cable_report.py` |
-| **Daily Plan Report** | `daily_reports.yml` (`plan_report`) | workflow_dispatch | `daily_plan_report.py` |
-| **Botlookup TNI Relay** | `botlookup_relay.yml` | `0,30 22,23 * * *` + `0,30 0-14 * * *` + `0 15 * * *` UTC = 04:30–21:30 Myanmar mỗi 30p | `botlookup_relay.py` |
-| ~~TNI Search Bot 24/7~~ | `tni_search_bot.yml` | **⚠️ ĐÃ TẮT** — chuyển sang Vercel webhook (`api/search_bot.py`) | ~~`telegram_bot.py`~~ |
-| ~~Telegram Daily Send~~ | `telegram_send.yml` | **⚠️ ĐÃ TẮT** — cron cũ `30 17` UTC = 00:00 Myanmar (SAI) | ~~`cron_send.py`~~ |
+| **Unified Train 5-min (Toa 0-11)** | `train_5min.yml` | `1/5 * * * *` (Mỗi 5 phút) | `cron_send.py`, `daily_plan_report.py`, `daily_read_report.py`, `refuel_plan_report.py`, v.v. |
+| **Botlookup TNI Relay** | `botlookup_relay.yml` | Phút `:06` và `:36` mỗi giờ | `botlookup_relay.py` |
 
 - **Secrets trên GitHub:**
   - `SEND_BOT_TOKEN`
@@ -474,24 +480,23 @@ Trong `apps_script_collector.js`:
 
 ## 🤖 Site Down Auto-Notify (09/06/2026)
 
-**File:** [`site_down_notify.gs`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/site_down_notify.gs) — trong cùng repo `phonghdpxd-cmd/tni-bot`
+**File:** [`site_down_v2.gs`](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/tni_site_down_repo/site_down_v2.gs) — trong cùng repo `MON6879/tni-sitedown-relay`
 
 ### Flow hoạt động
 ```
-Báo cáo site down → Gửi vào nhóm CONTROL (-5251698940)
+`botlookup_relay.py` gửi `/down_tni@auto_nocpro_bot` vào Botlookup group
          ↓
-Apps Script trigger 5 phút → fetchTelegramUpdates() (polling getUpdates)
+Waits 35s + Smart Retry 10s
          ↓
-Ghi vào Col A của Sheet: 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow (tab GID=0)
-         ↓ Col C công thức tự tính
-checkColC() → readColCRaw() → bọc <pre>...monospace...</pre>
-  ├── CONTROL  → Toàn bộ Col C (full)
-  ├── Team 1   → Header + summary T1 + site | T1 |
-  ├── Team 2   → Header + summary T2/T5 + site | T2 | | T5 |
-  ├── Team 3   → Header + summary T3 + site | T3 |
-  └── Team 4   → Header + summary T4 + site | T4 |
+POST raw text to `site_down_v2.gs` doPost (action: store_site_down)
          ↓
-checkAwAz() → AW4:AZ8 summary → Gửi Tin 2 cho T1/T2/T3/T4
+GAS ghi vào Cột A của Sheet: 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow (tab GID=0)
+         ↓
+GAS xóa TS_KEY_A1, chạy processSiteDownColC()
+         ↓
+GAS checkAndSend() trigger mỗi 1 phút:
+  ├── Luồng 1 (Col C) → Gửi Tin 1 (monospace site list) cho T1/T2/T3/T4 + CONTROL
+  └── Luồng 2 (AW7)   → Gửi Tin 2 (summary) cho T1/T2/T3/T4 + CONTROL
 ```
 
 ### Format Tin 1 (monospace `<pre>`)
@@ -617,31 +622,29 @@ Bot gửi tin nhắn xác nhận hoàn thành điểm danh về cho người dù
 
 | Thay đổi | Chi tiết |
 |---|---|
-| **Relay gửi trực tiếp T1/T2/T3/T4** | ❌ SAI — relay chỉ trigger bot + gửi CONTROL, site_down_notify.gs lo phân phối |
+| **Relay gửi trực tiếp T1/T2/T3/T4** | ❌ SAI — relay chỉ trigger bot + gửi CONTROL, site_down_v2.gs lo phân phối |
 | **Relay store_site_down → GAS** | ❌ Bỏ — raw data từ BOT LOOKUP thiếu `\| T1 \|` markers |
 | **Relay trigger-only** | ❌ Bỏ — CONTROL không nhận gì → Col A trống |
-| **Relay gửi raw → CONTROL (sạch)** | ✅ HIỆN TẠI — raw data → CONTROL → site_down_notify.gs ghi Col A |
+| **Relay gửi raw → CONTROL (sạch)** | ✅ HIỆN TẠI — raw data → CONTROL → site_down_v2.gs ghi Col A |
 | **Active window mở rộng** | 04:30–21:30 → 04:30–23:00 Myanmar (để test tối) |
 | **Cron schedule** | Đổi từ `*/30` (48/ngày, GitHub throttle) → explicit crons (active window) |
 
 ---
 
-## 🔄 Flow Botlookup Relay (HIỆN TẠI — 10/06/2026)
+## 🔄 Flow Botlookup Relay (HIỆN TẠI)
 
 ```
-GitHub Actions (mỗi 30p, 04:30–23:00 Myanmar)
+GitHub Actions `botlookup_relay.yml` (Phút :06 và :36 mỗi giờ)
     ↓
 botlookup_relay.py
     ├─ Đăng nhập @Phongha79 (Telethon session)
     ├─ Gửi /down_tni@auto_nocpro_bot vào BOT LOOKUP
-    ├─ Chờ 35s → đọc phản hồi từ @auto_nocpro_bot
-    └─ Gửi raw text (sạch, không prefix) vào CONTROL (-5251698940)
+    ├─ Chờ 35s + Smart Retry 10s → đọc phản hồi từ @auto_nocpro_bot
+    └─ POST raw text to site_down_v2.gs doPost (action: store_site_down)
               ↓
-site_down_notify.gs trigger mỗi 5 phút
-    ├─ fetchTelegramUpdates() → đọc tin từ CONTROL qua SD_BOT getUpdates
-    ├─ isSiteDownMessage() → check "tanintharyi" + date dd/mm/yyyy
-    ├─ writeToColumnA() → ghi vào Col A của SD Sheet
-    └─ checkColC() → đọc Col C formula → gửi T1/T2/T3/T4 + CONTROL
+site_down_v2.gs trigger mỗi 1 phút (checkAndSend)
+    ├─ Luồng 1: Xử lý Col C → gửi Tin 1
+    └─ Luồng 2: Xử lý AW7 → gửi Tin 2
 ```
 
 > **⚠️ Giới hạn:** Raw data từ BOT LOOKUP (`STATION | DURATION | OWNER | POWER`) thiếu
@@ -656,7 +659,7 @@ site_down_notify.gs trigger mỗi 5 phút
 
 **Bước 1 — Lấy dữ liệu đầy đủ** (format có `| T1 |`):
 - Vào nhóm **CONTROL** → copy tin site down đầy đủ (có emoji team 🟡T2, 🟠T5...)
-- Hoặc: Ai đó forward tin gốc màu xanh vào CONTROL → site_down_notify.gs tự đọc
+- Hoặc: Ai đó forward tin gốc màu xanh vào CONTROL → site_down_v2.gs tự đọc
 
 **Bước 2 — Paste vào Sheet** (nếu chưa auto):
 - Mở [Sheet "Input Site down Telegram"](https://docs.google.com/spreadsheets/d/1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow/edit?gid=0#gid=0)
@@ -680,7 +683,7 @@ site_down_notify.gs trigger mỗi 5 phút
 | [botlookup_relay.py](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/botlookup_relay.py) | Relay: trigger bot → gửi raw data → CONTROL. Active 04:30–23:00 Myanmar |
 | [.github/workflows/botlookup_relay.yml](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/.github/workflows/botlookup_relay.yml) | Workflow: 3 crons explicit trong active window, pip install telethon requests |
 | [apps_script_collector.js](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/apps_script_collector.js) | GAS collector: thêm action `store_site_down` (chưa deploy, để dành) |
-| [site_down_notify.gs](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/site_down_notify.gs) | GAS site down: polling CONTROL 5p → ghi Col A → gửi T1/T2/T3/T4 |
+| [site_down_v2.gs](file:///d:/6.%20AI/1.%20QLTC/Task%20and%20WO/site_down_v2.gs) | GAS site down: polling CONTROL 5p → ghi Col A → gửi T1/T2/T3/T4 |
 
 ---
 
