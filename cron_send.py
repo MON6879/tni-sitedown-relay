@@ -1983,6 +1983,7 @@ async def main():
         delete_tasks = []
         for del_cid in CHATID_TO_KEY.keys():
             delete_tasks.append((del_cid, "📋 1. Report — Daily Backlog"))
+            delete_tasks.append((del_cid, "📋 2. Report — DailyWO"))
             delete_tasks.append((del_cid, "📋 2. Report — Daily Backlog"))
             delete_tasks.append((del_cid, "📋 3. Report — Main DG Material Need"))
             delete_tasks.append((del_cid, "📋 4. Report — Daily EOD Task & Stats"))

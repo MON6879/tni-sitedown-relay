@@ -311,7 +311,7 @@ async def main():
                     async with TelegramClient(StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH) as tg_client:
                         for title_pfx in [
                             "📋 1. Report — Daily Backlog",
-                            "📋 2. Report — Daily Backlog",
+                            "📋 2. Report — DailyWO",
                             "📋 3. Report — Main DG Material Need",
                             "📋 4. Report — Daily EOD Task & Stats",
                             "📓 4b. Full Report"
@@ -348,7 +348,7 @@ async def main():
 
             # ── 4b. Gửi Bản tin 1 (Report 2) ──
             lines1 = [
-                f"📋 2. Report — Daily Backlog (Task Progress) — {t_name}",
+                f"📋 2. Report — DailyWO — {t_name}",
                 f"📅 {now_str}",
                 f"📌 Shows pending tasks and general cable patrol backlogs accumulated from previous days.",
                 "━━━━━━━━━━━━━━━━━━━━"
