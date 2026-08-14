@@ -703,15 +703,15 @@
               var targetPct = mTgt ? parseInt(mTgt[1], 10) : 75;
 
               var hdr2 = rows[1] || [];
-              var rawJ = hdr2[9] || '11/08';
-              var rawK = hdr2[10] || '10/08';
-              var rawL = hdr2[11] || '09/08';
-              var rawM = hdr2[12] || 'Plan: 12/08/26';
+              var rawJ = hdr2[9] || '13/08';
+              var rawK = hdr2[10] || '12/08';
+              var rawL = hdr2[11] || '11/08';
+              var rawM = hdr2[12] || 'Plan: 14/08/26';
 
-              var mJ = rawJ.match(/(\d{2}\/\d{2})/); var dJStr = mJ ? mJ[1] : '11/08';
-              var mK = rawK.match(/(\d{2}\/\d{2})/); var dKStr = mK ? mK[1] : '10/08';
-              var mL = rawL.match(/(\d{2}\/\d{2})/); var dLStr = mL ? mL[1] : '09/08';
-              var mM = rawM.match(/(\d{2}\/\d{2}(?:\/\d{2,4})?)/); var dMStr = mM ? mM[1] : '12/08/2026';
+              var mJ = rawJ.match(/(\d{2}\/\d{2})/); var dJStr = mJ ? mJ[1] : '13/08';
+              var mK = rawK.match(/(\d{2}\/\d{2})/); var dKStr = mK ? mK[1] : '12/08';
+              var mL = rawL.match(/(\d{2}\/\d{2})/); var dLStr = mL ? mL[1] : '11/08';
+              var mM = rawM.match(/(\d{2}\/\d{2}(?:\/\d{2,4})?)/); var dMStr = mM ? mM[1] : '14/08/2026';
 
               var fullMDate = dMStr.includes('/') && dMStr.split('/').length === 3 ? dMStr : dMStr + '/2026';
               var planLabel = '🎯 Plan ' + fullMDate + ' (M):';
