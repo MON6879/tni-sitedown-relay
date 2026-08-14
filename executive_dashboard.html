@@ -638,7 +638,7 @@
           var tgt = targetPct || d.targetPct || 75;
           var met = d.metTarget !== undefined ? d.metTarget : (d.pct >= tgt);
           var rankColor = met ? 'var(--emerald)' : (d.rank <= 2 ? 'var(--amber)' : 'var(--rose)');
-          var rankText = 'Rank #' + d.rank + ' (' + d.pct + '%/' + tgt + '% ' + (met ? '✅ Meet Target' : '❌ Not Meet Target') + ')';
+          var rankText = '#' + d.rank + ' (' + d.pct + '%/' + tgt + '% ' + (met ? '✅ Met' : '❌ Not Met') + ')';
 
           set(p+'-engineers', d.engineers);
           set(p+'-assigned', d.totalAssigned + ' WOs');
