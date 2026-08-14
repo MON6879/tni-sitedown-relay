@@ -761,6 +761,9 @@
               document.querySelectorAll('.sync-timestamp-tag').forEach(function(el){
                 el.textContent = nowStr + ' MMT';
               });
+              if (typeof window.updateWoChart === 'function') {
+                window.updateWoChart();
+              }
             })
             .catch(function(e) {
               fetch(GAS_URL + '?action=get_team_wo_stats')
@@ -770,6 +773,9 @@
                   TEAMS.forEach(function(k){
                     if (resp.data[k]) applyTeam(k, resp.data[k], resp.dateLabel, resp.planLabel);
                   });
+                  if (typeof window.updateWoChart === 'function') {
+                    window.updateWoChart();
+                  }
                 })
                 .catch(function(err){ setHTML('team-stats-badge', '⚠️ Fetch error: ' + err.message); });
             });
@@ -6306,42 +6312,51 @@ Team04>> 2Box</td>
       speakSentence();
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
-      // 🚆 CHUYẾN TÀU SỐ 4: Dynamic Auto-Sync between Cards (Hình 1) and Chart (Hình 2)
-      function parseCardNum(selector, defaultVal) {
-        const el = document.querySelector(selector);
+    // 🚆 CHUYẾN TÀU SỐ 4: Dynamic Auto-Sync between Cards (Hình 1) and Chart (Hình 2)
+    window.updateWoChart = function() {
+      function parseVal(id, defaultVal) {
+        const el = document.getElementById(id);
         if (!el) return defaultVal;
         const txt = el.textContent.replace(/[^0-9]/g, '');
         return txt ? parseInt(txt, 10) : defaultVal;
       }
 
-      // Tự động đọc số liệu thực tế từ 4 Thẻ Team Leader (Hình 1)
-      const t1Total = parseCardNum('.tag-t1-card .total-wo', 394);
-      const t1Close = parseCardNum('.tag-t1-card .close-wo', 72);
-      const t1Remain = parseCardNum('.tag-t1-card .remain-wo', 322);
-      const t1Overdue = parseCardNum('.tag-t1-card .overdue-wo', 151);
-      const t1Cd = parseCardNum('.tag-t1-card .cd-wo', 41);
+      const t1Total = parseVal('t1-assigned', 369);
+      const t1Close = parseVal('t1-fot', 77);
+      const t1Overdue = parseVal('t1-close', 160);
+      const t1Remain = parseVal('t1-remain', 292);
+      const t1Cd = parseVal('t1-cdnotyet', 7);
 
-      const t2Total = parseCardNum('.tag-t2-card .total-wo', 209);
-      const t2Close = parseCardNum('.tag-t2-card .close-wo', 119);
-      const t2Remain = parseCardNum('.tag-t2-card .remain-wo', 90);
-      const t2Overdue = parseCardNum('.tag-t2-card .overdue-wo', 24);
-      const t2Cd = parseCardNum('.tag-t2-card .cd-wo', 23);
+      const t2Total = parseVal('t2-assigned', 208);
+      const t2Close = parseVal('t2-fot', 125);
+      const t2Overdue = parseVal('t2-close', 25);
+      const t2Remain = parseVal('t2-remain', 83);
+      const t2Cd = parseVal('t2-cdnotyet', 26);
 
-      const t3Total = parseCardNum('.tag-t3-card .total-wo', 95);
-      const t3Close = parseCardNum('.tag-t3-card .close-wo', 32);
-      const t3Remain = parseCardNum('.tag-t3-card .remain-wo', 63);
-      const t3Overdue = parseCardNum('.tag-t3-card .overdue-wo', 14);
-      const t3Cd = parseCardNum('.tag-t3-card .cd-wo', 3);
+      const t3Total = parseVal('t3-assigned', 93);
+      const t3Close = parseVal('t3-fot', 58);
+      const t3Overdue = parseVal('t3-close', 7);
+      const t3Remain = parseVal('t3-remain', 35);
+      const t3Cd = parseVal('t3-cdnotyet', 1);
 
-      const t4Total = parseCardNum('.tag-t4-card .total-wo', 103);
-      const t4Close = parseCardNum('.tag-t4-card .close-wo', 81);
-      const t4Remain = parseCardNum('.tag-t4-card .remain-wo', 22);
-      const t4Overdue = parseCardNum('.tag-t4-card .overdue-wo', 0);
-      const t4Cd = parseCardNum('.tag-t4-card .cd-wo', 2);
+      const t4Total = parseVal('t4-assigned', 105);
+      const t4Close = parseVal('t4-fot', 100);
+      const t4Overdue = parseVal('t4-close', 0);
+      const t4Remain = parseVal('t4-remain', 5);
+      const t4Cd = parseVal('t4-cdnotyet', 0);
 
       const ctx = document.getElementById('woChart')?.getContext('2d');
-      if (ctx) {
+      if (!ctx) return;
+
+      if (window.woChartInstance) {
+        window.woChartInstance.data.datasets[0].data = [t1Total, t2Total, t3Total, t4Total];
+        window.woChartInstance.data.datasets[1].data = [t1Close, t2Close, t3Close, t4Close];
+        window.woChartInstance.data.datasets[2].data = [t1Remain, t2Remain, t3Remain, t4Remain];
+        window.woChartInstance.data.datasets[3].data = [t1Overdue, t2Overdue, t3Overdue, t4Overdue];
+        window.woChartInstance.data.datasets[4].data = [t1Cd, t2Cd, t3Cd, t4Cd];
+        window.woChartInstance.options.scales.y.max = Math.max(t1Total, t2Total, t3Total, t4Total) + 50;
+        window.woChartInstance.update();
+      } else {
         window.woChartInstance = new Chart(ctx, {
           type: 'bar',
           plugins: [ChartDataLabels],
@@ -6374,6 +6389,10 @@ Team04>> 2Box</td>
           }
         });
       }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      window.updateWoChart();
     });
   </script>
 </body>
