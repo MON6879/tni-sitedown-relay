@@ -118,10 +118,10 @@ jobs:
           check_time 05 48 && R1234=true && BOD=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 1+8+11: Reports 1-4 + BOD + Refuel Req"
           #  05:56 → Cable + Refuel Request (🤖 Bot API)
           check_time 05 56 && CABLE=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 7+8: Cable + Refuel Req (05:56 MMT)"
-          #  06:06 → Report 5 (Daily Plan - Ca Sáng) (📱 Telethon)
-          check_time 06 06 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Report 5 Daily Plan Morning (06:06 MMT)"
-          #  07:06 → Refuel Request Catch-up (🤖 Bot API)
-          check_time 07 06 && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 8: Refuel Req Catch-up (07:06 MMT)"
+          #  06:07 → Report 5 (Daily Plan - Ca Sáng) (📱 Telethon) (+1 min to avoid :06 Site Down)
+          check_time 06 07 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Report 5 Daily Plan Morning (06:07 MMT)"
+          #  07:07 → Refuel Request Catch-up (🤖 Bot API) (+1 min to avoid :06 Site Down)
+          check_time 07 07 && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 8: Refuel Req Catch-up (07:07 MMT)"
           #  08:48 → Report 6 Read Report (Ca 1) (📱 Telethon)
           check_time 08 48 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (08:48 MMT)"
           #  08:28 → Plan 5C Morning
@@ -130,8 +130,8 @@ jobs:
           check_time 09 56 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Morning (09:56 MMT)"
 
           # ═══════ 🌤️ AFTERNOON BLOCK (13:00-16:30) ═══════
-          #  13:06 → Refuel Request (🤖 Bot API)
-          check_time 13 06 && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 8: Refuel Request (13:06 MMT)"
+          #  13:07 → Refuel Request (🤖 Bot API) (+1 min to avoid :06 Site Down)
+          check_time 13 07 && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 8: Refuel Request (13:07 MMT)"
           #  13:11 → Refuel Plan (Report 2 Cấp Dầu - Ca 1) (📱 Telethon)
           check_time 13 11 && REFUEL_P1=true && REFUEL_P2=true && REFUEL_P21=true && NEED_PYTHON=true && echo "🚃 Refuel Plan (13:11 MMT)"
           #  14:58 → Report 6 Read Report (Ca 2) (📱 Telethon)
@@ -155,18 +155,18 @@ jobs:
           # ═══════ 🌙 EVENING BLOCK (17:00-22:30) ═══════
           #  17:18 → Report 6
           check_time 17 18 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6"
-          #  18:06 → Refuel Plan 2
-          check_time 18 06 && REFUEL_P2=true && REFUEL_P21=true && NEED_PYTHON=true && echo "🚃 Toa 10: Refuel Plan 2 (18:06 MMT)"
+          #  18:07 → Refuel Plan 2 (+1 min to avoid :06 Site Down)
+          check_time 18 07 && REFUEL_P2=true && REFUEL_P21=true && NEED_PYTHON=true && echo "🚃 Toa 10: Refuel Plan 2 (18:07 MMT)"
           #  18:41 → Report 5 (Daily Plan - Ca Chiều / EOD Plan vs Actual) (📱 Telethon)
           check_time 18 41 && P5A=true && NEED_PYTHON=true && echo "🚃 Toa 3: Report 5 Daily Plan EOD (18:41 MMT)"
           #  19:11 → Report 5 (Daily Plan - Ca Tối / Plan Update) (📱 Telethon)
           check_time 19 11 && P5B=true && NEED_PYTHON=true && echo "🚃 Toa 4: Report 5 Daily Plan Update (19:11 MMT)"
           #  19:41 → Report 6 Read Report (Ca 3) (📱 Telethon)
           check_time 19 41 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (19:41 MMT)"
-          #  21:36 → Refuel Plan All Reports (Reports 1, 2, 2.1, 4, 5) (📱 Telethon)
-          check_time 21 36 && REFUEL_P1=true && REFUEL_P2=true && REFUEL_P21=true && REFUEL_P4=true && NEED_PYTHON=true && echo "🚃 Refuel Plan All Reports (21:36 MMT)"
-          #  22:06 → Plan 5C Evening
-          check_time 22 06 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Evening (22:06 MMT)"
+          #  21:37 → Refuel Plan All Reports (Reports 1, 2, 2.1, 4, 5) (📱 Telethon) (+1 min to avoid :36 Site Down)
+          check_time 21 37 && REFUEL_P1=true && REFUEL_P2=true && REFUEL_P21=true && REFUEL_P4=true && NEED_PYTHON=true && echo "🚃 Refuel Plan All Reports (21:37 MMT)"
+          #  22:07 → Plan 5C Evening (+1 min to avoid :06 Site Down)
+          check_time 22 07 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Evening (22:07 MMT)"
 
           # Output all flags
           echo "need_python=$NEED_PYTHON" >> $GITHUB_OUTPUT
