@@ -35,7 +35,7 @@
 | **Báo cáo Lượt đọc (Report 6)** | **08:48, 14:58, 17:18, 19:41 MMT** | Toa Report 6 Read | `08:48`, `14:58`, `17:18`, `19:41` MMT | `daily_read_report.py` | Teams 1..4, CONTROL |
 | **Cable Report** | **05:56, 15:56 MMT** | Toa Cable | 05:56, 15:56 MMT | `cable_report.py` | CABLE Group |
 | **Refuel Request Report** | **05:48, 05:56, 07:06, 13:06, 15:56 MMT** | Toa Refuel Request | `05:48`, `05:56`, `07:06`, `13:06`, `15:56` MMT | `refuel_plan_report.py` | REFUEL Group |
-| **Site Down Relay** | **Mỗi giờ (:06-:25 & :36-:55)** | Toa Botlookup Relay | `:06-:25` và `:36-:55` MMT window | `botlookup_relay.py` | CONTROL |
+| **Site Down Relay** | **Mỗi giờ (:06 & :36 MMT)** | Độc lập `botlookup_relay.yml` (cron: `3,33 * * * *` UTC) | Chạy độc lập ~:03/:33 UTC (bù queue ~3-5p) | `botlookup_relay.py` | CONTROL |
 
 ---
 
