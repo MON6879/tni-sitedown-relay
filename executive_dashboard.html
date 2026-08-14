@@ -530,7 +530,7 @@
       <div class="section-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
         <div>
           <span><i class="fa-solid fa-layer-group"></i> Regional Teams Summary Cards (Click Card for Live Sheet Details)</span>
-          <div style="font-size:0.78rem; color:#38BDF8; font-weight:700; margin-top:0.2rem;"><i class="fa-solid fa-clock"></i> Sheet Data Export Time: <span id="sheet-export-time" style="color:#F8FAFC; font-weight:800;">07/08/2026 13:22:31</span></div>
+          <div style="font-size:0.78rem; color:#38BDF8; font-weight:700; margin-top:0.2rem;"><i class="fa-solid fa-clock"></i> Sheet Data Export Time: <span id="sheet-export-time" style="color:#F8FAFC; font-weight:800;">13/08/2026 16:36:00</span></div>
         </div>
         <button class="filter-btn active" style="background:linear-gradient(135deg, #10B981, #06B6D4); color:#fff; border:none; padding:0.5rem 1rem; font-weight:700; border-radius:10px; cursor:pointer;" onclick="openAllEngineersModal()"><i class="fa-solid fa-users-viewfinder"></i> View All 29 Engineers Roster (% High to Low)</button>
       </div>
@@ -780,8 +780,10 @@
                 applyTeam(k, teamData[k], dateLabel, planLabel, targetPct);
               });
 
-              var mExp = csvText.match(/Export\s*time:\s*(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2})/i);
-              var exportTimeStr = mExp ? mExp[1] : '07/08/2026 13:22:31';
+              var expCell = (rows[1] && rows[1][2]) ? rows[1][2] : '';
+              var mExp = (expCell + ' ' + csvText).match(/Export\s*time:\s*([\d\/\s:]+)/i);
+              var exportTimeStr = mExp ? mExp[1].trim() : '13/08/2026 16:36:00';
+              if (!exportTimeStr || exportTimeStr.length < 5) exportTimeStr = '13/08/2026 16:36:00';
               set('sheet-export-time', exportTimeStr);
 
               var now = new Date();
