@@ -113,59 +113,27 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 3.5. PRE-CHECK BẢO VỆ NHÓM (Circuit Breaker 100% Exact) ───────
-        # Kể từ 3 tin nhắn gửi lệnh /down_ gần nhất của bất kỳ ai trong nhóm:
-        # Nếu cả 3 lệnh gần nhất đều KHÔNG CÓ BẤT KỲ tin trả lời nào chứa "Auto Report NocPro",
-        # và từ thời điểm đó đến nay chưa có tin "Auto Report NocPro" xuất hiện -> TẠM DỪNG GỬI MỚI!
-        # Chỉ khi quét thấy có tin "Auto Report NocPro" xuất hiện trở lại -> Mới gửi lệnh cào dữ liệu!
-        try:
-            pre_history = await client(GetHistoryRequest(
-                peer=source, limit=60,
-                offset_date=None, offset_id=0, max_id=0, min_id=0, add_offset=0, hash=0
-            ))
-            
-            # Lấy tất cả tin nhắn dạng lệnh /down_ và tất cả tin nhắn chứa Auto Report NocPro (xếp từ cũ -> mới)
-            messages = list(reversed(pre_history.messages))
-            
-            my_down_cmds = []
-            auto_reports = []
-
-            for msg in messages:
-                txt = (msg.message or "").lower()
-                is_mine = (msg.sender_id == me.id) or getattr(msg, 'out', False)
-                if is_mine and "/down_tni" in txt:
-                    my_down_cmds.append(msg)
-                # Kiểm tra ĐÚNG 2 KEY CHUẨN: "Auto Report NocPro" + "Site down (not include long time site down)"
-                if "auto report nocpro" in txt and ("site down (not include long time site down)" in txt or "site down" in txt):
-                    auto_reports.append(msg)
-
-            # Dedup guard: Nếu đã gửi /down_tni trong vòng 20 phút qua -> Skip (tránh gửi nhiều lần khi cron chạy 5p/lần)
-            if my_down_cmds:
-                last_cmd_age_min = (datetime.now(timezone.utc) - my_down_cmds[-1].date).total_seconds() / 60.0
-                if last_cmd_age_min < 20.0 and os.environ.get("FORCE_RUN") != "1" and "--force" not in sys.argv:
-                    print(f"[{myanmar_now()}] ⏭️ Lệnh /down_tni đã gửi cách đây {last_cmd_age_min:.1f} phút (< 20p). Bỏ qua ca trùng.")
-                    return
-
-            # Lấy 3 lệnh /down_tni gần đây nhất do nick này gửi
-            if len(my_down_cmds) >= 3:
-                last_3_cmds = my_down_cmds[-3:]
-                third_last_cmd_date = last_3_cmds[0].date
+        # ── 3.5. FORCE MODE OVERRIDE & DEDUP CHECK ───────────────────────
+        force_mode = (os.environ.get("FORCE_RUN") == "1" or "--force" in sys.argv)
+        
+        if force_mode:
+            print(f"[{myanmar_now()}] ⚡ FORCE MODE ACTIVE: Ép nổ máy 100% — Gửi lệnh cào dữ liệu ngay lập tức mà không bị cản trở!")
+        else:
+            try:
+                pre_history = await client(GetHistoryRequest(
+                    peer=source, limit=60,
+                    offset_date=None, offset_id=0, max_id=0, min_id=0, add_offset=0, hash=0
+                ))
+                messages = list(reversed(pre_history.messages))
+                my_down_cmds = [m for m in messages if ((m.sender_id == me.id) or getattr(m, 'out', False)) and "/down_tni" in (m.message or "").lower()]
                 
-                # Có bất kỳ tin "Auto Report NocPro" nào xuất hiện từ sau lệnh thứ 3 gần nhất không?
-                has_nocpro_reply_after = any(r.date >= third_last_cmd_date for r in auto_reports)
-
-                # Bảo hiểm thoát Deadlock: Nếu quá 35 phút chưa gửi bản tin mới -> Tự động thử lại
-                newest_cmd_age_min = (datetime.now(timezone.utc) - my_down_cmds[-1].date).total_seconds() / 60.0
-
-                print(f"[{myanmar_now()}] 🔍 Pre-check: Lấy 3 lệnh /down_tni gần nhất của nick này | Phản hồi 'Auto Report NocPro': {'Có' if has_nocpro_reply_after else 'Không'} | Lệnh cuối cách đây: {newest_cmd_age_min:.1f} phút")
-
-                if not has_nocpro_reply_after and newest_cmd_age_min < 35:
-                    print(f"[{myanmar_now()}] ⚠️ Bot công ty chưa phản hồi 3 lệnh /down_tni gần nhất của nick này. BỎ QUA GỬI MỚI để không làm loãng nhóm!")
-                    return
-                else:
-                    print(f"[{myanmar_now()}] 🟢 Tiếp tục gửi lệnh cào dữ liệu...")
-        except Exception as pre_ex:
-            print(f"[{myanmar_now()}] ⚠️ Pre-check error (vẫn tiếp tục): {pre_ex}")
+                if my_down_cmds:
+                    last_cmd_age_min = (datetime.now(timezone.utc) - my_down_cmds[-1].date).total_seconds() / 60.0
+                    if last_cmd_age_min < 18.0:
+                        print(f"[{myanmar_now()}] ⏭️ Lệnh /down_tni đã gửi cách đây {last_cmd_age_min:.1f} phút (< 18p). Bỏ qua ca trùng.")
+                        return
+            except Exception as pre_ex:
+                print(f"[{myanmar_now()}] ⚠️ Pre-check skip: {pre_ex}")
 
         # ── 4+5. Gui lenh va ghi nho thoi diem SAU khi gui ─────
         print(f"[{myanmar_now()}] 📤 Gửi: {COMMAND}")
