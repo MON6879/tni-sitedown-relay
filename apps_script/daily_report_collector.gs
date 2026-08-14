@@ -66,6 +66,22 @@ function doGetDaily_(e) {
   }
 }
 
+// 🛡️ Webhook Enforcer: Tự động khôi phục 100% Webhook cho @SEARCHTNITASKWOBOT 24/7
+function autoEnforceSearchBotWebhook() {
+  const token = "8606383435:AAEstcN4Om6_9ZAjs4OoFV2uVlRALgae2Ac";
+  const expectedUrl = "https://tni-bot.vercel.app/api/search_bot";
+  try {
+    const res = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/getWebhookInfo", { muteHttpExceptions: true });
+    const json = JSON.parse(res.getContentText());
+    if (json.ok && json.result && json.result.url !== expectedUrl) {
+      UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/setWebhook?url=" + encodeURIComponent(expectedUrl), { muteHttpExceptions: true });
+      Logger.log("🛡️ Search Bot Webhook Auto-Restored to Vercel!");
+    }
+  } catch(e) {
+    Logger.log("Error checking Search Bot webhook: " + e.message);
+  }
+}
+
 // ================================================================
 //  GET_FIELDS — đọc cột A, trả về danh sách tên field
 //  Loại bỏ số thứ tự và dấu ":" ở cuối
