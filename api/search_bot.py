@@ -954,9 +954,9 @@ def store_daily_plan_to_sheet(date_str: str, team_str: str, content: str) -> dic
 
 
 def fetch_max_plan_ref() -> str:
-    """Fallback: Fetch max existing DP-xxx from Sheet and return next REF (e.g. DP-165)."""
+    """Fallback: Fetch max existing DP-xxx from Sheet and return next REF (e.g. DP-166)."""
     SPREADSHEET_ID_PLAN = "1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y"
-    csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID_PLAN}/gviz/tq?tqx=out:csv&gid=1934147618"
+    csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID_PLAN}/gviz/tq?tqx=out:csv&sheet=Team%20leader%20assign%20Plan"
     try:
         r = requests.get(csv_url, timeout=10)
         if r.status_code == 200:
@@ -971,7 +971,7 @@ def fetch_max_plan_ref() -> str:
                 return f"DP-{str(max_num + 1).zfill(3)}"
     except Exception as e:
         logger.warning(f"fetch_max_plan_ref error: {e}")
-    return "DP-165"
+    return f"DP-{int(time.time()) % 1000:03d}"
 
 
 _recent_plan_sends = {}
