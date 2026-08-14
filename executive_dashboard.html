@@ -780,11 +780,10 @@
                 applyTeam(k, teamData[k], dateLabel, planLabel, targetPct);
               });
 
-              var expCell = (rows[1] && rows[1][2]) ? rows[1][2] : '';
-              var mExp = (expCell + ' ' + csvText).match(/Export\s*time:\s*([\d\/\s:]+)/i);
-              var exportTimeStr = mExp ? mExp[1].trim() : '13/08/2026 16:36:00';
-              if (!exportTimeStr || exportTimeStr.length < 5) exportTimeStr = '13/08/2026 16:36:00';
+              var mExp = csvText.match(/Export\s*time:\s*([^\r\n,"]+)/i);
+              var exportTimeStr = (mExp && mExp[1]) ? mExp[1].trim() : '13/08/2026 16:36:48';
               set('sheet-export-time', exportTimeStr);
+              set('t1-export-hdr', 'Export time: ' + exportTimeStr);
 
               var now = new Date();
               var nowStr = ('0'+now.getDate()).slice(-2)+'/'+('0'+(now.getMonth()+1)).slice(-2)+'/'+now.getFullYear()+' '+('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
