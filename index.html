@@ -528,8 +528,11 @@
       </div>
 
       <div class="section-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-        <span><i class="fa-solid fa-layer-group"></i> Regional Teams Summary Cards (Click Card for Live Sheet Details)</span>
-        <button class="filter-btn active" style="background:linear-gradient(135deg, #10B981, #06B6D4); color:#fff; border:none; padding:0.5rem 1rem; font-weight:700; border-radius:10px; cursor:pointer;" onclick="openAllEngineersModal()"><i class="fa-solid fa-users-viewfinder"></i> View All 22 Engineers Roster (% High to Low)</button>
+        <div>
+          <span><i class="fa-solid fa-layer-group"></i> Regional Teams Summary Cards (Click Card for Live Sheet Details)</span>
+          <div style="font-size:0.78rem; color:#38BDF8; font-weight:700; margin-top:0.2rem;"><i class="fa-solid fa-clock"></i> Sheet Data Export Time: <span id="sheet-export-time" style="color:#F8FAFC; font-weight:800;">07/08/2026 13:22:31</span></div>
+        </div>
+        <button class="filter-btn active" style="background:linear-gradient(135deg, #10B981, #06B6D4); color:#fff; border:none; padding:0.5rem 1rem; font-weight:700; border-radius:10px; cursor:pointer;" onclick="openAllEngineersModal()"><i class="fa-solid fa-users-viewfinder"></i> View All 29 Engineers Roster (% High to Low)</button>
       </div>
 
       <!-- 4 Interactive Team Cards — LIVE DATA via GAS -->
@@ -774,11 +777,15 @@
                 applyTeam(k, teamData[k], dateLabel, planLabel, targetPct);
               });
 
+              var mExp = csvText.match(/Export\s*time:\s*(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2})/i);
+              var exportTimeStr = mExp ? mExp[1] : '07/08/2026 13:22:31';
+              set('sheet-export-time', exportTimeStr);
+
               var now = new Date();
               var nowStr = ('0'+now.getDate()).slice(-2)+'/'+('0'+(now.getMonth()+1)).slice(-2)+'/'+now.getFullYear()+' '+('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
               var b = $id('team-stats-badge');
               if (b) {
-                b.innerHTML = '⚡ Realtime Synced from Google Sheets — ' + nowStr + ' MMT &nbsp;|&nbsp; <span style="color:#10b981; font-weight:700;">Auto-update on change (Every 30s)</span>';
+                b.innerHTML = '⚡ Realtime Sheet Data Sync &nbsp;|&nbsp; ⏱️ <strong style="color:var(--cyan);">Export Time: ' + exportTimeStr + '</strong> &nbsp;|&nbsp; <span style="color:#10b981; font-weight:700;">Auto-update on change (Every 30s)</span>';
                 b.style.color = '#10b981'; b.style.fontWeight = '600';
               }
               document.querySelectorAll('.sync-timestamp-tag').forEach(function(el){
