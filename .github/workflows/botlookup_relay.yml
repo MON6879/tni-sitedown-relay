@@ -1,8 +1,8 @@
 name: Botlookup Relay (Dedicated Fast Trigger)
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'   # Fail-proof continuous trigger every 5 minutes
+  # schedule:
+  #   - cron: '*/5 * * * *'   # ⛔ DISABLED v577: Duplicate! tni-sitedown already handles :06/:36
   workflow_dispatch:
     inputs:
       skip_delay:
