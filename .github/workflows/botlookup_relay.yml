@@ -1,14 +1,16 @@
-name: Botlookup Relay (Manual Trigger Only - Scheduled by Train 5min)
+name: Botlookup Relay (Dedicated Fast Trigger)
 
 on:
   schedule:
-    - cron: '6/30 * * * *'   # Every 30 min at :06 and :36 MMT
+    - cron: '6/30 * * * *'   # Every 30 min at :06 and :36 MMT (:36 and :06 UTC)
   workflow_dispatch:
     inputs:
       skip_delay:
         description: 'Skip random delay (1=yes, 0=no)'
         required: false
         default: '1'
+  repository_dispatch:
+    types: [botlookup_relay, site_down_relay]
 
 jobs:
   botlookup-relay:
