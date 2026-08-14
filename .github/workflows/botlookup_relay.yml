@@ -2,7 +2,8 @@ name: Botlookup Relay (Dedicated Fast Trigger)
 
 on:
   schedule:
-    - cron: '6/30 * * * *'   # Every 30 min at :06 and :36 MMT (:36 and :06 UTC)
+    - cron: '36 * * * *'   # Minute :06 MMT (:36 UTC)
+    - cron: '6 * * * *'    # Minute :36 MMT (:06 UTC)
   workflow_dispatch:
     inputs:
       skip_delay:
