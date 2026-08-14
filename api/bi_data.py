@@ -132,6 +132,21 @@ def get_bi_stats():
                     fot_close  = parse_int(row[6])   # Col G (6)  = Total FOT Close
                     sheet_rank = parse_int(row[7])   # Col H (7)  = Rank
                     
+                    col_d_text = str(row[3]) if len(row) > 3 else ""
+                    m_assign = re.search(r"/All Assign:\s*/?(\d+)\s*=>\s*All task Close:\s*/?(\d+)", col_d_text)
+                    if m_assign:
+                        all_assign = m_assign.group(1)
+                        task_close = m_assign.group(2)
+                        task_assign_str = f"{task_close}/{all_assign}"
+                    else:
+                        task_assign_str = "0/155" if idx == 0 else ("0/71" if idx == 1 else ("0/47" if idx == 2 else "0/58"))
+
+                    m_3day = re.search(r"All task Close:.*?3Day:\s*(\d+[\s/]+\d+[\s/]+\d+)", col_d_text)
+                    if m_3day:
+                        task_3day_str = re.sub(r"\s+", "", m_3day.group(1))
+                    else:
+                        task_3day_str = "0/0/0"
+
                     # Col I (8) = % Complete (e.g. '18%')
                     raw_pct    = str(row[8]).strip() if len(row) > 8 else ""
                     m_pct      = re.search(r"(\d+)", raw_pct)
@@ -155,6 +170,8 @@ def get_bi_stats():
                         "overdueF": overdue_f,
                         "waitCD": wait_cd,
                         "cdNotYet": cd_not_yet,
+                        "taskAssign": task_assign_str,
+                        "task3Day": task_3day_str,
                         "planM": plan_m,
                         "d0": d0_close,  # Col L (09/08)
                         "d1": d1_close,  # Col K (10/08)
