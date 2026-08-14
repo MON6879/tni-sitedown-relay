@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TNI Operations BI Portal — Master Template & Seat Role Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0b0f19;
+            --card-bg: #121829;
+            --card-border: #1e293b;
+            --accent-blue: #38bdf8;
+            --accent-green: #22c55e;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-purple: #a855f7;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --code-bg: #0f172a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        /* Top Header Navigation matching BI Portal */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0f172a;
+            padding: 16px 24px;
+            border-radius: 16px;
+            border: 1px solid var(--card-border);
+            margin-bottom: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .brand-title h1 {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-title p {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .badge-live {
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge-live::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #22c55e;
+        }
+
+        /* Section Title */
+        .section-header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* BI Grid Layout */
+        .bi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+        }
+
+        /* BI Card Container */
+        .bi-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .bi-card:hover {
+            transform: translateY(-4px);
+            border-color: #3b82f6;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 14px;
+        }
+
+        .group-pill {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .pill-blue { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+        .pill-green { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+        .pill-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .pill-red { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .pill-purple { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+
+        .seat-badge {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+            background: #1e293b;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .template-name {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: var(--text-main);
+        }
+
+        .trigger-cmd {
+            font-size: 12px;
+            color: var(--accent-amber);
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Code box for Template Content */
+        .template-box {
+            background-color: var(--code-bg);
+            border: 1px solid #1e293b;
+            border-radius: 10px;
+            padding: 12px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            max-height: 220px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px solid #1e293b;
+            font-size: 12px;
+        }
+
+        .target-sheet {
+            color: var(--text-muted);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-copy {
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+
+        .btn-copy:hover {
+            opacity: 0.9;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BI Portal Top Navigation Header -->
+    <header>
+        <div class="brand">
+            <div class="brand-icon">📊</div>
+            <div class="brand-title">
+                <h1>TNI OPERATIONS BI PORTAL</h1>
+                <p>MASTER TEMPLATES & SEAT ROLES ECOSYSTEM</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="badge-live">LIVE SHEET SYNCHRONIZED</div>
+        </div>
+    </header>
+
+    <!-- BI Dashboard Section Header -->
+    <div class="section-header">
+        <h2>⚡ Telegram Groups & Seat Templates Matrix</h2>
+    </div>
+
+    <!-- BI Cards Grid -->
+    <div class="bi-grid">
+
+        <!-- CARD 1 -->
+        <div class="bi-card">
+            <div>
+                <div class="card-header">
+                    <span class="group-pill pill-blue">TNI SEARCH BOT</span>
+                    <span class="seat-badge">Ghế #1</span>
+                </div>
+                <div class="template-name">Daily Work Result Report</div>
+                <div class="trigger-cmd">⚡ Trigger: Type <code>daily</code> or <code>daily_result</code></div>
+                <div class="template-box">Daily result: 14/08/2026
+Transportation Used: Motorbike
+Full Name: Kyaw Kyaw
+Detail WO: WO_ICMS_20260814_123456
+Detail task: TASK_20260814_001
+Name Site rescue: TNI0019
+Name Cell rescue: TNI0019_01
+Resuce Cable: TNI0003-TNI0007
+Name and detail Site repair alarm: TNI0122 - Repaired ATS
+Name Site follow partner refuel: TNI0061
+Other task: Grounding check at site TNI0252
+Name and detail Site go busines trip start go: Yangon HQ
+Name and detail Site go busines trip end go: Pyi Kyaw Aung Site
+Km moto bike start: 14250
+Km moto bike the end: 14310</div>
+            </div>
+            <div class="card-footer">
+                <span class="target-sheet">📂 Sheet: Daily report and Bussiness (Row 2)</span>
+                <button class="btn-copy" onclick="navigator.clipboard.writeText(this.parentNode.previousElementSibling.firstElementChild.lastElementChild.innerText)">Copy Template</button>
+            </div>
+        </div>
+
+        <!-- CARD 2 -->
+        <div class="bi-card">
+            <div>
+                <div class="card-header">
+                    <span class="group-pill pill-purple">TNI SEARCH BOT</span>
+                    <span class="seat-badge">Ghế #2</span>
+                </div>
+                <div class="template-name">Request Enter Site (Towerco Format)</div>
+                <div class="trigger-cmd">⚡ Trigger: Type <code>site access</code> or <code>/request_enter_site</code></div>
+                <div class="template-box">Company Name: TNI
+Site Code: TNI0401
+Staff Name: Min Paing Oo
+Contact No: 09688433214
+NRC NO: 6/KaTaNa(N)114981
+Mail add: minpaing.oo@vcm.com.mm
+Date: 14/08/2026
+Activity Detail: Site down check & DG Maintenance
+Activity Start time: 08:00 AM
+Activity End Time: 05:00 PM</div>
+            </div>
+            <div class="card-footer">
+                <span class="target-sheet">📂 Instant Towerco Permit Format</span>
+                <button class="btn-copy" onclick="navigator.clipboard.writeText(this.parentNode.previousElementSibling.firstElementChild.lastElementChild.innerText)">Copy Template</button>
+            </div>
+        </div>
+
+        <!-- CARD 3 -->
+        <div class="bi-card">
+            <div>
+                <div class="card-header">
+                    <span class="group-pill pill-green">TEAM 1-4 PLAN GROUPS</span>
+                    <span class="seat-badge">Ghế #3</span>
+                </div>
+                <div class="template-name">Daily Plan Morning & Evening</div>
+                <div class="trigger-cmd">⚡ Trigger: Paste Daily Plan Header</div>
+                <div class="template-box">Daily Plan: 14/08/2026
+Team 1
+I. Hot task
+1. TNI0019 | DG abnormal check | Min Paing Oo
+2. TNI0122 | Solar replacement | Kyaw Kyaw
+II. Routine task
+1. TNI0061 | Monthly PM | Aung Aung</div>
+            </div>
+            <div class="card-footer">
+                <span class="target-sheet">📂 Sheet: Team leader assign Plan (Row 2)</span>
+                <button class="btn-copy" onclick="navigator.clipboard.writeText(this.parentNode.previousElementSibling.firstElementChild.lastElementChild.innerText)">Copy Template</button>
+            </div>
+        </div>
+
+        <!-- CARD 4 -->
+        <div class="bi-card">
+            <div>
+                <div class="card-header">
+                    <span class="group-pill pill-amber">9 TNI REQUEST REFUEL</span>
+                    <span class="seat-badge">Ghế #4</span>
+                </div>
+                <div class="template-name">Site Refuel Requisition Request</div>
+                <div class="trigger-cmd">⚡ Trigger: Type <code>Refuel Request</code></div>
+                <div class="template-box">Refuel Request: 14/08/2026
+Site Code: TNI0019
+Site Name: Kyunsu Station
+Current Fuel Volume (Liters): 45 L
+Requested Fuel Volume (Liters): 200 L
+DG Run Time (Hours): 18.5 h
+Reason for Refuel: Main power failure
+Assignee: Aye Min Soe</div>
+            </div>
+            <div class="card-footer">
+                <span class="target-sheet">📂 Sheet: Refuel Request Data (Row 2)</span>
+                <button class="btn-copy" onclick="navigator.clipboard.writeText(this.parentNode.previousElementSibling.firstElementChild.lastElementChild.innerText)">Copy Template</button>
+            </div>
+        </div>
+
+        <!-- CARD 5 -->
+        <div class="bi-card">
+            <div>
+                <div class="card-header">
+                    <span class="group-pill pill-red">TEAM ALARM CHANNELS</span>
+                    <span class="seat-badge">Ghế #5</span>
+                </div>
+                <div class="template-name">Site Down Emergency Red-Text Alarm</div>
+                <div class="trigger-cmd">⚡ Auto Dispatch: Every 30 mins (:06 & :36 MMT)</div>
+                <div class="template-box">🚨 5 TNI_SITE_DOWN_CELL_ALARM — SUMMARY (08:36 MMT)
+--------------------------------------------------
+Team 2: 6 sites down
+1: TNI0413 | 🔵T2 | 0.92 | MyTel | DG+Solar+BB | Kyunsu | Pyi Kyaw Aung | 1 | EAT: Checking with team
+2: TNI0415 | 🔵T2 | 7.83 | OCK | DG+Solar+BB | Kyunsu | Pyi Kyaw Aung | 1 | EAT: TCO team run Solar+BB</div>
+            </div>
+            <div class="card-footer">
+                <span class="target-sheet">📂 Sheet: Input Site down Telegram (Row 2)</span>
+                <button class="btn-copy" onclick="navigator.clipboard.writeText(this.parentNode.previousElementSibling.firstElementChild.lastElementChild.innerText)">Copy Template</button>
+            </div>
+        </div>
+
+        <!-- CARD 6 -->
+        <div class="bi-card">
+            <div>
+                <div class="card-header">
+                    <span class="group-pill pill-blue">TNI SEARCH BOT</span>
+                    <span class="seat-badge">Ghế #6</span>
+                </div>
+                <div class="template-name">Fast Lookup Commands Syntax</div>
+                <div class="trigger-cmd">⚡ Direct Chat Commands</div>
+                <div class="template-box">TNI0019 ➔ Task & WO Details
+info: TNI0019 ➔ Full Infrastructure (Site/Cable/GPON/DIA)
+cons TNI0019 ➔ Civil Construction Progress
+clear TNI0019 ➔ Alarm Clear History
+/t1notclose, /t2notclose, /t3notclose, /t4notclose ➔ Open WOs
+/mysite, /mycable, /mydia, /mydata ➔ Personal Assigned Resources</div>
+            </div>
+            <div class="card-footer">
+                <span class="target-sheet">📂 Instant Telegram Response</span>
+                <button class="btn-copy" onclick="navigator.clipboard.writeText(this.parentNode.previousElementSibling.firstElementChild.lastElementChild.innerText)">Copy Commands</button>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
