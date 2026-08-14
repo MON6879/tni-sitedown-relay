@@ -181,7 +181,6 @@ jobs:
           echo "refuel_p1=$REFUEL_P1" >> $GITHUB_OUTPUT
           echo "refuel_p2=$REFUEL_P2" >> $GITHUB_OUTPUT
           echo "refuel_p21=$REFUEL_P21" >> $GITHUB_OUTPUT
-
           echo "refuel_p4=$REFUEL_P4" >> $GITHUB_OUTPUT
           echo "botlookup_relay=$BOTLOOKUP_RELAY" >> $GITHUB_OUTPUT
 
