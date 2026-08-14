@@ -839,7 +839,11 @@ def is_daily_plan(text: str) -> bool:
     """
     if not text:
         return False
-    text_l = text.lower()
+    text_l = text.lower().strip()
+
+    # 🛑 BỎ QUA 100% CÁC CÚ PHÁP TRA CỨU (TNI, Info, Clear, Cons, NotClose, WaitCD) — KHÔNG THỂ THÀNH DAILY PLAN
+    if text_l.startswith("tni") or text_l.startswith("/tni") or text_l.startswith("info") or text_l.startswith("/info") or text_l.startswith("clear") or text_l.startswith("/clear") or text_l.startswith("cons") or text_l.startswith("/cons") or "notclose" in text_l or "waitcd" in text_l:
+        return False
 
     # Blacklist of bot outputs/reports to avoid self-triggering
     if any(kw in text_l for kw in (
@@ -1552,10 +1556,8 @@ def handle(update: dict) -> None:
         logger.info(f"[SSOT Router] Detailed Info lookup (Ghế Info): {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, f"Info:{tni}")
         try:
-            # Ghế Info: Gọi lookup_construction_site trước, nếu không có công trình thì chuyển sang Thông tin Hạ tầng đầy đủ (Site, Cable, GPON, DIA)
-            result = lookup_construction_site(tni)
-            if not result or result.startswith("❌"):
-                result = perform_unified_tni_search(tni, full_info=True)
+            # ✅ GHẾ INFO ĐỘC LẬP 100%: Tra cứu Thông tin Hạ tầng đầy đủ (Site, Cable, GPON, DIA) từ tab Name Site
+            result = perform_unified_tni_search(tni, full_info=True)
             for chunk in split_messages(result):
                 tg_send(chat_id, chunk)
         except Exception as err:
@@ -1568,9 +1570,10 @@ def handle(update: dict) -> None:
         tni = code
         if is_duplicate_search and is_duplicate_search(chat_id, user_id, f"TNI:{tni}"):
             return
-        logger.info(f"[SSOT Router] Unified TNI lookup: {tni} | chat={chat_id}")
+        logger.info(f"[SSOT Router] Unified TNI lookup (Ghế TNI): {tni} | chat={chat_id}")
         log_search_bg(first_name or str(user_id), user_id, tni)
         try:
+            # ✅ GHẾ TNI ĐỘC LẬP 100%: Chỉ tra cứu Task & WO tương ứng
             result = perform_unified_tni_search(tni, full_info=False)  # TNI0122 → Task+WO only
             for chunk in split_messages(result):
                 tg_send(chat_id, chunk)
