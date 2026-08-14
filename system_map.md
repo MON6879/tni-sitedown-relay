@@ -39,6 +39,33 @@
 
 ---
 
+### 📋 2.1. Hệ thống Auto Copy & Delete Processor (GAS-native):
+
+> **GAS Project**: TNI (cùng project với Construction Bot 10)
+> **File**: `auto_copy_processor.gs`
+> **Deployment URL**: `AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w`
+
+| Thuộc tính | Giá trị |
+|---|---|
+| **Lịch chạy** | ⏱️ Mỗi **15 phút** (Apps Script Time-driven trigger, trong khung giờ làm việc) |
+| **Config Sheet** | [`19RBlwehMC6BLoueaTEzsJHMx4puB0CTE5i5x79-uI6c`](https://docs.google.com/spreadsheets/d/19RBlwehMC6BLoueaTEzsJHMx4puB0CTE5i5x79-uI6c/edit?gid=808728491#gid=808728491) → Tab `Auto_Copy_Config` |
+| **Số rule** | 27 rule copy-paste + xóa hàng theo điều kiện |
+| **Keepalive** | Toa 0 `train_5min.yml` → Endpoint #5 (`curl ?action=ping`) |
+| **Chạy trên** | Google Cloud (Apps Script trigger) — KHÔNG qua GitHub Actions |
+
+**Phạm vi 27 rule:**
+
+| Nhóm | Số rule | Nguồn → Đích |
+|---|---|---|
+| Close WO DG | 1 | `Input Close WO DG paste 123` → `Update Close WO` |
+| Team 1-4 Analysis | 8 | `2. See alalysis` → `2.1 Your Data solution` |
+| Team 1-4 Tasks | 8 | `3. see to Task` → `3.1 Update Assign` |
+| BOD/Manager Assign | 7 | `1. BOD+MANAGER Assign` → `2.My control` (Finance, Manager, CM, PM, Asset, M&E, Admin, Transmission) |
+| Site/Cable | 8 | Team 1-4 Site col C:D → col T:U, Cable col E:F → col U:V |
+| PM Cross check | 2 | `Input site WO` → `PM Cross check` → `Reject history` |
+
+---
+
 ### 🔍 3. Ma trận Quy tắc Tra cứu Search Bot (`api/search_bot.py`):
 
 | Cú pháp gõ | Quy tắc nhận diện (Regex & Length) | Chức năng gọi | Chống lặp / Trùng lời thoại |
