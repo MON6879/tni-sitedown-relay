@@ -615,22 +615,27 @@ def perform_unified_tni_search(tni: str, full_info: bool = False) -> str:
 
     lines = []
 
-    # 1. Dữ liệu Task & WO thô nguyên bản từ Google Sheet cell (0 icon)
-    if has_tasks:
-        formatted = format_task_wo(task_wo)
-        if formatted:
-            lines.append(formatted)
-
-    # 2. Dữ liệu Site Info, Cable, GPON, DIA (Chỉ hiển thị khi full_info=True [Ghế Info] hoặc khi không có Task/WO)
-    if has_info and (full_info or not has_tasks):
-        if info.get("site") and info['site'].strip():
-            lines.append(linkify_text(info['site'].strip()))
-        if info.get("cable") and info['cable'].strip():
-            lines.append(linkify_text(info['cable'].strip()))
-        if info.get("gpon") and info['gpon'].strip():
-            lines.append(linkify_text(info['gpon'].strip()))
-        if info.get("dia") and info['dia'].strip():
-            lines.append(linkify_text(info['dia'].strip()))
+    if full_info:
+        # ✅ GHẾ INFO (Info: TNIxxxx / /info TNIxxxx): CHỈ trả về Hạ tầng (Site, Cable, GPON, DIA) từ tab Name Site (100% KHÔNG CHÈN Task/WO)
+        if has_info:
+            if info.get("site") and info['site'].strip():
+                lines.append(linkify_text(info['site'].strip()))
+            if info.get("cable") and info['cable'].strip():
+                lines.append(linkify_text(info['cable'].strip()))
+            if info.get("gpon") and info['gpon'].strip():
+                lines.append(linkify_text(info['gpon'].strip()))
+            if info.get("dia") and info['dia'].strip():
+                lines.append(linkify_text(info['dia'].strip()))
+        if not lines:
+            return f"No Info data found for {html.escape(tni_upper)}"
+    else:
+        # ✅ GHẾ TNI (TNIxxxx): CHỈ trả về Task & WO từ tab Tên Sum WO (100% KHÔNG CHÈN Info Hạ tầng)
+        if has_tasks:
+            formatted = format_task_wo(task_wo)
+            if formatted:
+                lines.append(formatted)
+        if not lines:
+            return f"No Task/WO data found for {html.escape(tni_upper)}"
 
     return "\n\n".join(lines).strip()
 
