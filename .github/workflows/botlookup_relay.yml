@@ -2,8 +2,7 @@ name: Botlookup Relay (Dedicated Fast Trigger)
 
 on:
   schedule:
-    - cron: '36 * * * *'   # Minute :06 MMT (:36 UTC)
-    - cron: '6 * * * *'    # Minute :36 MMT (:06 UTC)
+    - cron: '*/5 * * * *'   # Fail-proof continuous trigger every 5 minutes
   workflow_dispatch:
     inputs:
       skip_delay:

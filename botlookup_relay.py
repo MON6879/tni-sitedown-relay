@@ -139,6 +139,13 @@ async def main():
                 if "auto report nocpro" in txt and ("site down (not include long time site down)" in txt or "site down" in txt):
                     auto_reports.append(msg)
 
+            # Dedup guard: Nếu đã gửi /down_tni trong vòng 20 phút qua -> Skip (tránh gửi nhiều lần khi cron chạy 5p/lần)
+            if my_down_cmds:
+                last_cmd_age_min = (datetime.now(timezone.utc) - my_down_cmds[-1].date).total_seconds() / 60.0
+                if last_cmd_age_min < 20.0 and os.environ.get("FORCE_RUN") != "1" and "--force" not in sys.argv:
+                    print(f"[{myanmar_now()}] ⏭️ Lệnh /down_tni đã gửi cách đây {last_cmd_age_min:.1f} phút (< 20p). Bỏ qua ca trùng.")
+                    return
+
             # Lấy 3 lệnh /down_tni gần đây nhất do nick này gửi
             if len(my_down_cmds) >= 3:
                 last_3_cmds = my_down_cmds[-3:]
