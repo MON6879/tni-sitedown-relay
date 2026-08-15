@@ -73,7 +73,7 @@ function _dispatchGH(workflowFile, label, inputs) {
 }
 
 /**
- * Tạo 2 triggers tự động trên GAS
+ * Tạo trigger tự động trên GAS (Train 5-Min duy nhất)
  */
 function setupGitHubDispatchTriggers() {
   var existing = ScriptApp.getProjectTriggers();
@@ -84,8 +84,7 @@ function setupGitHubDispatchTriggers() {
     }
   }
   ScriptApp.newTrigger("dispatchTrain5Min").timeBased().everyMinutes(5).create();
-  ScriptApp.newTrigger("dispatchBotlookupRelay").timeBased().everyMinutes(30).create();
-  Logger.log("✅ Đã thiết lập 2 Trigger GAS: Train (mỗi 5 phút) + Botlookup (mỗi 30 phút)");
+  Logger.log("✅ Đã thiết lập Trigger GAS: Train (mỗi 5 phút). Botlookup chạy chuẩn theo GitHub Cron 3,33 UTC + sleep đến đúng :06/:36 MMT.");
 }
 
 /**

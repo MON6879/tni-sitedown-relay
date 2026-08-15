@@ -230,12 +230,20 @@ AI phai tuan thu TUYET DOI - khong co ngoai le:
 
 ## 📅 CHANGELOG
 
+### 15/08/2026 — v589: Fix chuẩn giờ Site Down Relay (:06 & :36 MMT) & Chống Spam Lệch Giờ
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `botlookup_relay.py` | Thêm `wait_until_target_minute()` tự động sleep tới đúng :06:00 hoặc :36:00 MMT; hủy chạy nếu lệch ngoài window (>300s) | Đảm bảo 100% gửi đúng phút :06 và :36 MMT, loại bỏ gửi sớm/muộn/lệch giờ |
+| `botlookup_relay.yml` | Thêm concurrency group `botlookup-relay`, chỉ bật `--force` khi manual dispatch | Chống chạy chồng chéo runner và bảo đảm tuân thủ hàm sleep |
+| `14_GITHUB_DISPATCH.gs` | Xóa trigger 30 phút ngẫu nhiên của GAS | GAS `everyMinutes(30)` chạy theo mốc tạo trigger (gây ra chạy lúc :25), chỉ giữ lại trigger 5 phút |
+| `site_down_v2.gs` | Xóa logic dispatch GitHub API mỗi 5 phút trong `checkAndSend()` | Chấm dứt spam gọi runner liên tục |
+
 ### 15/08/2026 — v588: GAS Dispatch thay thế GitHub Cron (Fix dứt điểm Relay đứng)
 | File | Thay đổi | Lý do |
 |---|---|---|
-| `14_GITHUB_DISPATCH.gs` **(NEW)** | GAS Time-Driven Trigger dispatch `train_5min.yml` (5p) + `botlookup_relay.yml` (30p) qua GitHub API | GitHub cron tự chết định kỳ → GAS trigger không bao giờ chết, = giống bấm "Run Workflow" tự động |
-| `botlookup_relay.py` | Xóa `wait_until_target_minute()` (không cần sleep chờ giờ nữa) | GAS dispatch đúng giờ, không cần script tự canh |
-| `botlookup_relay.yml` | Ghi chú cron là BACKUP ONLY, giảm timeout về 4p | GAS là trigger chính, cron chỉ dự phòng |
+| `14_GITHUB_DISPATCH.gs` **(NEW)** | GAS Time-Driven Trigger dispatch `train_5min.yml` (5p) qua GitHub API | GitHub cron tự chết định kỳ → GAS trigger không bao giờ chết, = giống bấm "Run Workflow" tự động |
+| `botlookup_relay.py` | Cập nhật Session Lock Alert | Cảnh báo khi Telethon session bị khóa |
+| `botlookup_relay.yml` | Ghi chú cron là BACKUP ONLY | Cron GitHub + GAS dispatch kết hợp |
 | `system_map.md` Section 0 | Cập nhật nguyên tắc: **GAS ƯU TIÊN HOÀN TOÀN → GitHub DỰ PHÒNG** | Quy tắc kiến trúc mới: ưu tiên GAS cho mọi tác vụ có thể |
 | `api/search_bot.py` (v587) | Thêm `msg_id` dedup cho Daily Plan → GAS server-side check, skip duplicate confirmation | Fix bot gửi "Plan saved" 2 lần do Vercel serverless multi-instance |
 

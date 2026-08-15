@@ -112,14 +112,64 @@ def in_active_window() -> bool:
     return ACTIVE_START <= (now.hour, now.minute) <= ACTIVE_END
 
 
+def wait_until_target_minute(force: bool = False) -> bool:
+    """
+    Chờ đến đúng phút :06:00 hoặc :36:00 MMT (Asia/Yangon UTC+6:30).
+    Nếu runner khởi động sớm lúc :03 hoặc :33 MMT, sẽ sleep chính xác số giây còn lại.
+    Nếu trễ nhẹ nhưng trong phạm vi an toàn (:06:00 - :06:59 hoặc :36:00 - :36:59 MMT), chạy ngay (0s delay).
+    Nếu trigger lệch xa khỏi cửa sổ (> 300 giây) và không phải manual force, hủy chạy để chống spam.
+    """
+    tz = timezone(timedelta(hours=6, minutes=30))
+    now = datetime.now(tz)
+    m = now.minute
+    s = now.second
+
+    if force:
+        print(f"[{myanmar_now()}] ⚡ Chế độ FORCE/MANUAL — Bắt đầu ngay không cần chờ.")
+        return True
+
+    # Xác định target minute gần nhất (:06 hoặc :36 MMT)
+    if 0 <= m <= 6:
+        target_sec = (6 - m) * 60 - s
+    elif 7 <= m <= 36:
+        target_sec = (36 - m) * 60 - s
+    else:
+        target_sec = (60 - m + 6) * 60 - s
+
+    print(f"[{myanmar_now()}] ⏱️ Thời gian hiện tại: {now.strftime('%H:%M:%S')} MMT | Khoảng cách tới target :06/:36: {target_sec}s")
+
+    # Nếu đang ở đúng phút :06 hoặc :36 (hoặc vừa qua trong vòng 60s)
+    if target_sec <= 0 and target_sec >= -60:
+        print(f"[{myanmar_now()}] 🎯 Đang ở đúng thời điểm target (:06 hoặc :36 MMT). Khởi động ngay!")
+        return True
+
+    # Nếu khởi động sớm trước mốc target (chờ tối đa 300s = 5 phút)
+    if 0 < target_sec <= 300:
+        print(f"[{myanmar_now()}] ⏳ Runner khởi động sớm — Sleep {target_sec}s để gửi lệnh đúng mốc :06 hoặc :36 MMT...")
+        import time
+        time.sleep(target_sec)
+        now_after = datetime.now(tz)
+        print(f"[{myanmar_now()}] 🔔 Đã chạm mốc {now_after.strftime('%H:%M:%S')} MMT. Bắt đầu gửi lệnh!")
+        return True
+
+    # Nếu bị trigger lệch xa ngoài khung giờ
+    print(f"[{myanmar_now()}] ⚠️ Trigger ngoài khung giờ :06 / :36 MMT (cần chờ {target_sec}s > 300s). HỦY CHẠY để chống gửi tin sai giờ!")
+    return False
+
+
 async def main():
+    force = ("--force" in sys.argv) or (os.environ.get("FORCE_RUN") == "1") or (os.environ.get("MANUAL_RUN") == "1")
+
     # ── 0. Kiểm tra khung giờ ─────────────────────────────────────
-    if not in_active_window():
-        print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ 04:30–21:30. Kết thúc.")
+    if not in_active_window() and not force:
+        print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ 03:30–22:15. Kết thúc.")
         return
 
-    # GAS Time-Driven Trigger dispatch workflow đúng giờ → không cần chờ thêm
-    print(f"[{myanmar_now()}] 🚀 Bắt đầu relay (dispatched by GAS Trigger)")
+    # ── 1. Chờ đúng phút :06 hoặc :36 MMT ────────────────────────
+    if not wait_until_target_minute(force):
+        return
+
+    print(f"[{myanmar_now()}] 🚀 Bắt đầu relay Site Down vào nhóm Botlookup...")
 
     # ── 2. Kết nối Telegram ───────────────────────────────────────
     from telethon.sessions import StringSession
