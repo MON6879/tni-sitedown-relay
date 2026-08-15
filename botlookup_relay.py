@@ -115,9 +115,9 @@ def in_active_window() -> bool:
 def wait_until_target_minute(force: bool = False) -> bool:
     """
     Chờ đến đúng phút :06:00 hoặc :36:00 MMT (Asia/Yangon UTC+6:30).
-    Nếu runner khởi động sớm lúc :03 hoặc :33 MMT, sẽ sleep chính xác số giây còn lại.
-    Nếu trễ nhẹ nhưng trong phạm vi an toàn (:06:00 - :06:59 hoặc :36:00 - :36:59 MMT), chạy ngay (0s delay).
-    Nếu trigger lệch xa khỏi cửa sổ (> 300 giây) và không phải manual force, hủy chạy để chống spam.
+    - Nếu runner khởi động sớm (:00-:05 hoặc :25-:35 MMT): sleep chính xác số giây còn lại để phát đúng :06:00 hoặc :36:00 MMT.
+    - Nếu runner khởi động trễ do GitHub Actions delay (:06-:20 hoặc :36-:50 MMT): CHẠY NGAY LẬP TỨC (0s delay), KHÔNG HỦY BỎ.
+    - Chế độ FORCE/MANUAL: Chạy ngay lập tức.
     """
     tz = timezone(timedelta(hours=6, minutes=30))
     now = datetime.now(tz)
@@ -128,33 +128,44 @@ def wait_until_target_minute(force: bool = False) -> bool:
         print(f"[{myanmar_now()}] ⚡ Chế độ FORCE/MANUAL — Bắt đầu ngay không cần chờ.")
         return True
 
-    # Xác định target minute gần nhất (:06 hoặc :36 MMT)
-    if 0 <= m <= 6:
+    print(f"[{myanmar_now()}] ⏱️ Runner khởi động lúc: {now.strftime('%H:%M:%S')} MMT (phút {m}:{s:02d})")
+
+    # 1. Khung nhịp :06 MMT
+    if 0 <= m < 6:
         target_sec = (6 - m) * 60 - s
-    elif 7 <= m <= 36:
-        target_sec = (36 - m) * 60 - s
-    else:
-        target_sec = (60 - m + 6) * 60 - s
-
-    print(f"[{myanmar_now()}] ⏱️ Thời gian hiện tại: {now.strftime('%H:%M:%S')} MMT | Khoảng cách tới target :06/:36: {target_sec}s")
-
-    # Nếu đang ở đúng phút :06 hoặc :36 (hoặc vừa qua trong vòng 60s)
-    if target_sec <= 0 and target_sec >= -60:
-        print(f"[{myanmar_now()}] 🎯 Đang ở đúng thời điểm target (:06 hoặc :36 MMT). Khởi động ngay!")
-        return True
-
-    # Nếu khởi động sớm trước mốc target (chờ tối đa 300s = 5 phút)
-    if 0 < target_sec <= 300:
-        print(f"[{myanmar_now()}] ⏳ Runner khởi động sớm — Sleep {target_sec}s để gửi lệnh đúng mốc :06 hoặc :36 MMT...")
+        print(f"[{myanmar_now()}] ⏳ Khởi động sớm trước mốc :06 MMT — Sleep {target_sec}s...")
         import time
         time.sleep(target_sec)
-        now_after = datetime.now(tz)
-        print(f"[{myanmar_now()}] 🔔 Đã chạm mốc {now_after.strftime('%H:%M:%S')} MMT. Bắt đầu gửi lệnh!")
+        print(f"[{myanmar_now()}] 🔔 Đã chạm mốc :06:00 MMT. Bắt đầu gửi lệnh!")
+        return True
+    elif 6 <= m <= 20:
+        print(f"[{myanmar_now()}] 🎯 Trong cửa sổ nhịp :06 MMT (phút {m}). Chạy ngay lập tức!")
         return True
 
-    # Nếu bị trigger lệch xa ngoài khung giờ
-    print(f"[{myanmar_now()}] ⚠️ Trigger ngoài khung giờ :06 / :36 MMT (cần chờ {target_sec}s > 300s). HỦY CHẠY để chống gửi tin sai giờ!")
-    return False
+    # 2. Khung nhịp :36 MMT
+    elif 21 <= m < 36:
+        target_sec = (36 - m) * 60 - s
+        print(f"[{myanmar_now()}] ⏳ Khởi động sớm trước mốc :36 MMT — Sleep {target_sec}s...")
+        import time
+        time.sleep(target_sec)
+        print(f"[{myanmar_now()}] 🔔 Đã chạm mốc :36:00 MMT. Bắt đầu gửi lệnh!")
+        return True
+    elif 36 <= m <= 50:
+        print(f"[{myanmar_now()}] 🎯 Trong cửa sổ nhịp :36 MMT (phút {m}). Chạy ngay lập tức!")
+        return True
+
+    # 3. Khung cuối giờ (:51 - :59) chuyển sang nhịp :06 giờ tiếp theo
+    else:
+        target_sec = (60 - m + 6) * 60 - s
+        if target_sec <= 600:
+            print(f"[{myanmar_now()}] ⏳ Cuối giờ — Sleep {target_sec}s để chạm mốc :06 MMT giờ kế tiếp...")
+            import time
+            time.sleep(target_sec)
+            print(f"[{myanmar_now()}] 🔔 Đã chạm mốc :06:00 MMT. Bắt đầu gửi lệnh!")
+            return True
+
+    print(f"[{myanmar_now()}] 🚀 Bắt đầu relay Site Down...")
+    return True
 
 
 async def main():
@@ -179,19 +190,7 @@ async def main():
         me = await client.get_me()
         print(f"[{myanmar_now()}] Dang nhap: @{me.username} ({me.first_name})")
 
-        # Build entity map tu tat ca dialogs
-        print(f"[{myanmar_now()}] Building entity map from dialogs...")
-        entity_map = {}  # gname -> entity
-        dialogs = await client.get_dialogs(limit=200)
-        for dialog in dialogs:
-            did = str(getattr(dialog.entity, 'id', 0))
-            for gname, gid in ALL_GROUPS.items():
-                if did == str(abs(int(gid))):
-                    entity_map[gname] = dialog.entity
-                    print(f"[{myanmar_now()}] Found {gname}: {dialog.title}")
-        print(f"[{myanmar_now()}] Entity map: {list(entity_map.keys())}")
-
-        # ── 3. Lấy entity nhóm Botlookup ─────────────────────────
+        # ── 3. Lấy entity nhóm Botlookup trực tiếp (Siêu tốc < 0.2s) ──
         try:
             source = await client.get_entity(SOURCE_GROUP)
             print(f"[{myanmar_now()}] 📌 Nhóm: {source.title}")
