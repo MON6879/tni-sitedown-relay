@@ -5822,6 +5822,81 @@ Team04>> 2Box</td>
       </div>
     </div>
 
+    <!-- 5. GMAIL ACCESS CONTROL & ROLE PERMISSION PANEL -->
+    <div id="access-control-panel" class="tab-panel">
+      <div class="section-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <div>
+          <span><i class="fa-solid fa-user-lock"></i> Gmail Access Control & Role-Based Permissions (Phân Quyền Truy Cập)</span>
+          <div style="font-size:0.78rem; color:#38BDF8; font-weight:700; margin-top:0.2rem;">
+            <i class="fa-solid fa-shield-halved"></i> Quản lý danh sách tài khoản Gmail & phân quyền xem từng Thẻ hệ thống BI Portal
+          </div>
+        </div>
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+          <button class="filter-btn" style="background:rgba(255,255,255,0.08); color:#F8FAFC; border:1px solid rgba(255,255,255,0.2); padding:0.6rem 1rem; border-radius:10px; cursor:pointer;" onclick="resetGmailDefaults()">
+            <i class="fa-solid fa-rotate-left"></i> Khôi phục Mặc định
+          </button>
+          <button class="filter-btn active" style="background:linear-gradient(135deg, var(--cyan), #059669); color:#fff; border:none; padding:0.6rem 1.2rem; font-weight:700; border-radius:10px; cursor:pointer;" onclick="openAddGmailModal()">
+            <i class="fa-solid fa-user-plus"></i> Add Authorized Gmail Account
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Summary Cards for Permissions -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+        <div class="card" style="border-left:4px solid var(--emerald); background:rgba(16,185,129,0.08); padding:1rem;">
+          <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-crown"></i> 🌟 Full Access (Admin)</div>
+          <div style="font-size:1.4rem; font-weight:800; color:var(--emerald); margin-top:0.3rem;" id="count-full-access">1 Account</div>
+          <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Toàn quyền xem tất cả 5 Thẻ & Phân quyền</div>
+        </div>
+        <div class="card" style="border-left:4px solid var(--cyan); background:rgba(6,182,212,0.08); padding:1rem;">
+          <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-user-shield"></i> 👑 BOD Assign Only</div>
+          <div style="font-size:1.4rem; font-weight:800; color:var(--cyan); margin-top:0.3rem;" id="count-bod-access">1 Account</div>
+          <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Chỉ xem Thẻ BOD Directives & Summary</div>
+        </div>
+        <div class="card" style="border-left:4px solid #a78bfa; background:rgba(167,139,250,0.08); padding:1rem;">
+          <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-building"></i> 🏢 Dept Assign Only</div>
+          <div style="font-size:1.4rem; font-weight:800; color:#a78bfa; margin-top:0.3rem;" id="count-dept-access">5 Accounts</div>
+          <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Chỉ xem Thẻ Phòng Ban, WO Detail & Team Roster</div>
+        </div>
+        <div class="card" style="border-left:4px solid #f59e0b; background:rgba(245,158,11,0.08); padding:1rem;">
+          <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-chart-pie"></i> 📊 Executive Only</div>
+          <div style="font-size:1.4rem; font-weight:800; color:#f59e0b; margin-top:0.3rem;" id="count-exec-access">1 Account</div>
+          <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Chỉ xem Thẻ Báo Cáo Tổng Quan & AI Voice</div>
+        </div>
+      </div>
+
+      <!-- Access Control Table Card -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.8rem;">
+          <div>
+            <h3 style="color:#fff; font-size:1.15rem; font-weight:700;"><i class="fa-solid fa-table-list"></i> Authorized Gmail Accounts Roster</h3>
+            <span style="font-size:0.78rem; color:var(--text-sub);">Danh sách tài khoản được cấp quyền truy cập hệ thống TNI BI</span>
+          </div>
+          <div style="display:flex; gap:0.5rem; align-items:center;">
+            <input type="text" id="searchGmailFilter" onkeyup="filterGmailTable()" placeholder="🔍 Tìm kiếm email, tên hoặc quyền..." style="background:#1E293B; border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:0.5rem 0.9rem; color:#fff; font-size:0.85rem; width:280px;" />
+          </div>
+        </div>
+        <div style="max-height: 600px; overflow-y: auto;">
+          <table class="data-table" id="accessTable">
+            <thead>
+              <tr>
+                <th style="width:40px;">#</th>
+                <th style="text-align:left !important;">Authorized Gmail Address</th>
+                <th style="text-align:left !important;">Full Name / Role Description</th>
+                <th>Assigned Permission</th>
+                <th>Status</th>
+                <th>Date Added</th>
+                <th style="width:100px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="gmailListTable">
+              <!-- Dynamically populated by JS renderGmailList() -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- TEAM 1 COMPLETE MODAL -->
   <div id="team1Modal" class="modal-backdrop">
     <div class="modal-box" style="max-width: 920px;">
@@ -6210,45 +6285,136 @@ Team04>> 2Box</td>
       document.getElementById('gmailModal').classList.remove('active');
     }
 
+    /* 🔐 GMAIL ACCESS CONTROL & ROLE-BASED PERMISSION PERSISTENCE */
+    const DEFAULT_GMAIL_ACCOUNTS = [
+      { email: "phonghdpxd@gmail.com", name: "Hà Đức Phong (System Admin / Super Admin)", role: "FULL", date: "15/08/2026" },
+      { email: "bod.director@mytel.com.mm", name: "Branch Director (BOD Executive)", role: "BOD", date: "15/08/2026" },
+      { email: "tni.technical@gmail.com", name: "Technical Department Manager", role: "DEPT", date: "15/08/2026" },
+      { email: "tni.operations@mytel.com.mm", name: "Regional Operations Team Leader", role: "EXEC", date: "15/08/2026" },
+      { email: "team1.dawei@mytel.com.mm", name: "Paing Aung Soe (Team 1 Lead - Dawei)", role: "DEPT", date: "15/08/2026" },
+      { email: "team2.myeik@mytel.com.mm", name: "Nay Myo Thu (Team 2 Lead - Myeik)", role: "DEPT", date: "15/08/2026" },
+      { email: "team3.bokpyin@mytel.com.mm", name: "Pyae Phyo Zaw (Team 3 Lead - Bokpyin)", role: "DEPT", date: "15/08/2026" },
+      { email: "team4.kawthoung@mytel.com.mm", name: "Naing Myo Htun (Team 4 Lead - Kawthoung)", role: "DEPT", date: "15/08/2026" }
+    ];
+
+    function getStoredGmailAccounts() {
+      try {
+        const stored = localStorage.getItem('tni_gmail_access_list');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {
+        console.error('Error reading stored accounts', e);
+      }
+      return DEFAULT_GMAIL_ACCOUNTS;
+    }
+
+    function saveStoredGmailAccounts(accounts) {
+      try {
+        localStorage.setItem('tni_gmail_access_list', JSON.stringify(accounts));
+      } catch (e) {
+        console.error('Error saving accounts', e);
+      }
+    }
+
+    function renderGmailList() {
+      const tbody = document.getElementById('gmailListTable');
+      if (!tbody) return;
+      const accounts = getStoredGmailAccounts();
+      tbody.innerHTML = '';
+
+      let cFull = 0, cBod = 0, cDept = 0, cExec = 0;
+
+      accounts.forEach((acc, idx) => {
+        let tagClass = 'tag-t2';
+        let roleLabel = '🌟 Full Access';
+        if (acc.role === 'BOD') {
+          tagClass = 'tag-t1';
+          roleLabel = '👑 BOD Assign Only';
+          cBod++;
+        } else if (acc.role === 'DEPT') {
+          tagClass = 'tag-t3';
+          roleLabel = '🏢 Dept Assign Only';
+          cDept++;
+        } else if (acc.role === 'EXEC') {
+          tagClass = 'tag-t4';
+          roleLabel = '📊 Executive Only';
+          cExec++;
+        } else {
+          cFull++;
+        }
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td style="text-align:left !important;"><strong style="color:var(--cyan);">${acc.email}</strong></td>
+          <td style="text-align:left !important; font-weight:600;">${acc.name}</td>
+          <td><span class="team-tag ${tagClass}">${roleLabel}</span></td>
+          <td><span class="status-pill-check sp-verified">✓ Active Authorized</span></td>
+          <td style="font-size:0.8rem; color:var(--text-sub);">${acc.date || '15/08/2026'}</td>
+          <td><button class="filter-btn" style="color:var(--rose); padding:0.25rem 0.6rem; font-size:0.75rem;" onclick="removeGmailIndex(${idx})"><i class="fa-solid fa-trash"></i> Remove</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      if (document.getElementById('count-full-access')) document.getElementById('count-full-access').textContent = `${cFull} Account${cFull !== 1 ? 's' : ''}`;
+      if (document.getElementById('count-bod-access')) document.getElementById('count-bod-access').textContent = `${cBod} Account${cBod !== 1 ? 's' : ''}`;
+      if (document.getElementById('count-dept-access')) document.getElementById('count-dept-access').textContent = `${cDept} Account${cDept !== 1 ? 's' : ''}`;
+      if (document.getElementById('count-exec-access')) document.getElementById('count-exec-access').textContent = `${cExec} Account${cExec !== 1 ? 's' : ''}`;
+    }
+
     function submitAddGmail() {
       const email = document.getElementById('newGmailInput').value.trim();
       const name = document.getElementById('newNameInput').value.trim();
       const roleVal = document.getElementById('newRoleSelect').value;
-      if (!email || !name) return;
-
-      let tagClass = 'tag-t2';
-      let roleLabel = '🌟 Full Access';
-      if (roleVal === 'BOD') {
-        tagClass = 'tag-t1';
-        roleLabel = '👑 BOD Assign Only';
-      } else if (roleVal === 'DEPT') {
-        tagClass = 'tag-t3';
-        roleLabel = '🏢 Dept Assign Only';
-      } else if (roleVal === 'EXEC') {
-        tagClass = 'tag-t4';
-        roleLabel = '📊 Executive Only';
+      if (!email || !name) {
+        alert('Vui lòng nhập đầy đủ Email và Tên người dùng!');
+        return;
       }
 
-      const tbody = document.getElementById('gmailListTable');
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><strong>${email}</strong></td>
-        <td>${name}</td>
-        <td><span class="team-tag ${tagClass}">${roleLabel}</span></td>
-        <td><span class="status-pill-check sp-verified">✓ Active Authorized</span></td>
-        <td><button class="filter-btn" style="color:var(--rose);" onclick="removeGmail(this)">Remove</button></td>
-      `;
-      tbody.appendChild(tr);
+      const accounts = getStoredGmailAccounts();
+      const today = new Date().toLocaleDateString('vi-VN');
+      accounts.push({ email, name, role: roleVal, date: today });
+      saveStoredGmailAccounts(accounts);
+      renderGmailList();
 
-      // Clear form inputs
       document.getElementById('newGmailInput').value = '';
       document.getElementById('newNameInput').value = '';
       closeAddGmailModal();
     }
 
-    function removeGmail(btn) {
-      btn.closest('tr').remove();
+    function removeGmailIndex(index) {
+      const accounts = getStoredGmailAccounts();
+      if (index >= 0 && index < accounts.length) {
+        if (confirm(`Bạn có chắc chắn muốn thu hồi quyền truy cập của ${accounts[index].email}?`)) {
+          accounts.splice(index, 1);
+          saveStoredGmailAccounts(accounts);
+          renderGmailList();
+        }
+      }
     }
+
+    function resetGmailDefaults() {
+      if (confirm('Khôi phục danh sách tài khoản phân quyền về mặc định?')) {
+        saveStoredGmailAccounts(DEFAULT_GMAIL_ACCOUNTS);
+        renderGmailList();
+      }
+    }
+
+    function filterGmailTable() {
+      const q = (document.getElementById('searchGmailFilter').value || '').toLowerCase();
+      const rows = document.querySelectorAll('#gmailListTable tr');
+      rows.forEach(r => {
+        const text = r.innerText.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    // Auto-init on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      renderGmailList();
+    });
 
     /* 🤖 AI VOICE SPEECH SYNTHESIS ENGINE (FULL COMPREHENSIVE AUDIO REPORT WITH SENTENCE CHUNKING QUEUE) */
     let isSpeaking = false;
