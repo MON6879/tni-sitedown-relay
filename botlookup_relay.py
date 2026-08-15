@@ -35,8 +35,8 @@ def _send_lock_alert(msg: str):
     alert = (
         f"🔐 *TELEGRAM SESSION LOCKED* \\({now} MMT\\)\n\n"
         f"{msg}\n\n"
-        f"👉 *Fix:* GitHub → MON6879/tni\-sitedown\-relay → Settings → Secrets\n"
-        f"✏️ Cập nhật lại `TELEGRAM\\_API\\_ID` và `TELEGRAM\\_SESSION`"
+        r"👉 *Fix:* GitHub → MON6879/tni\-sitedown\-relay → Settings → Secrets" + "\n"
+        r"✏️ Cập nhật lại `TELEGRAM\_API\_ID` và `TELEGRAM\_SESSION`"
     )
     # Thử gửi qua SEND_BOT_TOKEN → personal ID admin
     token   = os.environ.get("SEND_BOT_TOKEN", "").strip()
