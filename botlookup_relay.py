@@ -21,9 +21,60 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Cấu hình ──────────────────────────────────────────────────────
-API_ID         = int(os.environ.get("TELEGRAM_API_ID", "0"))
-API_HASH       = os.environ.get("TELEGRAM_API_HASH", "")
-SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
+_RAW_API_ID    = os.environ.get("TELEGRAM_API_ID", "0").strip()
+API_HASH       = os.environ.get("TELEGRAM_API_HASH", "").strip()
+SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "").strip()
+
+# ══════════════════════════════════════════════════════════════════
+# 🔐 CẢNH BÁO KHÓA TELEGRAM — Kiểm tra secrets ngay khi khởi động
+# ══════════════════════════════════════════════════════════════════
+def _send_lock_alert(msg: str):
+    """Gửi cảnh báo qua Bot API (không cần Telethon) khi session bị lỗi."""
+    tz  = timezone(timedelta(hours=6, minutes=30))
+    now = datetime.now(tz).strftime("%H:%M %d/%m/%Y")
+    alert = (
+        f"🔐 *TELEGRAM SESSION LOCKED* \\({now} MMT\\)\n\n"
+        f"{msg}\n\n"
+        f"👉 *Fix:* GitHub → MON6879/tni\-sitedown\-relay → Settings → Secrets\n"
+        f"✏️ Cập nhật lại `TELEGRAM\\_API\\_ID` và `TELEGRAM\\_SESSION`"
+    )
+    # Thử gửi qua SEND_BOT_TOKEN → personal ID admin
+    token   = os.environ.get("SEND_BOT_TOKEN", "").strip()
+    chat_id = "6859790680"  # Ha Duc Phong personal Telegram ID
+    if token:
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": alert, "parse_mode": "MarkdownV2"},
+                timeout=15,
+            )
+            print(f"[{now}] ⚠️ Lock alert sent to admin!")
+        except Exception as ex:
+            print(f"[{now}] ⚠️ Cannot send lock alert: {ex}")
+    print(f"[{now}] ❌ SESSION LOCK: {msg}")
+
+# Kiểm tra API_ID — phải là số nguyên hợp lệ, không phải session string
+try:
+    API_ID = int(_RAW_API_ID)
+    if API_ID == 0:
+        raise ValueError("API_ID = 0")
+except ValueError:
+    _send_lock_alert(
+        f"❌ `TELEGRAM\\_API\\_ID` không hợp lệ\\!\n"
+        f"Giá trị hiện tại: `{_RAW_API_ID[:30]}\\.\\.\\.`\n"
+        f"⚠️ Có thể đã paste nhầm SESSION string vào ô API\\_ID\\."
+    )
+    sys.exit(1)
+
+# Kiểm tra SESSION_STRING — phải đủ dài (Telethon session ≥ 100 ký tự)
+if len(SESSION_STRING) < 100:
+    _send_lock_alert(
+        f"❌ `TELEGRAM\\_SESSION` bị trống hoặc quá ngắn\\!\n"
+        f"Độ dài hiện tại: `{len(SESSION_STRING)}` ký tự \\(cần ≥ 100\\)\\.\n"
+        f"⚠️ Session string Telethon hợp lệ phải có ~350 ký tự\\."
+    )
+    sys.exit(1)
+# ══════════════════════════════════════════════════════════════════
 
 SOURCE_GROUP   = "Botlookup"
 COMMAND        = "/down_tni@auto_nocpro_bot"
@@ -61,27 +112,57 @@ def in_active_window() -> bool:
     return ACTIVE_START <= (now.hour, now.minute) <= ACTIVE_END
 
 
-def is_target_relay_window() -> bool:
-    """Check if current Myanmar minute is within :06-:25 or :36-:55 MMT (avoids :00/:30 peak queue delays)."""
-    if os.environ.get("FORCE_RUN") == "1" or "--force" in sys.argv:
-        return True
+def wait_until_target_minute():
+    """Chờ đến đúng phút :06 hoặc :36 MMT trước khi gửi lệnh Telegram.
+    Cron `3,33 * * * *` UTC khởi động runner sớm lúc :03/:33 MMT,
+    hàm này giữ script lại cho đến đúng mốc :06 hoặc :36 MMT."""
     tz = timezone(timedelta(hours=6, minutes=30))
+    TARGET_MINUTES = [6, 36]  # Mốc phút MMT chuẩn theo AGENTS.md
+    MAX_WAIT = 300  # Tối đa chờ 5 phút (an toàn)
+
     now = datetime.now(tz)
     m = now.minute
-    return (6 <= m <= 25) or (36 <= m <= 55)
+    s = now.second
+
+    # Tìm mốc phút gần nhất trong tương lai (hoặc ngay hiện tại)
+    current_total = m * 60 + s
+    best_wait = MAX_WAIT + 1
+    best_target = m
+
+    for target in TARGET_MINUTES:
+        target_total = target * 60
+        wait = target_total - current_total
+        if wait < -10:  # Nếu đã qua mốc hơn 10 giây, thử mốc giờ tiếp theo (+60 phút)
+            wait += 3600
+        if 0 <= wait < best_wait:
+            best_wait = wait
+            best_target = target
+
+    if best_wait > MAX_WAIT:
+        # Đã đúng hoặc qua mốc → chạy luôn
+        print(f"[{myanmar_now()}] ⏰ Đã qua mốc :06/:36, chạy ngay (m={m})")
+        return
+
+    if best_wait <= 0:
+        print(f"[{myanmar_now()}] ⏰ Đúng mốc :{best_target:02d} MMT, chạy ngay!")
+        return
+
+    print(f"[{myanmar_now()}] ⏳ Chờ {best_wait}s đến đúng phút :{best_target:02d} MMT...")
+    import time
+    time.sleep(best_wait)
+    print(f"[{myanmar_now()}] ⏰ Đã đến :{best_target:02d} MMT — BẮT ĐẦU gửi lệnh!")
 
 
 async def main():
-    # ── 0. Kiểm tra khung giờ & phút ─────────────────────────────
+    # ── 0. Kiểm tra khung giờ ─────────────────────────────────────
     if not in_active_window():
         print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ 04:30–21:30. Kết thúc.")
         return
 
-    if not is_target_relay_window():
-        tz = timezone(timedelta(hours=6, minutes=30))
-        now = datetime.now(tz)
-        print(f"[{myanmar_now()}] ⏭️ Bỏ qua ca chạy lúc {now.strftime('%H:%M')} MMT (Chỉ chạy đúng cửa sổ :06-:25 và :36-:55 MMT để không bao giờ trễ tin).")
-        return
+    # ── 0b. Chờ đến đúng phút :06 hoặc :36 MMT ──────────────────
+    # Cron `3,33 UTC` khởi động runner sớm (~:03/:33 MMT).
+    # Script tự chờ đến đúng mốc :06/:36 MMT trước khi gửi lệnh Telegram.
+    wait_until_target_minute()
 
     # ── 2. Kết nối Telegram ───────────────────────────────────────
     from telethon.sessions import StringSession
@@ -113,30 +194,8 @@ async def main():
             await client.send_message(TARGET_CHAT_ID, err)
             return
 
-        # ── 3.5. FORCE MODE OVERRIDE & DEDUP CHECK ───────────────────────
-        force_mode = (os.environ.get("FORCE_RUN") == "1" or "--force" in sys.argv)
-        
-        if force_mode:
-            print(f"[{myanmar_now()}] ⚡ FORCE MODE ACTIVE: Ép nổ máy 100% — Gửi lệnh cào dữ liệu ngay lập tức mà không bị cản trở!")
-        else:
-            try:
-                pre_history = await client(GetHistoryRequest(
-                    peer=source, limit=60,
-                    offset_date=None, offset_id=0, max_id=0, min_id=0, add_offset=0, hash=0
-                ))
-                messages = list(reversed(pre_history.messages))
-                my_down_cmds = [m for m in messages if ((m.sender_id == me.id) or getattr(m, 'out', False)) and "/down_tni" in (m.message or "").lower()]
-                
-                if my_down_cmds:
-                    last_cmd_age_min = (datetime.now(timezone.utc) - my_down_cmds[-1].date).total_seconds() / 60.0
-                    if last_cmd_age_min < 18.0:
-                        print(f"[{myanmar_now()}] ⏭️ Lệnh /down_tni đã gửi cách đây {last_cmd_age_min:.1f} phút (< 18p). Bỏ qua ca trùng.")
-                        return
-            except Exception as pre_ex:
-                print(f"[{myanmar_now()}] ⚠️ Pre-check skip: {pre_ex}")
-
-        # ── 4+5. Gui lenh va ghi nho thoi diem SAU khi gui ─────
-        print(f"[{myanmar_now()}] 📤 Gửi: {COMMAND}")
+        # ── 4+5. Gửi lệnh /down_tni@auto_nocpro_bot vào nhóm Botlookup ─────
+        print(f"[{myanmar_now()}] 📤 Gửi lệnh trực tiếp: {COMMAND}")
         await client.send_message(source, COMMAND)
         send_time = datetime.now(timezone.utc) - timedelta(seconds=5)
 
