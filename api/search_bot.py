@@ -939,7 +939,7 @@ def parse_plan_fields(text: str, chat_id: int | None = None, chat_title: str | N
 
 _processed_plan_msg_ids = set()
 
-def store_daily_plan_to_sheet(date_str: str, team_str: str, content: str) -> dict:
+def store_daily_plan_to_sheet(date_str: str, team_str: str, content: str, msg_id: int = None) -> dict:
     url = DAILY_APPS_SCRIPT_URL or APPS_SCRIPT_URL or "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
     payload = {
         "action": "store_daily_plan",
@@ -947,7 +947,8 @@ def store_daily_plan_to_sheet(date_str: str, team_str: str, content: str) -> dic
         "team": team_str,
         "content": content,
         "daily_report": "",
-        "comparison": ""
+        "comparison": "",
+        "msg_id": str(msg_id) if msg_id else ""
     }
     for attempt in range(3):
         try:
@@ -1369,9 +1370,15 @@ def handle(update: dict) -> None:
         chat_title = msg.get("chat", {}).get("title", "")
         date_str, team_str, content = parse_plan_fields(text, chat_id, chat_title)
         if date_str and team_str:
-            res = store_daily_plan_to_sheet(date_str, team_str, text)
+            res = store_daily_plan_to_sheet(date_str, team_str, text, msg_id=msg_id)
             ref = res.get("ref")
             dup = res.get("duplicate", False)
+
+            # 🛑 Nếu GAS xác nhận đây là bản trùng (đã lưu bởi instance Vercel khác) → bỏ qua, không gửi confirmation
+            if dup:
+                logger.info(f"GAS returned duplicate=true for msg_id={msg_id}, skipping confirmation")
+                return
+
             if not ref or ref == "?" or "OK" in str(ref):
                 ref_show = fetch_max_plan_ref()
             else:
@@ -1381,7 +1388,7 @@ def handle(update: dict) -> None:
             now_mm = datetime.fromtimestamp(msg_date, TZ_MM) if msg_date else datetime.now(TZ_MM)
             time_str = now_mm.strftime('%H:%M')
 
-            tg_send(chat_id, f"✅ <b>Plan {'updated' if dup else 'saved'} ({time_str})</b> — REF:<b>{ref_show}</b> | {date_str}")
+            tg_send(chat_id, f"✅ <b>Plan saved ({time_str})</b> — REF:<b>{ref_show}</b> | {date_str}")
             return
 
     # ── 2. DAILY REPORT SUBMIT (PRIORITY #2: Process daily report BEFORE SSOT classify) ──
