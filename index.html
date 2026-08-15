@@ -5826,9 +5826,9 @@ Team04>> 2Box</td>
     <div id="access-control-panel" class="tab-panel">
       <div class="section-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
         <div>
-          <span><i class="fa-solid fa-user-lock"></i> Gmail Access Control & Role-Based Permissions (Phân Quyền Truy Cập)</span>
+          <span><i class="fa-solid fa-user-lock"></i> Gmail Access Control &amp; Role-Based Permissions (Phân Quyền Truy Cập)</span>
           <div style="font-size:0.78rem; color:#38BDF8; font-weight:700; margin-top:0.2rem;">
-            <i class="fa-solid fa-shield-halved"></i> Quản lý danh sách tài khoản Gmail & phân quyền xem từng Thẻ hệ thống BI Portal
+            <i class="fa-solid fa-shield-halved"></i> Quản lý danh sách tài khoản Gmail &amp; phân quyền xem từng Thẻ hệ thống BI Portal
           </div>
         </div>
         <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
@@ -5836,32 +5836,55 @@ Team04>> 2Box</td>
             <i class="fa-solid fa-rotate-left"></i> Khôi phục Mặc định
           </button>
           <button class="filter-btn active" style="background:linear-gradient(135deg, var(--cyan), #059669); color:#fff; border:none; padding:0.6rem 1.2rem; font-weight:700; border-radius:10px; cursor:pointer;" onclick="openAddGmailModal()">
-            <i class="fa-solid fa-user-plus"></i> Add Authorized Gmail Account
+            <i class="fa-solid fa-user-plus"></i> + Thêm / Dán Gmail Hàng Loạt
           </button>
         </div>
       </div>
 
-      <!-- Quick Summary Cards for Permissions -->
+      <!-- Quick Summary Cards for Permissions with Copy Buttons -->
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
-        <div class="card" style="border-left:4px solid var(--emerald); background:rgba(16,185,129,0.08); padding:1rem;">
-          <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-crown"></i> 🌟 Full Access (Admin)</div>
-          <div style="font-size:1.4rem; font-weight:800; color:var(--emerald); margin-top:0.3rem;" id="count-full-access">1 Account</div>
-          <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Toàn quyền xem tất cả 5 Thẻ & Phân quyền</div>
+        <div class="card" style="border-left:4px solid var(--emerald); background:rgba(16,185,129,0.08); padding:1rem; display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-crown"></i> 🌟 Full Access (Admin)</div>
+            <div style="font-size:1.4rem; font-weight:800; color:var(--emerald); margin-top:0.3rem;" id="count-full-access">1 Account</div>
+            <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Toàn quyền xem tất cả 5 Thẻ &amp; Phân quyền</div>
+          </div>
+          <button class="filter-btn" style="margin-top:0.8rem; width:100%; padding:0.35rem; font-size:0.75rem; background:rgba(16,185,129,0.15); color:var(--emerald); border:1px solid rgba(16,185,129,0.3); border-radius:6px; cursor:pointer;" onclick="copyGroupEmails('FULL')">
+            <i class="fa-solid fa-copy"></i> Copy Gmail Nhóm Full Access
+          </button>
         </div>
-        <div class="card" style="border-left:4px solid var(--cyan); background:rgba(6,182,212,0.08); padding:1rem;">
-          <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-user-shield"></i> 👑 BOD Assign Only</div>
-          <div style="font-size:1.4rem; font-weight:800; color:var(--cyan); margin-top:0.3rem;" id="count-bod-access">1 Account</div>
-          <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Chỉ xem Thẻ BOD Directives & Summary</div>
+
+        <div class="card" style="border-left:4px solid var(--cyan); background:rgba(6,182,212,0.08); padding:1rem; display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-user-shield"></i> 👑 BOD Assign Group</div>
+            <div style="font-size:1.4rem; font-weight:800; color:var(--cyan); margin-top:0.3rem;" id="count-bod-access">1 Account</div>
+            <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Quyền xem Thẻ BOD Directives</div>
+          </div>
+          <button class="filter-btn" style="margin-top:0.8rem; width:100%; padding:0.35rem; font-size:0.75rem; background:rgba(6,182,212,0.15); color:var(--cyan); border:1px solid rgba(6,182,212,0.3); border-radius:6px; cursor:pointer;" onclick="copyGroupEmails('BOD')">
+            <i class="fa-solid fa-copy"></i> Copy Gmail Nhóm BOD
+          </button>
         </div>
-        <div class="card" style="border-left:4px solid #a78bfa; background:rgba(167,139,250,0.08); padding:1rem;">
-          <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-building"></i> 🏢 Dept Assign Only</div>
-          <div style="font-size:1.4rem; font-weight:800; color:#a78bfa; margin-top:0.3rem;" id="count-dept-access">5 Accounts</div>
-          <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Chỉ xem Thẻ Phòng Ban, WO Detail & Team Roster</div>
+
+        <div class="card" style="border-left:4px solid #a78bfa; background:rgba(167,139,250,0.08); padding:1rem; display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-building"></i> 🏢 Dept Assign Group</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#a78bfa; margin-top:0.3rem;" id="count-dept-access">5 Accounts</div>
+            <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Quyền xem Thẻ Phòng Ban &amp; WO</div>
+          </div>
+          <button class="filter-btn" style="margin-top:0.8rem; width:100%; padding:0.35rem; font-size:0.75rem; background:rgba(167,139,250,0.15); color:#a78bfa; border:1px solid rgba(167,139,250,0.3); border-radius:6px; cursor:pointer;" onclick="copyGroupEmails('DEPT')">
+            <i class="fa-solid fa-copy"></i> Copy Gmail Nhóm Dept
+          </button>
         </div>
-        <div class="card" style="border-left:4px solid #f59e0b; background:rgba(245,158,11,0.08); padding:1rem;">
-          <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-chart-pie"></i> 📊 Executive Only</div>
-          <div style="font-size:1.4rem; font-weight:800; color:#f59e0b; margin-top:0.3rem;" id="count-exec-access">1 Account</div>
-          <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Chỉ xem Thẻ Báo Cáo Tổng Quan & AI Voice</div>
+
+        <div class="card" style="border-left:4px solid #f59e0b; background:rgba(245,158,11,0.08); padding:1rem; display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="font-size:0.8rem; color:var(--text-sub);"><i class="fa-solid fa-chart-pie"></i> 📊 Executive Only</div>
+            <div style="font-size:1.4rem; font-weight:800; color:#f59e0b; margin-top:0.3rem;" id="count-exec-access">1 Account</div>
+            <div style="font-size:0.72rem; color:#94a3b8; margin-top:0.2rem;">Quyền xem Báo Cáo Tổng Quan</div>
+          </div>
+          <button class="filter-btn" style="margin-top:0.8rem; width:100%; padding:0.35rem; font-size:0.75rem; background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); border-radius:6px; cursor:pointer;" onclick="copyGroupEmails('EXEC')">
+            <i class="fa-solid fa-copy"></i> Copy Gmail Nhóm Exec
+          </button>
         </div>
       </div>
 
@@ -5872,8 +5895,11 @@ Team04>> 2Box</td>
             <h3 style="color:#fff; font-size:1.15rem; font-weight:700;"><i class="fa-solid fa-table-list"></i> Authorized Gmail Accounts Roster</h3>
             <span style="font-size:0.78rem; color:var(--text-sub);">Danh sách tài khoản được cấp quyền truy cập hệ thống TNI BI</span>
           </div>
-          <div style="display:flex; gap:0.5rem; align-items:center;">
-            <input type="text" id="searchGmailFilter" onkeyup="filterGmailTable()" placeholder="🔍 Tìm kiếm email, tên hoặc quyền..." style="background:#1E293B; border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:0.5rem 0.9rem; color:#fff; font-size:0.85rem; width:280px;" />
+          <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+            <button class="filter-btn" style="padding:0.45rem 0.8rem; font-size:0.8rem; background:rgba(56, 189, 248, 0.15); color:var(--cyan); border:1px solid rgba(56, 189, 248, 0.3); border-radius:8px; cursor:pointer;" onclick="copyGroupEmails('ALL')">
+              <i class="fa-solid fa-copy"></i> Copy Tất Cả Gmail
+            </button>
+            <input type="text" id="searchGmailFilter" onkeyup="filterGmailTable()" placeholder="🔍 Tìm kiếm email hoặc quyền..." style="background:#1E293B; border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:0.5rem 0.9rem; color:#fff; font-size:0.85rem; width:260px;" />
           </div>
         </div>
         <div style="max-height: 600px; overflow-y: auto;">
@@ -6208,31 +6234,55 @@ Team04>> 2Box</td>
     </div>
   </div>
 
-  <!-- ADD AUTHORIZED GMAIL MODAL (CHECKBOX MULTI-SELECT) -->
+  <!-- ADD AUTHORIZED GMAIL MODAL (BULK PASTE & CHECKBOX MULTI-SELECT) -->
   <div id="gmailModal" class="modal-backdrop">
-    <div class="modal-box" style="max-width: 560px; background:#0F172A; border:1px solid rgba(56, 189, 248, 0.3); border-radius:20px; padding:1.5rem;">
+    <div class="modal-box" style="max-width: 600px; background:#0F172A; border:1px solid rgba(56, 189, 248, 0.35); border-radius:20px; padding:1.6rem; box-shadow:0 25px 50px -12px rgba(0, 0, 0, 0.85);">
       <div class="modal-header" style="margin-bottom:1.2rem;">
         <div>
-          <h3 style="color:var(--cyan); font-weight:800; font-size:1.25rem;"><i class="fa-solid fa-user-shield"></i> Phân Quyền Tài Khoản Gmail</h3>
-          <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0.2rem;">Nhập Gmail &amp; tích chọn các Thẻ được phép truy cập trên hệ thống BI</p>
+          <h3 style="color:var(--cyan); font-weight:800; font-size:1.3rem;"><i class="fa-solid fa-user-shield"></i> Thêm &amp; Phân Quyền Gmail Hàng Loạt</h3>
+          <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0.2rem;">Dán danh sách 1 hoặc nhiều Gmail cùng lúc &amp; chọn quyền theo từng Nhóm</p>
         </div>
         <button class="close-btn" onclick="closeAddGmailModal()">&times;</button>
       </div>
       
       <div class="form-group" style="margin-bottom:1.2rem;">
         <label style="display:block; font-weight:700; color:#F8FAFC; margin-bottom:0.4rem; font-size:0.88rem;">
-          <i class="fa-solid fa-envelope" style="color:var(--cyan);"></i> Địa chỉ Gmail (Authorized Gmail):
+          <i class="fa-solid fa-envelope" style="color:var(--cyan);"></i> Danh sách Gmail (Dán 1 hoặc hàng loạt cách nhau bằng Xuống dòng / Dấu phẩy):
         </label>
-        <input type="email" id="newGmailInput" class="form-input" placeholder="e.g. htoolaynyaw@gmail.com hoặc user@mytel.com.mm" style="width:100%; background:#1E293B; border:1px solid rgba(255,255,255,0.2); border-radius:10px; padding:0.6rem 0.9rem; color:#fff; font-size:0.95rem;" required />
+        <textarea id="newGmailInput" class="form-input" rows="3" placeholder="Dán danh sách Gmail tại đây...&#10;Ví dụ:&#10;htoolaynyaw@gmail.com&#10;director@mytel.com.mm, technical@gmail.com" style="width:100%; background:#1E293B; border:1px solid rgba(255,255,255,0.2); border-radius:10px; padding:0.6rem 0.9rem; color:#fff; font-size:0.92rem; font-family:monospace; resize:vertical;"></textarea>
+      </div>
+
+      <!-- Quick Group Presets -->
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-weight:700; color:var(--text-sub); font-size:0.8rem; margin-bottom:0.4rem;">
+          ⚡ Chọn nhanh mẫu phân quyền theo Nhóm chức vụ:
+        </label>
+        <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+          <button type="button" class="filter-btn" style="padding:0.3rem 0.6rem; font-size:0.75rem; background:rgba(16, 185, 129, 0.15); color:var(--emerald); border:1px solid rgba(16, 185, 129, 0.3); border-radius:6px; cursor:pointer;" onclick="applyPermissionPreset('FULL')">
+            🌟 Full Access (5 Thẻ)
+          </button>
+          <button type="button" class="filter-btn" style="padding:0.3rem 0.6rem; font-size:0.75rem; background:rgba(6, 182, 212, 0.15); color:var(--cyan); border:1px solid rgba(6, 182, 212, 0.3); border-radius:6px; cursor:pointer;" onclick="applyPermissionPreset('BOD')">
+            👑 Nhóm BOD
+          </button>
+          <button type="button" class="filter-btn" style="padding:0.3rem 0.6rem; font-size:0.75rem; background:rgba(167, 139, 250, 0.15); color:#a78bfa; border:1px solid rgba(167, 139, 250, 0.3); border-radius:6px; cursor:pointer;" onclick="applyPermissionPreset('DEPT')">
+            🏢 Nhóm Trưởng Phòng
+          </button>
+          <button type="button" class="filter-btn" style="padding:0.3rem 0.6rem; font-size:0.75rem; background:rgba(249, 115, 22, 0.15); color:#FB923C; border:1px solid rgba(249, 115, 22, 0.3); border-radius:6px; cursor:pointer;" onclick="applyPermissionPreset('ENGINEER')">
+            👷 Nhóm Kỹ Sư
+          </button>
+          <button type="button" class="filter-btn" style="padding:0.3rem 0.6rem; font-size:0.75rem; background:rgba(245, 158, 11, 0.15); color:#f59e0b; border:1px solid rgba(245, 158, 11, 0.3); border-radius:6px; cursor:pointer;" onclick="applyPermissionPreset('EXEC')">
+            📊 Nhóm Báo Cáo
+          </button>
+        </div>
       </div>
 
       <div class="form-group">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
           <label style="font-weight:700; color:#F8FAFC; font-size:0.88rem;">
-            <i class="fa-solid fa-square-check" style="color:var(--emerald);"></i> Tích chọn các Thẻ được phép xem (Permissions):
+            <i class="fa-solid fa-square-check" style="color:var(--emerald);"></i> Tích chọn chi tiết các Thẻ được phép xem (Permissions):
           </label>
           <button type="button" class="filter-btn" style="padding:0.25rem 0.7rem; font-size:0.75rem; background:rgba(56, 189, 248, 0.15); color:var(--cyan); border:1px solid rgba(56, 189, 248, 0.3); border-radius:6px; cursor:pointer;" onclick="toggleSelectAllPermissions()">
-            <span id="selectAllBtnText">Chọn Tất Cả</span>
+            <span id="selectAllBtnText">Bỏ Chọn Tất Cả</span>
           </button>
         </div>
 
@@ -6258,7 +6308,7 @@ Team04>> 2Box</td>
           </label>
 
           <label style="display:flex; align-items:center; gap:0.65rem; color:#fff; font-size:0.88rem; cursor:pointer; padding:0.35rem 0.5rem; border-radius:8px; background:rgba(255,255,255,0.03);">
-            <input type="checkbox" id="perm_auth" class="perm-checkbox" value="AUTH" style="width:18px; height:18px; accent-color:var(--cyan); cursor:pointer;" />
+            <input type="checkbox" id="perm_auth" class="perm-checkbox" value="AUTH" checked style="width:18px; height:18px; accent-color:var(--cyan); cursor:pointer;" />
             <span>🔒 <b>Gmail Access List</b> (Quản Lý Phân Quyền Hệ Thống)</span>
           </label>
         </div>
@@ -6267,7 +6317,7 @@ Team04>> 2Box</td>
       <div style="display:flex; justify-content:flex-end; gap:0.8rem; margin-top:1.5rem;">
         <button type="button" class="filter-btn" style="background:rgba(255,255,255,0.08); padding:0.6rem 1.2rem; cursor:pointer;" onclick="closeAddGmailModal()">Hủy (Cancel)</button>
         <button type="button" class="voice-btn" style="background:linear-gradient(135deg, var(--cyan), #059669); padding:0.6rem 1.4rem; font-weight:800; cursor:pointer;" onclick="submitAddGmail()">
-          <i class="fa-solid fa-check"></i> Lưu &amp; Phân Quyền
+          <i class="fa-solid fa-check"></i> Lưu &amp; Phân Quyền Hàng Loạt
         </button>
       </div>
     </div>
@@ -6398,6 +6448,45 @@ Team04>> 2Box</td>
       if (document.getElementById('count-exec-access')) document.getElementById('count-exec-access').textContent = `${cExec} Account${cExec !== 1 ? 's' : ''}`;
     }
 
+    function applyPermissionPreset(preset) {
+      const cbExec = document.getElementById('perm_exec');
+      const cbDept = document.getElementById('perm_dept');
+      const cbWo   = document.getElementById('perm_wo');
+      const cbBod  = document.getElementById('perm_bod');
+      const cbAuth = document.getElementById('perm_auth');
+
+      // Reset all first
+      cbExec.checked = false;
+      cbDept.checked = false;
+      cbWo.checked   = false;
+      cbBod.checked  = false;
+      cbAuth.checked = false;
+
+      if (preset === 'FULL') {
+        cbExec.checked = true;
+        cbDept.checked = true;
+        cbWo.checked   = true;
+        cbBod.checked  = true;
+        cbAuth.checked = true;
+      } else if (preset === 'BOD') {
+        cbExec.checked = true;
+        cbBod.checked  = true;
+      } else if (preset === 'DEPT') {
+        cbExec.checked = true;
+        cbDept.checked = true;
+        cbWo.checked   = true;
+      } else if (preset === 'ENGINEER') {
+        cbDept.checked = true;
+        cbWo.checked   = true;
+      } else if (preset === 'EXEC') {
+        cbExec.checked = true;
+      }
+
+      const allCheckedNow = cbExec.checked && cbDept.checked && cbWo.checked && cbBod.checked && cbAuth.checked;
+      const btnText = document.getElementById('selectAllBtnText');
+      if (btnText) btnText.textContent = allCheckedNow ? "Bỏ Chọn Tất Cả" : "Chọn Tất Cả";
+    }
+
     let allChecked = true;
     function toggleSelectAllPermissions() {
       const checkboxes = document.querySelectorAll('.perm-checkbox');
@@ -6407,11 +6496,56 @@ Team04>> 2Box</td>
       if (btnText) btnText.textContent = allChecked ? "Bỏ Chọn Tất Cả" : "Chọn Tất Cả";
     }
 
+    function copyGroupEmails(group) {
+      const accounts = getStoredGmailAccounts();
+      let matchedEmails = [];
+
+      accounts.forEach(acc => {
+        const perms = Array.isArray(acc.perms) ? acc.perms : (acc.role ? [acc.role] : []);
+        if (group === 'ALL') {
+          matchedEmails.push(acc.email);
+        } else if (group === 'FULL' && (perms.includes('AUTH') || perms.length >= 5)) {
+          matchedEmails.push(acc.email);
+        } else if (group === 'BOD' && perms.includes('BOD')) {
+          matchedEmails.push(acc.email);
+        } else if (group === 'DEPT' && (perms.includes('DEPT') || perms.includes('WO'))) {
+          matchedEmails.push(acc.email);
+        } else if (group === 'EXEC' && perms.includes('EXEC')) {
+          matchedEmails.push(acc.email);
+        }
+      });
+
+      // Remove duplicates
+      matchedEmails = [...new Set(matchedEmails)];
+
+      if (matchedEmails.length === 0) {
+        alert(`Không có tài khoản nào thuộc nhóm [${group}] để sao chép!`);
+        return;
+      }
+
+      const textToCopy = matchedEmails.join('\n');
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        alert(`📋 Đã sao chép thành công ${matchedEmails.length} địa chỉ Gmail của nhóm [${group}] vào Clipboard!\n\n(Bạn có thể dán trực tiếp vào Excel, Google Sheets, Gmail hoặc Telegram)`);
+      }).catch(err => {
+        prompt('Sao chép danh sách Gmail dưới đây:', textToCopy);
+      });
+    }
+
     function submitAddGmail() {
-      const email = document.getElementById('newGmailInput').value.trim();
-      if (!email) {
-        alert('Vui lòng nhập Địa chỉ Gmail!');
+      const rawText = document.getElementById('newGmailInput').value.trim();
+      if (!rawText) {
+        alert('Vui lòng nhập hoặc dán ít nhất 1 Địa chỉ Gmail!');
         document.getElementById('newGmailInput').focus();
+        return;
+      }
+
+      // Extract all valid emails using regex
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+      const foundEmails = rawText.match(emailRegex) || [];
+      const uniqueEmails = [...new Set(foundEmails.map(e => e.trim().toLowerCase()))];
+
+      if (uniqueEmails.length === 0) {
+        alert('Không tìm thấy địa chỉ Gmail hợp lệ nào trong nội dung đã nhập!\nVui lòng kiểm tra lại định dạng email (e.g. user@gmail.com).');
         return;
       }
 
@@ -6425,19 +6559,28 @@ Team04>> 2Box</td>
       const accounts = getStoredGmailAccounts();
       const today = new Date().toLocaleDateString('vi-VN');
 
-      const existingIdx = accounts.findIndex(a => a.email.toLowerCase() === email.toLowerCase());
-      if (existingIdx >= 0) {
-        accounts[existingIdx].perms = perms;
-        accounts[existingIdx].date = today;
-      } else {
-        accounts.unshift({ email, perms, date: today });
-      }
+      let updatedCount = 0;
+      let addedCount = 0;
+
+      uniqueEmails.forEach(email => {
+        const existingIdx = accounts.findIndex(a => a.email.toLowerCase() === email);
+        if (existingIdx >= 0) {
+          accounts[existingIdx].perms = perms;
+          accounts[existingIdx].date = today;
+          updatedCount++;
+        } else {
+          accounts.unshift({ email, perms, date: today });
+          addedCount++;
+        }
+      });
 
       saveStoredGmailAccounts(accounts);
       renderGmailList();
 
       document.getElementById('newGmailInput').value = '';
       closeAddGmailModal();
+
+      alert(`✅ Đã phân quyền thành công cho ${uniqueEmails.length} tài khoản Gmail!\n(Thêm mới: ${addedCount}, Cập nhật quyền: ${updatedCount})`);
     }
 
     function removeGmailIndex(index) {
