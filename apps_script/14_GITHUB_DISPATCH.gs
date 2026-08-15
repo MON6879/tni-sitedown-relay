@@ -2,10 +2,9 @@ var DISPATCH_REPO = "MON6879/tni-sitedown-relay";
 var DISPATCH_API_BASE = "https://api.github.com/repos/" + DISPATCH_REPO + "/actions/workflows/";
 
 function dispatchTrain5Min() {
-  _dispatchGH("train_5min.yml", "Train5Min", {
-    "report_type": "Reports 1, 2, 3, 4 - Daily Task & Backlog",
-    "skip_delay": "1"
-  });
+  // NO inputs → workflow uses check_time() to decide which reports to run
+  // Sending report_type would force Reports 1-4 every 5 min!
+  _dispatchGH("train_5min.yml", "Train5Min");
 }
 
 function dispatchBotlookupRelay() {
