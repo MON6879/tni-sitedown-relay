@@ -112,57 +112,14 @@ def in_active_window() -> bool:
     return ACTIVE_START <= (now.hour, now.minute) <= ACTIVE_END
 
 
-def wait_until_target_minute():
-    """Chờ đến đúng phút :06 hoặc :36 MMT trước khi gửi lệnh Telegram.
-    Cron `3,33 * * * *` UTC khởi động runner sớm lúc :03/:33 MMT,
-    hàm này giữ script lại cho đến đúng mốc :06 hoặc :36 MMT."""
-    tz = timezone(timedelta(hours=6, minutes=30))
-    TARGET_MINUTES = [6, 36]  # Mốc phút MMT chuẩn theo AGENTS.md
-    MAX_WAIT = 300  # Tối đa chờ 5 phút (an toàn)
-
-    now = datetime.now(tz)
-    m = now.minute
-    s = now.second
-
-    # Tìm mốc phút gần nhất trong tương lai (hoặc ngay hiện tại)
-    current_total = m * 60 + s
-    best_wait = MAX_WAIT + 1
-    best_target = m
-
-    for target in TARGET_MINUTES:
-        target_total = target * 60
-        wait = target_total - current_total
-        if wait < -10:  # Nếu đã qua mốc hơn 10 giây, thử mốc giờ tiếp theo (+60 phút)
-            wait += 3600
-        if 0 <= wait < best_wait:
-            best_wait = wait
-            best_target = target
-
-    if best_wait > MAX_WAIT:
-        # Đã đúng hoặc qua mốc → chạy luôn
-        print(f"[{myanmar_now()}] ⏰ Đã qua mốc :06/:36, chạy ngay (m={m})")
-        return
-
-    if best_wait <= 0:
-        print(f"[{myanmar_now()}] ⏰ Đúng mốc :{best_target:02d} MMT, chạy ngay!")
-        return
-
-    print(f"[{myanmar_now()}] ⏳ Chờ {best_wait}s đến đúng phút :{best_target:02d} MMT...")
-    import time
-    time.sleep(best_wait)
-    print(f"[{myanmar_now()}] ⏰ Đã đến :{best_target:02d} MMT — BẮT ĐẦU gửi lệnh!")
-
-
 async def main():
     # ── 0. Kiểm tra khung giờ ─────────────────────────────────────
     if not in_active_window():
         print(f"[{myanmar_now()}] 🌙 Ngoài khung giờ 04:30–21:30. Kết thúc.")
         return
 
-    # ── 0b. Chờ đến đúng phút :06 hoặc :36 MMT ──────────────────
-    # Cron `3,33 UTC` khởi động runner sớm (~:03/:33 MMT).
-    # Script tự chờ đến đúng mốc :06/:36 MMT trước khi gửi lệnh Telegram.
-    wait_until_target_minute()
+    # GAS Time-Driven Trigger dispatch workflow đúng giờ → không cần chờ thêm
+    print(f"[{myanmar_now()}] 🚀 Bắt đầu relay (dispatched by GAS Trigger)")
 
     # ── 2. Kết nối Telegram ───────────────────────────────────────
     from telethon.sessions import StringSession

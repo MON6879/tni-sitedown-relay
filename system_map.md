@@ -11,9 +11,11 @@
 
 ---
 
-### 🏛️ 0. PHÂN ĐỊNH TRÁCH NHIỆM: GITHUB ACTIONS vs GOOGLE APPS SCRIPT (GAS)
+### 🏛️ 0. PHÂN ĐỊNH TRÁCH NHIỆM: GAS ƯU TIÊN HOÀN TOÀN → GITHUB ACTIONS DỰ PHÒNG
 
-> ⚡ **NGUYÊN TẮC CỐT LÕI**: GAS chịu trách nhiệm các tác vụ nội bộ bảng tính / Cloud Webhook; GITHUB ACTIONS chịu trách nhiệm chạy các kịch bản Python tự động, Telethon User Session và điều phối Đoàn tàu 5 phút.
+> ⚡ **NGUYÊN TẮC CỐT LÕI (v588)**: **ƯU TIÊN GAS HOÀN TOÀN** cho mọi tác vụ có thể xử lý bằng `UrlFetchApp.fetch()`. CHỈ dùng GitHub Actions khi BẮT BUỘC cần Telethon User Account hoặc thư viện Python đặc thù mà GAS không hỗ trợ.
+
+> 🕐 **NGUYÊN TẮC HẸN GIỜ (v588)**: GAS Time-Driven Trigger là bộ hẹn giờ CHÍNH cho toàn hệ thống (không bao giờ tự chết). GitHub cron chỉ là backup. GAS dispatch GitHub workflow qua API = giống bấm nút "Run Workflow" tự động.
 
 | Phân hệ | Thành phần đảm nhiệm | File / Script thực thi | Nơi chạy & Trigger | Nhiệm vụ chính |
 |---|---|---|---|---|
@@ -21,12 +23,13 @@
 | 🟢 **GAS NATIVE** | **Construction Bot 10** | `13_TNI_CONSTRUCTION.gs` | Google Cloud (Webhook Telegram) | Nhận báo cáo thi công, tải ảnh vào Google Drive, chèn dòng 3 |
 | 🟢 **GAS NATIVE** | **Báo cáo Chiều 17:30** | `auto_send_17h30.gs` / `telegram_report_bot.gs` | Google Cloud (Trigger 17:30 MMT) | Gửi báo cáo tiến độ công việc cho Leader & Manager qua Bot API |
 | 🟢 **GAS NATIVE** | **Sheet Backend API** | `apps_script_collector.gs`, `site_down_v2.gs` | Google Cloud (Web App Endpoint) | Ghi nhận dữ liệu vào Google Sheets (luôn chèn dòng 2) |
-| 🔵 **GITHUB ACTIONS** | **Toa 0 Keepalive** | `train_5min.yml` | GitHub (`MON6879` — mỗi 5 phút) | Sưởi ấm Vercel API & khóa khôi phục `setWebhook` 6 Bot |
+| 🟢 **GAS SCHEDULER** | **GitHub Dispatch Trigger** | `14_GITHUB_DISPATCH.gs` | Google Cloud (Trigger 5 phút + 30 phút) | **Hẹn giờ CHÍNH** — dispatch `train_5min.yml` (5p) + `botlookup_relay.yml` (30p) thay thế GitHub cron (hay tự chết) |
+| 🔵 **GITHUB ACTIONS** | **Toa 0 Keepalive** | `train_5min.yml` | GitHub (`MON6879` — **GAS dispatch** mỗi 5 phút) | Sưởi ấm Vercel API & khóa khôi phục `setWebhook` 6 Bot |
 | 🔵 **GITHUB ACTIONS** | **Reports 1, 2, 3, 4 + BOD** | `cron_send.py`, `daily_bod_assign.py` | GitHub (`MON6879` — 05:48 & 15:48 MMT) | Báo cáo công việc hàng ngày 4 Team & BOD Assign (Dung sai ±4p) |
 | 🔵 **GITHUB ACTIONS** | **Report 5A, 5B, 5C (Plan)** | `daily_plan_report.py` | GitHub (`MON6879` — theo lịch 7 mốc) | Báo cáo Kế hoạch Ngày/EOD/Update (Dung sai ±4p) |
 | 🔵 **GITHUB ACTIONS** | **Report 6 (Read Status)** | `daily_read_report.py` | GitHub (`MON6879` — 08:48, 14:58, 17:18, 19:41) | Báo cáo xác nhận đọc Note qua Telethon (Dung sai ±4p) |
 | 🔵 **GITHUB ACTIONS** | **Cable & Refuel Reports** | `cable_report.py`, `refuel_plan_report.py` | GitHub (`MON6879` — theo lịch) | Báo cáo Cáp đứt và Kế hoạch cấp dầu máy phát |
-| 🔵 **GITHUB ACTIONS** | **Site Down Relay Độc lập** | `botlookup_relay.yml` / `botlookup_relay.py` | GitHub (`MON6879` — cron `3,33 * * * *` UTC) | Cào dữ liệu trạm sập NOC Pro bằng Telethon lúc :06 & :36 MMT |
+| 🔵 **GITHUB ACTIONS** | **Site Down Relay Độc lập** | `botlookup_relay.yml` / `botlookup_relay.py` | GitHub (`MON6879` — **GAS dispatch** mỗi 30 phút) | Cào dữ liệu trạm sập NOC Pro bằng Telethon |
 
 ---
 
@@ -226,6 +229,15 @@ AI phai tuan thu TUYET DOI - khong co ngoai le:
 ---
 
 ## 📅 CHANGELOG
+
+### 15/08/2026 — v588: GAS Dispatch thay thế GitHub Cron (Fix dứt điểm Relay đứng)
+| File | Thay đổi | Lý do |
+|---|---|---|
+| `14_GITHUB_DISPATCH.gs` **(NEW)** | GAS Time-Driven Trigger dispatch `train_5min.yml` (5p) + `botlookup_relay.yml` (30p) qua GitHub API | GitHub cron tự chết định kỳ → GAS trigger không bao giờ chết, = giống bấm "Run Workflow" tự động |
+| `botlookup_relay.py` | Xóa `wait_until_target_minute()` (không cần sleep chờ giờ nữa) | GAS dispatch đúng giờ, không cần script tự canh |
+| `botlookup_relay.yml` | Ghi chú cron là BACKUP ONLY, giảm timeout về 4p | GAS là trigger chính, cron chỉ dự phòng |
+| `system_map.md` Section 0 | Cập nhật nguyên tắc: **GAS ƯU TIÊN HOÀN TOÀN → GitHub DỰ PHÒNG** | Quy tắc kiến trúc mới: ưu tiên GAS cho mọi tác vụ có thể |
+| `api/search_bot.py` (v587) | Thêm `msg_id` dedup cho Daily Plan → GAS server-side check, skip duplicate confirmation | Fix bot gửi "Plan saved" 2 lần do Vercel serverless multi-instance |
 
 ### 14/08/2026 — v576: Session Lock Alert
 | File | Thay đổi | Lý do |
