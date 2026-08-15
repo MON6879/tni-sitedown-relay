@@ -17,6 +17,33 @@
 
 > 🕐 **NGUYÊN TẮC HẸN GIỜ (v588)**: GAS Time-Driven Trigger là bộ hẹn giờ CHÍNH cho toàn hệ thống (không bao giờ tự chết). GitHub cron chỉ là backup. GAS dispatch GitHub workflow qua API = giống bấm nút "Run Workflow" tự động.
 
+---
+
+### 🛡️ 0.1. NGUYÊN TẮC CỐT LÕI: KIẾN TRÚC 5 TRỤ CỘT BẤT KHẢ XÂM PHẠM (ZERO-FAILURE ARCHITECTURE - v595)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (ZERO BUG POLICY)**: TUYỆT ĐỐI KHÔNG ĐƯỢC CÀI ĐẶT CODE CÓ KHẢ NĂNG GÂY NGHẼN, TỰ HỦY RUNNER HAY SẬP CHUỖI LIÊN HOÀN. MỌI COMPONENT BẮT BUỘC PHẢI TUÂN THỦ 5 TRỤ CỘT DƯỚI ĐÂY:
+
+1. **Cửa Sổ Kháng Trễ Động (Sliding Window Timing)**:
+   - Tuyệt đối không cài đặt logic hủy chạy (Abort) cứng nhắc khi GitHub Actions bị trễ 1-2 phút.
+   - Nếu runner khởi động sớm (:00-:05 hoặc :21-:35 MMT) $\rightarrow$ Sleep chính xác đến :06:00 hoặc :36:00 MMT rồi phát lệnh.
+   - Nếu runner khởi động trễ do GitHub queue delay (:06-:20 hoặc :36-:50 MMT) $\rightarrow$ **CHẠY NGAY LẬP TỨC VỚI 0s DELAY, TUYỆT ĐỐI KHÔNG HỦY BỎ!**
+
+2. **Quét Lịch Sử Duy Nhất 1 Lần (Single-Pass In-Memory Scanning)**:
+   - Tuyệt đối không chạy hàng chục vòng lặp `iter_messages()` tuần tự qua mạng gây nghẽn 140s và chạm Telegram FloodWait.
+   - Mỗi nhóm Telegram chỉ quét đúng **1 lần duy nhất** (lấy 50-100 tin gần nhất) và so khớp toàn bộ danh sách tiêu đề trong bộ nhớ RAM (< 3s).
+
+3. **Cô Lập Lỗi Độc Lập (Zero Cascading Failure)**:
+   - Tuyệt đối không chạy chuỗi liên hoàn `A && B && C` làm chết cả chuỗi khi 1 báo cáo gặp độ trễ từ Google Sheets.
+   - Mọi script độc lập phải được bọc cô lập lỗi (`python script.py || true`) để các báo cáo 1, 2, 3, 4, 5 và BOD luôn luôn được gửi 100%.
+
+4. **Khóa Độc Quyền Phiên Telethon (Concurrency Locking)**:
+   - Cài đặt `concurrency: group: ...` trên GitHub Actions để các tác vụ Telethon không bao giờ tranh chấp hay đè phiên làm Telegram khóa session.
+   - Ưu tiên tối đa Bot API cho việc gửi tin, chỉ dùng Telethon khi cào dữ liệu đặc thù.
+
+5. **Kênh Kép Song Hành (GAS Direct First, GitHub Actions Second)**:
+   - Mọi bản tin có thể gửi bằng Google Apps Script (`UrlFetchApp.fetch()`) bắt buộc ưu tiên gửi trực tiếp từ GAS Cloud.
+   - GitHub Actions đóng vai trò dự phòng và xử lý Telethon.
+
 | Phân hệ | Thành phần đảm nhiệm | File / Script thực thi | Nơi chạy & Trigger | Nhiệm vụ chính |
 |---|---|---|---|---|
 | 🟢 **GAS NATIVE** | **Auto Copy & Delete** | `auto_copy_processor.gs` | Google Cloud (Trigger 15 phút) | Đồng bộ 27 rule tự động giữa các Google Sheets |
