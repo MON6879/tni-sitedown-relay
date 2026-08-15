@@ -5882,8 +5882,7 @@ Team04>> 2Box</td>
               <tr>
                 <th style="width:40px;">#</th>
                 <th style="text-align:left !important;">Authorized Gmail Address</th>
-                <th style="text-align:left !important;">Full Name / Role Description</th>
-                <th>Assigned Permission</th>
+                <th style="text-align:left !important;">Assigned Tab Permissions (Các Thẻ Được Phép Xem)</th>
                 <th>Status</th>
                 <th>Date Added</th>
                 <th style="width:100px;">Actions</th>
@@ -6209,40 +6208,67 @@ Team04>> 2Box</td>
     </div>
   </div>
 
-  <!-- ADD AUTHORIZED GMAIL MODAL -->
+  <!-- ADD AUTHORIZED GMAIL MODAL (CHECKBOX MULTI-SELECT) -->
   <div id="gmailModal" class="modal-backdrop">
-    <div class="modal-box" style="max-width: 580px;">
-      <div class="modal-header">
+    <div class="modal-box" style="max-width: 560px; background:#0F172A; border:1px solid rgba(56, 189, 248, 0.3); border-radius:20px; padding:1.5rem;">
+      <div class="modal-header" style="margin-bottom:1.2rem;">
         <div>
-          <h3 style="color:var(--cyan); font-weight:800; font-size:1.25rem;"><i class="fa-solid fa-user-lock"></i> Add Authorized Gmail Account</h3>
-          <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0.2rem;">Phân quyền truy cập tài khoản Gmail theo Thẻ (Executive / Dept / BOD Assign)</p>
+          <h3 style="color:var(--cyan); font-weight:800; font-size:1.25rem;"><i class="fa-solid fa-user-shield"></i> Phân Quyền Tài Khoản Gmail</h3>
+          <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0.2rem;">Nhập Gmail &amp; tích chọn các Thẻ được phép truy cập trên hệ thống BI</p>
         </div>
         <button class="close-btn" onclick="closeAddGmailModal()">&times;</button>
       </div>
       
-      <div class="form-group">
-        <label><i class="fa-solid fa-envelope"></i> Authorized Gmail Address:</label>
-        <input type="email" id="newGmailInput" class="form-input" placeholder="e.g. user@mytel.com.mm or user@gmail.com" required />
+      <div class="form-group" style="margin-bottom:1.2rem;">
+        <label style="display:block; font-weight:700; color:#F8FAFC; margin-bottom:0.4rem; font-size:0.88rem;">
+          <i class="fa-solid fa-envelope" style="color:var(--cyan);"></i> Địa chỉ Gmail (Authorized Gmail):
+        </label>
+        <input type="email" id="newGmailInput" class="form-input" placeholder="e.g. htoolaynyaw@gmail.com hoặc user@mytel.com.mm" style="width:100%; background:#1E293B; border:1px solid rgba(255,255,255,0.2); border-radius:10px; padding:0.6rem 0.9rem; color:#fff; font-size:0.95rem;" required />
       </div>
 
       <div class="form-group">
-        <label><i class="fa-solid fa-id-card"></i> User Name & Role Description:</label>
-        <input type="text" id="newNameInput" class="form-input" placeholder="e.g. U Thura Aung (BOD Executive Assistant)" required />
-      </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+          <label style="font-weight:700; color:#F8FAFC; font-size:0.88rem;">
+            <i class="fa-solid fa-square-check" style="color:var(--emerald);"></i> Tích chọn các Thẻ được phép xem (Permissions):
+          </label>
+          <button type="button" class="filter-btn" style="padding:0.25rem 0.7rem; font-size:0.75rem; background:rgba(56, 189, 248, 0.15); color:var(--cyan); border:1px solid rgba(56, 189, 248, 0.3); border-radius:6px; cursor:pointer;" onclick="toggleSelectAllPermissions()">
+            <span id="selectAllBtnText">Chọn Tất Cả</span>
+          </button>
+        </div>
 
-      <div class="form-group">
-        <label><i class="fa-solid fa-shield-halved"></i> Assigned Tab Access Permission (Phân Quyền Xem Thẻ):</label>
-        <select id="newRoleSelect" class="form-input" style="background:#1E293B; cursor:pointer;">
-          <option value="FULL">🌟 Full Access (Xem Tất Cả Các Thẻ)</option>
-          <option value="BOD">👑 BOD Assign Only (Chỉ xem Thẻ BOD Assign)</option>
-          <option value="DEPT">🏢 Department Assign Only (Chỉ xem Thẻ Phòng Dep)</option>
-          <option value="EXEC">📊 Executive Summary Only (Chỉ xem Thẻ Báo Cáo Tổng Quan)</option>
-        </select>
+        <div style="display:grid; grid-template-columns:1fr; gap:0.55rem; background:#1E293B; border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:0.9rem;">
+          <label style="display:flex; align-items:center; gap:0.65rem; color:#fff; font-size:0.88rem; cursor:pointer; padding:0.35rem 0.5rem; border-radius:8px; background:rgba(255,255,255,0.03);">
+            <input type="checkbox" id="perm_exec" class="perm-checkbox" value="EXEC" checked style="width:18px; height:18px; accent-color:var(--cyan); cursor:pointer;" />
+            <span>📊 <b>Executive Summary</b> (Báo Cáo Tổng Quan &amp; AI Audio)</span>
+          </label>
+
+          <label style="display:flex; align-items:center; gap:0.65rem; color:#fff; font-size:0.88rem; cursor:pointer; padding:0.35rem 0.5rem; border-radius:8px; background:rgba(255,255,255,0.03);">
+            <input type="checkbox" id="perm_dept" class="perm-checkbox" value="DEPT" checked style="width:18px; height:18px; accent-color:var(--cyan); cursor:pointer;" />
+            <span>🏢 <b>Department Assign</b> (Giao Việc Phòng Ban TNI)</span>
+          </label>
+
+          <label style="display:flex; align-items:center; gap:0.65rem; color:#fff; font-size:0.88rem; cursor:pointer; padding:0.35rem 0.5rem; border-radius:8px; background:rgba(255,255,255,0.03);">
+            <input type="checkbox" id="perm_wo" class="perm-checkbox" value="WO" checked style="width:18px; height:18px; accent-color:var(--cyan); cursor:pointer;" />
+            <span>📋 <b>WO Detail</b> (Chi Tiết 9 Bảng Work Orders &amp; Kỹ Sư)</span>
+          </label>
+
+          <label style="display:flex; align-items:center; gap:0.65rem; color:#fff; font-size:0.88rem; cursor:pointer; padding:0.35rem 0.5rem; border-radius:8px; background:rgba(255,255,255,0.03);">
+            <input type="checkbox" id="perm_bod" class="perm-checkbox" value="BOD" checked style="width:18px; height:18px; accent-color:var(--cyan); cursor:pointer;" />
+            <span>👑 <b>BOD Assign</b> (Chỉ Đạo &amp; Giao Việc Ban Giám Đốc)</span>
+          </label>
+
+          <label style="display:flex; align-items:center; gap:0.65rem; color:#fff; font-size:0.88rem; cursor:pointer; padding:0.35rem 0.5rem; border-radius:8px; background:rgba(255,255,255,0.03);">
+            <input type="checkbox" id="perm_auth" class="perm-checkbox" value="AUTH" style="width:18px; height:18px; accent-color:var(--cyan); cursor:pointer;" />
+            <span>🔒 <b>Gmail Access List</b> (Quản Lý Phân Quyền Hệ Thống)</span>
+          </label>
+        </div>
       </div>
 
       <div style="display:flex; justify-content:flex-end; gap:0.8rem; margin-top:1.5rem;">
-        <button class="filter-btn" style="background:rgba(255,255,255,0.08);" onclick="closeAddGmailModal()">Cancel</button>
-        <button class="voice-btn" style="background:linear-gradient(135deg, var(--cyan), #059669);" onclick="submitAddGmail()"><i class="fa-solid fa-check"></i> Save & Grant Access</button>
+        <button type="button" class="filter-btn" style="background:rgba(255,255,255,0.08); padding:0.6rem 1.2rem; cursor:pointer;" onclick="closeAddGmailModal()">Hủy (Cancel)</button>
+        <button type="button" class="voice-btn" style="background:linear-gradient(135deg, var(--cyan), #059669); padding:0.6rem 1.4rem; font-weight:800; cursor:pointer;" onclick="submitAddGmail()">
+          <i class="fa-solid fa-check"></i> Lưu &amp; Phân Quyền
+        </button>
       </div>
     </div>
   </div>
@@ -6285,21 +6311,22 @@ Team04>> 2Box</td>
       document.getElementById('gmailModal').classList.remove('active');
     }
 
-    /* 🔐 GMAIL ACCESS CONTROL & ROLE-BASED PERMISSION PERSISTENCE */
+    /* 🔐 GMAIL ACCESS CONTROL & MULTI-PERMISSION PERSISTENCE */
     const DEFAULT_GMAIL_ACCOUNTS = [
-      { email: "phonghdpxd@gmail.com", name: "Hà Đức Phong (System Admin / Super Admin)", role: "FULL", date: "15/08/2026" },
-      { email: "bod.director@mytel.com.mm", name: "Branch Director (BOD Executive)", role: "BOD", date: "15/08/2026" },
-      { email: "tni.technical@gmail.com", name: "Technical Department Manager", role: "DEPT", date: "15/08/2026" },
-      { email: "tni.operations@mytel.com.mm", name: "Regional Operations Team Leader", role: "EXEC", date: "15/08/2026" },
-      { email: "team1.dawei@mytel.com.mm", name: "Paing Aung Soe (Team 1 Lead - Dawei)", role: "DEPT", date: "15/08/2026" },
-      { email: "team2.myeik@mytel.com.mm", name: "Nay Myo Thu (Team 2 Lead - Myeik)", role: "DEPT", date: "15/08/2026" },
-      { email: "team3.bokpyin@mytel.com.mm", name: "Pyae Phyo Zaw (Team 3 Lead - Bokpyin)", role: "DEPT", date: "15/08/2026" },
-      { email: "team4.kawthoung@mytel.com.mm", name: "Naing Myo Htun (Team 4 Lead - Kawthoung)", role: "DEPT", date: "15/08/2026" }
+      { email: "phonghdpxd@gmail.com", perms: ["EXEC", "DEPT", "WO", "BOD", "AUTH"], date: "15/08/2026" },
+      { email: "htoolaynyaw@gmail.com", perms: ["EXEC", "DEPT", "WO", "BOD", "AUTH"], date: "15/08/2026" },
+      { email: "bod.director@mytel.com.mm", perms: ["EXEC", "BOD"], date: "15/08/2026" },
+      { email: "tni.technical@gmail.com", perms: ["DEPT", "WO"], date: "15/08/2026" },
+      { email: "tni.operations@mytel.com.mm", perms: ["EXEC", "DEPT", "WO"], date: "15/08/2026" },
+      { email: "team1.dawei@mytel.com.mm", perms: ["DEPT", "WO"], date: "15/08/2026" },
+      { email: "team2.myeik@mytel.com.mm", perms: ["DEPT", "WO"], date: "15/08/2026" },
+      { email: "team3.bokpyin@mytel.com.mm", perms: ["DEPT", "WO"], date: "15/08/2026" },
+      { email: "team4.kawthoung@mytel.com.mm", perms: ["DEPT", "WO"], date: "15/08/2026" }
     ];
 
     function getStoredGmailAccounts() {
       try {
-        const stored = localStorage.getItem('tni_gmail_access_list');
+        const stored = localStorage.getItem('tni_gmail_access_list_v2');
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -6312,10 +6339,30 @@ Team04>> 2Box</td>
 
     function saveStoredGmailAccounts(accounts) {
       try {
-        localStorage.setItem('tni_gmail_access_list', JSON.stringify(accounts));
+        localStorage.setItem('tni_gmail_access_list_v2', JSON.stringify(accounts));
       } catch (e) {
         console.error('Error saving accounts', e);
       }
+    }
+
+    function renderPermBadges(perms) {
+      if (!perms || !perms.length) return '<span style="color:var(--rose);">❌ No Access</span>';
+      if (perms.length >= 5 || (perms.includes("EXEC") && perms.includes("DEPT") && perms.includes("WO") && perms.includes("BOD") && perms.includes("AUTH"))) {
+        return '<span class="team-tag tag-t2" style="font-weight:800; font-size:0.8rem;">🌟 Full Access (Tất Cả Các Thẻ)</span>';
+      }
+
+      const map = {
+        'EXEC': { label: '📊 Exec Summary', cls: 'tag-t4' },
+        'DEPT': { label: '🏢 Dept Assign', cls: 'tag-t3' },
+        'WO':   { label: '📋 WO Detail', cls: 'tag-t1' },
+        'BOD':  { label: '👑 BOD Assign', cls: 'tag-t1' },
+        'AUTH': { label: '🔒 Access Control', cls: 'tag-t2' }
+      };
+
+      return perms.map(p => {
+        const item = map[p] || { label: p, cls: 'tag-t1' };
+        return `<span class="team-tag ${item.cls}" style="margin:2px 3px; font-size:0.75rem; display:inline-block;">${item.label}</span>`;
+      }).join(' ');
     }
 
     function renderGmailList() {
@@ -6327,33 +6374,20 @@ Team04>> 2Box</td>
       let cFull = 0, cBod = 0, cDept = 0, cExec = 0;
 
       accounts.forEach((acc, idx) => {
-        let tagClass = 'tag-t2';
-        let roleLabel = '🌟 Full Access';
-        if (acc.role === 'BOD') {
-          tagClass = 'tag-t1';
-          roleLabel = '👑 BOD Assign Only';
-          cBod++;
-        } else if (acc.role === 'DEPT') {
-          tagClass = 'tag-t3';
-          roleLabel = '🏢 Dept Assign Only';
-          cDept++;
-        } else if (acc.role === 'EXEC') {
-          tagClass = 'tag-t4';
-          roleLabel = '📊 Executive Only';
-          cExec++;
-        } else {
-          cFull++;
-        }
+        const perms = Array.isArray(acc.perms) ? acc.perms : (acc.role ? [acc.role] : []);
+        if (perms.includes("AUTH") || perms.length >= 4) cFull++;
+        if (perms.includes("BOD")) cBod++;
+        if (perms.includes("DEPT") || perms.includes("WO")) cDept++;
+        if (perms.includes("EXEC")) cExec++;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${idx + 1}</td>
-          <td style="text-align:left !important;"><strong style="color:var(--cyan);">${acc.email}</strong></td>
-          <td style="text-align:left !important; font-weight:600;">${acc.name}</td>
-          <td><span class="team-tag ${tagClass}">${roleLabel}</span></td>
+          <td style="text-align:left !important;"><strong style="color:var(--cyan); font-size:0.92rem;">${acc.email}</strong></td>
+          <td style="text-align:left !important;">${renderPermBadges(perms)}</td>
           <td><span class="status-pill-check sp-verified">✓ Active Authorized</span></td>
           <td style="font-size:0.8rem; color:var(--text-sub);">${acc.date || '15/08/2026'}</td>
-          <td><button class="filter-btn" style="color:var(--rose); padding:0.25rem 0.6rem; font-size:0.75rem;" onclick="removeGmailIndex(${idx})"><i class="fa-solid fa-trash"></i> Remove</button></td>
+          <td><button class="filter-btn" style="color:var(--rose); padding:0.25rem 0.6rem; font-size:0.75rem; cursor:pointer;" onclick="removeGmailIndex(${idx})"><i class="fa-solid fa-trash"></i> Remove</button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -6364,23 +6398,45 @@ Team04>> 2Box</td>
       if (document.getElementById('count-exec-access')) document.getElementById('count-exec-access').textContent = `${cExec} Account${cExec !== 1 ? 's' : ''}`;
     }
 
+    let allChecked = true;
+    function toggleSelectAllPermissions() {
+      const checkboxes = document.querySelectorAll('.perm-checkbox');
+      allChecked = !allChecked;
+      checkboxes.forEach(cb => cb.checked = allChecked);
+      const btnText = document.getElementById('selectAllBtnText');
+      if (btnText) btnText.textContent = allChecked ? "Bỏ Chọn Tất Cả" : "Chọn Tất Cả";
+    }
+
     function submitAddGmail() {
       const email = document.getElementById('newGmailInput').value.trim();
-      const name = document.getElementById('newNameInput').value.trim();
-      const roleVal = document.getElementById('newRoleSelect').value;
-      if (!email || !name) {
-        alert('Vui lòng nhập đầy đủ Email và Tên người dùng!');
+      if (!email) {
+        alert('Vui lòng nhập Địa chỉ Gmail!');
+        document.getElementById('newGmailInput').focus();
         return;
       }
 
+      const checkedBoxes = Array.from(document.querySelectorAll('.perm-checkbox:checked'));
+      if (checkedBoxes.length === 0) {
+        alert('Vui lòng tích chọn ít nhất 1 Thẻ được phép truy cập!');
+        return;
+      }
+
+      const perms = checkedBoxes.map(cb => cb.value);
       const accounts = getStoredGmailAccounts();
       const today = new Date().toLocaleDateString('vi-VN');
-      accounts.push({ email, name, role: roleVal, date: today });
+
+      const existingIdx = accounts.findIndex(a => a.email.toLowerCase() === email.toLowerCase());
+      if (existingIdx >= 0) {
+        accounts[existingIdx].perms = perms;
+        accounts[existingIdx].date = today;
+      } else {
+        accounts.unshift({ email, perms, date: today });
+      }
+
       saveStoredGmailAccounts(accounts);
       renderGmailList();
 
       document.getElementById('newGmailInput').value = '';
-      document.getElementById('newNameInput').value = '';
       closeAddGmailModal();
     }
 
@@ -6411,7 +6467,6 @@ Team04>> 2Box</td>
       });
     }
 
-    // Auto-init on page load
     document.addEventListener('DOMContentLoaded', () => {
       renderGmailList();
     });
