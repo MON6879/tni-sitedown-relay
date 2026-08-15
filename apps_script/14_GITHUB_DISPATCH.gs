@@ -1,6 +1,5 @@
 var DISPATCH_REPO = "MON6879/tni-sitedown-relay";
 var DISPATCH_API_BASE = "https://api.github.com/repos/" + DISPATCH_REPO + "/actions/workflows/";
-var BACKUP_GITHUB_PAT = "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";
 
 /**
  * Trigger chạy mỗi 5 phút bởi GAS
@@ -43,8 +42,7 @@ function _dispatchGH(workflowFile, label, inputs) {
     props.getProperty("GITHUB_PAT") ||
     props.getProperty("GITHUB_TOKEN") ||
     props.getProperty("GH_PAT") ||
-    props.getProperty("GH_TOKEN") ||
-    BACKUP_GITHUB_PAT
+    props.getProperty("GH_TOKEN") || ""
   ).trim();
 
   if (!token) {
