@@ -1072,7 +1072,9 @@ def lookup_clear_site(tni: str) -> str:
         if col_idx < 0:
             return f"❌ Not found <b>{html.escape(tni_u)}</b> in Clear Site sheet."
 
-        lines = [f"🔍 <b>Clear History for {html.escape(tni_u)}</b>", "━━━━━━━━━━━━━━━━━━━━"]
+        header_lines = [f"🔍 <b>Clear History for {html.escape(tni_u)}</b>", "━━━━━━━━━━━━━━━━━━━━"]
+        history_lines = []
+
         for r in range(len(df)):
             row = df.iloc[r]
             val = safe(row, col_idx)
@@ -1080,9 +1082,32 @@ def lookup_clear_site(tni: str) -> str:
 
             if not val or val.lower() in ("nan", "-", ""):
                 continue
+
+            # Bỏ qua ô chứa chính mã trạm trong bảng
+            if val.upper() == tni_u:
+                if label and label.lower() != "nan":
+                    header_lines.append(f"• <b>Status:</b> {html.escape(label)}")
+                continue
+
             if label and label.lower() != "nan":
-                lines.append(f"• <b>{html.escape(label)}:</b> {html.escape(val)}")
-        return "\n".join(lines)
+                header_lines.append(f"• <b>{html.escape(label)}:</b> {html.escape(val)}")
+            else:
+                history_lines.append(f"• {html.escape(val)}")
+
+        result_parts = list(header_lines)
+        if history_lines:
+            result_parts.append("\n<b>📜 History Records:</b>")
+            cur_len = sum(len(x) for x in result_parts)
+            for h_line in history_lines:
+                if cur_len + len(h_line) + 2 > 3800:
+                    result_parts.append("• <i>... (more older records truncated)</i>")
+                    break
+                result_parts.append(h_line)
+                cur_len += len(h_line) + 1
+        else:
+            result_parts.append("• <i>No history records found</i>")
+
+        return "\n".join(result_parts)
     except Exception as e:
         logger.error(f"lookup_clear_site error [{tni_u}]: {e}")
         return f"❌ Error loading clear site data: {html.escape(str(e)[:80])}"
