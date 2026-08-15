@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // daily_report_trigger.gs
 // Trigger GitHub Actions "Reports 1,2,3,4" dung gio Myanmar
 // Flow: GAS Timer (16:00 Myanmar) → GitHub API workflow_dispatch
@@ -13,10 +13,10 @@
 //   3. Chay ham setupDailyReportTrigger() 1 lan (se tu dong tao trigger)
 // ============================================================
 
-const GH_REPO    = 'phonghdpxd-cmd/tni-bot';
-const GH_WF_FILE = 'daily_reports.yml';
-const GH_BRANCH  = 'main';
-const GH_REPORT  = 'Reports 1, 2, 3, 4 - Daily Task & Backlog';
+const DRT_GH_REPO    = 'phonghdpxd-cmd/tni-bot';
+const DRT_GH_WF_FILE = 'daily_reports.yml';
+const DRT_GH_BRANCH  = 'main';
+const DRT_GH_REPORT  = 'Reports 1, 2, 3, 4 - Daily Task & Backlog';
 
 
 
@@ -49,7 +49,7 @@ function triggerDailyReport_() {
 
   for (let i = 0; i < wfFiles.length; i++) {
     const wfFile = wfFiles[i];
-    const url = `https://api.github.com/repos/${GH_REPO}/actions/workflows/${wfFile}/dispatches`;
+    const url = `https://api.github.com/repos/${DRT_GH_REPO}/actions/workflows/${wfFile}/dispatches`;
 
     const options = {
       method: 'POST',
@@ -60,9 +60,9 @@ function triggerDailyReport_() {
       },
       contentType: 'application/json',
       payload: JSON.stringify({
-        ref: GH_BRANCH,
+        ref: DRT_GH_BRANCH,
         inputs: {
-          report_type: GH_REPORT,
+          report_type: DRT_GH_REPORT,
           skip_delay: '1',
         },
       }),
@@ -75,7 +75,7 @@ function triggerDailyReport_() {
       const now  = Utilities.formatDate(new Date(), 'Asia/Yangon', 'dd/MM/yyyy HH:mm');
       
       if (code === 204) {
-        Logger.log(`✅ [${now}] Trigger ${wfFile} (${GH_REPORT}) thanh cong!`);
+        Logger.log(`✅ [${now}] Trigger ${wfFile} (${DRT_GH_REPORT}) thanh cong!`);
         triggered = true;
         break;
       } else {
@@ -180,7 +180,7 @@ function handleWebhookRequest_(e) {
     success = triggerDailyReport_();
     runMessage = `[${nowStr}] Trigger Reports 1, 2, 3, 4 dispatch sent to GitHub Actions!`;
   } else if (action === 'trigger_report') {
-    const targetType = reportType || GH_REPORT;
+    const targetType = reportType || DRT_GH_REPORT;
     if (typeof triggerDailyWorkflow === 'function') {
       success = triggerDailyWorkflow(targetType);
       runMessage = `[${nowStr}] Trigger report "${targetType}" dispatched to GitHub Actions!`;
@@ -210,4 +210,6 @@ function testTriggerNow() {
   Logger.log('🧪 Test trigger ngay...');
   triggerDailyReport_();
 }
+
+
 
