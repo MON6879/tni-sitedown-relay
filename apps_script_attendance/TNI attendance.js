@@ -110,8 +110,18 @@ function doPost(e) {
       const textL = rawText.toLowerCase();
 
       // 1. Tra cứu Attendance & Leave Templates
-      if (textL.indexOf("template") !== -1 || textL.indexOf("attendance") === 0 || textL.indexOf("/attendance") === 0 || textL.indexOf("leave") === 0 || textL.indexOf("/leave") === 0) {
-        const tplReply = handleAttendanceTemplateQuery_(ssId, rawText);
+      const cleanCmd = textL.split("@")[0].trim();
+      if (cleanCmd.indexOf("template") !== -1 ||
+          cleanCmd.indexOf("attendance") !== -1 ||
+          cleanCmd.indexOf("/attendance") === 0 ||
+          cleanCmd.indexOf("/leave") === 0 ||
+          cleanCmd.indexOf("leave") === 0 ||
+          cleanCmd.indexOf("/header") === 0 ||
+          cleanCmd.indexOf("header") === 0 ||
+          cleanCmd.indexOf("/team") === 0 ||
+          cleanCmd.indexOf("/t1") === 0 || cleanCmd.indexOf("/t2") === 0 ||
+          cleanCmd.indexOf("/t3") === 0 || cleanCmd.indexOf("/t4") === 0) {
+        const tplReply = handleAttendanceTemplateQuery_(ssId, cleanCmd);
         if (tplReply) {
           sendTelegramMessage_(token, chatId, tplReply);
           return ContentService.createTextOutput("Template sent");
@@ -1089,4 +1099,35 @@ function processAttendanceReportText_(ssId, text, defaultTgId) {
     return 0;
   }
 }
+
+function setupAttendanceBotCommands() {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
+  const commands = [
+    { command: "attendance",     description: "Daily Attendance report template (Team 1-4)" },
+    { command: "template_team1", description: "Team 1 Attendance template" },
+    { command: "template_team2", description: "Team 2 Attendance template" },
+    { command: "template_team3", description: "Team 3 Attendance template" },
+    { command: "template_team4", description: "Team 4 Attendance template" },
+    { command: "leave",          description: "Leave / Take leave template (Full/Half day)" },
+    { command: "header",         description: "Header-only attendance template" }
+  ];
+  
+  const urlDefault = "https://api.telegram.org/bot" + token + "/setMyCommands";
+  UrlFetchApp.fetch(urlDefault, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({ commands: commands })
+  });
+
+  const urlGroups = "https://api.telegram.org/bot" + token + "/setMyCommands";
+  UrlFetchApp.fetch(urlGroups, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({ commands: commands, scope: { type: "all_group_chats" } })
+  });
+  
+  Logger.log("✅ Attendance bot commands registered successfully.");
+}
+
 
