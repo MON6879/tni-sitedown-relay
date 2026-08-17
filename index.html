@@ -1,4 +1,4 @@
-<!-- TNI Operations BI Portal v346 - Plan Week Tab + 8 BI Architecture Pillars -->
+<!-- TNI Operations BI Portal v347 - Plan - Result Dep Tab + 8 BI Architecture Pillars -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -517,7 +517,7 @@
         <i class="fa-solid fa-user-shield"></i> BOD Assign
       </button>
       <button class="nav-tab" onclick="showTab('plan-week-panel', this)">
-        <i class="fa-solid fa-calendar-week"></i> Plan Week
+        <i class="fa-solid fa-calendar-week"></i> Plan - Result Dep
       </button>
       <button class="nav-tab" onclick="showTab('access-control-panel', this)">
         <i class="fa-solid fa-lock"></i> Gmail Access List
@@ -5947,12 +5947,12 @@ Team04>> 2Box</td>
       </div>
     </div>
 
-    <!-- 6. PLAN WEEK TAB PANEL — Following 8 BI Architecture Pillars -->
+    <!-- 6. PLAN - RESULT DEP TAB PANEL — Following 8 BI Architecture Pillars -->
     <div id="plan-week-panel" class="tab-panel">
       <!-- Header with Week Number -->
       <div class="section-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
         <div>
-          <span><i class="fa-solid fa-calendar-week"></i> <span id="pdep-week-title">Department Plan — Week Loading...</span></span>
+          <span><i class="fa-solid fa-calendar-week"></i> <span id="pdep-week-title">Plan - Result Dep — Week Loading...</span></span>
           <div style="font-size:0.78rem; color:#38BDF8; font-weight:700; margin-top:0.2rem;" id="pdep-week-range">
             <i class="fa-solid fa-clock"></i> Loading date range...
           </div>
@@ -5970,7 +5970,7 @@ Team04>> 2Box</td>
       <!-- Active Plan Table -->
       <div class="card" id="pdep-plan-card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
-          <h3 style="color:#fff; font-size:1.05rem; font-weight:700;"><i class="fa-solid fa-list-check" style="color:var(--cyan);"></i> Active Department Plans <span id="pdep-count" style="color:var(--cyan); font-size:0.85rem;">(0)</span></h3>
+          <h3 style="color:#fff; font-size:1.05rem; font-weight:700;"><i class="fa-solid fa-list-check" style="color:var(--cyan);"></i> Plan - Result Dep <span id="pdep-count" style="color:var(--cyan); font-size:0.85rem;">(0)</span></h3>
           <div style="font-size:0.72rem; color:var(--text-sub);" id="pdep-sync-time">Last sync: —</div>
         </div>
         <div style="max-height: 500px; overflow-y: auto; overflow-x: auto;">
@@ -6028,7 +6028,7 @@ Team04>> 2Box</td>
       <div class="modal-box" style="max-width: 620px; background:#0F172A; border:1px solid rgba(16,185,129,0.35); border-radius:20px; padding:1.6rem; box-shadow:0 25px 50px -12px rgba(0,0,0,0.85);">
         <div class="modal-header" style="margin-bottom:1.2rem;">
           <div>
-            <h3 style="color:var(--emerald); font-weight:800; font-size:1.3rem;"><i class="fa-solid fa-plus-circle"></i> Add New Department Plan</h3>
+            <h3 style="color:var(--emerald); font-weight:800; font-size:1.3rem;"><i class="fa-solid fa-plus-circle"></i> Add New Plan - Result Dep</h3>
             <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0.2rem;">Fill in task details. Columns E-F can be edited directly on the table.</p>
           </div>
           <button class="close-btn" onclick="PlanWeek.closeAddModal()">&times;</button>
@@ -6461,7 +6461,7 @@ Team04>> 2Box</td>
 
           <label style="display:flex; align-items:center; gap:0.65rem; color:#fff; font-size:0.88rem; cursor:pointer; padding:0.35rem 0.5rem; border-radius:8px; background:rgba(255,255,255,0.03);">
             <input type="checkbox" id="perm_plan" class="perm-checkbox" value="PLAN" checked style="width:18px; height:18px; accent-color:var(--cyan); cursor:pointer;" />
-            <span>📅 <b>Plan Week</b> (Kế Hoạch Phòng Ban Theo Tuần)</span>
+            <span>📅 <b>Plan - Result Dep</b> (Kế Hoạch &amp; Kết Quả Phòng Ban)</span>
           </label>
 
           <label style="display:flex; align-items:center; gap:0.65rem; color:#fff; font-size:0.88rem; cursor:pointer; padding:0.35rem 0.5rem; border-radius:8px; background:rgba(255,255,255,0.03);">
@@ -6563,7 +6563,7 @@ Team04>> 2Box</td>
         'DEPT': { label: '🏢 Dept Assign', cls: 'tag-t3' },
         'WO':   { label: '📋 WO Detail', cls: 'tag-t1' },
         'BOD':  { label: '👑 BOD Assign', cls: 'tag-t1' },
-        'PLAN': { label: '📅 Plan Week', cls: 'tag-t3' },
+        'PLAN': { label: '📅 Plan - Result Dep', cls: 'tag-t3' },
         'AUTH': { label: '🔒 Access Control', cls: 'tag-t2' }
       };
 
@@ -6994,7 +6994,7 @@ Team04>> 2Box</td>
           this.refreshTimer = setInterval(() => this.loadData(), 30000);
         } catch (err) {
           console.error('[PlanWeek] Init failed:', err);
-          this.renderError('Unable to initialize Plan Week. Please refresh the page.');
+          this.renderError('Unable to initialize Plan - Result Dep. Please refresh the page.');
         }
       },
 
@@ -7100,7 +7100,7 @@ Team04>> 2Box</td>
           this.weekRange = json.meta?.weekRange || '';
           
           const titleEl = document.getElementById('pdep-week-title');
-          if (titleEl) titleEl.textContent = 'Department Plan — Week ' + this.weekNumber;
+          if (titleEl) titleEl.textContent = 'Plan - Result Dep — Week ' + this.weekNumber;
           const rangeEl = document.getElementById('pdep-week-range');
           if (rangeEl) rangeEl.innerHTML = '<i class="fa-solid fa-clock"></i> ' + this.weekRange;
           
