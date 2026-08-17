@@ -516,7 +516,7 @@ function resetCopiedNotes(sheetId, sheetName, condColLetter) {
 
 function extractSsId_(link) {
   if (!link) return "";
-  const match = link.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  const match = link.match(/\/d\/([a-zA-Z0-9_-]+)/);
   return match ? match[1] : link;
 }
 

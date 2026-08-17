@@ -19,44 +19,60 @@
 
 ---
 
-### 🛡️ 0.1. NGUYÊN TẮC CỐT LÕI: KIẾN TRÚC 5 TRỤ CỘT BẤT KHẢ XÂM PHẠM (ZERO-FAILURE ARCHITECTURE - v595)
+### 🛡️ 0.1. NGUYÊN TẮC CỐT LÕI: KIẾN TRÚC 7 TRỤ CỘT BẤT KHẢ XÂM PHẠM (ZERO-FAILURE ARCHITECTURE - v599)
 
-> ⚠️ **QUY TẮC BẮT BUỘC (ZERO BUG POLICY)**: TUYỆT ĐỐI KHÔNG ĐƯỢC CÀI ĐẶT CODE CÓ KHẢ NĂNG GÂY NGHẼN, TỰ HỦY RUNNER HAY SẬP CHUỖI LIÊN HOÀN. MỌI COMPONENT BẮT BUỘC PHẢI TUÂN THỦ 5 TRỤ CỘT DƯỚI ĐÂY:
+> ⚠️ **QUY TẮC BẮT BUỘC (ZERO BUG POLICY)**: TUYỆT ĐỐI KHÔNG ĐƯỢC CÀI ĐẶT CODE CÓ KHẢ NĂNG GÂY NGHẼN, TỰ HỦY RUNNER HAY SẬP CHUỖI LIÊN HOÀN. MỌI COMPONENT BẮT BUỘC PHẢI TUÂN THỦ 7 TRỤ CỘT DƯỚI ĐÂY:
 
-1. **Cửa Sổ Kháng Trễ Động (Sliding Window Timing)**:
-   - Tuyệt đối không cài đặt logic hủy chạy (Abort) cứng nhắc khi GitHub Actions bị trễ 1-2 phút.
-   - Nếu runner khởi động sớm (:00-:05 hoặc :21-:35 MMT) $\rightarrow$ Sleep chính xác đến :06:00 hoặc :36:00 MMT rồi phát lệnh.
-   - Nếu runner khởi động trễ do GitHub queue delay (:06-:20 hoặc :36-:50 MMT) $\rightarrow$ **CHẠY NGAY LẬP TỨC VỚI 0s DELAY, TUYỆT ĐỐI KHÔNG HỦY BỎ!**
+1. **Cửa Sổ Kháng Trễ Chặt (Tight Sliding Window Timing)**:
+   - Cửa sổ chấp nhận trễ tối đa **±4 phút** (không phải ±14 phút như trước).
+   - Nhịp :06 MMT: Chấp nhận runner đến từ :00-:10. Nếu :11-:20 → sleep đến :36.
+   - Nhịp :36 MMT: Chấp nhận runner đến từ :21-:40. Nếu :41-:59 → sleep đến :06 giờ kế.
+   - **TUYỆT ĐỐI KHÔNG chạy ngay tại phút :20 hay :50** — phải sleep đến mốc chẵn tiếp theo!
 
 2. **Quét Lịch Sử Duy Nhất 1 Lần (Single-Pass In-Memory Scanning)**:
-   - Tuyệt đối không chạy hàng chục vòng lặp `iter_messages()` tuần tự qua mạng gây nghẽn 140s và chạm Telegram FloodWait.
-   - Mỗi nhóm Telegram chỉ quét đúng **1 lần duy nhất** (lấy 50-100 tin gần nhất) và so khớp toàn bộ danh sách tiêu đề trong bộ nhớ RAM (< 3s).
+   - Mỗi nhóm Telegram chỉ quét đúng **1 lần duy nhất** (lấy 50-100 tin gần nhất) và so khớp trong RAM (< 3s).
 
 3. **Cô Lập Lỗi Độc Lập (Zero Cascading Failure)**:
-   - Tuyệt đối không chạy chuỗi liên hoàn `A && B && C` làm chết cả chuỗi khi 1 báo cáo gặp độ trễ từ Google Sheets.
-   - Mọi script độc lập phải được bọc cô lập lỗi (`python script.py || true`) để các báo cáo 1, 2, 3, 4, 5 và BOD luôn luôn được gửi 100%.
+   - Mọi script độc lập phải được bọc cô lập lỗi (`python script.py || true`).
 
 4. **Khóa Độc Quyền Phiên Telethon (Concurrency Locking)**:
-   - Cài đặt `concurrency: group: ...` trên GitHub Actions để các tác vụ Telethon không bao giờ tranh chấp hay đè phiên làm Telegram khóa session.
-   - Ưu tiên tối đa Bot API cho việc gửi tin, chỉ dùng Telethon khi cào dữ liệu đặc thù.
+   - Cài đặt `concurrency: group: ...` trên GitHub Actions.
 
 5. **Kênh Kép Song Hành (GAS Direct First, GitHub Actions Second)**:
    - Mọi bản tin có thể gửi bằng Google Apps Script (`UrlFetchApp.fetch()`) bắt buộc ưu tiên gửi trực tiếp từ GAS Cloud.
-   - GitHub Actions đóng vai trò dự phòng và xử lý Telethon.
+
+6. **Cô Lập Biến Toàn Cục GAS (GAS Global Scope Isolation)** *(MỚI v598)*:
+   - Trong Google Apps Script, **tất cả file `.gs` trong cùng 1 dự án dùng chung Global Scope**.
+   - TUYỆT ĐỐI KHÔNG được khai báo trùng tên biến toàn cục (`var GH_REPO`, `const CONFIG_SS_ID`...) giữa các file trong cùng 1 dự án.
+   - Mỗi dự án GAS chỉ chứa các file LIÊN QUAN TRỰC TIẾP với nhau. Tách riêng chức năng vào đúng dự án theo bảng phân bổ bên dưới.
+   - **4 DỰ ÁN GAS CHUẨN (KHÔNG THÊM, KHÔNG BỚT)**:
+
+   | # | Tên Dự Án GAS | Script ID | Chức Năng | Các File `.gs` Bên Trong |
+   |---|---|---|---|---|
+   | 1 | 🌟 **TNI** | `1rvgWwrAMDbqtmqw...` | Bot 10 Thi công + Dispatch GitHub + Auto Copy | `13_TNI_CONSTRUCTION.gs`, `14_GITHUB_DISPATCH.gs`, `auto_copy_processor.gs` |
+   | 2 | 📡 **TNI Site Down Bot** | `1fgIR_frjlOHBt4o...` | Site Down Relay + Refuel GAS | `site_down_v2.gs`, `apps_script_refuel.gs` |
+   | 3 | 👤 **TNI Attendance Bot** | `166XawHNCvkXmo...` | Điểm danh nhân viên | `attendance.gs` |
+   | 4 | 💰 **TC** | `1QsNLLXKtxo3wK...` | Quản Lý Tài Chính (QLTC) | `QLTC.gs` |
+
+7. **Xử Lý Gia Tăng Chống Timeout (Incremental Processing)** *(MỚI v599)*:
+   - GAS có giới hạn **tối đa 6 phút** mỗi lần thực thi. TUYỆT ĐỐI KHÔNG viết script xử lý toàn bộ dữ liệu mỗi lần chạy.
+   - Phải dùng cơ chế **đánh dấu đã xử lý** (Note trên ô nguồn, cờ trạng thái, hoặc timestamp) để chỉ xử lý dòng MỚI.
+   - Phải có **cơ chế dừng an toàn** (`MAX_RUNTIME_MS = 300000`) — kiểm tra thời gian chạy và dừng trước 5 phút nếu chưa xong.
+   - **TUYỆT ĐỐI KHÔNG dùng `--force` trên `workflow_dispatch` tự động** — chỉ dùng `--force` khi người dùng bấm tay với input `force: true`.
 
 | Phân hệ | Thành phần đảm nhiệm | File / Script thực thi | Nơi chạy & Trigger | Nhiệm vụ chính |
 |---|---|---|---|---|
-| 🟢 **GAS NATIVE** | **Auto Copy & Delete** | `auto_copy_processor.gs` | Google Cloud (Trigger 15 phút) | Đồng bộ 27 rule tự động giữa các Google Sheets |
+| 🟢 **GAS NATIVE** | **Auto Copy & Delete** | `auto_copy_processor.gs` | Google Cloud (Trigger 15 phút) | Đồng bộ 27 rule tự động giữa các Google Sheets (chỉ copy dòng MỚI) |
 | 🟢 **GAS NATIVE** | **Construction Bot 10** | `13_TNI_CONSTRUCTION.gs` | Google Cloud (Webhook Telegram) | Nhận báo cáo thi công, tải ảnh vào Google Drive, chèn dòng 3 |
 | 🟢 **GAS NATIVE** | **Báo cáo Chiều 17:30** | `auto_send_17h30.gs` / `telegram_report_bot.gs` | Google Cloud (Trigger 17:30 MMT) | Gửi báo cáo tiến độ công việc cho Leader & Manager qua Bot API |
 | 🟢 **GAS NATIVE** | **Sheet Backend API** | `apps_script_collector.gs`, `site_down_v2.gs` | Google Cloud (Web App Endpoint) | Ghi nhận dữ liệu vào Google Sheets (luôn chèn dòng 2) |
-| 🟢 **GAS SCHEDULER** | **GitHub Dispatch Trigger** | `14_GITHUB_DISPATCH.gs` | Google Cloud (Trigger 5 phút + 30 phút) | **Hẹn giờ CHÍNH** — dispatch `train_5min.yml` (5p) + `botlookup_relay.yml` (30p) thay thế GitHub cron (hay tự chết) |
+| 🟢 **GAS SCHEDULER** | **GitHub Dispatch Trigger** | `14_GITHUB_DISPATCH.gs` | Google Cloud (Trigger 5 phút) | **Hẹn giờ CHÍNH** — dispatch `train_5min.yml` (5p) + `botlookup_relay.yml` (chỉ trong cửa sổ :03-:05/:33-:35 MMT) |
 | 🔵 **GITHUB ACTIONS** | **Toa 0 Keepalive** | `train_5min.yml` | GitHub (`MON6879` — **GAS dispatch** mỗi 5 phút) | Sưởi ấm Vercel API & khóa khôi phục `setWebhook` 6 Bot |
-| 🔵 **GITHUB ACTIONS** | **Reports 1, 2, 3, 4 + BOD** | `cron_send.py`, `daily_bod_assign.py` | GitHub (`MON6879` — 05:48 & 15:48 MMT) | Báo cáo công việc hàng ngày 4 Team & BOD Assign (Dung sai ±4p) |
-| 🔵 **GITHUB ACTIONS** | **Report 5A, 5B, 5C (Plan)** | `daily_plan_report.py` | GitHub (`MON6879` — theo lịch 7 mốc) | Báo cáo Kế hoạch Ngày/EOD/Update (Dung sai ±4p) |
-| 🔵 **GITHUB ACTIONS** | **Report 6 (Read Status)** | `daily_read_report.py` | GitHub (`MON6879` — 08:48, 14:58, 17:18, 19:41) | Báo cáo xác nhận đọc Note qua Telethon (Dung sai ±4p) |
+| 🔵 **GITHUB ACTIONS** | **Reports 1, 2, 3, 4 + BOD** | `cron_send.py`, `daily_bod_assign.py` | GitHub (`MON6879` — 05:48 & 15:48 MMT) | Báo cáo công việc hàng ngày 4 Team & BOD Assign (Dung sai ±3p) |
+| 🔵 **GITHUB ACTIONS** | **Report 5A, 5B, 5C (Plan)** | `daily_plan_report.py` | GitHub (`MON6879` — theo lịch 7 mốc) | Báo cáo Kế hoạch Ngày/EOD/Update (Dung sai ±3p) |
+| 🔵 **GITHUB ACTIONS** | **Report 6 (Read Status)** | `daily_read_report.py` | GitHub (`MON6879` — 08:48, 14:58, 17:18, 19:41) | Báo cáo xác nhận đọc Note qua Telethon (Dung sai ±3p) |
 | 🔵 **GITHUB ACTIONS** | **Cable & Refuel Reports** | `cable_report.py`, `refuel_plan_report.py` | GitHub (`MON6879` — theo lịch) | Báo cáo Cáp đứt và Kế hoạch cấp dầu máy phát |
-| 🔵 **GITHUB ACTIONS** | **Site Down Relay Độc lập** | `botlookup_relay.yml` / `botlookup_relay.py` | GitHub (`MON6879` — **GAS dispatch** mỗi 30 phút) | Cào dữ liệu trạm sập NOC Pro bằng Telethon |
+| 🔵 **GITHUB ACTIONS** | **Site Down Relay Độc lập** | `botlookup_relay.yml` / `botlookup_relay.py` | GitHub (`MON6879` — Cron `3,33 * * * *` UTC + GAS dispatch cửa sổ chặt) | Cào dữ liệu trạm sập NOC Pro bằng Telethon, sleep chính xác đến :06/:36 MMT |
 
 ---
 

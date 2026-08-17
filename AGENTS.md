@@ -4,14 +4,16 @@
 
 ---
 
-# 🛡️ STRICT RULE: KIẾN TRÚC 5 TRỤ CỘT BẤT KHẢ XÂM PHẠM (ZERO-FAILURE ARCHITECTURE)
+# 🛡️ STRICT RULE: KIẾN TRÚC 7 TRỤ CỘT BẤT KHẢ XÂM PHẠM (ZERO-FAILURE ARCHITECTURE)
 
-> ⚠️ **QUY TẮC BẮT BUỘC (ZERO BUG POLICY)**: TUYỆT ĐỐI KHÔNG ĐƯỢC CÀI ĐẶT CODE CÓ KHẢ NĂNG GÂY NGHẼN, TỰ HỦY RUNNER HAY SẬP CHUỖI LIÊN HOÀN (DÙ CỐ Ý HAY VÔ TÌNH). MỌI COMPONENT BẮT BUỘC PHẢI TUÂN THỦ 5 TRỤ CỘT:
-> 1. **Cửa Sổ Kháng Trễ Động (Sliding Window Timing)**: Runner khởi động sớm $\rightarrow$ Sleep đến :06:00/:36:00 MMT; Runner khởi động trễ do GitHub queue $\rightarrow$ Chạy ngay lập tức với 0s delay, TUYỆT ĐỐI KHÔNG HỦY BỎ!
+> ⚠️ **QUY TẮC BẮT BUỘC (ZERO BUG POLICY)**: TUYỆT ĐỐI KHÔNG ĐƯỢC CÀI ĐẶT CODE CÓ KHẢ NĂNG GÂY NGHẼN, TỰ HỦY RUNNER HAY SẬP CHUỖI LIÊN HOÀN (DÙ CỐ Ý HAY VÔ TÌNH). MỌI COMPONENT BẮT BUỘC PHẢI TUÂN THỦ 7 TRỤ CỘT:
+> 1. **Cửa Sổ Kháng Trễ Chặt (Tight Sliding Window Timing)**: Cửa sổ chấp nhận trễ tối đa ±4 phút. Nhịp :06 chấp nhận :00-:10; phút :11-:20 sleep đến :36. Nhịp :36 chấp nhận :21-:40; phút :41-:59 sleep đến :06 giờ kế. TUYỆT ĐỐI KHÔNG chạy ngay tại :20 hay :50!
 > 2. **Quét Lịch Sử Duy Nhất 1 Lần (Single-Pass Scanning)**: Mỗi nhóm Telegram chỉ quét đúng 1 lần duy nhất (< 3s) và so khớp tiêu đề trong RAM, triệt tiêu 100% nguy cơ Timeout và Telegram FloodWait.
 > 3. **Cô Lập Lỗi Độc Lập (Zero Cascading Failure)**: Mọi script độc lập phải được bọc cô lập lỗi (`python script.py || true`) để không bao giờ làm chết chùm các báo cáo khác.
 > 4. **Khóa Độc Quyền Phiên Telethon (Concurrency Locking)**: Cài đặt `concurrency: group: ...` trên GitHub Actions để các tác vụ Telethon không bao giờ tranh chấp hay đè phiên.
 > 5. **Kênh Kép Song Hành (GAS Direct First, GitHub Second)**: GAS Cloud đảm nhiệm phát tin chính; GitHub Actions đóng vai trò dự phòng và cào Telethon.
+> 6. **Cô Lập Biến Toàn Cục GAS (GAS Global Scope Isolation)**: Tất cả file `.gs` trong cùng 1 dự án dùng chung Global Scope — KHÔNG khai báo trùng tên biến. Chỉ giữ 4 dự án GAS chuẩn (TNI, TNI Site Down Bot, TNI Attendance Bot, TC).
+> 7. **Xử Lý Gia Tăng Chống Timeout (Incremental Processing)**: GAS giới hạn 6 phút — phải đánh dấu dòng đã xử lý (Note), chỉ xử lý dòng MỚI, có cơ chế dừng an toàn 5 phút. KHÔNG dùng `--force` trên workflow_dispatch tự động.
 
 ---
 

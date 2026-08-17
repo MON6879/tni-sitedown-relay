@@ -14,6 +14,8 @@ import pandas as pd
 from datetime import datetime, timezone, timedelta
 from telegram import Bot
 from dotenv import load_dotenv
+from delete_old_helper import delete_old_messages_bot, save_msgids
+
 
 load_dotenv()
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 SEND_BOT_TOKEN = os.getenv("SEND_BOT_TOKEN", "")
 SPREADSHEET_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8"
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid=159298579"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=159298579"
 
 TZ_MM = timezone(timedelta(hours=6, minutes=30))
 
@@ -176,7 +178,7 @@ async def main():
     df = None
     for attempt in range(5):
         try:
-            resp = requests.get(SHEET_URL, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}, timeout=30)
+            resp = requests.get(SHEET_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
             resp.raise_for_status()
             df = pd.read_csv(io.StringIO(resp.text), header=None, dtype=str)
             logger.info(f"Đọc thành công bảng tính: {len(df)} dòng.")
@@ -292,42 +294,17 @@ async def main():
             sd["coolant_have"] += to_float(row.iloc[81]) if len(row) > 81 else 0.0
             sd["coolant_diff"] += to_float(row.iloc[82]) if len(row) > 82 else 0.0
 
-    # ── 4. Gửi báo cáo ──
+    # ── 4. Xóa sạch tin cũ Report 1, 2, 3 và Gửi báo cáo mới qua Bot API + GAS Cache ──
     async with Bot(token=SEND_BOT_TOKEN) as bot:
         for t_num, chat_id in TEAM_GROUPS.items():
             t_name = TEAM_NAMES[t_num]
             logger.info(f"--- Bắt đầu gửi báo cáo cho {t_name} ({chat_id}) ---")
 
-            # Xóa tin nhắn cũ của tất cả các kịch bản báo cáo (Telethon + multi-key GAS) trước khi gửi mới
-            TELEGRAM_SESSION = os.getenv("TELEGRAM_SESSION", "")
-            TELEGRAM_API_ID = int(os.getenv("TELEGRAM_API_ID", "0")) if os.getenv("TELEGRAM_API_ID", "").isdigit() else 0
-            TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "")
-
-            if SEND_BOT_TOKEN and TELEGRAM_SESSION and TELEGRAM_API_ID:
-                try:
-                    from telethon import TelegramClient
-                    from telethon.sessions import StringSession
-                    from delete_old_helper import delete_by_title_telethon
-                    async with TelegramClient(StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH) as tg_client:
-                        for title_pfx in [
-                            "📋 1. Report — Daily Backlog",
-                            "📋 2. Report — DailyWO",
-                            "📋 3. Report — Main DG Material Need",
-                            "📋 4. Report — Daily EOD Task & Stats",
-                            "📓 4b. Full Report"
-                        ]:
-                            await delete_by_title_telethon(tg_client, SEND_BOT_TOKEN, chat_id, title_pfx)
-                except Exception as tg_err:
-                    logger.warning(f"Telethon delete-by-title error for {t_name}: {tg_err}")
-
             if APPS_SCRIPT_URL:
                 try:
-                    from delete_old_helper import delete_old_messages_bot
                     delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, CHATID_TO_KEY[chat_id])
-                    delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, f"CRON_TEAM_T{t_num}")
-                    delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, f"CRON_ASSET_T{t_num}")
                 except Exception as ex:
-                    logger.warning(f"Lỗi khi xóa tin nhắn cũ của {t_name}: {ex}")
+                    logger.warning(f"Lỗi khi xóa tin nhắn cũ qua GAS của {t_name}: {ex}")
 
             sent_msg_ids = []
 
@@ -426,7 +403,6 @@ async def main():
                 try:
                     from delete_old_helper import save_msgids
                     save_msgids(APPS_SCRIPT_URL, CHATID_TO_KEY[chat_id], sent_msg_ids)
-                    save_msgids(APPS_SCRIPT_URL, f"CRON_TEAM_T{t_num}", sent_msg_ids)
                 except Exception as ex:
                     logger.warning(f"Lỗi khi lưu tin nhắn mới của {t_name}: {ex}")
 
