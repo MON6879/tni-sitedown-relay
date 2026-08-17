@@ -371,6 +371,28 @@
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
 
+    .data-table th.resizable {
+      position: sticky;
+      user-select: none;
+    }
+    .data-table th .resizer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 8px;
+      cursor: col-resize;
+      user-select: none;
+      height: 100%;
+      z-index: 20;
+      border-right: 2px solid rgba(255, 255, 255, 0.1);
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .data-table th .resizer:hover,
+    .data-table th .resizer.resizing {
+      border-right: 2px solid var(--cyan);
+      background: rgba(56, 189, 248, 0.2);
+    }
+
     .data-table td {
       padding: 0.95rem 1.1rem;
       font-size: 0.85rem;
@@ -6984,6 +7006,7 @@ Team04>> 2Box</td>
           this.userEmail = localStorage.getItem('tni_plan_dep_email') || '';
           this.loadData();
           this.loadPermissions();
+          this.initResizable();
           // Auto-refresh every 30s (Pillar 7: Performance Budget)
           if (this.refreshTimer) clearInterval(this.refreshTimer);
           this.refreshTimer = setInterval(() => this.loadData(), 30000);
@@ -6991,6 +7014,74 @@ Team04>> 2Box</td>
           console.error('[PlanWeek] Init failed:', err);
           this.renderError('Unable to initialize Plan Week. Please refresh the page.');
         }
+      },
+
+      // ── Make Tables Column Resizable with Mouse Drag ──
+      initResizable() {
+        const setupTable = (tableId, storageKey) => {
+          const table = document.getElementById(tableId);
+          if (!table) return;
+          const ths = table.querySelectorAll('thead th');
+          
+          const savedWidths = JSON.parse(localStorage.getItem(storageKey) || '{}');
+          ths.forEach((th, idx) => {
+            if (savedWidths[idx]) {
+              th.style.width = savedWidths[idx] + 'px';
+              th.style.minWidth = savedWidths[idx] + 'px';
+            }
+          });
+
+          ths.forEach((th, idx) => {
+            if (th.querySelector('.resizer')) return;
+            th.classList.add('resizable');
+            
+            const resizer = document.createElement('div');
+            resizer.className = 'resizer';
+            th.appendChild(resizer);
+
+            let startX = 0;
+            let startWidth = 0;
+
+            const onMouseDown = (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              startX = e.pageX;
+              startWidth = th.offsetWidth;
+              resizer.classList.add('resizing');
+              document.body.style.cursor = 'col-resize';
+              document.body.style.userSelect = 'none';
+
+              const onMouseMove = (moveEvent) => {
+                const diff = moveEvent.pageX - startX;
+                const newWidth = Math.max(40, startWidth + diff);
+                th.style.width = newWidth + 'px';
+                th.style.minWidth = newWidth + 'px';
+              };
+
+              const onMouseUp = () => {
+                resizer.classList.remove('resizing');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                
+                const widths = {};
+                ths.forEach((h, i) => {
+                  widths[i] = h.offsetWidth;
+                });
+                localStorage.setItem(storageKey, JSON.stringify(widths));
+              };
+
+              document.addEventListener('mousemove', onMouseMove);
+              document.addEventListener('mouseup', onMouseUp);
+            };
+
+            resizer.addEventListener('mousedown', onMouseDown);
+          });
+        };
+
+        setupTable('pdep-table', 'tni_pdep_active_widths');
+        setupTable('pdep-history-table', 'tni_pdep_history_widths');
       },
 
       // ── Load Permissions (Pillar 2: Security-First) ──
@@ -7015,6 +7106,11 @@ Team04>> 2Box</td>
 
       // ── Load Data (Pillar 1: SSOT + Pillar 4: Data Contract) ──
       async loadData() {
+        // 🛡️ Không vẽ lại bảng khi người dùng đang gõ dở nội dung (tránh bị out)
+        if (document.querySelector('#pdep-tbody input') || document.getElementById('planDepAddModal')?.classList.contains('active')) {
+          return;
+        }
+
         try {
           const ctrl = new AbortController();
           const timer = setTimeout(() => ctrl.abort(), 15000);
@@ -7095,8 +7191,8 @@ Team04>> 2Box</td>
             <td style="font-size:0.82rem; white-space:nowrap;">${this.escHtml(item.dateAssign)}</td>
             <td><strong style="font-size:0.85rem;">${this.escHtml(item.techManager)}</strong></td>
             <td style="text-align:left !important; max-width:400px; line-height:1.4; font-size:0.82rem; color:var(--text-sub);">${this.escHtml(item.detailTask)}</td>
-            <td style="font-size:0.82rem; color:var(--amber); cursor:pointer; text-decoration:underline dotted;" onclick="PlanWeek.startInlineEdit(${item.row}, 5, this, '${this.escAttr(item.progress)}')" title="Click to edit">${item.progress || '<span style=&quot;color:var(--text-muted);&quot;>— set —</span>'}</td>
-            <td style="font-size:0.82rem; color:var(--emerald); cursor:pointer; text-decoration:underline dotted;" onclick="PlanWeek.startInlineEdit(${item.row}, 6, this, '${this.escAttr(item.dateComplete)}')" title="Click to edit">${item.dateComplete || '<span style=&quot;color:var(--text-muted);&quot;>— set —</span>'}</td>
+            <td style="font-size:0.82rem; color:var(--amber); cursor:pointer;" onclick="PlanWeek.startInlineEdit(${item.row}, 5, this, '${this.escAttr(item.progress)}', 'text')" title="Click to edit">${item.progress ? this.escHtml(item.progress) : '<span style="color:var(--text-muted); text-decoration:underline dotted;">— set —</span>'}</td>
+            <td style="font-size:0.82rem; color:var(--emerald); cursor:pointer;" onclick="PlanWeek.startInlineEdit(${item.row}, 6, this, '${this.escAttr(item.dateComplete)}', 'date')" title="Click to edit">${item.dateComplete ? this.escHtml(item.dateComplete) + ' ✓' : '<span style="color:var(--text-muted); text-decoration:underline dotted;">— set —</span>'}</td>
             <td><button style="background:none; border:none; color:var(--rose); cursor:pointer; font-size:0.85rem;" onclick="PlanWeek.deleteRow(${item.row})" title="Delete"><i class="fa-solid fa-trash"></i></button></td>
           </tr>`;
         }).join('');
@@ -7127,23 +7223,69 @@ Team04>> 2Box</td>
         }).join('');
       },
 
-      // ── Inline Edit for E:F (Click to Edit) ──
-      startInlineEdit(row, col, td, currentVal) {
+      // ── Inline Edit for E:F (Click to Edit with Full Control) ──
+      startInlineEdit(row, col, td, currentVal, type) {
         if (td.querySelector('input')) return; // Already editing
         const original = currentVal || '';
-        td.innerHTML = `<input type="text" value="${this.escAttr(original)}" 
-          style="background:#1E293B; border:1px solid var(--cyan); border-radius:6px; padding:0.3rem 0.5rem; color:#fff; font-size:0.82rem; width:100px;"
-          placeholder="DD/MM/YYYY"
-          onkeydown="if(event.key==='Enter') PlanWeek.saveInlineEdit(${row}, ${col}, this); if(event.key==='Escape') PlanWeek.loadData();"
-          onblur="PlanWeek.saveInlineEdit(${row}, ${col}, this)" />`;
-        td.querySelector('input').focus();
-        td.querySelector('input').select();
+        
+        let inputHtml = '';
+        if (type === 'date') {
+          // Convert DD/MM/YYYY to YYYY-MM-DD for date input
+          let isoDate = '';
+          if (original && original.indexOf('/') !== -1) {
+            const p = original.split('/');
+            if (p.length === 3) isoDate = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+          }
+          if (!isoDate) {
+            const n = new Date();
+            isoDate = `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+          }
+          inputHtml = `<div style="display:flex; align-items:center; gap:4px;" onclick="event.stopPropagation();">
+            <input type="date" value="${isoDate}" id="pdep-inline-${row}-${col}"
+              style="background:#0F172A; border:1px solid var(--emerald); border-radius:6px; padding:0.25rem 0.4rem; color:#fff; font-size:0.8rem; width:125px;"
+              onkeydown="if(event.key==='Enter') PlanWeek.saveInlineDate(${row}, ${col}, this.value); if(event.key==='Escape') PlanWeek.render();" />
+            <button onclick="PlanWeek.saveInlineDate(${row}, ${col}, document.getElementById('pdep-inline-${row}-${col}').value)" 
+              style="background:var(--emerald); color:#fff; border:none; border-radius:4px; padding:0.25rem 0.45rem; cursor:pointer; font-size:0.75rem;" title="Save">✓</button>
+            <button onclick="PlanWeek.render()" 
+              style="background:#334155; color:#fff; border:none; border-radius:4px; padding:0.25rem 0.45rem; cursor:pointer; font-size:0.75rem;" title="Cancel">✕</button>
+          </div>`;
+        } else {
+          inputHtml = `<div style="display:flex; align-items:center; gap:4px;" onclick="event.stopPropagation();">
+            <input type="text" value="${this.escAttr(original)}" id="pdep-inline-${row}-${col}"
+              style="background:#0F172A; border:1px solid var(--amber); border-radius:6px; padding:0.25rem 0.5rem; color:#fff; font-size:0.8rem; width:130px;"
+              placeholder="Enter progress..."
+              onkeydown="if(event.key==='Enter') PlanWeek.saveInlineText(${row}, ${col}, this.value); if(event.key==='Escape') PlanWeek.render();" />
+            <button onclick="PlanWeek.saveInlineText(${row}, ${col}, document.getElementById('pdep-inline-${row}-${col}').value)" 
+              style="background:var(--amber); color:#000; font-weight:bold; border:none; border-radius:4px; padding:0.25rem 0.45rem; cursor:pointer; font-size:0.75rem;" title="Save">✓</button>
+            <button onclick="PlanWeek.render()" 
+              style="background:#334155; color:#fff; border:none; border-radius:4px; padding:0.25rem 0.45rem; cursor:pointer; font-size:0.75rem;" title="Cancel">✕</button>
+          </div>`;
+        }
+
+        td.innerHTML = inputHtml;
+        const inp = td.querySelector('input');
+        if (inp) {
+          inp.focus();
+          if (type !== 'date') inp.select();
+        }
       },
 
-      async saveInlineEdit(row, col, input) {
-        const newVal = input.value.trim();
-        const td = input.parentElement;
-        td.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="color:var(--cyan);"></i>';
+      async saveInlineDate(row, col, ymdVal) {
+        let formatted = '';
+        if (ymdVal) {
+          const p = ymdVal.split('-');
+          if (p.length === 3) formatted = `${p[2]}/${p[1]}/${p[0]}`;
+        }
+        await this.executeInlineSave(row, col, formatted);
+      },
+
+      async saveInlineText(row, col, textVal) {
+        await this.executeInlineSave(row, col, (textVal || '').trim());
+      },
+
+      async executeInlineSave(row, col, newVal) {
+        const tbody = document.getElementById('pdep-tbody');
+        if (tbody) tbody.style.pointerEvents = 'none';
         
         try {
           const resp = await fetch(this.GAS_URL, {
@@ -7153,10 +7295,12 @@ Team04>> 2Box</td>
           });
           const json = await resp.json();
           if (json.status !== 'ok') throw new Error(json.error?.message || 'Update failed');
-          this.loadData(); // Refresh
+          await this.loadData();
         } catch (err) {
           alert('Error saving: ' + err.message);
-          this.loadData();
+          await this.loadData();
+        } finally {
+          if (tbody) tbody.style.pointerEvents = 'auto';
         }
       },
 
