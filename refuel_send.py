@@ -293,7 +293,8 @@ def format_and_send_report(rows: list[str]) -> list[int]:
 
     # 1. XÓA TRIỆT ĐỂ 100% TẤT CẢ TIN CỦ BẰNG SMART SCANNER & REFUEL_BOT_TOKEN
     delete_all_previous_refuel_msgs(REFUEL_CHAT_ID, STATE_KEY)
-    tg_delete_by_title(REFUEL_CHAT_ID, "⛽ TNI REQUEST REFUEL")
+    tg_delete_by_title(REFUEL_CHAT_ID, "[Report 1] TNI REQUEST REFUEL")
+    tg_delete_by_title(REFUEL_CHAT_ID, "TNI REQUEST REFUEL")
 
     for idx, chunk_lines in enumerate(chunks):
         title = "🔄 <b>[Report 1] TNI REQUEST REFUEL — Daily Report</b>"
