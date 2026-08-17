@@ -13,9 +13,8 @@ from http.server import BaseHTTPRequestHandler
 
 # Active GAS Web App URLs (with fallback)
 GAS_ENDPOINTS = [
-    "https://script.google.com/macros/s/AKfycbxC_wvkPyZLSzMqAnfs8akiZsElNTDmxWtTpALuqkIF-Ygjb_tb595jy3-L5AEaL5R3hQ/exec",
-    "https://script.google.com/macros/s/AKfycbzidgWuL0DfKvkdDjKnN4qCRy4HUv8lIzvGiO3ZR84e-VLbu84IITd9H2HPSJW28yzhOw/exec",
     "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec",
+    "https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec",
 ]
 
 class handler(BaseHTTPRequestHandler):

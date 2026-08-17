@@ -7284,37 +7284,38 @@ Team04>> 2Box</td>
       },
 
       async executeInlineSave(row, col, newVal) {
-        const tbody = document.getElementById('pdep-tbody');
-        if (tbody) tbody.style.pointerEvents = 'none';
+        // Optimistic local update in memory
+        const target = this.planData.find(d => d.row === row);
+        if (target) {
+          if (col === 5) target.progress = newVal;
+          if (col === 6) target.dateComplete = newVal;
+          this.render();
+        }
         
         try {
+          const email = this.userEmail || localStorage.getItem('tni_plan_dep_email') || 'phonghdpxd@gmail.com';
           const resp = await fetch(this.GAS_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'plan_dep_update', row, col, value: newVal, email: this.userEmail })
+            body: JSON.stringify({ action: 'plan_dep_update', row, col, value: newVal, email: email })
           });
           const json = await resp.json();
           if (json.status !== 'ok') throw new Error(json.error?.message || 'Update failed');
-          await this.loadData();
+          // Quiet background sync
+          this.loadData();
         } catch (err) {
           alert('Error saving: ' + err.message);
-          await this.loadData();
-        } finally {
-          if (tbody) tbody.style.pointerEvents = 'auto';
+          this.loadData();
         }
       },
 
       // ── Update Action Buttons Visibility ──
       updateActionButtons() {
-        // Archive button visible only for ADMIN/EDITOR
-        // Add button visible only for EDITOR/ADMIN
-        // These are already rendered; re-render table to show/hide action column
         this.render();
       },
 
       // ── Open/Close Add Modal (Mọi người đều có quyền thêm) ──
       openAddModal() {
-        // Auto-fill today's date
         const dateInput = document.getElementById('pdep-add-date');
         if (dateInput) {
           const now = new Date();
@@ -7327,7 +7328,6 @@ Team04>> 2Box</td>
       },
       closeAddModal() {
         document.getElementById('planDepAddModal')?.classList.remove('active');
-        // Reset form
         const dateInput = document.getElementById('pdep-add-date');
         if (dateInput) dateInput.value = '';
         const mgr = document.getElementById('pdep-add-manager');
@@ -7336,13 +7336,12 @@ Team04>> 2Box</td>
         if (detail) detail.value = '';
       },
 
-      // ── Submit Add (Pillar 2: Security checked at GAS server) ──
+      // ── Submit Add (Tạo mới tức thì với Optimistic UI) ──
       async submitAdd() {
         const dateRaw = document.getElementById('pdep-add-date')?.value || '';
         const techManager = document.getElementById('pdep-add-manager')?.value || '';
         const detailTask = document.getElementById('pdep-add-detail')?.value?.trim() || '';
         
-        // Format date to DD/MM/YYYY
         let dateAssign = '';
         if (dateRaw) {
           const d = new Date(dateRaw);
@@ -7357,6 +7356,19 @@ Team04>> 2Box</td>
           saveBtn.disabled = true;
           saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
         }
+
+        // Optimistic UI: Hiển thị ngay lập tức trên bảng
+        const optimisticItem = {
+          row: 3,
+          dateAssign,
+          techManager,
+          detailTask,
+          progress: '',
+          dateComplete: ''
+        };
+        this.planData.unshift(optimisticItem);
+        this.render();
+        this.closeAddModal();
         
         try {
           const email = this.userEmail || localStorage.getItem('tni_plan_dep_email') || 'phonghdpxd@gmail.com';
@@ -7373,11 +7385,10 @@ Team04>> 2Box</td>
           });
           const json = await resp.json();
           if (json.status !== 'ok') throw new Error(json.error?.message || 'Add failed');
-          
-          this.closeAddModal();
           await this.loadData();
         } catch (err) {
           alert('Error adding plan: ' + err.message);
+          await this.loadData();
         } finally {
           if (saveBtn) {
             saveBtn.disabled = false;
@@ -7386,17 +7397,15 @@ Team04>> 2Box</td>
         }
       },
 
-      // ── Delete Row (CHỈ ADMIN MỚI CÓ QUYỀN XÓA) ──
+      // ── Delete Row (Xóa ngay tức thì 0.01s với Optimistic UI) ──
       async deleteRow(row, btnEl) {
         if (!confirm('Are you sure you want to delete this plan item?')) return;
         const email = this.userEmail || localStorage.getItem('tni_plan_dep_email') || 'phonghdpxd@gmail.com';
         
-        // Optimistic UI: làm mờ hàng và đổi icon đang xóa để người dùng không phải chờ
-        const tr = btnEl ? btnEl.closest('tr') : null;
-        if (tr) {
-          tr.style.opacity = '0.3';
-          tr.style.pointerEvents = 'none';
-        }
+        // Optimistic UI: Xóa khỏi bảng hiển thị ngay lập tức không cần chờ server
+        const previousData = [...this.planData];
+        this.planData = this.planData.filter(item => item.row !== row);
+        this.render();
 
         try {
           const resp = await fetch(this.GAS_URL, {
@@ -7406,10 +7415,12 @@ Team04>> 2Box</td>
           });
           const json = await resp.json();
           if (json.status !== 'ok') throw new Error(json.error?.message || 'Delete failed');
-          await this.loadData();
+          // Đồng bộ lại hàng chính xác trong nền
+          this.loadData();
         } catch (err) {
           alert('Error deleting: ' + err.message);
-          await this.loadData();
+          this.planData = previousData;
+          this.render();
         }
       },
 
