@@ -923,9 +923,12 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
       const colA = tplSheet.getRange(1, 1, Math.min(tplSheet.getLastRow(), 10), 1).getValues().map(r => String(r[0] || "").trim()).filter(Boolean);
       const colB = tplSheet.getRange(1, 2, Math.min(tplSheet.getLastRow(), 10), 1).getValues().map(r => String(r[0] || "").trim()).filter(Boolean);
       
-      if (isAll) return colA.join("\n") + "\n\n" + colB.join("\n");
-      if (isHalf) return colA.join("\n");
-      return colB.join("\n");
+      const strA = colA.length > 0 ? colA.join("\n") : "Full Name: take leave half day\nReason:";
+      const strB = colB.length > 0 ? colB.join("\n") : "Full Name: Take leave\nReason:";
+
+      if (isAll) return strA + "\n\n" + strB;
+      if (isHalf) return strA;
+      return strB;
     }
 
     // Team Attendance templates (Cols F:I -> Col idx 6, 7, 8, 9 in 1-based)

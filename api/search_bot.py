@@ -936,16 +936,16 @@ def get_leave_template_text(leave_type: str = None) -> str:
     col_a = extract_col_lines(0)
     col_b = extract_col_lines(1)
 
+    str_a = "\n".join(col_a) if col_a else "Full Name: take leave half day\nReason:"
+    str_b = "\n".join(col_b) if col_b else "Full Name: Take leave\nReason:"
+
     if leave_type == "half":
-        return "\n".join(col_a)
+        return str_a
     elif leave_type == "all" or leave_type == "both":
-        blocks = []
-        if col_a: blocks.append("\n".join(col_a))
-        if col_b: blocks.append("\n".join(col_b))
-        return "\n\n".join(blocks)
+        return f"{str_a}\n\n{str_b}"
     else:
         # Default: Full-day leave (Col B)
-        return "\n".join(col_b) if col_b else "\n".join(col_a)
+        return str_b
 
 
 
