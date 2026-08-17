@@ -6021,19 +6021,18 @@ Team04>> 2Box</td>
 
           <!-- Technical Manager (C) -->
           <div>
-            <label style="display:block; font-weight:700; color:#F8FAFC; margin-bottom:0.3rem; font-size:0.85rem;"><i class="fa-solid fa-user-tie" style="color:var(--amber);"></i> Technical Manager (C):</label>
+            <label style="display:block; font-weight:700; color:#F8FAFC; margin-bottom:0.3rem; font-size:0.85rem;"><i class="fa-solid fa-user-tie" style="color:var(--amber);"></i> Technical Manager / Backoffice (C):</label>
             <select id="pdep-add-manager" style="width:100%; background:#1E293B; border:1px solid rgba(255,255,255,0.2); border-radius:10px; padding:0.55rem 0.9rem; color:#fff; font-size:0.9rem;">
-              <option value="">— Select Manager —</option>
-              <option value="Mg Hein Htet Aung">Mg Hein Htet Aung</option>
-              <option value="Mg Kyaw Myo Tun">Mg Kyaw Myo Tun</option>
-              <option value="Mg Aung Zaw Hein">Mg Aung Zaw Hein</option>
-              <option value="Mg Nyi Nyi Aung">Mg Nyi Nyi Aung</option>
-              <option value="Mg Thura Aung">Mg Thura Aung</option>
-              <option value="Mg Zaw Min Oo">Mg Zaw Min Oo</option>
-              <option value="Mg Kyaw Swar">Mg Kyaw Swar</option>
-              <option value="Mg Paing Aung Soe">Mg Paing Aung Soe</option>
-              <option value="Mg Thiha">Mg Thiha</option>
-              <option value="Mg Phone Myat Kyaw">Mg Phone Myat Kyaw</option>
+              <option value="">— Select Backoffice / Manager —</option>
+              <option value="Admin">Admin</option>
+              <option value="Asset">Asset</option>
+              <option value="CM">CM</option>
+              <option value="Finance">Finance</option>
+              <option value="HR">HR</option>
+              <option value="M&E">M&E</option>
+              <option value="Manager">Manager</option>
+              <option value="PM">PM</option>
+              <option value="Transmission">Transmission</option>
             </select>
           </div>
 
@@ -7040,6 +7039,17 @@ Team04>> 2Box</td>
           const syncEl = document.getElementById('pdep-sync-time');
           if (syncEl) syncEl.textContent = 'Last sync: ' + new Date().toLocaleTimeString();
           
+          // Dynamic update Backoffice dropdown from Column J
+          if (json.meta?.backofficeList && Array.isArray(json.meta.backofficeList) && json.meta.backofficeList.length > 0) {
+            const selectEl = document.getElementById('pdep-add-manager');
+            if (selectEl) {
+              const currentVal = selectEl.value;
+              selectEl.innerHTML = '<option value="">— Select Backoffice / Manager —</option>' + 
+                json.meta.backofficeList.map(item => `<option value="${this.escAttr(item)}">${this.escHtml(item)}</option>`).join('');
+              if (currentVal) selectEl.value = currentVal;
+            }
+          }
+
           this.render();
           this.renderHistory();
         } catch (err) {
