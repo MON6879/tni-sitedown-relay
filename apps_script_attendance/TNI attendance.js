@@ -929,8 +929,11 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
 
     // Team Attendance templates (Cols F:I -> Col idx 6, 7, 8, 9 in 1-based)
     const teamColMap = { 1: 6, 2: 7, 3: 8, 4: 9 };
-    const m = q.match(/\b(?:team|t)?\s*([1-4])\b/i);
-    const teamNum = m ? parseInt(m[1], 10) : null;
+    let teamNum = null;
+    if (/team\s*0?1|\bt1\b|_team1\b|team_1\b|template_team1\b|\b1\b/i.test(q)) teamNum = 1;
+    else if (/team\s*0?2|\bt2\b|_team2\b|team_2\b|template_team2\b|\b2\b/i.test(q)) teamNum = 2;
+    else if (/team\s*0?3|\bt3\b|_team3\b|team_3\b|template_team3\b|\b3\b/i.test(q)) teamNum = 3;
+    else if (/team\s*0?4|\bt4\b|_team4\b|team_4\b|template_team4\b|\b4\b/i.test(q)) teamNum = 4;
 
     const nowMM = new Date();
     const dateShort = Utilities.formatDate(nowMM, "Asia/Rangoon", "dd/MM/yy");

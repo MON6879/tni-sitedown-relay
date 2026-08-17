@@ -1526,12 +1526,17 @@ def handle(update: dict) -> None:
         return
 
     # Plain text command for Attendance Template
-    if any(text_l.startswith(p) for p in ("template attendance", "attendance template", "template attend", "template diemdanh", "template att", "template team", "template t1", "template t2", "template t3", "template t4")) and len(text_l.split()) <= 4:
+    if any(text_l.startswith(p) for p in ("template attendance", "attendance template", "template attend", "template diemdanh", "template att", "template team", "template t1", "template t2", "template t3", "template t4", "template_team")) and len(text_l.split()) <= 4:
         header_only = any(kw in text_l for kw in ("header", "title", "tieude", "short"))
         team_num = None
-        m = re.search(r"\b(?:team|t)?\s*([1-4])\b", text_l)
-        if m:
-            team_num = int(m.group(1))
+        if re.search(r"team\s*0?1|\bt1\b|_team1\b|team_1\b|template_team1\b|\b1\b", text_l):
+            team_num = 1
+        elif re.search(r"team\s*0?2|\bt2\b|_team2\b|team_2\b|template_team2\b|\b2\b", text_l):
+            team_num = 2
+        elif re.search(r"team\s*0?3|\bt3\b|_team3\b|team_3\b|template_team3\b|\b3\b", text_l):
+            team_num = 3
+        elif re.search(r"team\s*0?4|\bt4\b|_team4\b|team_4\b|template_team4\b|\b4\b", text_l):
+            team_num = 4
         reply = get_attendance_template_text(team_num, header_only=header_only)
         tg_send(chat_id, reply)
         return
@@ -1556,16 +1561,7 @@ def handle(update: dict) -> None:
             tg_send(chat_id, reply)
             return
 
-        if first_word == "ping":
-            tg_send(chat_id, f"🏓 pong {BOT_VERSION} | chat={chat_id} | user={user_id}")
-            return
-
-        if first_word in ("start", "help", "menu", "men"):
-            if rest.upper().startswith("PLAN_T"):
-                team_num_str = rest[6:]
-                if team_num_str.isdigit():
-                    send_daily_plan_template(chat_id, int(team_num_str))
-                    return
+        if first_word in ("start", "help", "menu"):
             send_help_menu(chat_id)
             return
 
@@ -1595,12 +1591,18 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"👤 <b>{html.escape(first_name)}</b>\n🔑 ID: <code>{user_id}</code>\n💬 Chat: <code>{chat_id}</code>\n📍 Type: {chat_type}")
             return
 
-        if first_word in ("attendance", "attend", "diemdanh", "att") or (first_word == "template" and ("attend" in rest.lower() or "diemdanh" in rest.lower() or "att" in rest.lower())):
-            header_only = any(kw in rest.lower() for kw in ("header", "title", "tieude", "short"))
+        if first_word in ("attendance", "attend", "diemdanh", "att") or first_word.startswith("template_team") or first_word.startswith("template_t") or (first_word == "template" and ("attend" in rest.lower() or "diemdanh" in rest.lower() or "att" in rest.lower())):
+            full_cmd = f"{first_word} {rest}".lower()
+            header_only = any(kw in full_cmd for kw in ("header", "title", "tieude", "short"))
             team_num = None
-            m = re.search(r"\b(?:team|t)?\s*([1-4])\b", rest, re.IGNORECASE)
-            if m:
-                team_num = int(m.group(1))
+            if re.search(r"team\s*0?1|\bt1\b|_team1\b|team_1\b|template_team1\b|\b1\b", full_cmd):
+                team_num = 1
+            elif re.search(r"team\s*0?2|\bt2\b|_team2\b|team_2\b|template_team2\b|\b2\b", full_cmd):
+                team_num = 2
+            elif re.search(r"team\s*0?3|\bt3\b|_team3\b|team_3\b|template_team3\b|\b3\b", full_cmd):
+                team_num = 3
+            elif re.search(r"team\s*0?4|\bt4\b|_team4\b|team_4\b|template_team4\b|\b4\b", full_cmd):
+                team_num = 4
             reply = get_attendance_template_text(team_num, header_only=header_only)
             tg_send(chat_id, reply)
             return
