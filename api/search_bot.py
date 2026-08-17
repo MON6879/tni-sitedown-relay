@@ -900,6 +900,144 @@ def get_attendance_template_text(team_num: int = None, header_only: bool = False
         return "\n\n".join(all_blocks)
 
 
+def get_leave_template_text(leave_type: str = None) -> str:
+    """Tải động 2 mẫu xin nghỉ phép (Cột A: Half Day, Cột B: Full Day) từ tab Template Attendance."""
+    global _attendance_cache
+    now_ts = time.time()
+    df = None
+    
+    if _attendance_cache["data"] is not None and now_ts - _attendance_cache["time"] < 60:
+        df = _attendance_cache["data"]
+    else:
+        try:
+            url = "https://docs.google.com/spreadsheets/d/18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54/gviz/tq?tqx=out:csv&gid=1366655674"
+            resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            if resp.status_code == 200:
+                df = pd.read_csv(io.StringIO(resp.text), header=None)
+                _attendance_cache = {"time": now_ts, "data": df}
+        except Exception as e:
+            logger.error(f"Error fetching leave template: {e}")
+            if _attendance_cache["data"] is not None:
+                df = _attendance_cache["data"]
+    
+    if df is None:
+        return "⚠️ Could not load leave template from Google Sheets."
+
+    def extract_col_lines(c_idx):
+        if c_idx >= df.shape[1]:
+            return []
+        lines = []
+        for r in range(len(df)):
+            v = df.iloc[r, c_idx]
+            if pd.notna(v) and str(v).strip() != "":
+                lines.append(str(v).strip())
+        return lines
+
+    col_a = extract_col_lines(0)
+    col_b = extract_col_lines(1)
+
+    if leave_type == "half":
+        return "\n".join(col_a)
+    elif leave_type == "full":
+        return "\n".join(col_b)
+    else:
+        blocks = []
+        if col_a:
+            blocks.append("\n".join(col_a))
+        if col_b:
+            blocks.append("\n".join(col_b))
+        return "\n\n".join(blocks)
+
+
+
+_processed_attendance_msg_ids = set()
+
+def is_attendance_report(text: str) -> bool:
+    if not text:
+        return False
+    text_l = text.lower().strip()
+    if re.search(r"team\s*0?[1-4]\s*attendan[ce]+\s*report", text_l):
+        return True
+    if re.match(r"^[^:\n]+:\s*take\s*leave", text_l):
+        return True
+    return False
+
+def parse_attendance_report(text: str, default_tg_id: str = "") -> list:
+    records = []
+    lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
+    if not lines:
+        return []
+    
+    # 1. Team Leader Attendance report (Multi-person)
+    m_team = re.search(r"team\s*0?([1-4])\s*attendan[ce]+\s*report[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})", lines[0], re.IGNORECASE)
+    if m_team:
+        date_str = m_team.group(2)
+        current_rec = None
+        for line in lines[1:]:
+            m_p = re.match(r"^(?:\d+[\.\)]\s*)?([^:]+):\s*(.*)$", line)
+            if m_p and not m_p.group(1).lower().startswith("reason") and not m_p.group(1).lower().startswith("total"):
+                if current_rec:
+                    records.append(current_rec)
+                p_name = m_p.group(1).strip()
+                p_stat = m_p.group(2).strip().lower()
+                work = "Work" if "work" in p_stat and "leave" not in p_stat else ""
+                half_day = "Half day" if "half" in p_stat else ""
+                take_leave = "Take leave" if "leave" in p_stat and "half" not in p_stat else ""
+                current_rec = {
+                    "date": date_str,
+                    "name": p_name,
+                    "work": work,
+                    "takeLeave": take_leave,
+                    "halfDay": half_day,
+                    "reason": "",
+                    "telegramId": ""
+                }
+            elif line.lower().startswith("reason:") and current_rec:
+                current_rec["reason"] = line.split(":", 1)[1].strip()
+        if current_rec:
+            records.append(current_rec)
+        return records
+
+    # 2. Individual leave / half day format
+    m_indiv = re.match(r"^([^:]+):\s*take\s*leave(?:\s*(half\s*day|full\s*day))?", lines[0], re.IGNORECASE)
+    if m_indiv:
+        name = m_indiv.group(1).strip()
+        hd_match = m_indiv.group(2)
+        half_day = "Half day" if (hd_match and "half" in hd_match.lower()) or "half" in lines[0].lower() else ""
+        take_leave = "Take leave" if not half_day else ""
+        reason = ""
+        for line in lines[1:]:
+            if line.lower().startswith("reason:"):
+                reason = line.split(":", 1)[1].strip()
+        now_mm = datetime.now(TZ_MM)
+        date_str = now_mm.strftime("%d/%m/%Y")
+        records.append({
+            "date": date_str,
+            "name": name,
+            "work": "",
+            "takeLeave": take_leave,
+            "halfDay": half_day,
+            "reason": reason,
+            "telegramId": str(default_tg_id or "")
+        })
+        return records
+
+    return []
+
+def store_attendance_to_sheet(items: list) -> dict:
+    try:
+        url = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+        payload = {
+            "action": "attendance_add",
+            "items": items
+        }
+        resp = requests.post(url, json=payload, timeout=10)
+        return resp.json()
+    except Exception as e:
+        logger.error(f"store_attendance_to_sheet error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 def is_daily_plan(text: str) -> bool:
     """
     Detect Daily Plan message submitted by Team Leaders.
@@ -1091,7 +1229,7 @@ def send_help_menu(chat_id: int) -> None:
         "<b>[TOA 8] Construction Search</b>\n"
         "• Type: <code>cons TNI0310</code> or <code>pro TNI0310</code> or <code>/cons TNI0310</code>\n\n"
         "<b>[TOA 9] Attendance & Form Templates</b>\n"
-        "• Type: <code>template attendance</code>, <code>template team 1-4</code>, <code>template header</code>, <code>daily</code>, <code>plan</code>\n\n"
+        "• Type: <code>template attendance</code>, <code>template leave</code>, <code>template team 1-4</code>, <code>template header</code>, <code>daily</code>, <code>plan</code>\n\n"
         "<b>[TOA 10] Help & Interactive Menu</b>\n"
         "• Type: <code>menu</code> or <code>/menu</code> or <code>help</code>\n"
         "━━━━━━━━━━━━━━━━━━━━"
@@ -1398,6 +1536,13 @@ def handle(update: dict) -> None:
         tg_send(chat_id, reply)
         return
 
+    # Plain text command for Leave Template (Xin nghỉ phép: Cột A & B)
+    if any(text_l.startswith(p) for p in ("template leave", "leave template", "template take leave", "take leave", "leave half day", "leave full day", "xin nghi", "xin phep", "leave")) and len(text_l.split()) <= 4:
+        l_type = "half" if "half" in text_l else ("full" if "full" in text_l else None)
+        reply = get_leave_template_text(l_type)
+        tg_send(chat_id, reply)
+        return
+
     # ── UNIFIED COMMAND NORMALIZATION: Tự động loại bỏ '/' và '@bot_username' ──
     clean_text = text
     if clean_text.startswith("/"):
@@ -1460,12 +1605,39 @@ def handle(update: dict) -> None:
             tg_send(chat_id, reply)
             return
 
+        if first_word in ("leave", "takeleave", "xinnghi", "nghiphep") or (first_word == "template" and any(k in rest.lower() for k in ("leave", "nghi", "phep"))):
+            l_type = "half" if "half" in rest.lower() else ("full" if "full" in rest.lower() else None)
+            reply = get_leave_template_text(l_type)
+            tg_send(chat_id, reply)
+            return
+
         if first_word == "reload":
             load_all_sheets()
             tg_send(chat_id, "✅ Data reloaded")
             return
 
         clean_text = f"{first_word} {rest}".strip()
+
+    # ── 0. ATTENDANCE & LEAVE REPORT SUBMIT (PRIORITY #0: Process attendance/leave reports & split per person) ──
+    if is_attendance_report(clean_text) or is_attendance_report(text):
+        msg_id = msg.get("message_id")
+        if msg_id and msg_id in _processed_attendance_msg_ids:
+            logger.info(f"Skipping duplicate Attendance webhook msg_id={msg_id}")
+            return
+        if msg_id:
+            _processed_attendance_msg_ids.add(msg_id)
+            if len(_processed_attendance_msg_ids) > 500:
+                _processed_attendance_msg_ids.clear()
+
+        att_items = parse_attendance_report(text, default_tg_id=str(user_id or ""))
+        if att_items:
+            res = store_attendance_to_sheet(att_items)
+            count = len(att_items)
+            msg_date = msg.get("date")
+            now_mm = datetime.fromtimestamp(msg_date, TZ_MM) if msg_date else datetime.now(TZ_MM)
+            time_str = now_mm.strftime('%H:%M')
+            tg_send(chat_id, f"✅ <b>Attendance saved ({time_str})</b> — Recorded {count} staff to Sheet.")
+            return
 
     # ── 1. DAILY PLAN SUBMIT (PRIORITY #1: Process plan BEFORE SSOT classify to prevent TNI code hijacking) ──
     if is_daily_plan(clean_text) or is_daily_plan(text):

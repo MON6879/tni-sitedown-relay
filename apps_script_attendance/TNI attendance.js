@@ -97,6 +97,8 @@ function doPost(e) {
     const senderId = telegramUser ? telegramUser.id.toString() : "unknown";
     const senderName = telegramUser ? (telegramUser.first_name + (telegramUser.last_name ? " " + telegramUser.last_name : "")) : "Staff";
 
+    // ── XỬ LÝ TIN NHẮN VĂN BẢN (TEXT COMMANDS & ATTENDANCE / LEAVE REPORTS) ──
+    const rawText = (msg.text || msg.caption || "").trim();
     let fileId = null;
     if (msg.photo && msg.photo.length > 0) {
       fileId = msg.photo[msg.photo.length - 1].file_id;
@@ -104,8 +106,32 @@ function doPost(e) {
       fileId = msg.document.file_id;
     }
 
+    if (rawText && !fileId) {
+      const textL = rawText.toLowerCase();
+
+      // 1. Tra cứu Attendance & Leave Templates
+      if (textL.indexOf("template") !== -1 || textL.indexOf("attendance") === 0 || textL.indexOf("/attendance") === 0 || textL.indexOf("leave") === 0 || textL.indexOf("/leave") === 0) {
+        const tplReply = handleAttendanceTemplateQuery_(ssId, rawText);
+        if (tplReply) {
+          sendTelegramMessage_(token, chatId, tplReply);
+          return ContentService.createTextOutput("Template sent");
+        }
+      }
+
+      // 2. Thu thập báo cáo điểm danh của Team Leader / Xin nghỉ phép cá nhân
+      if (isAttendanceReportText_(rawText)) {
+        const count = processAttendanceReportText_(ssId, rawText, senderId);
+        if (count > 0) {
+          const nowMM = new Date();
+          const timeStr = Utilities.formatDate(nowMM, "Asia/Rangoon", "HH:mm");
+          sendTelegramMessage_(token, chatId, "✅ Attendance saved (" + timeStr + ") — Recorded " + count + " staff to Sheet.");
+          return ContentService.createTextOutput("Attendance recorded: " + count);
+        }
+      }
+    }
+
     if (!fileId) {
-      return ContentService.createTextOutput("Message does not contain photo");
+      return ContentService.createTextOutput("Message does not contain photo or attendance report");
     }
 
     logToSheet_("Photo fileId: " + fileId + ", downloading from Telegram...");
@@ -858,3 +884,209 @@ function logToSheet_(message) {
     logSheet.appendRow([new Date(), message]);
   } catch (e) {}
 }
+
+// ── ATTENDANCE & LEAVE TEMPLATE & RECORDING FUNCTIONS ──
+
+function isAttendanceReportText_(text) {
+  if (!text) return false;
+  const t = text.toLowerCase().trim();
+  if (/team\s*0?[1-4]\s*attendan[ce]+\s*report/i.test(t)) return true;
+  if (/^[^:\n]+:\s*take\s*leave/i.test(t)) return true;
+  return false;
+}
+
+function handleAttendanceTemplateQuery_(ssId, queryText) {
+  try {
+    const ss = SpreadsheetApp.openById(ssId);
+    const tplSheet = ss.getSheetByName("Template Attendance");
+    if (!tplSheet || tplSheet.getLastRow() < 1) return null;
+
+    const q = queryText.toLowerCase().trim();
+    const isLeave = q.indexOf("leave") !== -1 || q.indexOf("nghi") !== -1 || q.indexOf("phep") !== -1;
+    const isHeaderOnly = q.indexOf("header") !== -1 || q.indexOf("title") !== -1 || q.indexOf("short") !== -1;
+
+    // Leave templates (Cols A & B)
+    if (isLeave) {
+      const isHalf = q.indexOf("half") !== -1;
+      const isFull = q.indexOf("full") !== -1;
+      const colA = tplSheet.getRange(1, 1, Math.min(tplSheet.getLastRow(), 10), 1).getValues().map(r => String(r[0] || "").trim()).filter(Boolean);
+      const colB = tplSheet.getRange(1, 2, Math.min(tplSheet.getLastRow(), 10), 1).getValues().map(r => String(r[0] || "").trim()).filter(Boolean);
+      
+      if (isHalf) return colA.join("\n");
+      if (isFull) return colB.join("\n");
+      return colA.join("\n") + "\n\n" + colB.join("\n");
+    }
+
+    // Team Attendance templates (Cols F:I -> Col idx 6, 7, 8, 9 in 1-based)
+    const teamColMap = { 1: 6, 2: 7, 3: 8, 4: 9 };
+    const m = q.match(/\b(?:team|t)?\s*([1-4])\b/i);
+    const teamNum = m ? parseInt(m[1], 10) : null;
+
+    const nowMM = new Date();
+    const dateShort = Utilities.formatDate(nowMM, "Asia/Rangoon", "dd/MM/yy");
+
+    function getTeamLines(t) {
+      const colIdx = teamColMap[t];
+      if (!colIdx) return [];
+      const vals = tplSheet.getRange(1, colIdx, Math.min(tplSheet.getLastRow(), 30), 1).getValues();
+      const lines = [];
+      for (let r = 0; r < vals.length; r++) {
+        let v = String(vals[r][0] || "").trim();
+        if (v) {
+          if (v.toLowerCase().indexOf("total:") === 0) continue;
+          if (r === 0 && v.toLowerCase().indexOf("report:") !== -1) {
+            v = "Team 0" + t + " Attendane report: " + dateShort;
+          }
+          lines.push(v);
+          if (isHeaderOnly && lines.length >= 1) break;
+        }
+      }
+      return lines;
+    }
+
+    if (teamNum && teamColMap[teamNum]) {
+      const lines = getTeamLines(teamNum);
+      return lines.join("\n");
+    } else {
+      const blocks = [];
+      for (let t = 1; t <= 4; t++) {
+        const lines = getTeamLines(t);
+        if (lines.length > 0) blocks.push(lines.join("\n"));
+      }
+      return isHeaderOnly ? blocks.join("\n") : blocks.join("\n\n");
+    }
+  } catch (err) {
+    Logger.log("handleAttendanceTemplateQuery_ error: " + err);
+    return null;
+  }
+}
+
+function processAttendanceReportText_(ssId, text, defaultTgId) {
+  try {
+    const ss = SpreadsheetApp.openById(ssId);
+    const sumSheet = ss.getSheetByName("Sum report morning attendance");
+    if (!sumSheet) return 0;
+
+    // 1. Build lookup map from 'Staff attendance' (Col A: Telegram ID, Col C: Name Telegram, Col F: Full Name, Col H: VMY Code)
+    const staffMap = {};
+    const staffSheet = ss.getSheetByName("Staff attendance");
+    if (staffSheet && staffSheet.getLastRow() > 1) {
+      const staffValues = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 8).getValues();
+      for (let i = 0; i < staffValues.length; i++) {
+        const tgId = String(staffValues[i][0] || "").trim();
+        const tgName = String(staffValues[i][2] || "").trim().toLowerCase();
+        const fullName = String(staffValues[i][5] || "").trim().toLowerCase();
+        const vmyCode = String(staffValues[i][7] || "").trim().toLowerCase();
+        if (tgId) {
+          if (fullName) staffMap[fullName] = tgId;
+          if (tgName) staffMap[tgName] = tgId;
+          if (vmyCode) staffMap[vmyCode] = tgId;
+        }
+      }
+    }
+
+    const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return 0;
+
+    const items = [];
+    const mTeam = lines[0].match(/team\s*0?([1-4])\s*attendan[ce]+\s*report[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
+
+    if (mTeam) {
+      const dateStr = mTeam[2];
+      let currentRec = null;
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        const mP = line.match(/^(?:\d+[\.\)]\s*)?([^:]+):\s*(.*)$/);
+        if (mP && !/^reason/i.test(mP[1]) && !/^total/i.test(mP[1])) {
+          if (currentRec) items.push(currentRec);
+          const pName = mP[1].trim();
+          const pStat = mP[2].trim().toLowerCase();
+          const isWork = pStat.indexOf("work") !== -1 && pStat.indexOf("leave") === -1;
+          const isHalf = pStat.indexOf("half") !== -1;
+          const isLeave = pStat.indexOf("leave") !== -1 && !isHalf;
+          currentRec = {
+            date: dateStr,
+            name: pName,
+            work: isWork ? "Work" : "",
+            takeLeave: isLeave ? "Take leave" : "",
+            halfDay: isHalf ? "Half day" : "",
+            reason: "",
+            telegramId: ""
+          };
+        } else if (/^reason:/i.test(line) && currentRec) {
+          currentRec.reason = line.substring(line.indexOf(":") + 1).trim();
+        }
+      }
+      if (currentRec) items.push(currentRec);
+    } else {
+      const mIndiv = lines[0].match(/^([^:]+):\s*take\s*leave(?:\s*(half\s*day|full\s*day))?/i);
+      if (mIndiv) {
+        const pName = mIndiv[1].trim();
+        const isHalf = (mIndiv[2] && mIndiv[2].toLowerCase().indexOf("half") !== -1) || lines[0].toLowerCase().indexOf("half") !== -1;
+        const isLeave = !isHalf;
+        let reason = "";
+        for (let i = 1; i < lines.length; i++) {
+          if (/^reason:/i.test(lines[i])) {
+            reason = lines[i].substring(lines[i].indexOf(":") + 1).trim();
+          }
+        }
+        const nowMM = new Date();
+        const dateStr = Utilities.formatDate(nowMM, "Asia/Rangoon", "dd/MM/yyyy");
+        items.push({
+          date: dateStr,
+          name: pName,
+          work: "",
+          takeLeave: isLeave ? "Take leave" : "",
+          halfDay: isHalf ? "Half day" : "",
+          reason: reason,
+          telegramId: String(defaultTgId || "")
+        });
+      }
+    }
+
+    if (items.length === 0) return 0;
+
+    // 2. Base REF sequence
+    let nextRefSeq = 1;
+    if (sumSheet.getLastRow() > 1) {
+      const topRef = String(sumSheet.getRange(2, 1).getValue() || "").trim();
+      const mRef = topRef.match(/ATT-(\d+)/i);
+      if (mRef) {
+        nextRefSeq = parseInt(mRef[1], 10) + 1;
+      } else {
+        nextRefSeq = sumSheet.getLastRow();
+      }
+    }
+
+    // 3. Prepare rows (Strict Top Insertion Rule: insert at Row 2)
+    const rowsToInsert = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const name = it.name;
+      const normName = name.toLowerCase();
+      let tgId = it.telegramId;
+      if (!tgId && staffMap[normName]) {
+        tgId = staffMap[normName];
+      }
+      const refStr = "ATT-" + String(nextRefSeq + i).padStart(4, "0");
+      rowsToInsert.push([
+        refStr,
+        it.date,
+        name,
+        it.work,
+        it.takeLeave,
+        it.halfDay,
+        it.reason,
+        tgId
+      ]);
+    }
+
+    sumSheet.insertRowsBefore(2, rowsToInsert.length);
+    sumSheet.getRange(2, 1, rowsToInsert.length, 8).setValues(rowsToInsert);
+    return rowsToInsert.length;
+  } catch (err) {
+    Logger.log("processAttendanceReportText_ error: " + err);
+    return 0;
+  }
+}
+
