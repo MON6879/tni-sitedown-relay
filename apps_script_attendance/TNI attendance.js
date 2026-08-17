@@ -917,14 +917,15 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
 
     // Leave templates (Cols A & B)
     if (isLeave) {
-      const isHalf = q.indexOf("half") !== -1;
-      const isFull = q.indexOf("full") !== -1;
+      const isHalf = q.indexOf("half") !== -1 || q.indexOf("nuangay") !== -1 || q.indexOf("1/2") !== -1;
+      const isFull = q.indexOf("full") !== -1 || q.indexOf("cangay") !== -1;
+      const isAll = q.indexOf("all") !== -1 || q.indexOf("both") !== -1;
       const colA = tplSheet.getRange(1, 1, Math.min(tplSheet.getLastRow(), 10), 1).getValues().map(r => String(r[0] || "").trim()).filter(Boolean);
       const colB = tplSheet.getRange(1, 2, Math.min(tplSheet.getLastRow(), 10), 1).getValues().map(r => String(r[0] || "").trim()).filter(Boolean);
       
+      if (isAll) return colA.join("\n") + "\n\n" + colB.join("\n");
       if (isHalf) return colA.join("\n");
-      if (isFull) return colB.join("\n");
-      return colA.join("\n") + "\n\n" + colB.join("\n");
+      return colB.join("\n");
     }
 
     // Team Attendance templates (Cols F:I -> Col idx 6, 7, 8, 9 in 1-based)
@@ -1112,7 +1113,8 @@ function setupAttendanceBotCommands() {
     { command: "template_team2", description: "Team 2 Attendance template" },
     { command: "template_team3", description: "Team 3 Attendance template" },
     { command: "template_team4", description: "Team 4 Attendance template" },
-    { command: "leave",          description: "Leave / Take leave template (Full/Half day)" },
+    { command: "leave",          description: "Full-day leave template (Take leave)" },
+    { command: "leave_half",     description: "Half-day leave template (Half day)" },
     { command: "header",         description: "Header-only attendance template" }
   ];
   

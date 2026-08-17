@@ -2,7 +2,7 @@ import requests
 from http.server import BaseHTTPRequestHandler
 import json
 
-GAS_ATTENDANCE_URL = "https://script.google.com/macros/s/AKfycbzdCtRZy_z02yJgff7nq4x2g1UZmoRyun3JOk6pGJ1QfAk-zTjgSv0RfNFy-1HZ923qgg/exec"
+GAS_ATTENDANCE_URL = "https://script.google.com/macros/s/AKfycbxfEZsU7cnZsEJ-xWhf34VzyeStnwDnIBVppu21nv6NPkGEcQe1pUrARNQuIAqq1a0PKQ/exec"
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
