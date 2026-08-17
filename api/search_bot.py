@@ -837,6 +837,69 @@ def get_plan_template_text(team_num: int) -> str:
         logger.error(f"get_plan_template_text error: {e}")
         return f"Error: {str(e)}"
 
+_attendance_cache = {"time": 0, "data": None}
+
+def get_attendance_template_text(team_num: int = None, header_only: bool = False) -> str:
+    """Tải động mẫu điểm danh từ tab Template Attendance của Spreadsheet 18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54 (gid=1366655674)."""
+    global _attendance_cache
+    now_ts = time.time()
+    df = None
+    
+    if _attendance_cache["data"] is not None and now_ts - _attendance_cache["time"] < 60:
+        df = _attendance_cache["data"]
+    else:
+        try:
+            url = "https://docs.google.com/spreadsheets/d/18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54/gviz/tq?tqx=out:csv&gid=1366655674"
+            resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            if resp.status_code == 200:
+                df = pd.read_csv(io.StringIO(resp.text), header=None)
+                _attendance_cache = {"time": now_ts, "data": df}
+        except Exception as e:
+            logger.error(f"Error fetching attendance template: {e}")
+            if _attendance_cache["data"] is not None:
+                df = _attendance_cache["data"]
+    
+    if df is None:
+        return "⚠️ Could not load attendance template from Google Sheets."
+
+    team_col_map = {1: 5, 2: 6, 3: 7, 4: 8}
+    now_mm = datetime.now(TZ_MM)
+    date_short = now_mm.strftime("%d/%m/%y")
+
+    def extract_team_lines(t):
+        col_idx = team_col_map.get(t)
+        if col_idx is None or col_idx >= df.shape[1]:
+            return []
+        lines = []
+        for r in range(len(df)):
+            v = df.iloc[r, col_idx]
+            if pd.notna(v) and str(v).strip() != "":
+                v_str = str(v).strip()
+                if v_str.lower().startswith("total:"):
+                    continue
+                if r == 0 and "report:" in v_str.lower():
+                    v_str = f"Team 0{t} Attendane report: {date_short}"
+                lines.append(v_str)
+                if header_only and len(lines) >= 1:
+                    break
+        return lines
+
+    if team_num in team_col_map:
+        lines = extract_team_lines(team_num)
+        if not lines:
+            return f"⚠️ No template found for Team {team_num}."
+        return "\n".join(lines)
+    else:
+        all_blocks = []
+        for t in (1, 2, 3, 4):
+            lines = extract_team_lines(t)
+            if lines:
+                all_blocks.append("\n".join(lines))
+        if header_only:
+            return "\n".join(all_blocks)
+        return "\n\n".join(all_blocks)
+
+
 def is_daily_plan(text: str) -> bool:
     """
     Detect Daily Plan message submitted by Team Leaders.
@@ -1027,7 +1090,9 @@ def send_help_menu(chat_id: int) -> None:
         "• Admin: <code>mysite &lt;ID&gt;</code>, <code>mydata &lt;ID&gt;</code>\n\n"
         "<b>[TOA 8] Construction Search</b>\n"
         "• Type: <code>cons TNI0310</code> or <code>pro TNI0310</code> or <code>/cons TNI0310</code>\n\n"
-        "<b>[TOA 9] Help & Interactive Menu</b>\n"
+        "<b>[TOA 9] Attendance & Form Templates</b>\n"
+        "• Type: <code>template attendance</code>, <code>template team 1-4</code>, <code>template header</code>, <code>daily</code>, <code>plan</code>\n\n"
+        "<b>[TOA 10] Help & Interactive Menu</b>\n"
         "• Type: <code>menu</code> or <code>/menu</code> or <code>help</code>\n"
         "━━━━━━━━━━━━━━━━━━━━"
     )
@@ -1322,6 +1387,17 @@ def handle(update: dict) -> None:
         tg_send(chat_id, reply)
         return
 
+    # Plain text command for Attendance Template
+    if any(text_l.startswith(p) for p in ("template attendance", "attendance template", "template attend", "template diemdanh", "template att", "template team", "template t1", "template t2", "template t3", "template t4")) and len(text_l.split()) <= 4:
+        header_only = any(kw in text_l for kw in ("header", "title", "tieude", "short"))
+        team_num = None
+        m = re.search(r"\b(?:team|t)?\s*([1-4])\b", text_l)
+        if m:
+            team_num = int(m.group(1))
+        reply = get_attendance_template_text(team_num, header_only=header_only)
+        tg_send(chat_id, reply)
+        return
+
     # ── UNIFIED COMMAND NORMALIZATION: Tự động loại bỏ '/' và '@bot_username' ──
     clean_text = text
     if clean_text.startswith("/"):
@@ -1372,6 +1448,16 @@ def handle(update: dict) -> None:
             chat_title = msg["chat"].get("title") or first_name or "Private"
             chat_type  = msg["chat"].get("type", "private")
             tg_send(chat_id, f"👤 <b>{html.escape(first_name)}</b>\n🔑 ID: <code>{user_id}</code>\n💬 Chat: <code>{chat_id}</code>\n📍 Type: {chat_type}")
+            return
+
+        if first_word in ("attendance", "attend", "diemdanh", "att") or (first_word == "template" and ("attend" in rest.lower() or "diemdanh" in rest.lower() or "att" in rest.lower())):
+            header_only = any(kw in rest.lower() for kw in ("header", "title", "tieude", "short"))
+            team_num = None
+            m = re.search(r"\b(?:team|t)?\s*([1-4])\b", rest, re.IGNORECASE)
+            if m:
+                team_num = int(m.group(1))
+            reply = get_attendance_template_text(team_num, header_only=header_only)
+            tg_send(chat_id, reply)
             return
 
         if first_word == "reload":
