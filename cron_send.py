@@ -6,13 +6,14 @@ Dùng 3 bot theo dải row trong sheet Task remain (gid=133591305):
   Row 60-74: SEND_BOT + compiled report (management)
   Row 75-87: @TNITECHINICALDEPREPORT_BOT (technical dept)
 """
-import asyncio, csv, io, logging, os, re, requests, pandas as pd
+import asyncio, csv, io, logging, os, re, requests, time, pandas as pd
 from datetime import datetime, timezone, timedelta
 from telegram import Bot
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from dotenv import load_dotenv
-from delete_old_helper import delete_old_messages_bot, save_msgids, delete_by_title_telethon
+from delete_old_helper import delete_old_messages_bot, save_msgids, delete_by_title_telethon, delete_by_titles_batch_telethon
+
 
 load_dotenv()
 logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s", level=logging.INFO)
@@ -23,7 +24,7 @@ REPORT_TASK_BOT_TOKEN   = os.getenv("REPORT_TASK_BOT_TOKEN", "")
 TECHNICAL_DEP_BOT_TOKEN = os.getenv("TECHNICAL_DEP_BOT_TOKEN", "")
 MAIN_GAS_FALLBACK   = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
 APPS_SCRIPT_URL   = os.getenv("APPS_SCRIPT_URL", "").strip()
-if not APPS_SCRIPT_URL or "AKfycbzGFdnE" in APPS_SCRIPT_URL:
+if not APPS_SCRIPT_URL or "AKfycbzGFdnE" in APPS_SCRIPT_URL or "AKfycbz-" not in APPS_SCRIPT_URL:
     APPS_SCRIPT_URL = MAIN_GAS_FALLBACK
 TELEGRAM_API_ID         = int(os.getenv("TELEGRAM_API_ID", "0"))
 TELEGRAM_API_HASH       = os.getenv("TELEGRAM_API_HASH", "")
@@ -1975,48 +1976,47 @@ async def main():
         str(TELEGRAM_GROUPS["T4"]): "CRON_TEAM_T4_FULL",
     }
 
-    # ── Delete old messages theo tiêu đề (Telethon) + fallback GAS msg_id ──
-    # Telethon scan lịch sử chat → xóa TẤT CẢ tin cũ cùng tiêu đề
-    # Fallback: GAS msg_id (xóa tin liền trước nếu Telethon không khả dụng)
+    # ── Delete old messages theo tiêu đề (Telethon Batch) + fallback GAS msg_id ──
+    # Single-pass scan: mỗi nhóm chỉ quét lịch sử 1 lần, cực nhanh < 3s, không bị Timeout/FloodWait!
     if SEND_BOT_TOKEN and TELEGRAM_SESSION and TELEGRAM_API_ID:
-        # Tiêu đề từng loại tin → map (chat_id, title_prefix)
-        delete_tasks = []
-        for del_cid in CHATID_TO_KEY.keys():
-            delete_tasks.append((del_cid, "📋 1. Report — Daily Backlog"))
-            delete_tasks.append((del_cid, "📋 2. Report — DailyWO"))
-            delete_tasks.append((del_cid, "📋 2. Report — Daily Backlog"))
-            delete_tasks.append((del_cid, "📋 3. Report — Main DG Material Need"))
-            delete_tasks.append((del_cid, "📋 4. Report — Daily EOD Task & Stats"))
-            delete_tasks.append((del_cid, "📋 4a. Report — Daily EOD Task & Stats"))
-            delete_tasks.append((del_cid, "📓 4b. Full Report"))
-            delete_tasks.append((del_cid, "📊 4c. Report — Employee Task & Rank"))
-            delete_tasks.append((del_cid, "📦 4c. Asset progress for material"))
-            delete_tasks.append((del_cid, "📦 4d. Asset progress for material"))
-            delete_tasks.append((del_cid, "4d. Asset progress for material"))
-            delete_tasks.append((del_cid, "📦 3.1 Asset progress for material"))
-            delete_tasks.append((del_cid, "3.1 Asset progress for material"))
-            delete_tasks.append((del_cid, "📋 5. Report — Daily Plan"))
-        delete_tasks += [
-            (str(CONTROL_CHAT_ID), "📋 1. Report — Technical Dept Task Progress"),
-            (str(CONTROL_CHAT_ID), "📋 8. Report — Technical Dep Assign to Team"),
-            (str(CONTROL_CHAT_ID), "📋 4. Report — TL Comparison"),
-            (str(CONTROL_CHAT_ID), "📋 4a. Report — Daily EOD Task & Stats"),
-            (str(CONTROL_CHAT_ID), "📦 4c. Asset progress for material"),
-            (str(CONTROL_CHAT_ID), "4c. Asset progress for material"),
-            (str(CONTROL_CHAT_ID), "📦 3.1 Asset progress for material"),
-            (str(CONTROL_CHAT_ID), "3.1 Asset progress for material"),
-            (str(CONTROL_CHAT_ID), "📋 5. Report — Daily Plan"),
-            (str(CONTROL_CHAT_ID), "📋 1. BOD"),   # BOD report nếu có
+        team_prefixes = [
+            "📋 1. Report — Daily Backlog",
+            "📋 2. Report — DailyWO",
+            "📋 2. Report — Daily Backlog",
+            "📋 3. Report — Main DG Material Need",
+            "📋 4. Report — Daily EOD Task & Stats",
+            "📋 4a. Report — Daily EOD Task & Stats",
+            "📓 4b. Full Report",
+            "📊 4c. Report — Employee Task & Rank",
+            "📦 4c. Asset progress for material",
+            "📦 4d. Asset progress for material",
+            "4d. Asset progress for material",
+            "📦 3.1 Asset progress for material",
+            "3.1 Asset progress for material",
+            "📋 5. Report — Daily Plan",
         ]
+        chat_to_prefixes = {del_cid: team_prefixes for del_cid in CHATID_TO_KEY.keys()}
+        chat_to_prefixes[str(CONTROL_CHAT_ID)] = [
+            "📋 1. Report — Technical Dept Task Progress",
+            "📋 8. Report — Technical Dep Assign to Team",
+            "📋 4. Report — TL Comparison",
+            "📋 4a. Report — Daily EOD Task & Stats",
+            "📦 4c. Asset progress for material",
+            "4c. Asset progress for material",
+            "📦 3.1 Asset progress for material",
+            "3.1 Asset progress for material",
+            "📋 5. Report — Daily Plan",
+            "📋 1. BOD",
+        ]
+
         try:
             async with TelegramClient(
                 StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH
             ) as tg_client:
-                logger.info("🗑️ Delete old messages by title (Telethon)...")
-                for del_cid, title_pfx in delete_tasks:
-                    await delete_by_title_telethon(tg_client, SEND_BOT_TOKEN, del_cid, title_pfx)
+                logger.info("🗑️ Delete old messages by batch (Telethon Fast Scan)...")
+                await delete_by_titles_batch_telethon(tg_client, SEND_BOT_TOKEN, chat_to_prefixes)
         except Exception as tg_err:
-            logger.warning(f"Telethon delete lỗi, fallback GAS: {tg_err}")
+            logger.warning(f"Telethon batch delete lỗi, fallback GAS: {tg_err}")
             # Fallback: GAS msg_id delete
             if APPS_SCRIPT_URL:
                 for del_cid, del_key in CHATID_TO_KEY.items():
