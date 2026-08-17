@@ -6958,8 +6958,8 @@ Team04>> 2Box</td>
     // Pillar 5: Error Isolation — try-catch + error banner + retry
     // ============================================================
     window.PlanWeek = {
-      // Config — Standalone TNI BI Backend Project (1G790B-ZHinJUQKHr-u0F2NDiaxNDjfYYSo84QysD2c3b9VGZCeevUKCU)
-      GAS_URL: 'https://script.google.com/macros/s/AKfycbzidgWuL0DfKvkdDjKnN4qCRy4HUv8lIzvGiO3ZR84e-VLbu84IITd9H2HPSJW28yzhOw/exec',
+      // Config — Standalone TNI BI Backend Project
+      GAS_URL: 'https://script.google.com/macros/s/AKfycbwI2fqOgTzdR9RNoVTk4ZRcvBaa1JAZ9BVoo2k4hYlMJLX3Aso3og6LxcOu3I-vmVRm0g/exec',
       
       // State
       data: [],
@@ -6982,12 +6982,7 @@ Team04>> 2Box</td>
       // ── Init ──
       init() {
         try {
-          // Prompt for email on first visit (for permission check)
           this.userEmail = localStorage.getItem('tni_plan_dep_email') || '';
-          if (!this.userEmail) {
-            this.userEmail = (prompt('Enter your Gmail for Plan Week access control:') || '').trim().toLowerCase();
-            if (this.userEmail) localStorage.setItem('tni_plan_dep_email', this.userEmail);
-          }
           this.loadData();
           this.loadPermissions();
           // Auto-refresh every 30s (Pillar 7: Performance Budget)
@@ -7069,8 +7064,6 @@ Team04>> 2Box</td>
         
         if (countEl) countEl.textContent = '(' + this.data.length + ')';
         
-        const isAdmin = this.userRole === 'ADMIN';
-        
         tbody.innerHTML = this.data.map((item, idx) => {
           const hasComplete = item.dateComplete && item.dateComplete.trim() !== '';
           
@@ -7081,7 +7074,7 @@ Team04>> 2Box</td>
             <td style="text-align:left !important; max-width:400px; line-height:1.4; font-size:0.82rem; color:var(--text-sub);">${this.escHtml(item.detailTask)}</td>
             <td style="font-size:0.82rem; color:var(--amber); cursor:pointer; text-decoration:underline dotted;" onclick="PlanWeek.startInlineEdit(${item.row}, 5, this, '${this.escAttr(item.progress)}')" title="Click to edit">${item.progress || '<span style=&quot;color:var(--text-muted);&quot;>— set —</span>'}</td>
             <td style="font-size:0.82rem; color:var(--emerald); cursor:pointer; text-decoration:underline dotted;" onclick="PlanWeek.startInlineEdit(${item.row}, 6, this, '${this.escAttr(item.dateComplete)}')" title="Click to edit">${item.dateComplete || '<span style=&quot;color:var(--text-muted);&quot;>— set —</span>'}</td>
-            <td>${isAdmin ? '<button style="background:none; border:none; color:var(--rose); cursor:pointer; font-size:0.85rem;" onclick="PlanWeek.deleteRow(' + item.row + ')" title="Delete"><i class="fa-solid fa-trash"></i></button>' : '<span style="color:var(--text-muted); font-size:0.7rem;">🔒</span>'}</td>
+            <td><button style="background:none; border:none; color:var(--rose); cursor:pointer; font-size:0.85rem;" onclick="PlanWeek.deleteRow(${item.row})" title="Delete"><i class="fa-solid fa-trash"></i></button></td>
           </tr>`;
         }).join('');
       },
@@ -7152,12 +7145,8 @@ Team04>> 2Box</td>
         this.render();
       },
 
-      // ── Open/Close Add Modal ──
+      // ── Open/Close Add Modal (Mọi người đều có quyền thêm) ──
       openAddModal() {
-        if (this.userRole === 'VIEWER') {
-          alert('You need EDITOR or ADMIN permission to add plans. Contact admin.');
-          return;
-        }
         // Auto-fill today's date
         const dateInput = document.getElementById('pdep-add-date');
         if (dateInput) {
@@ -7218,9 +7207,17 @@ Team04>> 2Box</td>
         }
       },
 
-      // ── Delete Row (Pillar 2: ADMIN only, checked at GAS) ──
+      // ── Delete Row (CHỈ ADMIN MỚI CÓ QUYỀN XÓA) ──
       async deleteRow(row) {
         if (!confirm('Are you sure you want to delete this plan item?')) return;
+        if (!this.userEmail) {
+          this.userEmail = (prompt('Enter your Admin Gmail to confirm deletion:') || '').trim().toLowerCase();
+          if (this.userEmail) localStorage.setItem('tni_plan_dep_email', this.userEmail);
+        }
+        if (!this.userEmail) {
+          alert('Admin Gmail is required to delete rows.');
+          return;
+        }
         try {
           const resp = await fetch(this.GAS_URL, {
             method: 'POST',
