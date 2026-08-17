@@ -57,18 +57,13 @@ _last_daily_sync_date = ""
 
 def fetch_config_templates(force: bool = False) -> dict:
     """Fetch Column A (A2:A) from 'Config' tab (gid=1236389870) in Google Sheet 1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8.
-    Automatically refreshes at 01:08 AM MMT daily or when cache is >30 minutes old.
+    Automatically refreshes every 5 minutes (300 seconds) or when forced.
     """
     global _config_templates_cache, _config_templates_ts, _last_daily_sync_date, _keywords_cache
     now = time.time()
-    now_mm = datetime.now(TZ_MM)
-    today_str = now_mm.strftime("%Y-%m-%d")
     
-    # Check if 01:08 AM MMT has passed today and we haven't synced for today yet
-    is_sync_time = (now_mm.hour == 1 and now_mm.minute >= 8) or (now_mm.hour > 1)
-    need_daily_sync = is_sync_time and (_last_daily_sync_date != today_str)
-
-    if not force and not need_daily_sync and _config_templates_cache and (now - _config_templates_ts < 1800):
+    # 5-minute cache TTL (Pillar 1: Tight Sliding Window Timing)
+    if not force and _config_templates_cache and (now - _config_templates_ts < 300):
         return _config_templates_cache
 
     try:
@@ -101,8 +96,6 @@ def fetch_config_templates(force: bool = False) -> dict:
             _config_templates_cache = {"all": lines, "map": mapping}
             _config_templates_ts = now
             _keywords_cache = keywords
-            if is_sync_time:
-                _last_daily_sync_date = today_str
             logger.info(f"Loaded {len(lines)} templates from Config sheet A2:A")
             return _config_templates_cache
     except Exception as e:
@@ -111,6 +104,43 @@ def fetch_config_templates(force: bool = False) -> dict:
     if _config_templates_cache:
         return _config_templates_cache
     return {"all": [], "map": {}}
+
+def sync_telegram_menu_commands(force: bool = False) -> bool:
+    """Sync Telegram Bot Menu Commands from Google Sheet Config Tab Column A every 5 minutes."""
+    if not COLLECTOR_BOT_TOKEN:
+        return False
+    data = fetch_config_templates(force=force)
+    lines = data.get("all", [])
+    if not lines:
+        return False
+    
+    commands = []
+    seen = set()
+    for l in lines:
+        first_part = l.split(":")[0].strip() if ":" in l else l.split()[0].strip()
+        cmd = first_part.lower().replace(" ", "_").replace("-", "_")
+        cmd = "".join(c for c in cmd if c.isalnum() or c == "_")[:32]
+        if cmd and cmd not in seen:
+            seen.add(cmd)
+            desc = f"Get {first_part} template"
+            commands.append({"command": cmd, "description": desc[:256]})
+
+    for def_cmd, def_desc in [("done", "Get Done template"), ("find", "Search tasks, WOs, or site details")]:
+        if def_cmd not in seen:
+            seen.add(def_cmd)
+            commands.append({"command": def_cmd, "description": def_desc})
+
+    try:
+        r = requests.post(
+            f"https://api.telegram.org/bot{COLLECTOR_BOT_TOKEN}/setMyCommands",
+            json={"commands": commands},
+            timeout=10
+        )
+        logger.info(f"Telegram setMyCommands sync ({len(commands)} commands): {r.json()}")
+        return True
+    except Exception as ex:
+        logger.error(f"Telegram setMyCommands error: {ex}")
+        return False
 
 def get_keywords() -> list:
     """Load keywords from Config sheet col A (text before ':'), cache result."""
@@ -126,17 +156,27 @@ def get_template_text(cmd_name: str) -> str:
     mapping = data.get("map", {})
     
     clean_cmd = cmd_name.lstrip("/").strip().lower()
+    norm_cmd = clean_cmd.replace("_", " ").replace("-", " ")
+    no_space_cmd = clean_cmd.replace("_", "").replace("-", "").replace(" ", "")
     
     # 1. Exact match in mapping
     if clean_cmd in mapping:
         return mapping[clean_cmd]
+    if norm_cmd in mapping:
+        return mapping[norm_cmd]
         
-    # 2. Match lines starting with command name (e.g. /inventory -> all "Inventory..." lines)
-    matching = [line for line in lines if line.lower().startswith(clean_cmd)]
+    # 2. Normalized match (e.g. loss_fuel -> Loss fuel, inventory_oil -> Inventory oil)
+    for k, v in mapping.items():
+        k_clean = k.replace("_", "").replace("-", "").replace(" ", "")
+        if k_clean == no_space_cmd:
+            return v
+        
+    # 3. Match lines starting with command name (e.g. /inventory -> all "Inventory..." lines)
+    matching = [line for line in lines if line.lower().startswith(norm_cmd) or line.lower().startswith(clean_cmd)]
     if matching:
         return "\n".join(matching)
         
-    # 3. Fallback: all lines if /template or /all
+    # 4. Fallback: all lines if /template or /all
     if clean_cmd in ("template", "templates", "all", "help"):
         return "\n".join(lines) if lines else ""
 
@@ -1223,12 +1263,13 @@ class handler(BaseHTTPRequestHandler):
             return
 
         ensure_collector_webhook_active()
+        cmd_synced = sync_telegram_menu_commands()
         token_ok  = "SET" if COLLECTOR_BOT_TOKEN else "MISSING"
         script_ok = "SET" if APPS_SCRIPT_URL else "MISSING"
         self.send_response(200)
         self.end_headers()
         self.wfile.write(
-            f"Collector Bot OK | TOKEN:{token_ok} | SCRIPT_URL:{script_ok}".encode()
+            f"Collector Bot OK | TOKEN:{token_ok} | SCRIPT_URL:{script_ok} | CMDS_SYNCED:{cmd_synced}".encode()
         )
 
     def log_message(self, *a): pass
