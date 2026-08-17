@@ -7148,7 +7148,7 @@ Team04>> 2Box</td>
         try {
           const resp = await fetch(this.GAS_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'plan_dep_update', row, col, value: newVal, email: this.userEmail })
           });
           const json = await resp.json();
@@ -7211,7 +7211,7 @@ Team04>> 2Box</td>
         try {
           const resp = await fetch(this.GAS_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({
               action: 'plan_dep_add',
               email: this.userEmail,
@@ -7244,7 +7244,7 @@ Team04>> 2Box</td>
         try {
           const resp = await fetch(this.GAS_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'plan_dep_delete', row, email: this.userEmail })
           });
           const json = await resp.json();
