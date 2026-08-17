@@ -6970,19 +6970,10 @@ Team04>> 2Box</td>
     };
 
     // ============================================================
-    // 🏛️ PLAN WEEK TAB — window.PlanWeek Namespace
-    // Following 8 BI Architecture Pillars (v2026-08-17)
-    // Pillar 1: SSOT — All data from GAS API
-    // Pillar 2: Security-First — Server-side permission check
-    // Pillar 3: Separation — Self-contained namespace
-    // Pillar 4: Data Contract — Standard response format
-    // Pillar 5: Error Isolation — try-catch + error banner + retry
+    // 🏛️ PLAN WEEK TAB — window.PlanWeek Namespace (High Speed)
     // ============================================================
     window.PlanWeek = {
-      // Config — Same-origin Vercel Proxy Endpoint (Zero CORS failures)
       GAS_URL: '/api/plan_dep',
-      
-      // State
       data: [],
       historyData: [],
       permits: [],
@@ -6993,21 +6984,12 @@ Team04>> 2Box</td>
       historyVisible: false,
       refreshTimer: null,
 
-      // Department color map
-      deptColors: {
-        'Admin': 'tag-t2', 'Asset': 'tag-t3', 'Technical': 'tag-t1',
-        'Transmission': 'tag-t4', 'CM': 'tag-t1', 'Construction Projects': 'tag-t2',
-        'Finance': 'tag-t4', 'M&E': 'tag-t3', 'PM': 'tag-t1'
-      },
-
-      // ── Init ──
       init() {
         try {
           this.userEmail = localStorage.getItem('tni_plan_dep_email') || '';
           this.loadData();
           this.loadPermissions();
           this.initResizable();
-          // Auto-refresh every 30s (Pillar 7: Performance Budget)
           if (this.refreshTimer) clearInterval(this.refreshTimer);
           this.refreshTimer = setInterval(() => this.loadData(), 30000);
         } catch (err) {
@@ -7016,7 +6998,6 @@ Team04>> 2Box</td>
         }
       },
 
-      // ── Make Tables Column Resizable with Mouse Drag ──
       initResizable() {
         const setupTable = (tableId, storageKey) => {
           const table = document.getElementById(tableId);
@@ -7039,8 +7020,7 @@ Team04>> 2Box</td>
             resizer.className = 'resizer';
             th.appendChild(resizer);
 
-            let startX = 0;
-            let startWidth = 0;
+            let startX = 0, startWidth = 0;
 
             const onMouseDown = (e) => {
               e.stopPropagation();
@@ -7066,9 +7046,7 @@ Team04>> 2Box</td>
                 document.removeEventListener('mouseup', onMouseUp);
                 
                 const widths = {};
-                ths.forEach((h, i) => {
-                  widths[i] = h.offsetWidth;
-                });
+                ths.forEach((h, i) => { widths[i] = h.offsetWidth; });
                 localStorage.setItem(storageKey, JSON.stringify(widths));
               };
 
@@ -7084,7 +7062,6 @@ Team04>> 2Box</td>
         setupTable('pdep-history-table', 'tni_pdep_history_widths');
       },
 
-      // ── Load Permissions (Pillar 2: Security-First) ──
       async loadPermissions() {
         try {
           const ctrl = new AbortController();
@@ -7098,15 +7075,12 @@ Team04>> 2Box</td>
             this.userRole = me ? me.role : 'VIEWER';
           }
         } catch (err) {
-          console.warn('[PlanWeek] Permission check failed, defaulting to VIEWER:', err.message);
           this.userRole = 'VIEWER';
         }
-        this.updateActionButtons();
+        this.render();
       },
 
-      // ── Load Data (Pillar 1: SSOT + Pillar 4: Data Contract) ──
       async loadData() {
-        // 🛡️ Không vẽ lại bảng khi người dùng đang gõ dở nội dung (tránh bị out)
         if (document.querySelector('#pdep-tbody input') || document.getElementById('planDepAddModal')?.classList.contains('active')) {
           return;
         }
@@ -7118,24 +7092,21 @@ Team04>> 2Box</td>
           clearTimeout(timer);
           const json = await resp.json();
           
-          if (json.status !== 'ok') throw new Error(json.error?.message || 'API returned error');
+          if (json.status !== 'ok') throw new Error(json.error?.message || 'API error');
           
           this.data = json.data || [];
           this.historyData = json.history || [];
           this.weekNumber = json.meta?.weekNumber || 0;
           this.weekRange = json.meta?.weekRange || '';
           
-          // Update header
           const titleEl = document.getElementById('pdep-week-title');
           if (titleEl) titleEl.textContent = 'Department Plan — Week ' + this.weekNumber;
           const rangeEl = document.getElementById('pdep-week-range');
           if (rangeEl) rangeEl.innerHTML = '<i class="fa-solid fa-clock"></i> ' + this.weekRange;
           
-          // Update sync time
           const syncEl = document.getElementById('pdep-sync-time');
           if (syncEl) syncEl.textContent = 'Last sync: ' + new Date().toLocaleTimeString();
           
-          // Dynamic update Backoffice dropdown from Column J
           if (json.meta?.backofficeList && Array.isArray(json.meta.backofficeList) && json.meta.backofficeList.length > 0) {
             const selectEl = document.getElementById('pdep-add-manager');
             if (selectEl) {
@@ -7149,14 +7120,12 @@ Team04>> 2Box</td>
           this.render();
           this.renderHistory();
         } catch (err) {
-          console.error('[PlanWeek] Load failed:', err);
           if (!this.data.length) {
             this.renderError('Failed to load Plan data: ' + err.message);
           }
         }
       },
 
-      // ── Render Active Plan Table (Pillar 5: Error Isolation) ──
       render() {
         const tbody = document.getElementById('pdep-tbody');
         const countEl = document.getElementById('pdep-count');
@@ -7170,7 +7139,6 @@ Team04>> 2Box</td>
         
         if (countEl) countEl.textContent = '(' + this.data.length + ')';
         
-        // Sort: Ngày lớn lên đầu (Cột B), sau đó gom theo Technical Manager (Cột C)
         const parseD = s => {
           if (!s) return 0;
           const p = String(s).trim().split('/');
@@ -7179,8 +7147,8 @@ Team04>> 2Box</td>
         this.data.sort((a, b) => {
           const da = parseD(a.dateAssign);
           const db = parseD(b.dateAssign);
-          if (db !== da) return db - da; // Ngày lớn lên đầu
-          return (a.techManager || '').localeCompare(b.techManager || ''); // Gom theo Manager
+          if (db !== da) return db - da;
+          return (a.techManager || '').localeCompare(b.techManager || '');
         });
 
         tbody.innerHTML = this.data.map((item, idx) => {
@@ -7198,7 +7166,6 @@ Team04>> 2Box</td>
         }).join('');
       },
 
-      // ── Render History Table ──
       renderHistory() {
         const tbody = document.getElementById('pdep-history-tbody');
         const countEl = document.getElementById('pdep-history-count');
@@ -7223,14 +7190,12 @@ Team04>> 2Box</td>
         }).join('');
       },
 
-      // ── Inline Edit for E:F (Click to Edit with Full Control) ──
       startInlineEdit(row, col, td, currentVal, type) {
-        if (td.querySelector('input')) return; // Already editing
+        if (td.querySelector('input')) return;
         const original = currentVal || '';
         
         let inputHtml = '';
         if (type === 'date') {
-          // Convert DD/MM/YYYY to YYYY-MM-DD for date input
           let isoDate = '';
           if (original && original.indexOf('/') !== -1) {
             const p = original.split('/');
@@ -7284,8 +7249,7 @@ Team04>> 2Box</td>
       },
 
       async executeInlineSave(row, col, newVal) {
-        // Optimistic local update in memory
-        const target = this.planData.find(d => d.row === row);
+        const target = this.data.find(d => d.row === row);
         if (target) {
           if (col === 5) target.progress = newVal;
           if (col === 6) target.dateComplete = newVal;
@@ -7301,7 +7265,6 @@ Team04>> 2Box</td>
           });
           const json = await resp.json();
           if (json.status !== 'ok') throw new Error(json.error?.message || 'Update failed');
-          // Quiet background sync
           this.loadData();
         } catch (err) {
           alert('Error saving: ' + err.message);
@@ -7309,12 +7272,6 @@ Team04>> 2Box</td>
         }
       },
 
-      // ── Update Action Buttons Visibility ──
-      updateActionButtons() {
-        this.render();
-      },
-
-      // ── Open/Close Add Modal (Mọi người đều có quyền thêm) ──
       openAddModal() {
         const dateInput = document.getElementById('pdep-add-date');
         if (dateInput) {
@@ -7336,7 +7293,6 @@ Team04>> 2Box</td>
         if (detail) detail.value = '';
       },
 
-      // ── Submit Add (Tạo mới tức thì với Optimistic UI) ──
       async submitAdd() {
         const dateRaw = document.getElementById('pdep-add-date')?.value || '';
         const techManager = document.getElementById('pdep-add-manager')?.value || '';
@@ -7357,16 +7313,16 @@ Team04>> 2Box</td>
           saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
         }
 
-        // Optimistic UI: Hiển thị ngay lập tức trên bảng
+        // 🚀 TỐC ĐỘ 0.01S: Hiển thị dòng mới tức thì lên bảng và đóng form ngay!
         const optimisticItem = {
-          row: 3,
+          row: Date.now(),
           dateAssign,
           techManager,
           detailTask,
           progress: '',
           dateComplete: ''
         };
-        this.planData.unshift(optimisticItem);
+        this.data.unshift(optimisticItem);
         this.render();
         this.closeAddModal();
         
@@ -7385,26 +7341,26 @@ Team04>> 2Box</td>
           });
           const json = await resp.json();
           if (json.status !== 'ok') throw new Error(json.error?.message || 'Add failed');
-          await this.loadData();
+          // Quiet background sync with real row index
+          this.loadData();
         } catch (err) {
           alert('Error adding plan: ' + err.message);
-          await this.loadData();
+          this.loadData();
         } finally {
           if (saveBtn) {
             saveBtn.disabled = false;
-            saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Add Plan';
+            saveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Save Plan';
           }
         }
       },
 
-      // ── Delete Row (Xóa ngay tức thì 0.01s với Optimistic UI) ──
       async deleteRow(row, btnEl) {
         if (!confirm('Are you sure you want to delete this plan item?')) return;
         const email = this.userEmail || localStorage.getItem('tni_plan_dep_email') || 'phonghdpxd@gmail.com';
         
-        // Optimistic UI: Xóa khỏi bảng hiển thị ngay lập tức không cần chờ server
-        const previousData = [...this.planData];
-        this.planData = this.planData.filter(item => item.row !== row);
+        // 🚀 TỐC ĐỘ 0.01S: Xóa khỏi bảng hiển thị ngay lập tức
+        const previousData = [...this.data];
+        this.data = this.data.filter(item => item.row !== row);
         this.render();
 
         try {
@@ -7415,16 +7371,14 @@ Team04>> 2Box</td>
           });
           const json = await resp.json();
           if (json.status !== 'ok') throw new Error(json.error?.message || 'Delete failed');
-          // Đồng bộ lại hàng chính xác trong nền
           this.loadData();
         } catch (err) {
           alert('Error deleting: ' + err.message);
-          this.planData = previousData;
+          this.data = previousData;
           this.render();
         }
       },
 
-      // ── Archive Completed Tasks ──
       async archiveCompleted() {
         if (!confirm('Move all completed tasks (with Date Complete before this week) to History?')) return;
         try {
@@ -7438,7 +7392,6 @@ Team04>> 2Box</td>
         }
       },
 
-      // ── Toggle History Section ──
       toggleHistory() {
         this.historyVisible = !this.historyVisible;
         const section = document.getElementById('pdep-history-section');
@@ -7447,11 +7400,10 @@ Team04>> 2Box</td>
         if (chevron) chevron.style.transform = this.historyVisible ? 'rotate(180deg)' : 'rotate(0deg)';
       },
 
-      // ── Error Banner (Pillar 5: Error Isolation) ──
       renderError(msg) {
         const tbody = document.getElementById('pdep-tbody');
         if (tbody) {
-          tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem;">
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem;">
             <div style="color:var(--rose); font-size:1rem; margin-bottom:0.8rem;">
               <i class="fa-solid fa-triangle-exclamation"></i> ${this.escHtml(msg)}
             </div>
@@ -7462,7 +7414,6 @@ Team04>> 2Box</td>
         }
       },
 
-      // ── Utility: HTML Escape ──
       escHtml(str) { 
         const d = document.createElement('div'); 
         d.textContent = str || ''; 
@@ -7475,7 +7426,6 @@ Team04>> 2Box</td>
 
     window.addEventListener('DOMContentLoaded', () => {
       window.updateWoChart();
-      // Init Plan Week when tab is first shown (lazy load)
       let planWeekInitialized = false;
       const origShowTab = window.showTab;
       window.showTab = function(panelId, tabBtn) {
