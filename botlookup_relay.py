@@ -296,9 +296,9 @@ async def main():
         gas_url = os.environ.get("SD_APPS_SCRIPT_URL") or os.environ.get("APPS_SCRIPT_URL") or ""
 
         if not bot_messages:
-            err = f"[{myanmar_now()}] @{BOT_USERNAME} khong phan hoi trong 35s (Stage 1 + 2)"
+            err = f"[{myanmar_now()}] @{BOT_USERNAME} did not respond within 35s (Stage 1 + 2)"
             print(err)
-            await client.send_message(TARGET_CHAT_ID, err)
+            # 🛑 Không gửi tin báo lỗi nội bộ vào nhóm tác chiến để tránh spam nhóm
 
         raw_text = "\n".join(bot_messages) if bot_messages else ""
 
