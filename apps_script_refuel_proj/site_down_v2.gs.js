@@ -626,11 +626,16 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
     if (!isRealIncidentData_(txt)) continue;
     const clean = escHtml(txt.replace(/[*_`]/g, ""));
     if (r < AWAZ_LABELS.length) {
-      lines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
+      const labelName = AWAZ_LABELS[r].name;
+      const prefixRegex = new RegExp("^" + labelName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
+      const cleanBody = clean.replace(prefixRegex, "");
+      lines.push(AWAZ_LABELS[r].emoji + " <b>" + labelName + ":</b> " + cleanBody);
     } else {
       const lm = txt.match(/^([^:]+):/);
       const lb = lm ? lm[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
-      lines.push("📌 <b>" + escHtml(lb) + ":</b> " + clean);
+      const prefixRegex = new RegExp("^" + lb.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
+      const cleanBody = clean.replace(prefixRegex, "");
+      lines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
     }
     hasData = true;
   }
@@ -661,11 +666,16 @@ function buildAwAzControlMessage(ts, awaz) {
       if (!isRealIncidentData_(txt)) continue;
       const clean = escHtml(txt.replace(/[*_`]/g, ""));
       if (r < AWAZ_LABELS.length) {
-        teamLines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
+        const labelName = AWAZ_LABELS[r].name;
+        const prefixRegex = new RegExp("^" + labelName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
+        const cleanBody = clean.replace(prefixRegex, "");
+        teamLines.push(AWAZ_LABELS[r].emoji + " <b>" + labelName + ":</b> " + cleanBody);
       } else {
         const lm = txt.match(/^([^:]+):/);
         const lb = lm ? lm[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
-        teamLines.push("📌 <b>" + escHtml(lb) + ":</b> " + clean);
+        const prefixRegex = new RegExp("^" + lb.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
+        const cleanBody = clean.replace(prefixRegex, "");
+        teamLines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
       }
       hasData = true;
       totalIncidents++;
