@@ -54,6 +54,20 @@ const AWAZ_LABELS = [
 const TEAM_COLORS = { T1: "🟠", T2: "🔵", T3: "🟢", T4: "🟡" };
 
 
+/**
+ * 🤖 Xử lý Webhook Telegram Update (Bot 10 Construction, Callbacks, Commands)
+ */
+function handleTelegramWebhook_(data) {
+  try {
+    if (typeof processTelegramUpdate === "function") {
+      processTelegramUpdate(data);
+    }
+  } catch (ex) {
+    Logger.log("[handleTelegramWebhook_] Lỗi xử lý update: " + ex.message);
+  }
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, status: "processed" })).setMimeType(ContentService.MimeType.JSON);
+}
+
 // ============================================================
 // WEB APP — doPost() (Xử lý dán Cột A — CHỈ GỌI LUỒNG COL C)
 // ============================================================
