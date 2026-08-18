@@ -103,16 +103,18 @@ function doPost(e) {
       const props   = PropertiesService.getScriptProperties();
       const relayTs = data.relay_ts || 0;
 
-      // Clear & ghi dữ liệu mới vào Cột A
+      // ✅ GHI ĐÈ TRỰC TIẾP (Atomic Overwrite) — KHÔNG clearContent trước để tránh công thức FILTER bị giật về #N/A
       const lastRow = Math.max(sheet.getLastRow(), 1);
-      sheet.getRange(1, 1, lastRow, 1).clearContent();
-
       const lines = text.split("\n");
       if (lines.length > 0) {
         const values = lines.map(l => [l]);
         sheet.getRange(1, 1, values.length, 1).setValues(values);
+        // Chỉ xóa các dòng thừa bên dưới nếu dữ liệu mới ngắn hơn dữ liệu cũ
+        if (lastRow > values.length) {
+          sheet.getRange(values.length + 1, 1, lastRow - values.length, 1).clearContent();
+        }
       }
-      Logger.log("[doPost] store_site_down — " + lines.length + " dòng ghi vào Col A | relay_ts=" + relayTs);
+      Logger.log("[doPost] store_site_down — " + lines.length + " dòng ghi vào Col A (Atomic Overwrite) | relay_ts=" + relayTs);
 
       // ✅ TÁCH BIỆT LUỒNG: Xóa chìa khóa A1 để Luồng A1/Col C BẮN TIN 1 NGAY LẬP TỨC
       props.deleteProperty(TS_KEY_A1);
@@ -120,22 +122,32 @@ function doPost(e) {
       if (relayTs > 0) props.setProperty("SD_LAST_RELAY_TS", relayTs.toString());
 
       SpreadsheetApp.flush();
-      Utilities.sleep(300);
+      Utilities.sleep(5000); // Chờ 5s để Google Sheets hoàn tất tính toán công thức Cột C và AW7 trước khi đọc
+      SpreadsheetApp.flush();
 
-      // ✅ CHỈ CHẠY LUỒNG A1 / COL C (Không đụng chạm gì tới Luồng AW7)
+      // ✅ THỰC THI TUẦN TỰ 2 BẢN TIN SAU KHI SHEET TÍNH TOÁN XONG
       var sentColC = false;
+      var sentSummary = false;
       try {
         sentColC = processSiteDownColC(sheet);
-        Logger.log("[doPost] Luồng A1/Col C chạy xong. Kết quả: " + sentColC);
+        Logger.log("[doPost] Luồng 1 (Cột C) gửi xong: " + sentColC);
       } catch(errColC) {
-        Logger.log("[doPost] ❌ Lỗi Luồng A1/Col C: " + errColC.message);
+        Logger.log("[doPost] ❌ Lỗi Luồng 1 (Cột C): " + errColC.message);
+      }
+
+      try {
+        sentSummary = processSummaryAwAz(sheet);
+        Logger.log("[doPost] Luồng 2 (AW7 Summary) gửi xong: " + sentSummary);
+      } catch(errSum) {
+        Logger.log("[doPost] ❌ Lỗi Luồng 2 (AW7 Summary): " + errSum.message);
       }
 
       return _json({ 
         ok: true, 
         lines: lines.length,
         relay_ts: relayTs,
-        sent_tin1: sentColC
+        sent_tin1: sentColC,
+        sent_tin2: sentSummary
       });
     }
 
@@ -160,7 +172,13 @@ function doPost(e) {
       return _json({ ok: true, msgids: msgids });
     }
 
-    return _json({ ok: false, msg: "Unknown action: " + action });
+    // ── Plan Dep (BI Plan Week Backend) ──
+    if (action === "plan_dep_add" || action === "plan_dep_update" || action === "plan_dep_delete") {
+      return handlePlanDepPost_(data);
+    }
+
+    // 🚀 CHUYỂN TIẾP TẤT CẢ CÁC ACTION CÒN LẠI (Asset Collector, Cable, MDG, Refuel, v.v.)
+    return doPostCollector_(e);
 
   } catch (err) {
     return _json({ ok: false, msg: err.message });
@@ -170,6 +188,11 @@ function doPost(e) {
 function doGet(e) {
   try {
     const action = (e.parameter && e.parameter.action) || "";
+
+    // ── Plan Dep (BI Plan Week Backend) ──
+    if (action === "get_plan_dep") return handleGetPlanDep_();
+    if (action === "get_plan_dep_permit") return handleGetPlanDepPermit_();
+    if (action === "plan_dep_archive") return handlePlanDepArchive_();
 
     if (action === "get_note_b2b5") {
       const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
@@ -185,6 +208,9 @@ function doGet(e) {
       const msgids = JSON.parse(raw);
       return _json({ ok: true, msgids: msgids });
     }
+
+    // 🚀 CHUYỂN TIẾP TẤT CẢ CÁC GET REQUEST CÒN LẠI CHO COLLECTOR
+    return doGetCollector_(e);
 
     return _json({ ok: false, msg: "Unknown GET action: " + action });
   } catch (err) {
@@ -250,9 +276,9 @@ function checkAndSend(isWebhookCall) {
   }
 
   // 🔹 LUỒNG 2: DÀNH RIÊNG CHO AW7 (TIN 2 SUMMARY)
-  // Nếu Tin 1 vừa phát (r1 = true), ép Tin 2 phát lại ngay phía dưới để Tin 2 LUÔN NẰM Ở ĐÁY CHAT DƯỚI TIN 1
+  // CHỈ GỬI khi timestamp AW7 thay đổi, dữ liệu mới và có sự cố thực tế. Không ép gửi lại tin cũ.
   try {
-    r2 = processSummaryAwAz(sheet, r1 === true);
+    r2 = processSummaryAwAz(sheet);
   } catch(e2) {
     Logger.log("❌ Lỗi Luồng 2 (AW7 Summary): " + e2.message);
   }
@@ -280,17 +306,34 @@ function processSiteDownColC(sheet) {
     return false;
   }
 
+  // 🛑 NẾU TIN CŨ QUÁ 35 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
+  if (!isTimestampFresh_(storeKey, 35)) {
+    Logger.log("[Luồng A1] ⚠️ Timestamp A1 (" + storeKey + ") đã trễ hơn 35 phút so với hiện tại → Bỏ qua không gửi tin cũ.");
+    return false;
+  }
+
   // ✅ ĐỘC LẬP: Lưu ngay khóa A1
   props.setProperty(TS_KEY_A1, storeKey);
-  Logger.log("[Luồng A1] 🆕 Timestamp A1 thay đổi: " + storeKey + " → Đang gửi Tin 1...");
+  Logger.log("[Luồng A1] 🆕 Timestamp A1 thay đổi và hợp lệ: " + storeKey + " → Đang gửi Tin 1...");
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 1) return false;
 
-  const colC = sheet.getRange(1, 3, lastRow, 1).getValues().flat().map(v => (v || "").toString().trim());
+  let colC = sheet.getRange(1, 3, lastRow, 1).getValues().flat().map(v => (v || "").toString().trim());
 
   function isTeamSummaryLine(l) {
     return /Team\s*0?[1-4][\s\—\-]*:\s*Total\s+Site\s+down/i.test(l);
+  }
+
+  // 🛡️ FORMULA READINESS GUARD: Nếu tóm tắt báo có Site Down nhưng danh sách dòng C10 chưa nạp kịp -> Chờ 1.5s để Sheets tính toán xong
+  const hasSitesInSummary = /Total\s+Site\s+down\s*:\s*[1-9]\d*/i.test(colC[1] || "") || /Total\s+Site\s+down\s*:\s*[1-9]\d*/i.test(colC[3] || "");
+  let rawCount = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !isTeamSummaryLine(l)).length;
+  if (hasSitesInSummary && rawCount === 0) {
+    Logger.log("[Luồng A1] ⏳ Công thức Cột C đang tính toán... Chờ 5s và đọc lại");
+    Utilities.sleep(5000);
+    SpreadsheetApp.flush();
+    const newLastRow = sheet.getLastRow();
+    colC = sheet.getRange(1, 3, newLastRow, 1).getValues().flat().map(v => (v || "").toString().trim());
   }
 
   // Gửi nhóm CONTROL
@@ -381,10 +424,8 @@ function processSiteDownColC(sheet) {
     const teamField = fields[1].trim().toUpperCase();
     for (const team of teams) {
       const tn  = team.slice(1);
-      const idx = teamField.indexOf("T" + tn);
-      if (idx < 0) continue;
-      const afterChar = teamField[idx + 1 + tn.length];
-      if (!afterChar || !/\d/.test(afterChar)) {
+      const reg = new RegExp("(?:^|[^A-Z0-9])T0?" + tn + "(?:$|[^A-Z0-9]|\\s*S\\d)", "i");
+      if (reg.test(teamField) || new RegExp("Team\\s*0?" + tn + "\\b", "i").test(teamField)) {
         teamSites[team].push(line);
         break;
       }
@@ -421,36 +462,97 @@ function processSiteDownColC(sheet) {
 // LUỒNG 2 — XỬ LÝ AW7 (TIN 2 — Bảng SUMMARY)
 // Độc lập 100% — Chỉ đọc mốc giờ ô AW7 & ghi chìa khóa TS_KEY_AW7
 // ============================================================
-function processSummaryAwAz(sheet, forceSend) {
-  const rawTs = sheet.getRange("AW7").getValue().toString().trim();
+function processSummaryAwAz(sheet) {
+  const rawVal = sheet.getRange("AW7").getValue();
+  // 🔍 DEBUG: Log kiểu dữ liệu thực tế của ô AW7
+  Logger.log("[Luồng AW7] rawVal type=" + typeof rawVal + " | instanceof Date=" + (rawVal instanceof Date) + " | raw=" + String(rawVal).substring(0, 60));
+
+  let rawTs;
+  if (rawVal instanceof Date) {
+    // Nếu là Date object → format chuẩn hóa về dd/MM/yyyy HH:mm (không có giây)
+    rawTs = Utilities.formatDate(rawVal, "Asia/Rangoon", "dd/MM/yyyy HH:mm");
+  } else {
+    rawTs = String(rawVal).trim();
+  }
+
   if (!rawTs) {
     Logger.log("[Luồng AW7] Ô AW7 rỗng — Bỏ qua Luồng 2");
     return false;
   }
 
-  // ✅ ĐỘC LẬP 100%: Chỉ đọc mốc giờ riêng của ô AW7
-  const tsKey = parseAW7Timestamp(sheet) || formatTsHeader(rawTs);
+  // ✅ Chuẩn hóa tsKey: CHỈ giữ lại dd/MM/yyyy HH:mm, loại bỏ giây và phần dư
+  const m = rawTs.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
+  const tsKey = m ? m[1] : rawTs.substring(0, 16).trim();
+
+  if (!tsKey) {
+    Logger.log("[Luồng AW7] Không bóc tách được timestamp từ AW7 — Bỏ qua Luồng 2");
+    return false;
+  }
 
   const props  = PropertiesService.getScriptProperties();
   const lastTs = props.getProperty(TS_KEY_AW7) || "";
 
-  // forceSend = true khi Tin 1 vừa phát → ép Tin 2 gửi lại ngay dưới Tin 1 (đảm bảo Tin 2 luôn ở đáy chat)
-  if (tsKey === lastTs && !forceSend) {
+  // 🔍 DEBUG: Log so sánh cụ thể
+  Logger.log("[Luồng AW7] tsKey=[" + tsKey + "] lastTs=[" + lastTs + "] match=" + (tsKey === lastTs));
+
+  // 🛑 1. NẾU GIỜ KHÔNG THAY ĐỔI AW7 THÌ TUYỆT ĐỐI KHÔNG GỬI
+  if (tsKey === lastTs) {
     Logger.log("[Luồng AW7] Timestamp AW7 không đổi (" + tsKey + ") → Bỏ qua Luồng 2");
     return false;
   }
-  if (forceSend) {
-    Logger.log("[Luồng AW7] ⚡ forceSend=true (Tin 1 vừa phát) → Ép gửi lại Tin 2 xuống đáy chat!");
+
+  // 🛑 2. NẾU TIN CŨ QUÁ 35 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
+  if (!isTimestampFresh_(tsKey, 35)) {
+    Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") đã trễ hơn 35 phút so với giờ hiện tại → Bỏ qua không gửi tin cũ.");
+    return false;
   }
 
-  // ✅ ĐỘC LẬP: Lưu ngay khóa AW7
+  let awaz = readAwAz(sheet);
+
+  // 🛡️ FORMULA READINESS GUARD: Kiểm tra bảng AW7:AZ15 đã hoàn tất tính toán chưa
+  let hasAnyData = false;
+  for (let r = 0; r < awaz.length; r++) {
+    for (let c = 0; c < 4; c++) {
+      if (isRealIncidentData_((awaz[r][c] || "").toString().trim())) {
+        hasAnyData = true;
+        break;
+      }
+    }
+    if (hasAnyData) break;
+  }
+
+  // Nếu công thức Sheet chưa tính xong, flush và chờ thêm 3.5s
+  if (!hasAnyData) {
+    Logger.log("[Luồng AW7] Bảng AW:AZ chưa có dữ liệu (đang tính toán) → Flush và chờ thêm 3.5s...");
+    SpreadsheetApp.flush();
+    Utilities.sleep(3500);
+    SpreadsheetApp.flush();
+    awaz = readAwAz(sheet);
+    for (let r = 0; r < awaz.length; r++) {
+      for (let c = 0; c < 4; c++) {
+        if (isRealIncidentData_((awaz[r][c] || "").toString().trim())) {
+          hasAnyData = true;
+          break;
+        }
+      }
+      if (hasAnyData) break;
+    }
+  }
+
+  // 🛑 NẾU VẪN KHÔNG CÓ SỰ CỐ THỰC SỰ: BỎ QUA HOÀN TOÀN, KHÔNG GỬI VÀ KHÔNG LƯU KEY
+  if (!hasAnyData) {
+    Logger.log("[Luồng AW7] ⚠️ Bảng AW:AZ không có sự cố thực tế → Bỏ qua không gửi Tin 2.");
+    return false;
+  }
+
+  // ✅ ĐỘC LẬP: Lưu ngay khóa AW7 khi đã có dữ liệu thực tế
   props.setProperty(TS_KEY_AW7, tsKey);
-  Logger.log("[Luồng AW7] 🆕 Timestamp AW7 thay đổi: " + tsKey + " → Đang gửi Tin 2 (SUMMARY)...");
+  Logger.log("[Luồng AW7] 🆕 Timestamp AW7 có dữ liệu sự cố thực tế: " + tsKey + " → Đang xử lý Tin 2 (SUMMARY)...");
 
-  const awaz  = readAwAz(sheet);
   const teams = ["T1", "T2", "T3", "T4"];
+  let sentCount = 0;
 
-  // Gửi sang 4 nhóm Team
+  // Gửi sang 4 nhóm Team (Chỉ gửi nhóm nào CÓ SỰ CỐ, không gửi "No incident")
   for (const team of teams) {
     try {
       const chatId = SD_GROUPS[team];
@@ -458,33 +560,43 @@ function processSummaryAwAz(sheet, forceSend) {
       const colIdx = AWAZ_COL[team];
       if (colIdx === undefined) continue;
       const msg = buildAwAzTeamMessage(team, tsKey, awaz, colIdx);
+      if (!msg) {
+        Logger.log("[Luồng AW7][" + team + "] Không có sự cố → Bỏ qua không gửi.");
+        continue;
+      }
       sendOrEditTelegram(chatId, msg, "TIN2_" + team, "[Tin2][" + team + "]");
+      sentCount++;
     } catch (err) {
       Logger.log("[Luồng AW7][" + team + "] ❌ " + err.message);
     }
   }
 
-  // Gửi nhóm CONTROL
+  // Gửi nhóm CONTROL (Chỉ gửi nếu có ít nhất 1 team có sự cố)
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
       const msg = buildAwAzControlMessage(tsKey, awaz);
-      sendOrEditTelegram(controlId, msg, "TIN2_CONTROL", "[Tin2][CONTROL]");
+      if (msg) {
+        sendOrEditTelegram(controlId, msg, "TIN2_CONTROL", "[Tin2][CONTROL]");
+      }
     } catch(e) {
       Logger.log("[Luồng AW7][CONTROL] ❌ " + e.message);
     }
   }
 
-  // Gửi DM cá nhân
-  for (const pid of SD_PERSONAL_IDS) {
-    try {
-      sendOrEditTelegram(pid, buildAwAzControlMessage(tsKey, awaz), "TIN2_P_" + pid, "[Tin2][DM]");
-    } catch(e) {}
-    Utilities.sleep(200);
+  // Gửi DM cá nhân (Chỉ gửi nếu có sự cố)
+  const ctrlMsg = buildAwAzControlMessage(tsKey, awaz);
+  if (ctrlMsg) {
+    for (const pid of SD_PERSONAL_IDS) {
+      try {
+        sendOrEditTelegram(pid, ctrlMsg, "TIN2_P_" + pid, "[Tin2][DM]");
+      } catch(e) {}
+      Utilities.sleep(200);
+    }
   }
 
-  Logger.log("[Luồng AW7] ✅ Hoàn tất gửi Tin 2 SUMMARY!");
-  return true;
+  Logger.log("[Luồng AW7] ✅ Hoàn tất xử lý Tin 2 SUMMARY (Đã gửi " + sentCount + " nhóm)!");
+  return sentCount > 0;
 }
 
 
@@ -525,6 +637,26 @@ function readAwAz(sheet) {
   return sheet.getRange(7, 49, 9, 4).getValues();
 }
 
+// 🛡️ HELPER: Kiểm tra ô AW:AZ có chứa dữ liệu sự cố thực sự không
+// Quy tắc: CHỈ coi là có data khi ô chứa ít nhất 1 ký tự chữ cái (a-z/A-Z)
+// VÀ không phải là pattern rỗng đã biết (No incident, nan, none, etc.)
+function isRealIncidentData_(txt) {
+  if (!txt) return false;
+  var s = txt.toString().trim();
+  if (!s) return false;
+  // Loại bỏ các giá trị rỗng đã biết
+  var lo = s.toLowerCase();
+  if (lo === "0" || lo === "-" || lo === "=" || lo === "nan" || lo === "none" || lo === "null") return false;
+  if (lo.indexOf("no incident") >= 0) return false;
+  // Phải chứa ít nhất 1 ký tự chữ cái THỰC (a-zA-Z) và không chỉ toàn số/ký hiệu
+  // VD: '/0 = /0' -> false, 'TNI0115 : 97.7' -> true, 'Bhone Htet Aung' -> true
+  if (!/[a-zA-Z]/.test(s)) return false;
+  // Loại trừ: chỉ chứa các từ generic không có thông tin sự cố
+  var stripped = s.replace(/[^a-zA-Z]/g, "").toLowerCase();
+  if (stripped === "nan" || stripped === "none" || stripped === "null") return false;
+  return true;
+}
+
 function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
   const label   = "Team " + teamKey.replace("T", "");
   const numRows = awaz.length;
@@ -536,18 +668,24 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
   let hasData = false;
   for (let r = 0; r < numRows; r++) {
     const txt = ((awaz[r] || [])[colIdx] || "").toString().trim();
-    if (!txt || txt === "0") continue;
+    if (!isRealIncidentData_(txt)) continue;
     const clean = escHtml(txt.replace(/[*_`]/g, ""));
     if (r < AWAZ_LABELS.length) {
-      lines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
+      const labelName = AWAZ_LABELS[r].name;
+      const prefixRegex = new RegExp("^" + labelName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
+      const cleanBody = clean.replace(prefixRegex, "");
+      lines.push(AWAZ_LABELS[r].emoji + " <b>" + labelName + ":</b> " + cleanBody);
     } else {
       const lm = txt.match(/^([^:]+):/);
       const lb = lm ? lm[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
-      lines.push("📌 <b>" + escHtml(lb) + ":</b> " + clean);
+      const prefixRegex = new RegExp("^" + lb.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
+      const cleanBody = clean.replace(prefixRegex, "");
+      lines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
     }
     hasData = true;
   }
-  if (!hasData) lines.push("✅ No incident");
+  // 🛑 KHÔNG CÓ SỰ CỐ THÌ TRẢ VỀ NULL ĐỂ BỎ QUA KHÔNG GỬI
+  if (!hasData) return null;
   return lines.join("\n");
 }
 
@@ -564,27 +702,73 @@ function buildAwAzControlMessage(ts, awaz) {
   lines.push("📅 " + escHtml(ts));
   lines.push("━".repeat(26));
 
+  let totalIncidents = 0;
   for (const t of teamDefs) {
-    lines.push("");
-    lines.push(t.emoji + " <b>" + t.label + "</b>");
-    lines.push("─".repeat(20));
+    const teamLines = [];
     let hasData = false;
     for (let r = 0; r < numRows; r++) {
       const txt = ((awaz[r] || [])[t.col] || "").toString().trim();
-      if (!txt || txt === "0") continue;
+      if (!isRealIncidentData_(txt)) continue;
       const clean = escHtml(txt.replace(/[*_`]/g, ""));
       if (r < AWAZ_LABELS.length) {
-        lines.push(AWAZ_LABELS[r].emoji + " <b>" + AWAZ_LABELS[r].name + ":</b> " + clean);
+        const labelName = AWAZ_LABELS[r].name;
+        const prefixRegex = new RegExp("^" + labelName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
+        const cleanBody = clean.replace(prefixRegex, "");
+        teamLines.push(AWAZ_LABELS[r].emoji + " <b>" + labelName + ":</b> " + cleanBody);
       } else {
         const lm = txt.match(/^([^:]+):/);
         const lb = lm ? lm[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
-        lines.push("📌 <b>" + escHtml(lb) + ":</b> " + clean);
+        const prefixRegex = new RegExp("^" + lb.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
+        const cleanBody = clean.replace(prefixRegex, "");
+        teamLines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
       }
       hasData = true;
+      totalIncidents++;
     }
-    if (!hasData) lines.push("✅ No incident");
+    if (hasData) {
+      lines.push("");
+      lines.push(t.emoji + " <b>" + t.label + "</b>");
+      lines.push("─".repeat(20));
+      lines.push(...teamLines);
+    }
   }
+  // Nếu tất cả các team đều không có sự cố thì không gửi gì
+  if (totalIncidents === 0) return null;
   return lines.join("\n");
+}
+
+function isTimestampFresh_(tsStr, maxAgeMinutes) {
+  maxAgeMinutes = (typeof maxAgeMinutes === "number") ? maxAgeMinutes : 35;
+  if (!tsStr) return false;
+  const m = tsStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+  if (!m) return true;
+  const day = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10) - 1;
+  const year = parseInt(m[3], 10);
+  const hour = parseInt(m[4], 10);
+  const minute = parseInt(m[5], 10);
+  
+  const now = new Date();
+  const nowStr = Utilities.formatDate(now, "Asia/Rangoon", "yyyy-MM-dd HH:mm");
+  const nowParts = nowStr.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+  if (nowParts) {
+    const curYear = parseInt(nowParts[1], 10);
+    const curMonth = parseInt(nowParts[2], 10) - 1;
+    const curDay = parseInt(nowParts[3], 10);
+    const curHour = parseInt(nowParts[4], 10);
+    const curMin = parseInt(nowParts[5], 10);
+
+    const tsDate = new Date(year, month, day, hour, minute);
+    const curDate = new Date(curYear, curMonth, curDay, curHour, curMin);
+    const diffMinutes = (curDate.getTime() - tsDate.getTime()) / (1000 * 60);
+
+    // 🛑 NẾU LỆCH QUÁ 5 PHÚT (diffMinutes > 5) HOẶC TƯƠNG LAI > 2 PHÚT -> BỎ QUA KHÔNG GỬI
+    if (diffMinutes > maxAgeMinutes || diffMinutes < -2) {
+      Logger.log("[isTimestampFresh_] ⚠️ Timestamp " + tsStr + " lệch " + diffMinutes.toFixed(1) + " phút (vượt quá " + maxAgeMinutes + "m) → BỎ QUA KHÔNG GỬI");
+      return false;
+    }
+  }
+  return true;
 }
 
 
@@ -609,7 +793,35 @@ function splitMessage(text, maxLen) {
   return chunks;
 }
 
+// 🛡️ HÀM KIỂM TRA NỘI DUNG RỖNG: Nếu không có dữ liệu thực tế thì TUYỆT ĐỐI KHÔNG GỬI
+function isValidMessageContent_(text) {
+  if (!text) return false;
+  var s = text.toString().trim();
+  if (!s || s === "..." || s === "null" || s === "undefined") return false;
+  
+  // Loại bỏ các chuỗi rỗng toàn dấu phân cách < > | | |
+  var noDelims = s.replace(/[<>|\s\-_.,:]/g, "");
+  if (!noDelims || noDelims.length < 3) return false;
+  
+  // Loại bỏ các tin chỉ chứa No incident hoặc tiêu đề không có nội dung
+  var lines = s.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+  var meaningfulLines = lines.filter(l => {
+    var lo = l.toLowerCase();
+    if (lo.indexOf("no incident") >= 0) return false;
+    if (/^[━─_=\-\s]+$/.test(l)) return false;
+    if (/^(📊|📅|📌|team\s*\d|summary)/i.test(lo) && l.length < 40) return false;
+    return true;
+  });
+  
+  if (meaningfulLines.length === 0) return false;
+  return true;
+}
+
 function sendOrEditTelegram(chatId, text, msgKey, tag) {
+  if (!isValidMessageContent_(text)) {
+    Logger.log("[sendOrEditTelegram] ⚠️ Nội dung rỗng hoặc không có sự cố thực tế → BỎ QUA KHÔNG GỬI (" + tag + ")");
+    return;
+  }
   deleteOldMessages_(chatId, msgKey);
   Utilities.sleep(200);
   const props  = PropertiesService.getScriptProperties();
@@ -619,7 +831,10 @@ function sendOrEditTelegram(chatId, text, msgKey, tag) {
 }
 
 function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
-  // ✅ Xóa tin cũ và bắn tin mới xuống ĐÁY CHAT TELEGRAM theo định dạng HTML đẹp mắt (KHÔNG dùng thẻ <pre> ô xám code)
+  if (!isValidMessageContent_(plainContent)) {
+    Logger.log("[sendOrEditTelegramPre] ⚠️ Nội dung rỗng hoặc không có sự cố thực tế → BỎ QUA KHÔNG GỬI (" + tag + ")");
+    return;
+  }
   deleteOldMessages_(chatId, msgKey);
   Utilities.sleep(200);
   const props  = PropertiesService.getScriptProperties();
@@ -807,11 +1022,11 @@ function triggerBotlookupRelay() {
 // TIỆN ÍCH CHẠY THỬ & ĐẶT TRIGGER
 // ============================================================
 function setupSdTrigger() {
+  // Xóa bỏ tất cả trigger chạy ngầm mỗi 1 phút để tránh tự gửi lại tin cũ
   ScriptApp.getProjectTriggers()
     .filter(t => t.getHandlerFunction() === "checkAndSend")
     .forEach(t => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger("checkAndSend").timeBased().everyMinutes(1).create();
-  Logger.log("✅ Trigger checkAndSend() mỗi 1 phút đã cài đặt.");
+  Logger.log("✅ Đã dọn sạch trigger ngầm. Tin nhắn Site Down chỉ gửi đồng bộ khi có dữ liệu dán Cột A từ Botlookup.");
 }
 
 // 🧪 CHẠY THỬ ĐỘC LẬP 2 LUỒNG
