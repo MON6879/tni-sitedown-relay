@@ -116,9 +116,9 @@ function doPost(e) {
       }
       Logger.log("[doPost] store_site_down — " + lines.length + " dòng ghi vào Col A (Atomic Overwrite) | relay_ts=" + relayTs);
 
-      // ✅ MỞ KHÓA TOÀN BỘ: Xóa cả chìa khóa A1 và AW7 để sau khi dán Cột A là tự động gửi thông tin ngay lập tức
+      // ✅ MỞ KHÓA LUỒNG 1: Xóa chìa khóa A1 để dữ liệu Cột A vừa dán luôn được gửi Tin 1
       props.deleteProperty(TS_KEY_A1);
-      props.deleteProperty(TS_KEY_AW7);
+      // 🛑 TUYỆT ĐỐI KHÔNG XÓA TS_KEY_AW7: Luồng 2 (AW7 Summary) chỉ gửi khi ô AW7 thực sự có mốc giờ MỚI!
 
       if (relayTs > 0) props.setProperty("SD_LAST_RELAY_TS", relayTs.toString());
 
@@ -128,7 +128,9 @@ function doPost(e) {
       Utilities.sleep(3000); // ⏱️ Chờ đúng 3s + flush để Google Sheets hoàn tất 100% tính toán công thức Cột C và AW7
       SpreadsheetApp.flush();
 
-      // ✅ THỰC THI GỬI NGAY LẬP TỨC (isDirectPush = true: KHÔNG BỊ CHẶN BỞI FRESHNESS CHECK)
+      // ✅ THỰC THI GỬI:
+      // - Luồng 1 (Cột C): Luôn gửi dữ liệu trạm sập chi tiết của đợt cào mới
+      // - Luồng 2 (AW7): CHỈ GỬI NẾU MỐC GIỜ TRONG Ô AW7 THỰC SỰ THAY ĐỔI
       var sentColC = false;
       var sentSummary = false;
       try {
@@ -139,7 +141,7 @@ function doPost(e) {
       }
 
       try {
-        sentSummary = processSummaryAwAz(sheet, true);
+        sentSummary = processSummaryAwAz(sheet, false); // false = BẮT BUỘC kiểm tra timestamp AW7 có mới hay không
         Logger.log("[doPost] Luồng 2 (AW7 Summary) gửi xong: " + sentSummary);
       } catch(errSum) {
         Logger.log("[doPost] ❌ Lỗi Luồng 2 (AW7 Summary): " + errSum.message);
