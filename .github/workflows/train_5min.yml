@@ -126,8 +126,8 @@ jobs:
 
 
           # ═══════ ☀️ MORNING BLOCK (05:00-10:00) ═══════
-          #  05:48 → Reports 1,2,3,4 + BOD + Refuel Request (🤖 Bot API)
-          check_time 05 48 && R1234=true && BOD=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 1+8+11: Reports 1-4 + BOD + Refuel Req"
+          #  05:46 → Reports 1,2,3,4 + BOD + Refuel Request (🤖 Bot API)
+          check_time 05 46 && R1234=true && BOD=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 1+8+11: Reports 1-4 + BOD + Refuel Req (05:46 MMT)"
           #  05:56 → Cable Daily Report (🤖 Bot API)
           check_time 05 56 && CABLE=true && NEED_PYTHON=true && echo "🚃 Toa 7: Cable Daily Report (05:56 MMT)"
           #  06:06 → Report 5 (Daily Plan - Ca Sáng) (📱 Telethon)
@@ -158,8 +158,8 @@ jobs:
           check_time 14 58 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (14:58 MMT)"
           #  15:26 → Plan 5C Evening (📱 Telethon)
           check_time 15 26 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Evening (15:26 MMT)"
-          #  15:48 → Reports 1,2,3,4 + BOD (🤖 Bot API)
-          check_time 15 48 && R1234=true && BOD=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 1+8+11: Reports 1-4 + BOD + Refuel Req"
+          #  15:46 → Reports 1,2,3,4 + BOD (🤖 Bot API)
+          check_time 15 46 && R1234=true && BOD=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 1+8+11: Reports 1-4 + BOD + Refuel Req (15:46 MMT)"
           #  15:56 → Cable Daily Report (🤖 Bot API)
           check_time 15 56 && CABLE=true && NEED_PYTHON=true && echo "🚃 Toa 7: Cable Daily Report (15:56 MMT)"
 

@@ -59,6 +59,17 @@ const TEAM_COLORS = { T1: "🟠", T2: "🔵", T3: "🟢", T4: "🟡" };
  */
 function handleTelegramWebhook_(data) {
   try {
+    const updateId = data.update_id;
+    if (updateId) {
+      const cache = CacheService.getScriptCache();
+      const cacheKey = "TG_UPD_" + updateId;
+      if (cache.get(cacheKey)) {
+        Logger.log("[handleTelegramWebhook_] 🛡️ Bỏ qua update_id trùng lặp: " + updateId);
+        return ContentService.createTextOutput(JSON.stringify({ ok: true, status: "dedup_skipped" })).setMimeType(ContentService.MimeType.JSON);
+      }
+      cache.put(cacheKey, "1", 600); // Khóa trùng 10 phút (600s)
+    }
+
     if (typeof processTelegramUpdate === "function") {
       processTelegramUpdate(data);
     }

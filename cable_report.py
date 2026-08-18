@@ -117,6 +117,13 @@ def main():
         print("❌ COLLECTOR_BOT_TOKEN not set", file=sys.stderr)
         sys.exit(1)
 
+    # 🗑️ Xóa triệt để toàn bộ tin Cable cũ theo tiêu đề qua Telethon
+    try:
+        from tg_utils import tg_delete_by_title
+        tg_delete_by_title(CABLE_CHAT_ID, "TNI CABLE ROUTE", bot_token=CABLE_BOT_TOKEN)
+    except Exception as e:
+        print(f"⚠️ tg_delete_by_title error: {e}", file=sys.stderr)
+
     gas_url = os.getenv("APPS_SCRIPT_URL", "") or CABLE_APPS_SCRIPT_URL
     if gas_url:
         try:
