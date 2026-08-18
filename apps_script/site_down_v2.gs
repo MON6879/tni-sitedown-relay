@@ -270,13 +270,7 @@ function checkAndSend(isWebhookCall) {
     if (hour < 3 || hour > 22) return { sent_tin1: false, sent_tin2: false };
     if (hour === 3 && minute < 30) return { sent_tin1: false, sent_tin2: false };
     if (hour === 22 && minute > 30) return { sent_tin1: false, sent_tin2: false };
-
-    const thisMinute = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHHmm");
-    const lastDoneMinute = props.getProperty("SD_LAST_DONE_MINUTE") || "";
-    if (thisMinute === lastDoneMinute) {
-      return { sent_tin1: false, sent_tin2: false };
-    }
-    props.setProperty("SD_LAST_DONE_MINUTE", thisMinute);
+    // ✅ v660: Bỏ SD_LAST_DONE_MINUTE throttle — Trigger 1 phút đã bị xóa, không còn nguy cơ chạy đè
   }
 
   // ── 3. Mở Google Sheet và THỰC THI 2 LUỒNG TRONG 2 KHỐI TRY/CATCH TÁCH BIỆT ──
@@ -325,15 +319,10 @@ function processSiteDownColC(sheet, isDirectPush) {
     return false;
   }
 
-  // 🛑 NẾU KHÔNG PHẢI DIRECT PUSH TỪ TELETHON VÀ TIN CŨ QUÁ 45 PHÚT THÌ BỎ QUA
-  if (!isDirectPush && !isTimestampFresh_(storeKey, 45)) {
-    Logger.log("[Luồng A1] ⚠️ Timestamp A1 (" + storeKey + ") đã trễ hơn 45 phút so với hiện tại → Bỏ qua không gửi tin cũ.");
-    return false;
-  }
 
-  // ✅ ĐỘC LẬP: Lưu ngay khóa A1
+  // ✅ v660: Lưu ngay khóa A1 — Sheet ổn định, chỉ cần so timestamp cũ/mới
   props.setProperty(TS_KEY_A1, storeKey);
-  Logger.log("[Luồng A1] 🆕 Timestamp A1 thay đổi và hợp lệ: " + storeKey + " (isDirectPush=" + !!isDirectPush + ") → Đang gửi Tin 1...");
+  Logger.log("[Luồng A1] 🆕 Timestamp A1 thay đổi: " + storeKey + " (isDirectPush=" + !!isDirectPush + ") → Đang gửi Tin 1...");
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 1) return false;
@@ -342,17 +331,6 @@ function processSiteDownColC(sheet, isDirectPush) {
 
   function isTeamSummaryLine(l) {
     return /Team\s*0?[1-4][\s\—\-]*:\s*Total\s+Site\s+down/i.test(l);
-  }
-
-  // 🛡️ FORMULA READINESS GUARD: Nếu tóm tắt báo có Site Down nhưng danh sách dòng C10 chưa nạp kịp -> Chờ 1.5s để Sheets tính toán xong
-  const hasSitesInSummary = /Total\s+Site\s+down\s*:\s*[1-9]\d*/i.test(colC[1] || "") || /Total\s+Site\s+down\s*:\s*[1-9]\d*/i.test(colC[3] || "");
-  let rawCount = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !isTeamSummaryLine(l)).length;
-  if (hasSitesInSummary && rawCount === 0) {
-    Logger.log("[Luồng A1] ⏳ Công thức Cột C đang tính toán... Chờ 5s và đọc lại");
-    Utilities.sleep(5000);
-    SpreadsheetApp.flush();
-    const newLastRow = sheet.getLastRow();
-    colC = sheet.getRange(1, 3, newLastRow, 1).getValues().flat().map(v => (v || "").toString().trim());
   }
 
   // Gửi nhóm CONTROL
@@ -520,15 +498,10 @@ function processSummaryAwAz(sheet, isDirectPush) {
     return false;
   }
 
-  // 🛑 2. NẾU KHÔNG PHẢI DIRECT PUSH VÀ TIN CŨ QUÁ 45 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA
-  if (!isDirectPush && !isTimestampFresh_(tsKey, 45)) {
-    Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") đã trễ hơn 45 phút so với giờ hiện tại → Bỏ qua không gửi tin cũ.");
-    return false;
-  }
-
+  // ✅ v660: Chỉ cần đọc AW:AZ 1 lần duy nhất (doPost đã flush+sleep(3s)+flush trước khi gọi hàm này)
   let awaz = readAwAz(sheet);
 
-  // 🛡️ FORMULA READINESS GUARD: Kiểm tra bảng AW7:AZ15 đã hoàn tất tính toán chưa
+  // Quét 1 lần: Có ít nhất 1 ô chứa sự cố thực tế không?
   let hasAnyData = false;
   for (let r = 0; r < awaz.length; r++) {
     for (let c = 0; c < 4; c++) {
@@ -540,25 +513,7 @@ function processSummaryAwAz(sheet, isDirectPush) {
     if (hasAnyData) break;
   }
 
-  // Nếu công thức Sheet chưa tính xong, flush và chờ thêm 3.5s
-  if (!hasAnyData) {
-    Logger.log("[Luồng AW7] Bảng AW:AZ chưa có dữ liệu (đang tính toán) → Flush và chờ thêm 3.5s...");
-    SpreadsheetApp.flush();
-    Utilities.sleep(3500);
-    SpreadsheetApp.flush();
-    awaz = readAwAz(sheet);
-    for (let r = 0; r < awaz.length; r++) {
-      for (let c = 0; c < 4; c++) {
-        if (isRealIncidentData_((awaz[r][c] || "").toString().trim())) {
-          hasAnyData = true;
-          break;
-        }
-      }
-      if (hasAnyData) break;
-    }
-  }
-
-  // 🛑 NẾU VẪN KHÔNG CÓ SỰ CỐ THỰC SỰ: BỎ QUA HOÀN TOÀN, KHÔNG GỬI VÀ KHÔNG LƯU KEY
+  // 🛑 NẾU KHÔNG CÓ SỰ CỐ THỰC SỰ: BỎ QUA HOÀN TOÀN, KHÔNG GỬI VÀ KHÔNG LƯU KEY
   if (!hasAnyData) {
     Logger.log("[Luồng AW7] ⚠️ Bảng AW:AZ không có sự cố thực tế → Bỏ qua không gửi Tin 2.");
     return false;
@@ -763,39 +718,7 @@ function buildAwAzControlMessage(ts, awaz) {
   return lines.join("\n");
 }
 
-function isTimestampFresh_(tsStr, maxAgeMinutes) {
-  maxAgeMinutes = (typeof maxAgeMinutes === "number") ? maxAgeMinutes : 35;
-  if (!tsStr) return false;
-  const m = tsStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
-  if (!m) return true;
-  const day = parseInt(m[1], 10);
-  const month = parseInt(m[2], 10) - 1;
-  const year = parseInt(m[3], 10);
-  const hour = parseInt(m[4], 10);
-  const minute = parseInt(m[5], 10);
-  
-  const now = new Date();
-  const nowStr = Utilities.formatDate(now, "Asia/Rangoon", "yyyy-MM-dd HH:mm");
-  const nowParts = nowStr.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
-  if (nowParts) {
-    const curYear = parseInt(nowParts[1], 10);
-    const curMonth = parseInt(nowParts[2], 10) - 1;
-    const curDay = parseInt(nowParts[3], 10);
-    const curHour = parseInt(nowParts[4], 10);
-    const curMin = parseInt(nowParts[5], 10);
-
-    const tsDate = new Date(year, month, day, hour, minute);
-    const curDate = new Date(curYear, curMonth, curDay, curHour, curMin);
-    const diffMinutes = (curDate.getTime() - tsDate.getTime()) / (1000 * 60);
-
-    // 🛑 NẾU LỆCH QUÁ 5 PHÚT (diffMinutes > 5) HOẶC TƯƠNG LAI > 2 PHÚT -> BỎ QUA KHÔNG GỬI
-    if (diffMinutes > maxAgeMinutes || diffMinutes < -2) {
-      Logger.log("[isTimestampFresh_] ⚠️ Timestamp " + tsStr + " lệch " + diffMinutes.toFixed(1) + " phút (vượt quá " + maxAgeMinutes + "m) → BỎ QUA KHÔNG GỬI");
-      return false;
-    }
-  }
-  return true;
-}
+// ✅ v660: isTimestampFresh_ đã bị loại bỏ — Sheet ổn định, chỉ cần so timestamp A1/AW7 cũ vs mới là đủ.
 
 
 // ============================================================
