@@ -96,7 +96,7 @@ BOT_USERNAME   = "auto_nocpro_bot"
 WAIT_REPLY_SEC = 35
 
 ACTIVE_START   = (3, 30)
-ACTIVE_END     = (22, 15)
+ACTIVE_END     = (23, 59)
 
 MIN_DELAY_SEC  = 0
 MAX_DELAY_SEC  = 0

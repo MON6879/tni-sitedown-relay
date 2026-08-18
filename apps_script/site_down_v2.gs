@@ -123,21 +123,23 @@ function doPost(e) {
       if (relayTs > 0) props.setProperty("SD_LAST_RELAY_TS", relayTs.toString());
 
       SpreadsheetApp.flush();
+      try { lock.releaseLock(); } catch(eLock) {} // ✅ Nhả lock ngay để không block các request khác trong lúc sleep
+
       Utilities.sleep(30000); // ⏱️ Chờ đúng 30s để Google Sheets hoàn tất 100% tính toán công thức Cột C và AW7
       SpreadsheetApp.flush();
 
-      // ✅ THỰC THI GỬI NGAY LẬP TỨC SAU 30S (KHÔNG DELAY THÊM)
+      // ✅ THỰC THI GỬI NGAY LẬP TỨC SAU 30S (isDirectPush = true: KHÔNG BỊ CHẶN BỞI FRESHNESS CHECK)
       var sentColC = false;
       var sentSummary = false;
       try {
-        sentColC = processSiteDownColC(sheet);
+        sentColC = processSiteDownColC(sheet, true);
         Logger.log("[doPost] Luồng 1 (Cột C) gửi xong: " + sentColC);
       } catch(errColC) {
         Logger.log("[doPost] ❌ Lỗi Luồng 1 (Cột C): " + errColC.message);
       }
 
       try {
-        sentSummary = processSummaryAwAz(sheet);
+        sentSummary = processSummaryAwAz(sheet, true);
         Logger.log("[doPost] Luồng 2 (AW7 Summary) gửi xong: " + sentSummary);
       } catch(errSum) {
         Logger.log("[doPost] ❌ Lỗi Luồng 2 (AW7 Summary): " + errSum.message);
@@ -160,8 +162,9 @@ function doPost(e) {
       props.deleteProperty(TS_KEY_A1);
       props.deleteProperty(TS_KEY_AW7);
       SpreadsheetApp.flush();
-      const sent1 = processSiteDownColC(sheet);
-      const sent2 = processSummaryAwAz(sheet);
+      try { lock.releaseLock(); } catch(eLock) {}
+      const sent1 = processSiteDownColC(sheet, true);
+      const sent2 = processSummaryAwAz(sheet, true);
       return _json({ ok: true, sent_tin1: sent1, sent_tin2: sent2 });
     }
 
@@ -305,7 +308,7 @@ function checkAndSend(isWebhookCall) {
 // LUỒNG 1 — XỬ LÝ A1 / CỘT C (TIN 1 — Chi tiết Site Down)
 // Độc lập 100% — Chỉ đọc mốc giờ A1 & ghi chìa khóa TS_KEY_A1
 // ============================================================
-function processSiteDownColC(sheet) {
+function processSiteDownColC(sheet, isDirectPush) {
   const storeKey = parseA1Timestamp(sheet);
   if (!storeKey) {
     Logger.log("[Luồng A1] Không tìm thấy timestamp hợp lệ trong A1");
@@ -315,20 +318,20 @@ function processSiteDownColC(sheet) {
   const props   = PropertiesService.getScriptProperties();
   const lastKey = props.getProperty(TS_KEY_A1) || "";
 
-  if (storeKey === lastKey) {
+  if (storeKey === lastKey && !isDirectPush) {
     Logger.log("[Luồng A1] Timestamp A1 không đổi (" + storeKey.substring(0, 30) + ") → Bỏ qua Luồng 1");
     return false;
   }
 
-  // 🛑 NẾU TIN CŨ QUÁ 35 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
-  if (!isTimestampFresh_(storeKey, 35)) {
-    Logger.log("[Luồng A1] ⚠️ Timestamp A1 (" + storeKey + ") đã trễ hơn 35 phút so với hiện tại → Bỏ qua không gửi tin cũ.");
+  // 🛑 NẾU KHÔNG PHẢI DIRECT PUSH TỪ TELETHON VÀ TIN CŨ QUÁ 45 PHÚT THÌ BỎ QUA
+  if (!isDirectPush && !isTimestampFresh_(storeKey, 45)) {
+    Logger.log("[Luồng A1] ⚠️ Timestamp A1 (" + storeKey + ") đã trễ hơn 45 phút so với hiện tại → Bỏ qua không gửi tin cũ.");
     return false;
   }
 
   // ✅ ĐỘC LẬP: Lưu ngay khóa A1
   props.setProperty(TS_KEY_A1, storeKey);
-  Logger.log("[Luồng A1] 🆕 Timestamp A1 thay đổi và hợp lệ: " + storeKey + " → Đang gửi Tin 1...");
+  Logger.log("[Luồng A1] 🆕 Timestamp A1 thay đổi và hợp lệ: " + storeKey + " (isDirectPush=" + !!isDirectPush + ") → Đang gửi Tin 1...");
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 1) return false;
@@ -476,7 +479,7 @@ function processSiteDownColC(sheet) {
 // LUỒNG 2 — XỬ LÝ AW7 (TIN 2 — Bảng SUMMARY)
 // Độc lập 100% — Chỉ đọc mốc giờ ô AW7 & ghi chìa khóa TS_KEY_AW7
 // ============================================================
-function processSummaryAwAz(sheet) {
+function processSummaryAwAz(sheet, isDirectPush) {
   const rawVal = sheet.getRange("AW7").getValue();
   // 🔍 DEBUG: Log kiểu dữ liệu thực tế của ô AW7
   Logger.log("[Luồng AW7] rawVal type=" + typeof rawVal + " | instanceof Date=" + (rawVal instanceof Date) + " | raw=" + String(rawVal).substring(0, 60));
@@ -509,15 +512,15 @@ function processSummaryAwAz(sheet) {
   // 🔍 DEBUG: Log so sánh cụ thể
   Logger.log("[Luồng AW7] tsKey=[" + tsKey + "] lastTs=[" + lastTs + "] match=" + (tsKey === lastTs));
 
-  // 🛑 1. NẾU GIỜ KHÔNG THAY ĐỔI AW7 THÌ TUYỆT ĐỐI KHÔNG GỬI
-  if (tsKey === lastTs) {
+  // 🛑 1. NẾU GIỜ KHÔNG THAY ĐỔI AW7 THÌ BỎ QUA (TRỪ KHI DIRECT PUSH)
+  if (tsKey === lastTs && !isDirectPush) {
     Logger.log("[Luồng AW7] Timestamp AW7 không đổi (" + tsKey + ") → Bỏ qua Luồng 2");
     return false;
   }
 
-  // 🛑 2. NẾU TIN CŨ QUÁ 35 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
-  if (!isTimestampFresh_(tsKey, 35)) {
-    Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") đã trễ hơn 35 phút so với giờ hiện tại → Bỏ qua không gửi tin cũ.");
+  // 🛑 2. NẾU KHÔNG PHẢI DIRECT PUSH VÀ TIN CŨ QUÁ 45 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA
+  if (!isDirectPush && !isTimestampFresh_(tsKey, 45)) {
+    Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") đã trễ hơn 45 phút so với giờ hiện tại → Bỏ qua không gửi tin cũ.");
     return false;
   }
 
