@@ -123,12 +123,12 @@ function doPost(e) {
       if (relayTs > 0) props.setProperty("SD_LAST_RELAY_TS", relayTs.toString());
 
       SpreadsheetApp.flush();
-      try { lock.releaseLock(); } catch(eLock) {} // ✅ Nhả lock ngay để không block các request khác trong lúc sleep
+      try { lock.releaseLock(); } catch(eLock) {} // ✅ Nhả lock ngay
 
-      Utilities.sleep(30000); // ⏱️ Chờ đúng 30s để Google Sheets hoàn tất 100% tính toán công thức Cột C và AW7
+      Utilities.sleep(3000); // ⏱️ Chờ đúng 3s + flush để Google Sheets hoàn tất 100% tính toán công thức Cột C và AW7
       SpreadsheetApp.flush();
 
-      // ✅ THỰC THI GỬI NGAY LẬP TỨC SAU 30S (isDirectPush = true: KHÔNG BỊ CHẶN BỞI FRESHNESS CHECK)
+      // ✅ THỰC THI GỬI NGAY LẬP TỨC (isDirectPush = true: KHÔNG BỊ CHẶN BỞI FRESHNESS CHECK)
       var sentColC = false;
       var sentSummary = false;
       try {
