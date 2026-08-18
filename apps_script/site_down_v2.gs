@@ -15,7 +15,7 @@
 // ============================================================
 
 // ── Telegram Bot Token ──────────────────────────────────────
-const SD_BOT_TOKEN = PropertiesService.getScriptProperties().getProperty("SD_BOT_TOKEN") || "";
+const SD_BOT_TOKEN = PropertiesService.getScriptProperties().getProperty("SD_BOT_TOKEN") || PropertiesService.getScriptProperties().getProperty("SEND_BOT_TOKEN") || "";
 
 // ── Telegram Group Chat IDs ──────────────────────────────────
 const SD_GROUPS = {
@@ -840,7 +840,7 @@ function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
   Utilities.sleep(200);
   const props  = PropertiesService.getScriptProperties();
   const idKey  = "SD_MSGID_" + msgKey;
-  const newIds = sendTelegramCollectIds_(chatId, plainContent, tag);
+  const newIds = sendTelegramPreCollectIds_(chatId, plainContent, tag);
   props.setProperty(idKey, JSON.stringify(newIds));
 }
 
@@ -871,8 +871,21 @@ function sendTelegramCollectIds_(chatId, text, tag) {
         muteHttpExceptions: true,
       });
       const res = JSON.parse(resp.getContentText());
-      if (res.ok && res.result && res.result.message_id) ids.push(res.result.message_id);
-    } catch(e) {}
+      if (res.ok && res.result && res.result.message_id) {
+        ids.push(res.result.message_id);
+      } else {
+        Logger.log(tag + " ⚠️ HTML send fail: " + (res.description || "error") + " -> retry plain text");
+        const resp2 = UrlFetchApp.fetch(url, {
+          method: "post", contentType: "application/json",
+          payload: JSON.stringify({ chat_id: chatId, text: chunk }),
+          muteHttpExceptions: true,
+        });
+        const res2 = JSON.parse(resp2.getContentText());
+        if (res2.ok && res2.result && res2.result.message_id) ids.push(res2.result.message_id);
+      }
+    } catch(e) {
+      Logger.log(tag + " ❌ sendTelegramCollectIds_ error: " + e.message);
+    }
   });
   return ids;
 }
@@ -890,8 +903,21 @@ function sendTelegramPreCollectIds_(chatId, plainContent, tag) {
         muteHttpExceptions: true,
       });
       const res = JSON.parse(resp.getContentText());
-      if (res.ok && res.result && res.result.message_id) ids.push(res.result.message_id);
-    } catch(e) {}
+      if (res.ok && res.result && res.result.message_id) {
+        ids.push(res.result.message_id);
+      } else {
+        Logger.log(tag + " ⚠️ <pre> send fail: " + (res.description || "error") + " -> retry plain text");
+        const resp2 = UrlFetchApp.fetch(url, {
+          method: "post", contentType: "application/json",
+          payload: JSON.stringify({ chat_id: chatId, text: plainContent }),
+          muteHttpExceptions: true,
+        });
+        const res2 = JSON.parse(resp2.getContentText());
+        if (res2.ok && res2.result && res2.result.message_id) ids.push(res2.result.message_id);
+      }
+    } catch(e) {
+      Logger.log(tag + " ❌ sendTelegramPreCollectIds_ error: " + e.message);
+    }
     if (i < chunks.length - 1) Utilities.sleep(200);
   });
   return ids;
