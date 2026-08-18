@@ -152,6 +152,19 @@ function doPost(e) {
       });
     }
 
+    if (action === "send_site_down_now") {
+      const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
+      const sheet = getSheetByGid(ss, SD_SHEET_GID);
+      if (!sheet) return _json({ ok: false, msg: "Sheet not found" });
+      const props = PropertiesService.getScriptProperties();
+      props.deleteProperty(TS_KEY_A1);
+      props.deleteProperty(TS_KEY_AW7);
+      SpreadsheetApp.flush();
+      const sent1 = processSiteDownColC(sheet);
+      const sent2 = processSummaryAwAz(sheet);
+      return _json({ ok: true, sent_tin1: sent1, sent_tin2: sent2 });
+    }
+
     if (action === "get_note_b2b5") {
       const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
       const sheet = getSheetByGid(ss, SD_SHEET_GID);
@@ -307,9 +320,9 @@ function processSiteDownColC(sheet) {
     return false;
   }
 
-  // 🛑 NẾU TIN CŨ QUÁ 20 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
-  if (!isTimestampFresh_(storeKey, 20)) {
-    Logger.log("[Luồng A1] ⚠️ Timestamp A1 (" + storeKey + ") đã trễ hơn 20 phút so với hiện tại → Bỏ qua không gửi tin cũ.");
+  // 🛑 NẾU TIN CŨ QUÁ 35 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
+  if (!isTimestampFresh_(storeKey, 35)) {
+    Logger.log("[Luồng A1] ⚠️ Timestamp A1 (" + storeKey + ") đã trễ hơn 35 phút so với hiện tại → Bỏ qua không gửi tin cũ.");
     return false;
   }
 
@@ -502,9 +515,9 @@ function processSummaryAwAz(sheet) {
     return false;
   }
 
-  // 🛑 2. NẾU TIN CŨ QUÁ 20 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
-  if (!isTimestampFresh_(tsKey, 20)) {
-    Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") đã trễ hơn 20 phút so với giờ hiện tại → Bỏ qua không gửi tin cũ.");
+  // 🛑 2. NẾU TIN CŨ QUÁ 35 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
+  if (!isTimestampFresh_(tsKey, 35)) {
+    Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") đã trễ hơn 35 phút so với giờ hiện tại → Bỏ qua không gửi tin cũ.");
     return false;
   }
 
@@ -739,7 +752,7 @@ function buildAwAzControlMessage(ts, awaz) {
 }
 
 function isTimestampFresh_(tsStr, maxAgeMinutes) {
-  maxAgeMinutes = (typeof maxAgeMinutes === "number") ? maxAgeMinutes : 20;
+  maxAgeMinutes = (typeof maxAgeMinutes === "number") ? maxAgeMinutes : 35;
   if (!tsStr) return false;
   const m = tsStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
   if (!m) return true;
