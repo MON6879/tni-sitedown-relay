@@ -112,15 +112,15 @@ jobs:
           REFUEL_P1=false; REFUEL_P2=false; REFUEL_P21=false; REFUEL_P4=false
           AUDITOR91=false
 
-          # check_time <hour> <target_minute> — dung sai ±3 phút (đảm bảo 100% bắt trúng kể cả khi GitHub queue trễ 2-3p)
+          # check_time <hour> <target_minute> — dung sai ±2 phút (chu kỳ 5 phút đảm bảo khớp ĐÚNG 1 LẦN DUY NHẤT)
           check_time() {
             local TH=$1 TM=$2
             local CURR_MIN=$(( 10#$H * 60 + 10#$M ))
             local TARG_MIN=$(( 10#$TH * 60 + 10#$TM ))
             local DIFF=$(( CURR_MIN - TARG_MIN ))
             [ $DIFF -lt 0 ] && DIFF=$(( -DIFF ))
-            # Tolerance: ±3 phút (bắt trọn chu kỳ 5 phút, không bao giờ bị bỏ sót do delay)
-            [ $DIFF -le 3 ] && return 0
+            # Tolerance: ±2 phút (mỗi mục tiêu chỉ khớp đúng 1 nhịp chạy duy nhất trong chu kỳ 5 phút)
+            [ $DIFF -le 2 ] && return 0
             return 1
           }
 

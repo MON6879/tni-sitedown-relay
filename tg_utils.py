@@ -82,7 +82,7 @@ def tg_delete(chat_id: str, msg_id, bot_token: str = None):
         logger.warning(f"tg_delete error: {e}")
 
 
-def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300) -> int:
+def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300, bot_token: str = None) -> int:
     """
     Dùng Telethon để scan lịch sử chat, tìm TẤT CẢ tin nhắn từ bot
     có cùng tiêu đề (title_prefix), xóa hết qua Bot API.
@@ -91,7 +91,7 @@ def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300)
     api_id   = _tg_api_id()
     api_hash = _tg_api_hash()
     session  = _tg_session()
-    token    = _bot_token()
+    token    = _bot_token(bot_token)
 
     if not (api_id and api_hash and session and token):
         logger.warning("tg_delete_by_title: thiếu Telethon credentials, bỏ qua.")
@@ -102,12 +102,13 @@ def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300)
         from telethon.sessions import StringSession
         deleted = 0
         # Lấy bot user_id
+        bot_id = None
         try:
             me_r = requests.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10)
-            bot_id = me_r.json()["result"]["id"]
+            if me_r.status_code == 200:
+                bot_id = me_r.json()["result"]["id"]
         except Exception as ex:
             logger.warning(f"tg_delete_by_title: getMe lỗi: {ex}")
-            return 0
 
         try:
             async with TelegramClient(StringSession(session), api_id, api_hash) as client:
