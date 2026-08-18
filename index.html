@@ -349,6 +349,39 @@
     .row-detail:last-child { border-bottom: none; }
 
     /* Custom Tables */
+
+    /* Universal Resizable Table Columns */
+    table {
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    table th, table td {
+      position: relative;
+    }
+    table th.resizable, table td.resizable {
+      position: relative;
+      user-select: none;
+    }
+    table th .resizer, table td .resizer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 7px;
+      cursor: col-resize;
+      user-select: none;
+      height: 100%;
+      z-index: 30;
+      border-right: 2px solid rgba(255, 255, 255, 0.12);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    table th .resizer:hover,
+    table th .resizer.resizing,
+    table td .resizer:hover,
+    table td .resizer.resizing {
+      border-right: 2px solid var(--cyan) !important;
+      background: rgba(56, 189, 248, 0.35) !important;
+    }
+    
     .data-table {
       width: 100%;
       border-collapse: separate;
@@ -714,6 +747,215 @@
           return result;
         }
 
+        
+        /* ══════════════════════════════════════════════════════════════════
+           👑 TOA 3 & TOA 4: DYNAMIC MODAL RENDERER & UNIVERSAL TABLE RESIZER
+           ══════════════════════════════════════════════════════════════════ */
+        function renderTeamModalContent(teamKey, teamCode, teamTitle, teamColor, teamSummary, deptPoints, engineers, dates) {
+          var d0Str = dates.d0Str || '17/08';
+          var d1Str = dates.d1Str || '16/08';
+          var d2Str = dates.d2Str || '15/08';
+          var planStr = dates.planStr || '18/08';
+          
+          var teamEngs = engineers.filter(function(e) { return (e.team_code || '').indexOf(teamCode) !== -1; });
+          teamEngs.sort(function(a, b) {
+            var pa = parseFloat((a.rate || '0').replace(/[^\d.]/g, '')) || 0;
+            var pb = parseFloat((b.rate || '0').replace(/[^\d.]/g, '')) || 0;
+            return pb - pa;
+          });
+
+          var html = '';
+          html += '<div style="background:rgba(56, 189, 248, 0.12); border:1px solid rgba(56, 189, 248, 0.3); border-radius:16px; padding:1.2rem; margin-bottom:1.2rem;">';
+          html += '  <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">';
+          html += '    <span>CD Not Yet Close: <strong style="color:var(--amber); font-size:1.1rem;">' + (teamSummary.cdNotYet || 0) + ' WOs</strong></span>';
+          html += '    <span>Total Assigned: <strong style="color:var(--cyan); font-size:1.1rem;">' + (teamSummary.totalAssigned || 0) + ' WOs</strong></span>';
+          html += '  </div>';
+          html += '  <div style="display:flex; justify-content:space-between;">';
+          html += '    <span>Plan ' + planStr + ': <strong style="color:var(--amber);">' + (teamSummary.planM || 0) + ' WOs</strong></span>';
+          html += '    <span>Total FOT Close: <strong style="color:var(--emerald);">' + (teamSummary.fotClose || 0) + ' WOs</strong></span>';
+          html += '  </div>';
+          html += '  <div style="display:flex; justify-content:space-between; margin-top:0.5rem;">';
+          html += '    <span>Close ' + d0Str + ': <strong style="color:var(--cyan);">' + (teamSummary.d0 || 0) + ' WOs</strong></span>';
+          html += '    <span>Completion Benchmark: <strong style="color:' + (teamSummary.metTarget ? 'var(--emerald)' : 'var(--rose)') + ';">' + (teamSummary.pct || 0) + '% (Rank #' + (teamSummary.rank || 1) + ')</strong></span>';
+          html += '  </div>';
+          html += '</div>';
+
+          html += '<h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-list-check"></i> Point & Department Breakdown for ' + teamTitle + '</h4>';
+          html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.8rem; margin-bottom:1.5rem;">';
+          html += '  <div class="row-detail"><span>Asset Tasks:</span><strong>' + (deptPoints.asset || 'TL:0 /0 P:0') + '</strong></div>';
+          html += '  <div class="row-detail"><span>Finance Tasks:</span><strong>' + (deptPoints.finance || 'TL:0 /0 P:0') + '</strong></div>';
+          html += '  <div class="row-detail"><span>Manager Tasks:</span><strong>' + (deptPoints.manager || 'TL:0 /0 P:0') + '</strong></div>';
+          html += '  <div class="row-detail"><span>Preventive Maintenance (PM):</span><strong>' + (deptPoints.pm || 'TL:0 /0 P:0') + '</strong></div>';
+          html += '  <div class="row-detail"><span>Corrective Maintenance (CM):</span><strong>' + (deptPoints.cm || 'TL:0 /0 P:0') + '</strong></div>';
+          html += '  <div class="row-detail"><span>M&E Tasks:</span><strong>' + (deptPoints.me || 'TL:0 /0 P:0') + '</strong></div>';
+          html += '</div>';
+
+          html += '<h4 style="color:var(--cyan); margin-bottom:0.8rem;"><i class="fa-solid fa-users"></i> ' + teamTitle + ' Engineer Roster & Performance (Sorted by % Completion High to Low)</h4>';
+          html += '<table class="data-table">';
+          html += '  <thead>';
+          html += '    <tr>';
+          html += '      <th>#</th>';
+          html += '      <th style="color:var(--cyan);">Name System</th>';
+          html += '      <th>Completed WOs</th>';
+          html += '      <th>Completion Rate</th>';
+          html += '      <th style="color:#38BDF8 !important; font-weight:800;">Close ' + d0Str + '</th>';
+          html += '      <th style="color:#38BDF8 !important; font-weight:800;">Close ' + d1Str + '</th>';
+          html += '      <th style="color:#38BDF8 !important; font-weight:800;">Close ' + d2Str + '</th>';
+          html += '      <th style="color:#EC4899 !important; font-weight:800;">Plan ' + planStr + '</th>';
+          html += '      <th style="color:#EA580C; font-weight:800;">Overdue FOT</th>';
+          html += '      <th>Not Yet On Time</th>';
+          html += '      <th>Sum Not Yet + Wait CD</th>';
+          html += '    </tr>';
+          html += '  </thead>';
+          html += '  <tbody>';
+          for (var i = 0; i < teamEngs.length; i++) {
+            var e = teamEngs[i];
+            var pVal = parseFloat((e.rate || '0').replace(/[^\d.]/g, '')) || 0;
+            var rateColor = pVal >= 75 ? 'var(--emerald)' : (pVal >= 25 ? 'var(--amber)' : 'var(--rose)');
+            var planVal = (e.plan === '#DIV/0!' || e.plan === '0' || !e.plan) ? '0' : e.plan;
+            html += '    <tr>';
+            html += '      <td>' + (i + 1) + '</td>';
+            html += '      <td><code>' + e.nsys + '</code></td>';
+            html += '      <td>' + (e.completed || 0) + '</td>';
+            html += '      <td><strong style="color:' + rateColor + ';">' + e.rate + '</strong></td>';
+            html += '      <td>' + (parseInt(e.d0, 10) > 0 ? '<strong style="color:#38BDF8;">' + e.d0 + '</strong>' : '0') + '</td>';
+            html += '      <td>' + (parseInt(e.d1, 10) > 0 ? '<strong style="color:#38BDF8;">' + e.d1 + '</strong>' : '0') + '</td>';
+            html += '      <td>' + (parseInt(e.d2, 10) > 0 ? '<strong style="color:#38BDF8;">' + e.d2 + '</strong>' : '0') + '</td>';
+            html += '      <td>' + (parseInt(planVal, 10) > 0 ? '<strong style="color:#EC4899;">' + planVal + '</strong>' : '0') + '</td>';
+            html += '      <td>' + (parseInt(e.overdue, 10) > 0 ? '<strong style="color:#EA580C;">' + e.overdue + '</strong>' : '0') + '</td>';
+            html += '      <td>' + (e.notyet || 0) + '</td>';
+            html += '      <td>' + (e.sum_remain || 0) + '</td>';
+            html += '    </tr>';
+          }
+          html += '  </tbody>';
+          html += '</table>';
+          return html;
+        }
+
+        function renderAllEngineersTableHtml(engineers, dates) {
+          var d0Str = dates.d0Str || '17/08';
+          var d1Str = dates.d1Str || '16/08';
+          var d2Str = dates.d2Str || '15/08';
+          var planStr = dates.planStr || '18/08';
+
+          var sorted = engineers.slice().sort(function(a, b) {
+            var pa = parseFloat((a.rate || '0').replace(/[^\d.]/g, '')) || 0;
+            var pb = parseFloat((b.rate || '0').replace(/[^\d.]/g, '')) || 0;
+            return pb - pa;
+          });
+
+          var html = '';
+          html += '<table class="data-table">';
+          html += '  <thead>';
+          html += '    <tr>';
+          html += '      <th>#</th>';
+          html += '      <th style="color:var(--cyan);">NAME SYSTEM</th>';
+          html += '      <th>TEAM REGION</th>';
+          html += '      <th style="color:var(--cyan);">RANK</th>';
+          html += '      <th>COMPLETED WOS</th>';
+          html += '      <th style="color:var(--emerald);">COMPLETION RATE</th>';
+          html += '      <th style="color:#38BDF8 !important; font-weight:800;">CLOSE ' + d0Str + '</th>';
+          html += '      <th style="color:#38BDF8 !important; font-weight:800;">CLOSE ' + d1Str + '</th>';
+          html += '      <th style="color:#38BDF8 !important; font-weight:800;">CLOSE ' + d2Str + '</th>';
+          html += '      <th style="color:#EC4899 !important; font-weight:800;">PLAN ' + planStr + '</th>';
+          html += '      <th style="color:#EA580C !important; font-weight:800;">OVERDUE FOT</th>';
+          html += '      <th>NOT YET ON TIME</th>';
+          html += '      <th>SUM NOT YET + WAIT CD</th>';
+          html += '    </tr>';
+          html += '  </thead>';
+          html += '  <tbody>';
+
+          var teamTags = {
+            'TEAM01': '<span class="team-tag tag-t1">Team 1 Dawei</span>',
+            'TEAM02': '<span class="team-tag tag-t2">Team 2 Myeik</span>',
+            'TEAM03': '<span class="team-tag tag-t3">Team 3 Bokpyin</span>',
+            'TEAM04': '<span class="team-tag tag-t4">Team 4 Kawthoung</span>'
+          };
+
+          for (var i = 0; i < sorted.length; i++) {
+            var e = sorted[i];
+            var pVal = parseFloat((e.rate || '0').replace(/[^\d.]/g, '')) || 0;
+            var rateColor = pVal >= 75 ? 'var(--emerald)' : (pVal >= 25 ? 'var(--amber)' : 'var(--rose)');
+            var planVal = (e.plan === '#DIV/0!' || e.plan === '0' || !e.plan) ? '0' : e.plan;
+            var tTag = '<span class="team-tag">Other</span>';
+            for (var tk in teamTags) {
+              if ((e.team_code || '').indexOf(tk) !== -1) { tTag = teamTags[tk]; break; }
+            }
+
+            html += '    <tr>';
+            html += '      <td>' + (i + 1) + '</td>';
+            html += '      <td><code>' + e.nsys + '</code></td>';
+            html += '      <td>' + tTag + '</td>';
+            html += '      <td><strong style="color:var(--cyan);">' + (i + 1) + '</strong></td>';
+            html += '      <td>' + (e.completed || 0) + '</td>';
+            html += '      <td><strong style="color:' + rateColor + ';">' + e.rate + '</strong></td>';
+            html += '      <td>' + (parseInt(e.d0, 10) > 0 ? '<strong style="color:#38BDF8;">' + e.d0 + '</strong>' : '0') + '</td>';
+            html += '      <td>' + (parseInt(e.d1, 10) > 0 ? '<strong style="color:#38BDF8;">' + e.d1 + '</strong>' : '0') + '</td>';
+            html += '      <td>' + (parseInt(e.d2, 10) > 0 ? '<strong style="color:#38BDF8;">' + e.d2 + '</strong>' : '0') + '</td>';
+            html += '      <td>' + (parseInt(planVal, 10) > 0 ? '<strong style="color:#EC4899 !important;">' + planVal + '</strong>' : '0') + '</td>';
+            html += '      <td>' + (parseInt(e.overdue, 10) > 0 ? '<strong style="color:#EA580C !important;">' + e.overdue + '</strong>' : '0') + '</td>';
+            html += '      <td>' + (e.notyet || 0) + '</td>';
+            html += '      <td>' + (e.sum_remain || 0) + '</td>';
+            html += '    </tr>';
+          }
+          html += '  </tbody>';
+          html += '</table>';
+          return html;
+        }
+
+        window.makeAllTablesResizable = function() {
+          document.querySelectorAll('table').forEach(function(table) {
+            var ths = table.querySelectorAll('thead th');
+            if (ths.length === 0) {
+              var firstRow = table.querySelector('tr');
+              if (firstRow) { ths = firstRow.querySelectorAll('th, td'); }
+            }
+            if (!ths || ths.length === 0) return;
+
+            ths.forEach(function(th) {
+              if (th.querySelector('.resizer')) return;
+              th.style.position = 'relative';
+              th.classList.add('resizable');
+
+              var resizer = document.createElement('div');
+              resizer.className = 'resizer';
+              th.appendChild(resizer);
+
+              var startX = 0, startWidth = 0;
+
+              var onMouseDown = function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                startX = e.pageX;
+                startWidth = th.offsetWidth;
+                resizer.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+
+                var onMouseMove = function(moveEvent) {
+                  var diff = moveEvent.pageX - startX;
+                  var newWidth = Math.max(25, startWidth + diff);
+                  th.style.width = newWidth + 'px';
+                  th.style.minWidth = newWidth + 'px';
+                };
+
+                var onMouseUp = function() {
+                  resizer.classList.remove('resizing');
+                  document.body.style.cursor = '';
+                  document.body.style.userSelect = '';
+                  document.removeEventListener('mousemove', onMouseMove);
+                  document.removeEventListener('mouseup', onMouseUp);
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+              };
+
+              resizer.addEventListener('mousedown', onMouseDown);
+            });
+          });
+        };
+
         function loadStats() {
           fetch(CSV_URL + '&t=' + Date.now())
             .then(function(r){
@@ -729,15 +971,15 @@
               var targetPct = mTgt ? parseInt(mTgt[1], 10) : 75;
 
               var hdr2 = rows[1] || [];
-              var rawJ = hdr2[9] || '13/08';
-              var rawK = hdr2[10] || '12/08';
-              var rawL = hdr2[11] || '11/08';
-              var rawM = hdr2[12] || 'Plan: 14/08/26';
+              var rawJ = hdr2[9] || '17/08';
+              var rawK = hdr2[10] || '16/08';
+              var rawL = hdr2[11] || '15/08';
+              var rawM = hdr2[12] || 'Plan: 18/08/26';
 
-              var mJ = rawJ.match(/(\d{2}\/\d{2})/); var dJStr = mJ ? mJ[1] : '13/08';
-              var mK = rawK.match(/(\d{2}\/\d{2})/); var dKStr = mK ? mK[1] : '12/08';
-              var mL = rawL.match(/(\d{2}\/\d{2})/); var dLStr = mL ? mL[1] : '11/08';
-              var mM = rawM.match(/(\d{2}\/\d{2}(?:\/\d{2,4})?)/); var dMStr = mM ? mM[1] : '14/08/2026';
+              var mJ = rawJ.match(/(\d{2}\/\d{2})/); var dJStr = mJ ? mJ[1] : '17/08';
+              var mK = rawK.match(/(\d{2}\/\d{2})/); var dKStr = mK ? mK[1] : '16/08';
+              var mL = rawL.match(/(\d{2}\/\d{2})/); var dLStr = mL ? mL[1] : '15/08';
+              var mM = rawM.match(/(\d{2}\/\d{2}(?:\/\d{2,4})?)/); var dMStr = mM ? mM[1] : '18/08/2026';
 
               var fullMDate = dMStr.includes('/') && dMStr.split('/').length === 3 ? dMStr : dMStr + '/2026';
               var planLabel = '🎯 Plan ' + fullMDate + ' (M):';
@@ -746,9 +988,48 @@
               var mMonth = dJStr.split('/')[1] || '08';
               var dateLabel = mJDay + '/' + mKDay + '/' + mLDay + '-' + mMonth + '-2026';
 
-              // Parse Rows 53-56 for Team 1 to 4
+              var datesObj = {
+                d0Str: dJStr,
+                d1Str: dKStr,
+                d2Str: dLStr,
+                planStr: fullMDate,
+                dateLabel: dateLabel,
+                planLabel: planLabel
+              };
+
+              // Parse 28 Engineers (Rows 4 to 31)
+              var allEngineers = [];
+              for (var r = 3; r < Math.min(32, rows.length); r++) {
+                var rowData = rows[r] || [];
+                var tCode = rowData[4] || '';
+                if (tCode.indexOf('TEAM') !== -1) {
+                  allEngineers.push({
+                    stt: rowData[1] || '',
+                    real_name: rowData[2] || '',
+                    nsys: rowData[3] || '',
+                    team_code: tCode,
+                    wait_cd: rowData[5] || '0',
+                    completed: parseInt(rowData[6] || '0', 10) || 0,
+                    rank: rowData[7] || '',
+                    rate: rowData[8] || '0%',
+                    d0: rowData[9] || '0',
+                    d1: rowData[10] || '0',
+                    d2: rowData[11] || '0',
+                    plan: rowData[12] || '0',
+                    overdue: rowData[13] || '0',
+                    notyet: rowData[14] || '0',
+                    sum_remain: rowData[15] || '0'
+                  });
+                }
+              }
+
+              // Parse Rows 53-56 for Team 1 to 4 Summary
               var teamData = {};
+              var deptPointsMap = {};
               var tKeys = ['team1', 'team2', 'team3', 'team4'];
+              var tCodes = ['MYT_TNI_TEAM01_Dawei', 'MYT_TNI_TEAM02_Myeik', 'MYT_TNI_TEAM03_Bokpyin', 'MYT_TNI_TEAM04_Kawthoung'];
+              var tTitles = ['Team 1 (Paing Aung Soe - Dawei)', 'Team 2 (Nay Myo Thu - Myeik)', 'Team 3 (Pyae Phyo Zaw - Bokpyin)', 'Team 4 (Naing Myo Htun - Kawthoung)'];
+              var tColors = ['var(--rose)', 'var(--cyan)', 'var(--emerald)', 'var(--amber)'];
               var tEngs  = {team1:10, team2:11, team3:4, team4:4};
               var tRanks = [];
 
@@ -794,6 +1075,16 @@
                   pct: pct, closeRate: pct, targetPct: targetPct, metTarget: metTarget
                 };
                 tRanks.push({ k: tk, pct: pct });
+
+                deptPointsMap[tk] = {
+                  manager: row[23] || 'TL:0 /0 P:0',
+                  asset: row[24] || 'TL:0 /0 P:0',
+                  cm: row[25] || 'TL:0 /0 P:0',
+                  me: row[26] || 'TL:0 /0 P:0',
+                  pm: row[27] || 'TL:0 /0 P:0',
+                  construction: row[28] || 'TL:0 /0 P:0',
+                  finance: row[29] || 'TL:0 /0 P:0'
+                };
               }
 
               tRanks.sort(function(a,b){ return b.pct - a.pct; });
@@ -803,8 +1094,27 @@
                 applyTeam(k, teamData[k], dateLabel, planLabel, targetPct);
               });
 
+              // 👑 RENDER DYNAMICALLY INTO 4 TEAM MODALS
+              for (var i = 0; i < 4; i++) {
+                var tk = tKeys[i];
+                var mEl = document.getElementById(tk + 'ModalContent');
+                if (mEl) {
+                  mEl.innerHTML = renderTeamModalContent(tk, tCodes[i], tTitles[i], tColors[i], teamData[tk], deptPointsMap[tk], allEngineers, datesObj);
+                }
+              }
+
+              // 👑 RENDER DYNAMICALLY INTO ALL ENGINEERS MODAL & TABLE 3
+              var allModEl = document.getElementById('allEngineersModalContent');
+              if (allModEl) {
+                allModEl.innerHTML = renderAllEngineersTableHtml(allEngineers, datesObj);
+              }
+              var t3Cont = document.getElementById('table3-dynamic-container');
+              if (t3Cont) {
+                t3Cont.innerHTML = renderAllEngineersTableHtml(allEngineers, datesObj);
+              }
+
               var mExp = csvText.match(/Export\s*time:\s*([^\r\n,"]+)/i);
-              var exportTimeStr = (mExp && mExp[1]) ? mExp[1].trim() : '13/08/2026 16:36:48';
+              var exportTimeStr = (mExp && mExp[1]) ? mExp[1].trim() : '17/08/2026 15:52:02';
               set('sheet-export-time', exportTimeStr);
               set('t1-export-hdr', 'Export time: ' + exportTimeStr);
 
@@ -821,9 +1131,11 @@
               if (typeof window.updateWoChart === 'function') {
                 window.updateWoChart();
               }
+              if (typeof window.makeAllTablesResizable === 'function') {
+                window.makeAllTablesResizable();
+              }
             })
             .catch(function(err){
-              // Fallback to Apps Script
               fetch(GAS+'?action=get_team_wo_stats')
                 .then(function(r){return r.json();})
                 .then(function(resp){
@@ -834,6 +1146,9 @@
                   if (typeof window.updateWoChart === 'function') {
                     window.updateWoChart();
                   }
+                  if (typeof window.makeAllTablesResizable === 'function') {
+                    window.makeAllTablesResizable();
+                  }
                   var b=$id('team-stats-badge');
                   if(b) b.innerHTML='⚡ Synced from Apps Script — '+resp.updatedAt+' MMT';
                 })
@@ -843,6 +1158,7 @@
                 });
             });
         }
+
         function init(){ loadStats(); setInterval(loadStats, 30*1000); }
         if(document.readyState==='loading'){
           document.addEventListener('DOMContentLoaded', init);
@@ -926,61 +1242,13 @@
       <!-- TABLE 3: SUMMARY ALL NAME SYSTEM PERFORMANCE ROSTER (ALL 4 TEAMS — SORTED % HIGH TO LOW) -->
       <div class="card" id="all-engineers-summary-card">
         <div style="text-align:center; font-size:0.75rem; font-weight:700; color:#10b981; margin-bottom:0.6rem;">
-          ⚡ Realtime Synced from Google Sheets — <span class="sync-timestamp-tag">17/08/2026 17:38 MMT</span> | <span style="color:#38bdf8;">Auto-update on change (Every 30s)</span>
+          ⚡ Realtime Synced from Google Sheets — <span class="sync-timestamp-tag">18/08/2026 06:30 MMT</span> | <span style="color:#38bdf8;">Auto-update on change (Every 30s)</span>
         </div>
         <div class="section-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
           <span><i class="fa-solid fa-users"></i> Table 3: Summary All Name System Roster — Direct Google Sheet Raw Data (Sum all WO Team)</span>
           <button class="filter-btn active" style="background:linear-gradient(135deg, #10B981, #06B6D4); color:#fff; border:none; padding:0.4rem 0.9rem; font-weight:700; border-radius:8px; cursor:pointer;" onclick="openAllEngineersModal()"><i class="fa-solid fa-expand"></i> View Full Modal</button>
         </div>
-        <div style="max-height: 520px; overflow-y: auto;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th style="color:var(--cyan);">NAME SYSTEM</th>
-                <th>TEAM REGION</th>
-                <th style="color:var(--cyan);">RANK</th>
-                <th>COMPLETED WOS</th>
-                <th style="color:var(--emerald);">COMPLETION RATE</th>
-                <th style="color:#38BDF8 !important; font-weight:800;">CLOSE 16/08</th>
-                <th style="color:#38BDF8 !important; font-weight:800;">CLOSE 15/08</th>
-                <th style="color:#38BDF8 !important; font-weight:800;">CLOSE 14/08</th>
-                <th style="color:#EC4899 !important; font-weight:800;">PLAN 17/08</th>
-                <th style="color:#EA580C !important; font-weight:800;">OVERDUE FOT</th>
-                <th>NOT YET ON TIME</th>
-                <th>SUM NOT YET + WAIT CD</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>1</td><td><code>myt_khantchaw.nyo</code></td><td><span class="team-tag tag-t4">Team 4 Kawthoung</span></td><td><strong style="color:var(--cyan);">1</strong></td><td>34</td><td><strong style="color:var(--emerald);">97%</strong></td><td><strong style="color:#38BDF8;">1</strong></td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">1</strong></td><td>0</td><td>1</td><td>1</td></tr>
-              <tr><td>2</td><td><code>myt_naingmyo.htun</code></td><td><span class="team-tag tag-t4">Team 4 Kawthoung</span></td><td><strong style="color:var(--cyan);">2</strong></td><td>26</td><td><strong style="color:var(--emerald);">96%</strong></td><td><strong style="color:#38BDF8;">1</strong></td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">1</strong></td><td>0</td><td>1</td><td>1</td></tr>
-              <tr><td>3</td><td><code>myt_tinmaung.win</code></td><td><span class="team-tag tag-t4">Team 4 Kawthoung</span></td><td><strong style="color:var(--cyan);">3</strong></td><td>44</td><td><strong style="color:var(--emerald);">94%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">3</strong></td><td>0</td><td>3</td><td>3</td></tr>
-              <tr><td>4</td><td><code>myt_winhtet.aung11</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">4</strong></td><td>16</td><td><strong style="color:var(--emerald);">89%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">2</strong></td><td><strong style="color:#EA580C !important;">1</strong></td><td>1</td><td>2</td></tr>
-              <tr><td>5</td><td><code>myt_aungthin.mya</code></td><td><span class="team-tag tag-t1">Team 1 Dawei</span></td><td><strong style="color:var(--cyan);">5</strong></td><td>20</td><td><strong style="color:var(--emerald);">87%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">3</strong></td><td><strong style="color:#EA580C !important;">2</strong></td><td>1</td><td>3</td></tr>
-              <tr><td>6</td><td><code>myt_sithu.htun</code></td><td><span class="team-tag tag-t3">Team 3 Bokpyin</span></td><td><strong style="color:var(--cyan);">6</strong></td><td>42</td><td><strong style="color:var(--emerald);">86%</strong></td><td><strong style="color:#38BDF8;">1</strong></td><td>0</td><td><strong style="color:#38BDF8;">9</strong></td><td><strong style="color:#EC4899 !important;">7</strong></td><td><strong style="color:#EA580C !important;">3</strong></td><td>4</td><td>7</td></tr>
-              <tr><td>7</td><td><code>myt_pyaephyo.zaw</code></td><td><span class="team-tag tag-t3">Team 3 Bokpyin</span></td><td><strong style="color:var(--cyan);">7</strong></td><td>8</td><td><strong style="color:var(--emerald);">80%</strong></td><td><strong style="color:#38BDF8;">1</strong></td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">2</strong></td><td><strong style="color:#EA580C !important;">1</strong></td><td>1</td><td>2</td></tr>
-              <tr><td>8</td><td><code>myt_pyikyaw.aung</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">8</strong></td><td>47</td><td><strong style="color:var(--emerald);">80%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">12</strong></td><td>0</td><td>12</td><td>12</td></tr>
-              <tr><td>9</td><td><code>myt_wanna.oo2</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">9</strong></td><td>23</td><td><strong style="color:var(--emerald);">74%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">8</strong></td><td><strong style="color:#EA580C !important;">1</strong></td><td>7</td><td>8</td></tr>
-              <tr><td>10</td><td><code>myt_tinnaing.lin11</code></td><td><span class="team-tag tag-t3">Team 3 Bokpyin</span></td><td><strong style="color:var(--cyan);">10</strong></td><td>14</td><td><strong style="color:var(--emerald);">74%</strong></td><td>0</td><td>0</td><td><strong style="color:#38BDF8;">1</strong></td><td><strong style="color:#EC4899 !important;">5</strong></td><td><strong style="color:#EA580C !important;">2</strong></td><td>3</td><td>5</td></tr>
-              <tr><td>11</td><td><code>myt_naymyo.thu</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">11</strong></td><td>26</td><td><strong style="color:var(--emerald);">72%</strong></td><td><strong style="color:#38BDF8;">1</strong></td><td><strong style="color:#38BDF8;">1</strong></td><td>0</td><td><strong style="color:#EC4899 !important;">10</strong></td><td><strong style="color:#EA580C !important;">7</strong></td><td>3</td><td>10</td></tr>
-              <tr><td>12</td><td><code>myt_myintkoko.aung</code></td><td><span class="team-tag tag-t3">Team 3 Bokpyin</span></td><td><strong style="color:var(--cyan);">13</strong></td><td>9</td><td><strong style="color:var(--amber);">56%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">7</strong></td><td><strong style="color:#EA580C !important;">1</strong></td><td>6</td><td>7</td></tr>
-              <tr><td>13</td><td><code>myt_maung.maung11</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">14</strong></td><td>15</td><td><strong style="color:var(--amber);">44%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">19</strong></td><td><strong style="color:#EA580C !important;">5</strong></td><td>14</td><td>19</td></tr>
-              <tr><td>14</td><td><code>myt_ye.lin22</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">15</strong></td><td>3</td><td><strong style="color:var(--amber);">38%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">5</strong></td><td><strong style="color:#EA580C !important;">3</strong></td><td>2</td><td>5</td></tr>
-              <tr><td>15</td><td><code>myt_paingaung.soe</code></td><td><span class="team-tag tag-t1">Team 1 Dawei</span></td><td><strong style="color:var(--cyan);">16</strong></td><td>5</td><td><strong style="color:var(--amber);">28%</strong></td><td>0</td><td><strong style="color:#38BDF8;">1</strong></td><td><strong style="color:#38BDF8;">1</strong></td><td><strong style="color:#EC4899 !important;">13</strong></td><td><strong style="color:#EA580C !important;">8</strong></td><td>5</td><td>13</td></tr>
-              <tr><td>16</td><td><code>myt_phyoko.ko44</code></td><td><span class="team-tag tag-t1">Team 1 Dawei</span></td><td><strong style="color:var(--cyan);">17</strong></td><td>12</td><td><strong style="color:var(--amber);">25%</strong></td><td><strong style="color:#38BDF8;">1</strong></td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">36</strong></td><td><strong style="color:#EA580C !important;">12</strong></td><td>24</td><td>36</td></tr>
-              <tr><td>17</td><td><code>myt_bonemyat.naing1</code></td><td><span class="team-tag tag-t1">Team 1 Dawei</span></td><td><strong style="color:var(--cyan);">18</strong></td><td>16</td><td><strong style="color:var(--amber);">24%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">51</strong></td><td><strong style="color:#EA580C !important;">41</strong></td><td>10</td><td>51</td></tr>
-              <tr><td>18</td><td><code>myt_bhonehtet.aung</code></td><td><span class="team-tag tag-t1">Team 1 Dawei</span></td><td><strong style="color:var(--cyan);">19</strong></td><td>14</td><td><strong style="color:var(--amber);">24%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">45</strong></td><td><strong style="color:#EA580C !important;">24</strong></td><td>21</td><td>45</td></tr>
-              <tr><td>19</td><td><code>myt_aunglwin.phyo</code></td><td><span class="team-tag tag-t1">Team 1 Dawei</span></td><td><strong style="color:var(--cyan);">20</strong></td><td>14</td><td><strong style="color:var(--rose);">18%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">66</strong></td><td><strong style="color:#EA580C !important;">23</strong></td><td>43</td><td>66</td></tr>
-              <tr><td>20</td><td><code>myt_zinmin.shein</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">21</strong></td><td>1</td><td><strong style="color:var(--rose);">14%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">6</strong></td><td><strong style="color:#EA580C !important;">2</strong></td><td>4</td><td>6</td></tr>
-              <tr><td>21</td><td><code>myt_tharhtoo.aung11</code></td><td><span class="team-tag tag-t1">Team 1 Dawei</span></td><td><strong style="color:var(--cyan);">22</strong></td><td>3</td><td><strong style="color:var(--rose);">4%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">70</strong></td><td><strong style="color:#EA580C !important;">52</strong></td><td>18</td><td>70</td></tr>
-              <tr><td>22</td><td><code>myt_myothant.htoo</code></td><td><span class="team-tag tag-t1">Team 1 Dawei</span></td><td><strong style="color:var(--cyan);">23</strong></td><td>0</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">2</strong></td><td><strong style="color:#EA580C !important;">2</strong></td><td>0</td><td>2</td></tr>
-              <tr><td>23</td><td><code>myt_nyi.nyi23</code></td><td><span class="team-tag tag-t1">Team 1 Dawei</span></td><td><strong style="color:var(--cyan);">23</strong></td><td>0</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">1</strong></td><td>0</td><td>1</td><td>1</td></tr>
-              <tr><td>24</td><td><code>myt_aungkyaw.latt</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">23</strong></td><td>0</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">4</strong></td><td><strong style="color:#EA580C !important;">1</strong></td><td>3</td><td>4</td></tr>
-              <tr><td>25</td><td><code>myt_minpaing.oo</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">23</strong></td><td>0</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">11</strong></td><td><strong style="color:#EA580C !important;">8</strong></td><td>3</td><td>11</td></tr>
-              <tr><td>26</td><td><code>myt_naythurain.oo</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">23</strong></td><td>0</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">1</strong></td><td>0</td><td>1</td><td>1</td></tr>
-              <tr><td>27</td><td><code>myt_phyoko</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">23</strong></td><td>0</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">1</strong></td><td><strong style="color:#EA580C !important;">1</strong></td><td>0</td><td>1</td></tr>
-              <tr><td>28</td><td><code>myt_kyawnyein.thu</code></td><td><span class="team-tag tag-t4">Team 4 Kawthoung</span></td><td><strong style="color:var(--cyan);">23</strong></td><td>1</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td><span style="color:#EC4899 !important; opacity:0.6;">0</span></td><td>0</td><td>0</td><td>0</td></tr>
-            </tbody></table>
+        <div id="table3-dynamic-container" style="max-height: 520px; overflow-y: auto;">
         </div>
       </div>
 
@@ -1037,15 +1305,15 @@
 
             <!-- 3. WO DETAIL TAB PANEL (All 7 Raw Tables from Sheet 'Progress Team Task and WO+Oil' - GID 159298579) -->
     <div id="wo-detail-panel" class="tab-panel">
-      <div class="header-card" style="margin-bottom: 1.5rem;">
-        <div class="welcome-badge"><i class="fa-solid fa-database"></i> GOOGLE SHEET TAB: Progress Team Task and WO+Oil (GID 159298579)</div>
-        <h2 style="font-size:1.6rem; font-weight:800; color:#fff; margin-top:0.4rem;">Full Raw Google Sheet Tables Collection (Tables 1 to 7)</h2>
-        <p style="font-size:0.85rem; color:var(--text-sub); margin-top:0.2rem;">Complete 100% Unfiltered Raw Import from Google Sheet Tab: Progress Team Task and WO+Oil</p>
-        
-        <!-- Jump to Table Quick Navigation -->
-        <div style="margin-top: 1rem; display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
-          <span style="font-size:0.8rem; font-weight:700; color:var(--text-sub); margin-right:0.3rem;"><i class="fa-solid fa-arrow-down-short-wide"></i> Quick Jump:</span>
-          <a href="#wo-table-1" class="filter-btn" style="text-decoration:none; padding:0.4rem 0.8rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 1</a> <a href="#wo-table-2" class="filter-btn" style="text-decoration:none; padding:0.4rem 0.8rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 2</a> <a href="#wo-table-3" class="filter-btn" style="text-decoration:none; padding:0.4rem 0.8rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 3</a> <a href="#wo-table-4" class="filter-btn" style="text-decoration:none; padding:0.4rem 0.8rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 4</a> <a href="#wo-table-5" class="filter-btn" style="text-decoration:none; padding:0.4rem 0.8rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 5</a> <a href="#wo-table-6" class="filter-btn" style="text-decoration:none; padding:0.4rem 0.8rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 6</a> <a href="#wo-table-7" class="filter-btn" style="text-decoration:none; padding:0.4rem 0.8rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 7</a>
+      <div class="header-card" style="margin-bottom: 1.2rem; padding: 1.1rem 1.4rem;">
+        <!-- DÒNG 1: TIÊU ĐỀ BẢNG RAW & GID TAG -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.6rem;">
+          <h2 style="font-size:1.25rem; font-weight:800; color:#fff; margin:0; display:flex; align-items:center; gap:0.5rem;"><i class="fa-solid fa-table-list" style="color:var(--cyan);"></i> Raw Google Sheet Import: Tables 1 to 7 <span class="welcome-badge" style="font-size:0.75rem; padding:0.25rem 0.65rem; margin-left:0.4rem; vertical-align:middle;"><i class="fa-solid fa-database"></i> Tab: Progress Team Task and WO+Oil (GID 159298579)</span></h2>
+        </div>
+        <!-- DÒNG 2: THANH ĐIỀU HƯỚNG NHANH QUICK JUMP -->
+        <div style="margin-top: 0.65rem; display:flex; flex-wrap:wrap; gap:0.4rem; align-items:center;">
+          <span style="font-size:0.8rem; font-weight:700; color:var(--text-sub); margin-right:0.2rem;"><i class="fa-solid fa-arrow-down-short-wide"></i> Quick Jump:</span>
+          <a href="#wo-table-1" class="filter-btn" style="text-decoration:none; padding:0.3rem 0.65rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 1</a> <a href="#wo-table-2" class="filter-btn" style="text-decoration:none; padding:0.3rem 0.65rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 2</a> <a href="#wo-table-3" class="filter-btn" style="text-decoration:none; padding:0.3rem 0.65rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 3</a> <a href="#wo-table-4" class="filter-btn" style="text-decoration:none; padding:0.3rem 0.65rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 4</a> <a href="#wo-table-5" class="filter-btn" style="text-decoration:none; padding:0.3rem 0.65rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 5</a> <a href="#wo-table-6" class="filter-btn" style="text-decoration:none; padding:0.3rem 0.65rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 6</a> <a href="#wo-table-7" class="filter-btn" style="text-decoration:none; padding:0.3rem 0.65rem; font-size:0.75rem;"><i class="fa-solid fa-table"></i> Table 7</a>
         </div>
       </div>
 
@@ -5996,7 +6264,8 @@ Team04>> 2Box</td>
         </div>
         <button class="close-btn" onclick="closeTeam1Modal()">&times;</button>
       </div>
-      <div style="max-height: 480px; overflow-y: auto;">
+      <div id="team1ModalContent" style="max-height: 480px; overflow-y: auto;">
+
         <div style="background:rgba(56, 189, 248, 0.12); border:1px solid rgba(56, 189, 248, 0.3); border-radius:16px; padding:1.2rem; margin-bottom:1.2rem;">
           <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
             <span>CD Not Yet Close: <strong style="color:var(--amber); font-size:1.1rem;">41 WOs</strong></span>
@@ -6048,6 +6317,7 @@ Team04>> 2Box</td>
             <tr><td>8</td><td><code>myt_nyi.nyi23</code></td><td>0</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td></tr>
           </tbody>
         </table>
+      
       </div>
     </div>
   </div>
@@ -6061,7 +6331,8 @@ Team04>> 2Box</td>
         </div>
         <button class="close-btn" onclick="closeTeam2Modal()">&times;</button>
       </div>
-      <div style="max-height: 480px; overflow-y: auto;">
+      <div id="team2ModalContent" style="max-height: 480px; overflow-y: auto;">
+
         <div style="background:rgba(16, 185, 129, 0.12); border:1px solid rgba(16, 185, 129, 0.3); border-radius:16px; padding:1.2rem; margin-bottom:1.2rem;">
           <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
             <span>CD Not Yet Close: <strong style="color:var(--amber); font-size:1.1rem;">1 WOs</strong></span>
@@ -6115,6 +6386,7 @@ Team04>> 2Box</td>
             <tr><td>10</td><td><code>myt_phyoko</code></td><td>0</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EA580C;">1</strong></td><td>0</td><td>1</td></tr>
           </tbody>
         </table>
+      
       </div>
     </div>
   </div>
@@ -6128,7 +6400,8 @@ Team04>> 2Box</td>
         </div>
         <button class="close-btn" onclick="closeTeam3Modal()">&times;</button>
       </div>
-      <div style="max-height: 480px; overflow-y: auto;">
+      <div id="team3ModalContent" style="max-height: 480px; overflow-y: auto;">
+
         <div style="background:rgba(56, 189, 248, 0.12); border:1px solid rgba(56, 189, 248, 0.3); border-radius:16px; padding:1.2rem; margin-bottom:1.2rem;">
           <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
             <span>CD Not Yet Close: <strong style="color:var(--amber); font-size:1.1rem;">0 WOs</strong></span>
@@ -6175,6 +6448,7 @@ Team04>> 2Box</td>
             <tr><td>3</td><td><code>myt_sithu.htun</code></td><td>15</td><td><strong style="color:var(--amber);">29%</strong></td><td>0</td><td>0</td><td><strong style="color:#38BDF8;">6</strong></td><td><strong style="color:#EC4899;">3</strong></td><td><strong style="color:#EA580C;">6</strong></td><td>31</td><td>37</td></tr>
           </tbody>
         </table>
+      
       </div>
     </div>
   </div>
@@ -6188,7 +6462,8 @@ Team04>> 2Box</td>
         </div>
         <button class="close-btn" onclick="closeTeam4Modal()">&times;</button>
       </div>
-      <div style="max-height: 480px; overflow-y: auto;">
+      <div id="team4ModalContent" style="max-height: 480px; overflow-y: auto;">
+
         <div style="background:rgba(234, 179, 8, 0.12); border:1px solid rgba(234, 179, 8, 0.3); border-radius:16px; padding:1.2rem; margin-bottom:1.2rem;">
           <div style="display:flex; justify-content:space-between; margin-bottom:0.5rem;">
             <span>CD Not Yet Close: <strong style="color:var(--amber); font-size:1.1rem;">3 WOs</strong></span>
@@ -6235,21 +6510,22 @@ Team04>> 2Box</td>
             <tr><td>3</td><td><code>myt_kyawnyein.thu</code></td><td>1</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
           </tbody>
         </table>
+      
       </div>
     </div>
   </div>
 
   <!-- ALL ENGINEERS SUMMARY MODAL -->
   <div id="allEngineersModal" class="modal-backdrop">
-    <div class="modal-box" style="max-width: 950px;">
+    <div class="modal-box" style="max-width: 1050px;">
       <div class="modal-header">
         <div>
-          <h3 style="color:var(--cyan); font-weight:800; font-size:1.3rem;"><i class="fa-solid fa-users"></i> Summary All Name System Performance Roster (All 4 Teams)</h3>
-          <p style="font-size:0.8rem; color:var(--text-sub); margin-top:0.2rem;">Sorted by % Completion Rate from High to Low (All 22 Active Engineers)</p>
+          <h3 style="color:var(--cyan); font-weight:800; font-size:1.3rem;"><i class="fa-solid fa-users"></i> All 28 Engineers Performance Roster (Sorted by % Completion High to Low)</h3>
         </div>
         <button class="close-btn" onclick="closeAllEngineersModal()">&times;</button>
       </div>
-      <div style="max-height: 520px; overflow-y: auto;">
+      <div id="allEngineersModalContent" style="max-height: 520px; overflow-y: auto;">
+
         <table class="data-table">
             <thead>
               <tr>
@@ -6298,6 +6574,7 @@ Team04>> 2Box</td>
               <tr><td>27</td><td><code>myt_phyoko</code></td><td><span class="team-tag tag-t2">Team 2 Myeik</span></td><td><strong style="color:var(--cyan);">23</strong></td><td>0</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td><strong style="color:#EC4899 !important;">1</strong></td><td><strong style="color:#EA580C !important;">1</strong></td><td>0</td><td>1</td></tr>
               <tr><td>28</td><td><code>myt_kyawnyein.thu</code></td><td><span class="team-tag tag-t4">Team 4 Kawthoung</span></td><td><strong style="color:var(--cyan);">23</strong></td><td>1</td><td><strong style="color:var(--rose);">0%</strong></td><td>0</td><td>0</td><td>0</td><td><span style="color:#EC4899 !important; opacity:0.6;">0</span></td><td>0</td><td>0</td><td>0</td></tr>
             </tbody></table>
+      
       </div>
     </div>
   </div>
@@ -6410,15 +6687,15 @@ Team04>> 2Box</td>
     }
 
     /* Modal Handlers */
-    function openTeam1Modal() { document.getElementById('team1Modal').classList.add('active'); }
+    function openTeam1Modal() { document.getElementById("team1Modal").classList.add("active"); setTimeout(function(){ if(typeof window.makeAllTablesResizable==="function") window.makeAllTablesResizable(); }, 50); } document.getElementById('team1Modal').classList.add('active'); }
     function closeTeam1Modal() { document.getElementById('team1Modal').classList.remove('active'); }
-    function openTeam2Modal() { document.getElementById('team2Modal').classList.add('active'); }
+    function openTeam2Modal() { document.getElementById("team2Modal").classList.add("active"); setTimeout(function(){ if(typeof window.makeAllTablesResizable==="function") window.makeAllTablesResizable(); }, 50); } document.getElementById('team2Modal').classList.add('active'); }
     function closeTeam2Modal() { document.getElementById('team2Modal').classList.remove('active'); }
-    function openTeam3Modal() { document.getElementById('team3Modal').classList.add('active'); }
+    function openTeam3Modal() { document.getElementById("team3Modal").classList.add("active"); setTimeout(function(){ if(typeof window.makeAllTablesResizable==="function") window.makeAllTablesResizable(); }, 50); } document.getElementById('team3Modal').classList.add('active'); }
     function closeTeam3Modal() { document.getElementById('team3Modal').classList.remove('active'); }
-    function openTeam4Modal() { document.getElementById('team4Modal').classList.add('active'); }
+    function openTeam4Modal() { document.getElementById("team4Modal").classList.add("active"); setTimeout(function(){ if(typeof window.makeAllTablesResizable==="function") window.makeAllTablesResizable(); }, 50); } document.getElementById('team4Modal').classList.add('active'); }
     function closeTeam4Modal() { document.getElementById('team4Modal').classList.remove('active'); }
-    function openAllEngineersModal() { document.getElementById('allEngineersModal').classList.add('active'); }
+    function openAllEngineersModal() { document.getElementById("allEngineersModal").classList.add("active"); setTimeout(function(){ if(typeof window.makeAllTablesResizable==="function") window.makeAllTablesResizable(); }, 50); } document.getElementById('allEngineersModal').classList.add('active'); }
     function closeAllEngineersModal() { document.getElementById('allEngineersModal').classList.remove('active'); }
 
     function openAddGmailModal() {
