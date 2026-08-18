@@ -123,10 +123,10 @@ function doPost(e) {
       if (relayTs > 0) props.setProperty("SD_LAST_RELAY_TS", relayTs.toString());
 
       SpreadsheetApp.flush();
-      Utilities.sleep(5000); // Chờ 5s để Google Sheets hoàn tất tính toán công thức Cột C và AW7 trước khi đọc
+      Utilities.sleep(30000); // ⏱️ Chờ đúng 30s để Google Sheets hoàn tất 100% tính toán công thức Cột C và AW7
       SpreadsheetApp.flush();
 
-      // ✅ THỰC THI TUẦN TỰ 2 BẢN TIN SAU KHI SHEET TÍNH TOÁN XONG
+      // ✅ THỰC THI GỬI NGAY LẬP TỨC SAU 30S (KHÔNG DELAY THÊM)
       var sentColC = false;
       var sentSummary = false;
       try {
