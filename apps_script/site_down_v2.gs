@@ -307,9 +307,9 @@ function processSiteDownColC(sheet) {
     return false;
   }
 
-  // 🛑 NẾU TIN CŨ QUÁ 35 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
-  if (!isTimestampFresh_(storeKey, 35)) {
-    Logger.log("[Luồng A1] ⚠️ Timestamp A1 (" + storeKey + ") đã trễ hơn 35 phút so với hiện tại → Bỏ qua không gửi tin cũ.");
+  // 🛑 NẾU TIN CŨ QUÁ 20 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
+  if (!isTimestampFresh_(storeKey, 20)) {
+    Logger.log("[Luồng A1] ⚠️ Timestamp A1 (" + storeKey + ") đã trễ hơn 20 phút so với hiện tại → Bỏ qua không gửi tin cũ.");
     return false;
   }
 
@@ -502,9 +502,9 @@ function processSummaryAwAz(sheet) {
     return false;
   }
 
-  // 🛑 2. NẾU TIN CŨ QUÁ 35 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
-  if (!isTimestampFresh_(tsKey, 35)) {
-    Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") đã trễ hơn 35 phút so với giờ hiện tại → Bỏ qua không gửi tin cũ.");
+  // 🛑 2. NẾU TIN CŨ QUÁ 20 PHÚT SO VỚI GIỜ HIỆN TẠI THÌ BỎ QUA KHÔNG GỬI
+  if (!isTimestampFresh_(tsKey, 20)) {
+    Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") đã trễ hơn 20 phút so với giờ hiện tại → Bỏ qua không gửi tin cũ.");
     return false;
   }
 
@@ -739,7 +739,7 @@ function buildAwAzControlMessage(ts, awaz) {
 }
 
 function isTimestampFresh_(tsStr, maxAgeMinutes) {
-  maxAgeMinutes = (typeof maxAgeMinutes === "number") ? maxAgeMinutes : 35;
+  maxAgeMinutes = (typeof maxAgeMinutes === "number") ? maxAgeMinutes : 20;
   if (!tsStr) return false;
   const m = tsStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
   if (!m) return true;
