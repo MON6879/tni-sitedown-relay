@@ -657,22 +657,29 @@ function readAwAz(sheet) {
 }
 
 // 🛡️ HELPER: Kiểm tra ô AW:AZ có chứa dữ liệu sự cố thực sự không
-// Quy tắc: CHỈ coi là có data khi ô chứa ít nhất 1 ký tự chữ cái (a-z/A-Z)
-// VÀ không phải là pattern rỗng đã biết (No incident, nan, none, etc.)
+// Quy tắc: Lột bỏ toàn bộ prefix (Site down, Cell down, DG Abnormal, DG Run>16H, Link down) và timestamp.
+// CHỈ coi là có sự cố khi còn lại ít nhất 1 chữ số 1-9 (số lượng > 0) hoặc chữ cái (mã trạm TNI..., tên kỹ sư).
+// Nếu chỉ toàn số 0 (ví dụ = /0 = /0, 0 = 0, 0 =, 0) -> KHÔNG PHẢI SỰ CỐ -> BỎ QUA 100%.
 function isRealIncidentData_(txt) {
   if (!txt) return false;
   var s = txt.toString().trim();
   if (!s) return false;
-  // Loại bỏ các giá trị rỗng đã biết
-  var lo = s.toLowerCase();
-  if (lo === "0" || lo === "-" || lo === "=" || lo === "nan" || lo === "none" || lo === "null") return false;
-  if (lo.indexOf("no incident") >= 0) return false;
-  // Phải chứa ít nhất 1 ký tự chữ cái THỰC (a-zA-Z) và không chỉ toàn số/ký hiệu
-  // VD: '/0 = /0' -> false, 'TNI0115 : 97.7' -> true, 'Bhone Htet Aung' -> true
-  if (!/[a-zA-Z]/.test(s)) return false;
-  // Loại trừ: chỉ chứa các từ generic không có thông tin sự cố
-  var stripped = s.replace(/[^a-zA-Z]/g, "").toLowerCase();
-  if (stripped === "nan" || stripped === "none" || stripped === "null") return false;
+  
+  var clean = s
+    .replace(/^[\*_\`\s]*/, '')
+    .replace(/^(Site\s*down|Cell\s*down|DG\s*Abnormal|DG\s*Run\s*>?\s*16H|Link\s*down)\s*:\s*/i, '')
+    .replace(/\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2}(:\d{2})?/g, '')
+    .replace(/=>/g, '')
+    .replace(/[\s\*_\`=\/\-:,+><]/g, '')
+    .trim();
+
+  if (!clean) return false;
+  var lo = clean.toLowerCase();
+  if (lo === 'noincident' || lo === 'none' || lo === 'nan' || lo === 'null') return false;
+  
+  // Phải có ít nhất 1 chữ số 1-9 (số lượng sự cố > 0) hoặc ký tự chữ cái (mã trạm, tên nhân viên)
+  if (!/[1-9a-zA-Z]/.test(clean)) return false;
+  
   return true;
 }
 
