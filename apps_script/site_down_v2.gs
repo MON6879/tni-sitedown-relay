@@ -116,8 +116,9 @@ function doPost(e) {
       }
       Logger.log("[doPost] store_site_down — " + lines.length + " dòng ghi vào Col A (Atomic Overwrite) | relay_ts=" + relayTs);
 
-      // ✅ TÁCH BIỆT LUỒNG: Xóa chìa khóa A1 để Luồng A1/Col C BẮN TIN 1 NGAY LẬP TỨC
+      // ✅ MỞ KHÓA TOÀN BỘ: Xóa cả chìa khóa A1 và AW7 để sau khi dán Cột A là tự động gửi thông tin ngay lập tức
       props.deleteProperty(TS_KEY_A1);
+      props.deleteProperty(TS_KEY_AW7);
 
       if (relayTs > 0) props.setProperty("SD_LAST_RELAY_TS", relayTs.toString());
 
