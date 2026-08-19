@@ -162,11 +162,11 @@ function doPost(e) {
       if (!sheet) return _json({ ok: false, msg: "Sheet not found" });
       const props = PropertiesService.getScriptProperties();
       props.deleteProperty(TS_KEY_A1);
-      props.deleteProperty(TS_KEY_AW7);
+      // 🛑 TUYỆT ĐỐI KHÔNG XÓA TS_KEY_AW7 — Summary AW7 chỉ gửi khi mốc giờ trong ô AW7 thực sự thay đổi!
       SpreadsheetApp.flush();
       try { lock.releaseLock(); } catch(eLock) {}
       const sent1 = processSiteDownColC(sheet, true);
-      const sent2 = processSummaryAwAz(sheet, true);
+      const sent2 = processSummaryAwAz(sheet, false);
       return _json({ ok: true, sent_tin1: sent1, sent_tin2: sent2 });
     }
 
@@ -255,14 +255,14 @@ function checkAndSend(isWebhookCall) {
 
   const props = PropertiesService.getScriptProperties();
 
-  // ── 1. Reset đệm độc lập vào 03:30 AM đầu ngày ─────────────────────────
+  // ── 1. Reset đệm Cột A vào 03:30 AM đầu ngày ─────────────────────────
   const todayStr = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMdd");
   const lastDay  = props.getProperty("SD_LAST_RUN_DATE") || "";
   if (todayStr !== lastDay) {
     props.setProperty("SD_LAST_RUN_DATE", todayStr);
     props.deleteProperty(TS_KEY_A1);
-    props.deleteProperty(TS_KEY_AW7);
-    Logger.log("🌅 NGÀY MỚI (" + todayStr + ") — Đã reset chìa khóa A1 & AW7!");
+    // 🛑 TUYỆT ĐỐI KHÔNG XÓA TS_KEY_AW7: AW7 độc lập 100%, chỉ cập nhật khi ô AW7 có mốc giờ mới!
+    Logger.log("🌅 NGÀY MỚI (" + todayStr + ") — Đã reset chìa khóa A1!");
   }
 
   // ── 2. Kiểm tra khung giờ hoạt động (03:30 - 22:30 Myanmar) ────────────
@@ -934,7 +934,6 @@ function setupSdTrigger() {
 function testSendNow() {
   const props = PropertiesService.getScriptProperties();
   props.deleteProperty(TS_KEY_A1);
-  props.deleteProperty(TS_KEY_AW7);
   const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
   const sheet = getSheetByGid(ss, SD_SHEET_GID);
   if (!sheet) return;
