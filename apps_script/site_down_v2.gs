@@ -898,20 +898,12 @@ function triggerBotlookupRelay() {
   const pat   = props.getProperty("GITHUB_PAT") || "";
   if (!pat) return;
   try {
-    // 1. Dispatch to MON6879/tni-sitedown-relay
+    // 1. Dispatch DUY NHẤT 1 LẦN to MON6879/tni-sitedown-relay botlookup_relay.yml
     UrlFetchApp.fetch("https://api.github.com/repos/MON6879/tni-sitedown-relay/actions/workflows/botlookup_relay.yml/dispatches", {
       method: "post",
       headers: { "Authorization": "token " + pat, "Accept": "application/vnd.github.v3+json" },
       contentType: "application/json",
       payload: JSON.stringify({ ref: "main", inputs: { skip_delay: "1" } }),
-      muteHttpExceptions: true,
-    });
-    // 2. Fallback dispatch to train_5min.yml
-    UrlFetchApp.fetch("https://api.github.com/repos/MON6879/tni-sitedown-relay/actions/workflows/train_5min.yml/dispatches", {
-      method: "post",
-      headers: { "Authorization": "token " + pat, "Accept": "application/vnd.github.v3+json" },
-      contentType: "application/json",
-      payload: JSON.stringify({ ref: "main", inputs: { report_type: "Task - Bot Lookup Relay", skip_delay: "1" } }),
       muteHttpExceptions: true,
     });
     props.setProperty("SD_LAST_DISPATCH_TS", Date.now().toString());
