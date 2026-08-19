@@ -129,10 +129,9 @@ function doPost(e) {
       SpreadsheetApp.flush();
 
       // ✅ THỰC THI GỬI:
-      // - Luồng 1 (Cột C): Luôn gửi dữ liệu trạm sập chi tiết của đợt cào mới
-      // - Luồng 2 (AW7): CHỈ GỬI NẾU MỐC GIỜ TRONG Ô AW7 THỰC SỰ THAY ĐỔI
+      // Luồng 1 (Cột C): Dành riêng cho dữ liệu trạm sập chi tiết của đợt cào mới vừa dán vào Cột A
+      // 🛑 TUYỆT ĐỐI KHÔNG GỌI Luồng 2 (AW7 Summary) ở đây để tránh gửi đúp / gửi thừa tin cũ
       var sentColC = false;
-      var sentSummary = false;
       try {
         sentColC = processSiteDownColC(sheet, true);
         Logger.log("[doPost] Luồng 1 (Cột C) gửi xong: " + sentColC);
@@ -140,19 +139,11 @@ function doPost(e) {
         Logger.log("[doPost] ❌ Lỗi Luồng 1 (Cột C): " + errColC.message);
       }
 
-      try {
-        sentSummary = processSummaryAwAz(sheet, false); // false = BẮT BUỘC kiểm tra timestamp AW7 có mới hay không
-        Logger.log("[doPost] Luồng 2 (AW7 Summary) gửi xong: " + sentSummary);
-      } catch(errSum) {
-        Logger.log("[doPost] ❌ Lỗi Luồng 2 (AW7 Summary): " + errSum.message);
-      }
-
       return _json({ 
         ok: true, 
         lines: lines.length,
         relay_ts: relayTs,
-        sent_tin1: sentColC,
-        sent_tin2: sentSummary
+        sent_tin1: sentColC
       });
     }
 
