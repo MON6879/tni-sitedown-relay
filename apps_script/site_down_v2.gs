@@ -813,24 +813,37 @@ function getSavedMsgIds_(msgKey) {
 }
 
 function deleteTelegramMsgBot_(chatId, messageId) {
-  try {
-    const resp = UrlFetchApp.fetch("https://api.telegram.org/bot" + SD_BOT_TOKEN + "/deleteMessage", {
-      method: "post", contentType: "application/json",
-      payload: JSON.stringify({ chat_id: chatId, message_id: messageId }),
-      muteHttpExceptions: true,
-    });
-    const res = JSON.parse(resp.getContentText());
-    return res.ok === true || (res.description && res.description.indexOf("message to delete not found") >= 0);
-  } catch(e) { return false; }
+  if (!messageId) return false;
+  const tokens = [SD_BOT_TOKEN, "8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI"];
+  for (let t = 0; t < tokens.length; t++) {
+    try {
+      const resp = UrlFetchApp.fetch("https://api.telegram.org/bot" + tokens[t] + "/deleteMessage", {
+        method: "post", contentType: "application/json",
+        payload: JSON.stringify({ chat_id: chatId, message_id: messageId }),
+        muteHttpExceptions: true,
+      });
+      const res = JSON.parse(resp.getContentText());
+      if (res.ok === true || (res.description && res.description.indexOf("message to delete not found") >= 0)) {
+        return true;
+      }
+    } catch(e) {}
+  }
+  return false;
 }
 
 function deleteOldMessages_(chatId, msgKey) {
-  const oldIds = getSavedMsgIds_(msgKey);
-  for (let i = 0; i < oldIds.length; i++) {
-    deleteTelegramMsgBot_(chatId, oldIds[i]);
-    if (i < oldIds.length - 1) Utilities.sleep(100);
+  try {
+    const oldIds = getSavedMsgIds_(msgKey);
+    for (let i = 0; i < oldIds.length; i++) {
+      deleteTelegramMsgBot_(chatId, oldIds[i]);
+    }
+  } catch(e) {
+    Logger.log("[deleteOldMessages_] ⚠️ Lỗi xóa tin cũ: " + e.message);
+  } finally {
+    try {
+      PropertiesService.getScriptProperties().deleteProperty("SD_MSGID_" + msgKey);
+    } catch(e) {}
   }
-  PropertiesService.getScriptProperties().deleteProperty("SD_MSGID_" + msgKey);
 }
 
 function colorizeTeams(text) {
