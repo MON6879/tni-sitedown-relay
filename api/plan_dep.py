@@ -11,10 +11,9 @@ import urllib.parse
 import requests
 from http.server import BaseHTTPRequestHandler
 
-# Active GAS Web App URLs (with fallback)
+# Active GAS Web App URLs (SSOT)
 GAS_ENDPOINTS = [
     "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec",
-    "https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec",
 ]
 
 class handler(BaseHTTPRequestHandler):

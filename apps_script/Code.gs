@@ -1,2 +1,38 @@
-// File này để trống nhằm xóa sạch code cũ trong file Code.gs mặc định của Apps Script.
-// Bạn hãy copy toàn bộ nội dung file này (chỉ có dòng comment này) và dán đè vào file Code.gs trên sheet để tránh bị lỗi trùng lặp biến.
+// ============================================================
+// 🏛️ TNI OPERATIONS BACKEND HUB — ROOT ROUTER
+// Ghế Quản Trị: Ghế GAS-OPS-1 (17 Files)
+// Ghế Ngoại Giao: Ghế EXT-OPS-HUB
+// ============================================================
+
+function doGet(e) {
+  try {
+    return doGetCollector_(e);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  try {
+    // 1. Nếu là Telegram Webhook Update (Bot 10 Construction hoặc Bot khác)
+    if (e && e.postData && e.postData.contents) {
+      try {
+        const raw = JSON.parse(e.postData.contents);
+        if (raw.update_id !== undefined && !raw.action) {
+          if (typeof processTelegramUpdate === "function") {
+            processTelegramUpdate(raw);
+          }
+          return ContentService.createTextOutput(JSON.stringify({ ok: true, status: "processed" }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+      } catch (exJson) {}
+    }
+
+    // 2. Chuyển tiếp tới Collector Hub (Daily, Refuel, MDG, Cable, BI Plan Dep, etc.)
+    return doPostCollector_(e);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
