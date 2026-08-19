@@ -219,6 +219,41 @@ function doGet(e) {
       return _json({ ok: true, msgids: msgids });
     }
 
+    // ── Admin Audit: Kiểm tra / Gán SD_BOT_TOKEN & Dọn dẹp Trigger cũ ──
+    if (action === "admin_audit_sitedown") {
+      const props = PropertiesService.getScriptProperties();
+      const sdTokenOld = props.getProperty("SD_BOT_TOKEN") || "";
+      const sendToken = props.getProperty("SEND_BOT_TOKEN") || "";
+      
+      // Tự động gán SD_BOT_TOKEN nếu chưa có hoặc rỗng
+      if (!sdTokenOld) {
+        props.setProperty("SD_BOT_TOKEN", "8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI");
+      }
+      const sdTokenNew = props.getProperty("SD_BOT_TOKEN") || "";
+
+      // Dọn dẹp tất cả trigger checkAndSend cũ (nếu có)
+      const deletedTriggers = [];
+      const allTriggers = ScriptApp.getProjectTriggers();
+      for (let i = 0; i < allTriggers.length; i++) {
+        const handlerName = allTriggers[i].getHandlerFunction();
+        if (handlerName === "checkAndSend") {
+          deletedTriggers.push(handlerName);
+          ScriptApp.deleteTrigger(allTriggers[i]);
+        }
+      }
+
+      const remainingTriggers = ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction());
+
+      return _json({
+        ok: true,
+        sd_bot_token_before: sdTokenOld ? sdTokenOld.substring(0, 15) + "..." : "EMPTY (NOT SET)",
+        sd_bot_token_active: sdTokenNew ? sdTokenNew.substring(0, 15) + "..." : "EMPTY",
+        send_bot_token_active: sendToken ? sendToken.substring(0, 15) + "..." : "EMPTY",
+        deleted_legacy_triggers: deletedTriggers,
+        remaining_triggers: remainingTriggers
+      });
+    }
+
     // 🚀 CHUYỂN TIẾP TẤT CẢ CÁC GET REQUEST CÒN LẠI CHO COLLECTOR
     return doGetCollector_(e);
 
