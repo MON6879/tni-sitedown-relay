@@ -701,10 +701,24 @@ function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
     Logger.log("[sendOrEditTelegramPre] ⚠️ Nội dung rỗng hoặc không có sự cố thực tế → BỎ QUA KHÔNG GỬI (" + tag + ")");
     return;
   }
-  deleteOldMessages_(chatId, msgKey);
-  Utilities.sleep(200);
   const props  = PropertiesService.getScriptProperties();
   const idKey  = "SD_MSGID_" + msgKey;
+  const oldIds = getSavedMsgIds_(msgKey);
+  const escaped = escHtml(plainContent);
+  const chunks  = splitMessage(escaped, 3800);
+
+  // 1. Thử SỬA TRỰC TIẾP tin nhắn cũ (In-place Edit)
+  if (oldIds.length === 1 && chunks.length === 1) {
+    const edited = editTelegramMsg_(chatId, oldIds[0], "<pre>" + chunks[0] + "</pre>", "HTML", tag);
+    if (edited) {
+      Logger.log(tag + " ✅ Đã SỬA TRỰC TIẾP tin nhắn cũ (In-place Edit msg_id=" + oldIds[0] + ") thành công!");
+      return;
+    }
+  }
+
+  // 2. Nếu không sửa được → Xóa tin cũ và gửi tin mới
+  deleteOldMessages_(chatId, msgKey);
+  Utilities.sleep(200);
   const newIds = sendTelegramPreCollectIds_(chatId, plainContent, tag);
   props.setProperty(idKey, JSON.stringify(newIds));
 }
