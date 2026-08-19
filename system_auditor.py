@@ -92,7 +92,9 @@ GAS_SERVICES = {
 SHEET_CONNECTORS = {
     "Sheet 10_TNI_SITE_DOWN (GID=0)": "https://docs.google.com/spreadsheets/d/1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow/gviz/tq?tqx=out:csv&gid=0",
     "Sheet Task remain (GID=133591305)": "https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/gviz/tq?tqx=out:csv&gid=133591305",
-    "Sheet Auto Copy Config (GID=0)": "https://docs.google.com/spreadsheets/d/19RBlwehMC6BLoueaTEzsJHMx4puB0CTE5i5x79-uI6c/gviz/tq?tqx=out:csv&gid=0"
+    "Sheet Auto Copy Config (GID=0)": "https://docs.google.com/spreadsheets/d/19RBlwehMC6BLoueaTEzsJHMx4puB0CTE5i5x79-uI6c/gviz/tq?tqx=out:csv&gid=0",
+    "Sheet Team leader assign Plan (GID=1934147618)": "https://docs.google.com/spreadsheets/d/1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y/export?format=csv&gid=1934147618",
+    "Sheet Daily report and Bussiness (GID=996027261)": "https://docs.google.com/spreadsheets/d/1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y/export?format=csv&gid=996027261"
 }
 
 # ── 2. MA TRẬN LỊCH TRÌNH BÁO CÁO CHUẨN (MASTER SCHEDULE MATRIX) ───────────
@@ -315,6 +317,32 @@ def audit_sheets_connectors():
                             diff_min = (now_mm - a1_dt).total_seconds() / 60
                             if 4 <= now_mm.hour <= 22 and diff_min > 50:
                                 extra_note = f" ⚠️ Cảnh báo: A1 trễ {int(diff_min)}p ({m.group(1)})"
+                        except Exception:
+                            pass
+
+                # Kiểm tra độ tươi mới của Sheet Plan
+                elif "Team leader assign Plan" in name and len(lines) > 1:
+                    row2 = lines[1]
+                    m = re.search(r'(\d{2}/\d{2}/\d{4})', row2)
+                    if m:
+                        try:
+                            plan_dt = datetime.strptime(m.group(1), "%d/%m/%Y").date()
+                            today_mm = datetime.now(TZ_MM).date()
+                            if (today_mm - plan_dt).days > 1:
+                                extra_note = f" ⚠️ Cảnh báo: Plan mới nhất là ngày {m.group(1)} (đứng { (today_mm - plan_dt).days } ngày)"
+                        except Exception:
+                            pass
+
+                # Kiểm tra độ tươi mới của Sheet Daily Result
+                elif "Daily report and Bussiness" in name and len(lines) > 1:
+                    row2 = lines[1]
+                    m = re.search(r'(\d{2}/\d{2}/\d{4})', row2)
+                    if m:
+                        try:
+                            res_dt = datetime.strptime(m.group(1), "%d/%m/%Y").date()
+                            today_mm = datetime.now(TZ_MM).date()
+                            if (today_mm - res_dt).days > 1:
+                                extra_note = f" ⚠️ Cảnh báo: Result mới nhất là ngày {m.group(1)} (đứng { (today_mm - res_dt).days } ngày)"
                         except Exception:
                             pass
                 results.append({
