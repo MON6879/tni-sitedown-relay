@@ -231,7 +231,7 @@ function sendRefuelReport() {
 }
 
 /**
- * Xây dựng và gom nhóm danh sách dòng tin nhắn theo Team
+ * Xây dựng và gom nhóm danh sách dòng tin nhắn theo Requester (tên người yêu cầu)
  */
 function buildRefuelMessageLines(rows) {
   let headerLine = "";
@@ -241,80 +241,47 @@ function buildRefuelMessageLines(rows) {
     startIdx = 1;
   }
   
-  // Phân nhóm
-  const teamGroups = {
-    1: [],
-    2: [],
-    3: [],
-    4: [],
-    0: []
-  };
+  // Gom nhóm theo tên người yêu cầu (Requester) và đếm số lượng
+  var requesterCounts = {};
+  var requesterOrder = [];
   
-  for (let i = startIdx; i < rows.length; i++) {
-    const line = rows[i];
-    const match = line.match(/\/T([1-9])/);
-    const teamNum = match ? parseInt(match[1], 10) : 0;
-    if (teamGroups[teamNum] !== undefined) {
-      teamGroups[teamNum].push(line);
-    } else {
-      teamGroups[0].push(line);
+  for (var i = startIdx; i < rows.length; i++) {
+    var name = rows[i].trim();
+    if (!name) continue;
+    if (requesterCounts[name] === undefined) {
+      requesterCounts[name] = 0;
+      requesterOrder.push(name);
     }
+    requesterCounts[name]++;
   }
   
-  const t1Count = teamGroups[1].length;
-  const t2Count = teamGroups[2].length;
-  const t3Count = teamGroups[3].length;
-  const t4Count = teamGroups[4].length;
-  const t0Count = teamGroups[0].length;
-  const totalCount = t1Count + t2Count + t3Count + t4Count + t0Count;
+  // Sắp xếp theo số lượng giảm dần
+  requesterOrder.sort(function(a, b) {
+    return requesterCounts[b] - requesterCounts[a];
+  });
   
-  const lines = [];
-  
-  // 1. Khung tổng hợp (Summary) ở đầu tin nhắn
-  lines.push("📊 <b>Summary by Team:</b>");
-  lines.push("🔴 Team 1: <b>" + t1Count + "</b> sites");
-  lines.push("🔵 Team 2: <b>" + t2Count + "</b> sites");
-  lines.push("🟢 Team 3: <b>" + t3Count + "</b> sites");
-  lines.push("🟡 Team 4: <b>" + t4Count + "</b> sites");
-  if (t0Count > 0) {
-    lines.push("⚪ Other: <b>" + t0Count + "</b> sites");
+  var totalCount = 0;
+  for (var k = 0; k < requesterOrder.length; k++) {
+    totalCount += requesterCounts[requesterOrder[k]];
   }
-  lines.push("Total: <b>" + totalCount + "</b> sites");
+  
+  var lines = [];
+  
+  // 1. Khung tổng hợp (Summary) theo tên người yêu cầu
+  lines.push("📊 <b>Summary by Requester:</b>");
+  for (var s = 0; s < requesterOrder.length; s++) {
+    var rName = requesterOrder[s];
+    var rCount = requesterCounts[rName];
+    lines.push("• " + rName + ": <b>" + rCount + "</b> sites");
+  }
+  lines.push("");
+  lines.push("📦 Total: <b>" + totalCount + "</b> sites");
   lines.push("━━━━━━━━━━━━━━━━━━━━━");
   lines.push("");
   
   if (headerLine) {
     lines.push(headerLine);
     lines.push("");
-  }
-  
-  // 2. Liệt kê chi tiết và phân nhóm các xe bằng dấu tròn màu sắc
-  const teamEmojis = {
-    1: "🔴",
-    2: "🔵",
-    3: "🟢",
-    4: "🟡",
-    0: "⚪"
-  };
-  const teamNames = {
-    1: "Team 1",
-    2: "Team 2",
-    3: "Team 3",
-    4: "Team 4",
-    0: "Other/Unknown"
-  };
-  
-  const activeTeams = [1, 2, 3, 4, 0];
-  for (let k = 0; k < activeTeams.length; k++) {
-    const t = activeTeams[k];
-    const teamRows = teamGroups[t];
-    if (teamRows.length > 0) {
-      lines.push(teamEmojis[t] + " <b>" + teamNames[t] + " (" + teamRows.length + " sites)</b>");
-      for (let j = 0; j < teamRows.length; j++) {
-        lines.push(teamRows[j]);
-      }
-      lines.push(""); // Dòng trống ngăn cách các nhóm
-    }
   }
   
   if (totalCount === 0) {

@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // daily_report_trigger.gs
 // Trigger GitHub Actions "Reports 1,2,3,4" dung gio Myanmar
 // Flow: GAS Timer (16:00 Myanmar) → GitHub API workflow_dispatch

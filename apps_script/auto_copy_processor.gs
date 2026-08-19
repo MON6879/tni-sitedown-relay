@@ -69,47 +69,7 @@ function runAutoCopyProcessorManual() {
   runAutoCopyProcessor(true);
 }
 
-/**
- * Hàm hỗ trợ reset nhanh trạng thái copy của Team 3 để kiểm tra copy lại
- */
-function runResetTeam3CopiedNotes() {
-  resetCopiedNotes("1Z2E4gSGXpYbjexfZJGNDglACYB9Zn46VXuiO2GGSGqQ", "3. see to Task", "A");
-}
 
-/**
- * Hàm tự động reset Note trên tất cả các sheet nguồn có trong bảng cấu hình
- */
-function runResetAllCopiedNotes() {
-  Logger.log("🔄 Bắt đầu reset ghi chú (Note) trên tất cả các sheet nguồn...");
-  try {
-    const configSS = getSpreadsheetCached_(CONFIG_SS_ID);
-    const sheetConfig = configSS.getSheetByName(CONFIG_TAB_NAME);
-    const lastRow = sheetConfig.getLastRow();
-    if (lastRow < 2) {
-      Logger.log("ℹ️ Bảng cấu hình trống.");
-      return;
-    }
-    const configRows = sheetConfig.getRange(2, 1, lastRow - 1, 4).getValues();
-    for (let i = 0; i < configRows.length; i++) {
-      const sourceLink = String(configRows[i][0] || "").trim();
-      const sourceSheet = String(configRows[i][1] || "").trim();
-      const sourceColCond = String(configRows[i][2] || "").trim();
-      if (sourceLink && sourceSheet && sourceColCond) {
-        try {
-          const srcSSId = extractSsId_(sourceLink);
-          const srcInfo = parseSheetAndRange_(sourceSheet);
-          const condRangeInfo = parseColAndStartRow_(sourceColCond);
-          resetCopiedNotes(srcSSId, srcInfo.sheetName, condRangeInfo.colLetter);
-        } catch (e) {
-          Logger.log("  ⚠️ Bỏ qua dòng cấu hình #" + (i+2) + ": " + e.message);
-        }
-      }
-    }
-    Logger.log("✅ Đã hoàn thành reset tất cả ghi chú nguồn.");
-  } catch (err) {
-    Logger.log("❌ Lỗi khi chạy Reset All: " + err.message);
-  }
-}
 
 /**
  * Hàm kiểm tra nhanh nội dung các ô A3, A4 để phân tích lỗi công thức
@@ -160,7 +120,7 @@ function runDebugTeam4() {
  */
 function runAutoCopyProcessor(bypassTimeGate) {
   if (bypassTimeGate !== true && !isWithinCopyActiveWindows_()) {
-    Logger.log("😴 Ngoài khung giờ hoạt động Copy (08:00-12:00 & 14:00-22:00 Myanmar) — Dừng tiến trình.");
+    Logger.log("😴 Ngoài khung giờ hoạt động Copy (05:00-20:00 Myanmar) — Dừng tiến trình.");
     return;
   }
   Logger.log("🚀 Bắt đầu tiến trình Auto Copy & Delete...");
@@ -227,7 +187,7 @@ function runAutoCopyProcessor(bypassTimeGate) {
         const delSSId = extractSsId_(deleteLink);
         const delSS = getSpreadsheetCached_(delSSId);
         const delInfo = parseSheetAndRange_(deleteColCond);
-        const delSh = delSS.getSheetByName(delInfo.sheetName);
+        const delSh = getSheetSmart_(delSS, delInfo.sheetName);
 
         if (!delSh) {
           Logger.log("  ❌ Lỗi: Không tìm thấy sheet xóa: '" + delInfo.sheetName + "'");
@@ -242,23 +202,45 @@ function runAutoCopyProcessor(bypassTimeGate) {
             const numRowsToRead = delLastRow - delStartRow + 1;
             const delData = delSh.getRange(delStartRow, delColNum, numRowsToRead, 1).getValues();
             let deletedCount = 0;
-            const rowsToDelete = [];
+
+            // 🚀 Gom các dòng cần xóa liên tiếp thành từng khối để xóa 1 lần duy nhất bằng deleteRows (Siêu tốc & chống Timeout)
+            const blocks = [];
+            let currentBlock = null;
 
             for (let r = numRowsToRead - 1; r >= 0; r--) {
-              if (String(delData[r][0]).trim() === deleteValCond) {
-                rowsToDelete.push(r + delStartRow);
+              const cellVal = String(delData[r][0] || "").trim().toLowerCase();
+              if (cellVal === deleteValCond.toLowerCase()) {
+                const rowNum = r + delStartRow;
+                if (!currentBlock) {
+                  currentBlock = { startRow: rowNum, count: 1 };
+                } else if (currentBlock.startRow === rowNum + 1) {
+                  currentBlock.startRow = rowNum;
+                  currentBlock.count++;
+                } else {
+                  blocks.push(currentBlock);
+                  currentBlock = { startRow: rowNum, count: 1 };
+                }
+              } else {
+                if (currentBlock) {
+                  blocks.push(currentBlock);
+                  currentBlock = null;
+                }
               }
+            }
+            if (currentBlock) {
+              blocks.push(currentBlock);
             }
 
-            for (let d = 0; d < rowsToDelete.length; d++) {
+            // Xóa từng khối từ dưới lên trên (nhanh gấp 100 lần, không bao giờ bị timeout)
+            for (let b = 0; b < blocks.length; b++) {
               try {
-                delSh.deleteRow(rowsToDelete[d]);
-                deletedCount++;
+                delSh.deleteRows(blocks[b].startRow, blocks[b].count);
+                deletedCount += blocks[b].count;
               } catch (delErr) {
-                Logger.log("  ⚠️ Lỗi khi xóa dòng " + rowsToDelete[d] + ": " + delErr.message);
+                Logger.log("  ⚠️ Lỗi khi xóa khối dòng từ " + blocks[b].startRow + " (số lượng " + blocks[b].count + "): " + delErr.message);
               }
             }
-            Logger.log("  🗑️ Đã xóa thành công: " + deletedCount + " dòng có '" + deleteValCond + "' tại '" + delInfo.sheetName + "' cột " + delColLetter);
+            Logger.log("  🗑️ Đã xóa thành công: " + deletedCount + " dòng có '" + deleteValCond + "' tại '" + delSh.getName() + "' cột " + delColLetter);
           }
         }
       } catch (err) {
@@ -274,7 +256,7 @@ function runAutoCopyProcessor(bypassTimeGate) {
         const srcSSId = extractSsId_(sourceLink);
         const srcSS = getSpreadsheetCached_(srcSSId);
         const srcInfo = parseSheetAndRange_(sourceSheet);
-        const srcSh = srcSS.getSheetByName(srcInfo.sheetName);
+        const srcSh = getSheetSmart_(srcSS, srcInfo.sheetName);
 
         if (!srcSh) {
           Logger.log("  ❌ Lỗi: Không tìm thấy sheet nguồn: '" + srcInfo.sheetName + "'");
@@ -282,7 +264,7 @@ function runAutoCopyProcessor(bypassTimeGate) {
           const tgtSSId = targetLink ? extractSsId_(targetLink) : srcSSId;
           const tgtSS = getSpreadsheetCached_(tgtSSId);
           const tgtInfo = parseSheetAndRange_(targetSheet);
-          const tgtSh = tgtSS.getSheetByName(tgtInfo.sheetName);
+          const tgtSh = getSheetSmart_(tgtSS, tgtInfo.sheetName);
 
           if (!tgtSh) {
             Logger.log("  ❌ Lỗi: Không tìm thấy sheet đích: '" + tgtInfo.sheetName + "'");
@@ -383,7 +365,6 @@ function runAutoCopyProcessor(bypassTimeGate) {
                   }
                   
                   if (hasCircularError) {
-                    srcSh.getRange(srcRowNum, 1, 1, 2).setBackground("#FF5252");
                     const errMsg = "⚠️ Lỗi vòng lặp/công thức tại sheet '" + srcInfo.sheetName + "' dòng " + srcRowNum + " (Cấu hình dòng #" + rowIdx + ")";
                     errorRows.push(errMsg);
                     Logger.log("  ❌ " + errMsg);
@@ -397,8 +378,13 @@ function runAutoCopyProcessor(bypassTimeGate) {
 
               if (rowsToAppend.length > 0) {
                 const tgtNextRow = findNextEmptyRowInCol_(tgtSh, targetStartCol, targetStartRow);
+                const maxRows = tgtSh.getMaxRows();
+                const neededRows = tgtNextRow + rowsToAppend.length - 1;
+                if (neededRows > maxRows) {
+                  tgtSh.insertRowsAfter(maxRows, neededRows - maxRows);
+                }
                 tgtSh.getRange(tgtNextRow, targetStartCol, rowsToAppend.length, numCols).setValues(rowsToAppend);
-                Logger.log("  ✅ Đã copy hàng loạt " + rowsToAppend.length + " dòng sang sheet đích từ dòng " + tgtNextRow);
+                Logger.log("  ✅ Đã copy hàng loạt " + rowsToAppend.length + " dòng sang sheet đích từ dòng " + tgtNextRow + " (liền kề, không tạo khoảng trống)");
               }
               Logger.log("  📊 Hoàn thành copy: " + copiedCount + " dòng.");
               
@@ -424,7 +410,7 @@ function runAutoCopyProcessor(bypassTimeGate) {
       "━━━━━━━━━━━━━━━━━━━━\n" +
       errorRows.join("\n") +
       "\n━━━━━━━━━━━━━━━━━━━━\n" +
-      "🔧 Các dòng trên đã được bôi đỏ trong sheet nguồn. Vui lòng kiểm tra và chỉnh sửa.";
+      "🔧 Vui lòng kiểm tra và chỉnh sửa công thức ở các dòng trên.";
     Logger.log("📨 Tổng hợp lỗi:\n" + summaryMsg);
     // Ghi lỗi vào Script Properties để có thể truy xuất sau
     const props = PropertiesService.getScriptProperties();
@@ -470,45 +456,7 @@ function getLastCopyErrors() {
   }
 }
 
-/**
- * Reset toàn bộ Cell Note "✅ Auto-Copied" trên sheet nguồn để cho phép copy lại
- * Hữu ích khi bạn muốn chạy lại toàn bộ từ đầu
- */
-function resetCopiedNotes(sheetId, sheetName, condColLetter) {
-  if (sheetName === undefined || sheetId === undefined) {
-    Logger.log("⚠️ Cảnh báo: Vui lòng không chọn chạy trực tiếp hàm 'resetCopiedNotes' này. Hãy bấm vào menu thả xuống ở trên đầu và chọn chạy hàm 'runResetAllCopiedNotes' (để reset tất cả các Team) hoặc 'runResetTeam3CopiedNotes' (chỉ reset Team 3) nhé ạ.");
-    return;
-  }
-  try {
-    const ss = SpreadsheetApp.openById(sheetId || CONFIG_SS_ID);
-    const sh = ss.getSheetByName(sheetName);
-    if (!sh) { Logger.log("❌ Không tìm thấy sheet: " + sheetName); return; }
-    const colNum = colLetterToNum_(condColLetter || "A");
-    const lastRow = sh.getLastRow();
-    if (lastRow < 1) return;
-    
-    // Đọc tất cả note trong cột một lần duy nhất để tối ưu hiệu suất (nhanh gấp 100 lần)
-    const range = sh.getRange(1, colNum, lastRow, 1);
-    const notes = range.getNotes();
-    let hasChanges = false;
-    
-    for (let r = 0; r < lastRow; r++) {
-      const note = notes[r][0] || "";
-      if (note.indexOf("✅ Auto-Copied:") !== -1) {
-        notes[r][0] = "";
-        hasChanges = true;
-      }
-    }
-    
-    // Chỉ ghi đè lại nếu thực sự có note cần xóa
-    if (hasChanges) {
-      range.setNotes(notes);
-    }
-    Logger.log("✅ Đã xóa toàn bộ Auto-Copied Note trên sheet '" + sheetName + "' cột " + condColLetter);
-  } catch (e) {
-    Logger.log("❌ Lỗi reset notes: " + e.message);
-  }
-}
+
 
 // ============================================================
 // HELPERS
@@ -518,6 +466,37 @@ function extractSsId_(link) {
   if (!link) return "";
   const match = link.match(/\/d\/([a-zA-Z0-9_-]+)/);
   return match ? match[1] : link;
+}
+
+function getSheetSmart_(ss, targetName) {
+  if (!ss || !targetName) return null;
+  targetName = String(targetName).trim();
+  
+  // 1. Tìm chính xác
+  let sheet = ss.getSheetByName(targetName);
+  if (sheet) return sheet;
+  
+  // 2. Tìm không phân biệt chữ hoa/thường và chuẩn hóa khoảng trắng thừa
+  const cleanTarget = targetName.toLowerCase().replace(/\s+/g, " ");
+  const allSheets = ss.getSheets();
+  for (let i = 0; i < allSheets.length; i++) {
+    const sh = allSheets[i];
+    const cleanShName = sh.getName().toLowerCase().replace(/\s+/g, " ");
+    if (cleanShName === cleanTarget) {
+      return sh;
+    }
+  }
+  
+  // 3. Tìm tương đối không tính khoảng cách
+  const cleanTargetNoSpace = targetName.toLowerCase().replace(/\s+/g, "");
+  for (let i = 0; i < allSheets.length; i++) {
+    const sh = allSheets[i];
+    const cleanShName = sh.getName().toLowerCase().replace(/\s+/g, "");
+    if (cleanShName === cleanTargetNoSpace) {
+      return sh;
+    }
+  }
+  return null;
 }
 
 function parseSheetAndRange_(sheetStr) {
@@ -566,24 +545,28 @@ function parseRangeCols_(rangeStr) {
 
 function findNextEmptyRowInCol_(sheet, columnIdx, startRow) {
   startRow = startRow || 1;
-  const lastRow = sheet.getLastRow();
-  if (lastRow < startRow) return startRow;
-  const numRowsToRead = lastRow - startRow + 1;
+  const maxRows = sheet.getMaxRows();
+  if (maxRows < startRow) return startRow;
+  
+  const numRowsToRead = maxRows - startRow + 1;
   const values = sheet.getRange(startRow, columnIdx, numRowsToRead, 1).getValues();
-  for (let i = numRowsToRead - 1; i >= 0; i--) {
+  
+  // 🔍 Quét TUẦN TỰ TỪ TRÊN XUỐNG DƯỚI (Top-Down) để tìm dòng trống LIỀN KỀ ĐẦU TIÊN
+  for (let i = 0; i < values.length; i++) {
     const val = values[i][0];
-    if (val !== "" && val !== null && val !== undefined) {
-      return i + startRow + 1;
+    const s = (val === null || val === undefined) ? "" : String(val).trim();
+    if (s === "") {
+      return i + startRow; // Trả về ngay ô trống liền kề đầu tiên (không bao giờ để trống hàng)
     }
   }
-  return startRow;
+  return maxRows + 1;
 }
 
 function sortSheetByConfig_(ss, sortConfig) {
   if (!ss || !sortConfig) return;
   try {
     const info = parseSheetAndRange_(sortConfig);
-    const sheet = ss.getSheetByName(info.sheetName);
+    const sheet = getSheetSmart_(ss, info.sheetName);
     if (!sheet) {
       Logger.log("  ❌ Lỗi sort: Không tìm thấy sheet '" + info.sheetName + "'");
       return;
@@ -595,9 +578,30 @@ function sortSheetByConfig_(ss, sortConfig) {
     const defaultStartRow = frozenRows > 0 ? frozenRows + 1 : 2;
 
     const sortInfo = parseSortConfigRange_(info.rangeStr, defaultStartRow);
-    const startRow = sortInfo.startRow;
+    let startRow = sortInfo.startRow;
     const colLetter = sortInfo.colLetter;
     const colIdx = colLetterToNum_(colLetter);
+
+    // 🛡️ BẢO VỆ TIÊU ĐỀ: Nếu dòng startRow chứa chữ tiêu đề -> Tự động bắt đầu sort từ dòng tiếp theo
+    if (startRow <= lastRow) {
+      const checkRowVals = sheet.getRange(startRow, 1, 1, lastCol).getValues()[0];
+      for (let h = 0; h < checkRowVals.length; h++) {
+        const hStr = String(checkRowVals[h] || "").toLowerCase();
+        if (
+          hStr.indexOf("date assign") !== -1 ||
+          hStr.indexOf("detailed content") !== -1 ||
+          hStr.indexOf("target date") !== -1 ||
+          hStr.indexOf("group assign") !== -1 ||
+          hStr.indexOf("dep assign") !== -1 ||
+          hStr.indexOf("backoffice receive") !== -1 ||
+          hStr.indexOf("your task") !== -1 && hStr.indexOf("assign") !== -1
+        ) {
+          Logger.log("  🛡️ Phát hiện dòng " + startRow + " là Tiêu đề (Header) -> Bắt đầu sort từ dòng " + (startRow + 1));
+          startRow = startRow + 1;
+          break;
+        }
+      }
+    }
 
     let actualLastRow = startRow;
     const colValues = sheet.getRange(1, colIdx, lastRow, 1).getValues();
@@ -759,13 +763,9 @@ function isWithinCopyActiveWindows_() {
   const hour = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "H"), 10);
   const minute = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "m"), 10);
   
-  // Khung 1: 08:00 - 12:00
-  if (hour >= 8 && hour < 12) return true;
-  if (hour === 12 && minute === 0) return true;
-  
-  // Khung 2: 14:00 - 22:00
-  if (hour >= 14 && hour < 22) return true;
-  if (hour === 22 && minute === 0) return true;
+  // Khung giờ hoạt động: 05:00 - 20:00
+  if (hour >= 5 && hour < 20) return true;
+  if (hour === 20 && minute === 0) return true;
   
   return false;
 }

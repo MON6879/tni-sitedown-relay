@@ -33,7 +33,7 @@ const REPORT_GID       = "133591305";
 // ENTRY POINTS
 // ============================================================
 
-function doPost(e) {
+function doPostCollector_(e) {
   try {
     const body  = JSON.parse(e.postData.contents);
 
@@ -60,7 +60,8 @@ function doPost(e) {
     if (body.action === "get_general")      return handleGetGeneral(ss);
     if (body.action === "get_report_data")   return handleGetReportData(ss);
     if (body.action === "get_asset_stats")   return handleGetAssetStats(ss);
-    if (body.action === "store_site_down")   return handleStoreSiteDownDirect(body);
+    // ⚠️ v684: ĐÃ XÓA routing "store_site_down" — Handler chính nằm tại doPost() trong site_down_v2.gs dòng 97.
+    // handleStoreSiteDownDirect() bên dưới (dòng ~1964) là dead code nguy hiểm có logic khác (clearContent + 10s sleep).
     if (body.action === "save_note_msgids")   return handleSaveNoteMsgIds(body);
     if (body.action === "save_msgids")          return handleSaveMsgIds(body);
     if (body.action === "get_msg_id")           return handleGetMsgId(body);
@@ -95,13 +96,22 @@ function doPost(e) {
     if (body.action === "collect_message" ||
         body.action === "collect_photo")     return doPostRefuelPlan_(e);
 
+    // ── Plan Dep Collector (BI Plan Week) ───────────────────────────────────
+    if (body.action === "plan_dep_add" ||
+        body.action === "plan_dep_update" ||
+        body.action === "plan_dep_delete")   return handlePlanDepPost_(body);
+
+    // ── Attendance Collector (Morning Attendance & Staff Leave) ─────────────
+    if (body.action === "attendance_add" ||
+        body.action === "collect_attendance") return handleAttendancePost_(body);
+
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
     return json({ status: "error", message: err.message, stack: err.stack });
   }
 }
 
-function doGet(e) {
+function doGetCollector_(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || "";
 
@@ -184,6 +194,10 @@ function doGet(e) {
     if (action === "get_team_wo_stats") return handleGetTeamWoStats_();
     if (action === "debug_sum_sheet")   return handleDebugSumSheet_();
 
+    // ── Plan Dep (BI Plan Week) ───────────────────────────────
+    if (action === "get_plan_dep")        return handleGetPlanDep_();
+    if (action === "get_plan_dep_permit") return handleGetPlanDepPermit_();
+    if (action === "plan_dep_archive")    return handlePlanDepArchive_();
 
     // ── Default: status check ─────────────────────────────────
     const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -363,21 +377,17 @@ function handleAdd(sheet, body) {
   // Ghi REF vào cột A
   sheet.getRange(2, 1).setValue(seqId);
 
-  // Gắn ảnh pending (nếu user đã gửi ảnh trước khi gửi text)
+  // Gắn ảnh pending vào DUY NHẤT CỘT F
   const props   = PropertiesService.getScriptProperties();
   const pKey    = "PENDING_PHOTO_" + chatId;
   const pending = JSON.parse(props.getProperty(pKey) || "[]");
   if (pending.length > 0) {
-    pending.forEach(function(link, idx) {
-      if (idx < 12) {
-        sheet.getRange(2, 6 + idx).setValue(link); // F=6 ... Q=17
-      }
-    });
+    sheet.getRange(2, 6).setValue(pending.join("\n"));
     props.deleteProperty(pKey);
   }
 
   const bg = seqId % 2 === 0 ? "#EBF3FB" : "#FFFFFF";
-  sheet.getRange(2, 1, 1, 17).setBackground(bg); // A–Q
+  sheet.getRange(2, 1, 1, 6).setBackground(bg); // A–F
 
   // Lưu ACTIVE_REF + reset PHOTO_COUNT cho user này
   // Ảnh gửi sau sẽ tự gắn vào đây, dừng sau 12 ảnh
@@ -388,14 +398,19 @@ function handleAdd(sheet, body) {
 }
 
 // ============================================================
-// ACTION: ADD_PHOTO — ảnh Telegram → Google Drive → link vào cột F–Q
-// Payload: { action, user_id, tg_url, date }
-// Cột F=6, G=7, H=8, I=9, J=10, K=11, L=12, M=13, N=14, O=15, P=16, Q=17 (tối đa 12 ảnh)
+// ACTION: ADD_PHOTO — ảnh Telegram → Google Drive Subfolder → link vào DUY NHẤT CỘT F
 // ============================================================
+
 function handleAddPhoto(sheet, body) {
   const userId = String(body.user_id || "").trim();
   if (!userId) {
     return json({ status: "error", message: "Missing user_id" });
+  }
+
+  let refId  = body.ref_id ? parseInt(body.ref_id) : null;
+  if (!refId) {
+    const activeStr = PropertiesService.getScriptProperties().getProperty("ACTIVE_REF_" + userId);
+    if (activeStr) refId = parseInt(activeStr);
   }
 
   // 1. Tạo blob từ base64 (Python đã download sẵn) hoặc download từ URL (fallback cũ)
@@ -415,10 +430,6 @@ function handleAddPhoto(sheet, body) {
         return json({ status: "error", message: "Telegram fetch HTTP " + code });
       }
       blob = resp.getBlob();
-      const ct = blob.getContentType() || "";
-      if (ct.indexOf("image") === -1 && ct.indexOf("octet") === -1) {
-        return json({ status: "error", message: "Invalid content type: " + ct });
-      }
     } else {
       return json({ status: "error", message: "Missing photo_b64 or tg_url" });
     }
@@ -426,55 +437,57 @@ function handleAddPhoto(sheet, body) {
     return json({ status: "error", message: "Blob error: " + e.message });
   }
 
+  // 2. Tạo hoặc lấy subfolder riêng cho phiếu này trong thư mục '2.2 TNIASSET TELEGRAM'
+  const parentFolder = getOrCreatePhotoFolder_();
+  let targetFolder = parentFolder;
+  let folderLink = "https://drive.google.com/drive/folders/" + parentFolder.getId();
+  
+  if (refId) {
+    const subfolderName = "Asset_#" + Utilities.formatString("%05d", refId);
+    const existing = parentFolder.getFoldersByName(subfolderName);
+    if (existing.hasNext()) {
+      targetFolder = existing.next();
+    } else {
+      targetFolder = parentFolder.createFolder(subfolderName);
+      targetFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
+    folderLink = "https://drive.google.com/drive/folders/" + targetFolder.getId();
+  }
 
-  // 2. Upload lên Google Drive folder 'TNI_Asset_Photos'
-  const folder   = getOrCreatePhotoFolder_();
-  const file     = folder.createFile(blob);
+  const file = targetFolder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   const driveLink = "https://drive.google.com/file/d/" + file.getId() + "/view";
 
-  // 3. Gắn ảnh vào đúng row
-  let refId  = body.ref_id ? parseInt(body.ref_id) : null;
+  // 3. Gắn link folder tải all ảnh vào DUY NHẤT CỘT F của dòng tương ứng
   const WIN_MS = 30 * 60 * 1000;
   const nowMs  = new Date().getTime();
   let attached = false;
 
-  // Ưu tiên 1a: ref_id từ Reply/caption
-  // Ưu tiên 1b: ACTIVE_REF_{userId} — lệnh text gần nhất của user
-  if (!refId) {
-    const activeStr = PropertiesService.getScriptProperties().getProperty("ACTIVE_REF_" + userId);
-    if (activeStr) refId = parseInt(activeStr);
-  }
-
-  const props2    = PropertiesService.getScriptProperties();
-  const countKey  = "PHOTO_COUNT_" + userId;
-  const photoCount = parseInt(props2.getProperty(countKey) || "0");
-
-  // Dừng nếu đã đủ 12 ảnh
-  if (photoCount >= 12) {
-    return json({ status: "ok", attached: false, reason: "max_photos_reached" });
-  }
-
-  // Tính thẳng row: seqId = rowNum - 1 → rowNum = refId + 1
   if (refId) {
-    const targetRow = refId + 1;
-    const lastRow   = sheet.getLastRow();
-    if (targetRow >= 2 && targetRow <= lastRow) {
-      // Đọc cột F–Q (col 6–17) của row đó
-      const photoCols = sheet.getRange(targetRow, 6, 1, 12).getValues()[0];
-      for (let c = 0; c < 12; c++) {
-        if (!photoCols[c]) {
-          sheet.getRange(targetRow, 6 + c).setValue(driveLink);
-          attached = true;
-          // Tăng đếm ảnh
-          props2.setProperty(countKey, String(photoCount + 1));
+    let targetRow = null;
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      const colA = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      for (let r = 0; r < colA.length; r++) {
+        if (parseInt(colA[r][0]) === refId) {
+          targetRow = r + 2;
           break;
         }
       }
     }
+
+    if (targetRow) {
+      const currentVal = sheet.getRange(targetRow, 6).getValue().toString().trim();
+      let updatedVal = folderLink;
+      if (currentVal && currentVal.indexOf(folderLink) === -1) {
+        updatedVal = folderLink + "\n" + currentVal;
+      }
+      sheet.getRange(targetRow, 6).setValue(updatedVal);
+      attached = true;
+    }
   }
 
-  // Ưu tiên 2 (fallback): tìm row gần nhất của user trong 30 phút
+  // Fallback: tìm row gần nhất của user trong 30 phút
   if (!attached) {
     const data = sheet.getDataRange().getValues();
     for (let i = data.length - 1; i >= 0; i--) {
@@ -482,14 +495,13 @@ function handleAddPhoto(sheet, body) {
       const rowTime = parseSheetDate_(String(data[i][1] || ""));
       if (!rowTime || (nowMs - rowTime.getTime()) > WIN_MS) break; // quá cũ
 
-      // Tìm cột ảnh trống (F=col5 → Q=col16, index 0-based)
-      for (let c = 5; c <= 16; c++) {
-        if (!data[i][c]) {
-          sheet.getRange(i + 1, c + 1).setValue(driveLink);
-          attached = true;
-          break;
-        }
+      const currentVal = (data[i][5] || "").toString().trim();
+      let updatedVal = folderLink;
+      if (currentVal && currentVal.indexOf(folderLink) === -1) {
+        updatedVal = folderLink + "\n" + currentVal;
       }
+      sheet.getRange(i + 1, 6).setValue(updatedVal);
+      attached = true;
       break;
     }
   }
@@ -500,7 +512,7 @@ function handleAddPhoto(sheet, body) {
     const key   = "PENDING_PHOTO_" + userId;
     const arr   = JSON.parse(props.getProperty(key) || "[]");
     if (arr.length < 12) {
-      arr.push(driveLink);
+      arr.push(folderLink);
       props.setProperty(key, JSON.stringify(arr));
     }
   }
@@ -2762,10 +2774,344 @@ function fixAllMismatchedConfigs() {
   }
 }
 
+// ============================================================
+// PLAN DEP — BI Plan Week Tab Backend
+// Sheet: 1grwuZpn4gIku2V66WC59-YccEN2yz1ItIuvgeuzO8W8
+// Tabs: Plan Dep (active), History Plan Dep (archive), Permit BI (auth)
+// ============================================================
+function handleGetPlanDep_() {
+  try {
+    const PDEP_SS_ID = "1grwuZpn4gIku2V66WC59-YccEN2yz1ItIuvgeuzO8W8";
+    const ss = SpreadsheetApp.openById(PDEP_SS_ID);
+    const planSheet = ss.getSheetByName("Plan Dep");
+    let planData = [];
+    if (planSheet && planSheet.getLastRow() > 2) {
+      const rows = planSheet.getRange(3, 1, planSheet.getLastRow() - 2, 6).getValues();
+      planData = rows.filter(r => r.some(c => String(c).trim() !== "")).map((r, i) => ({
+        row: i + 3,
+        col_a: String(r[0] || "").trim(),
+        dateAssign: r[1] instanceof Date ? Utilities.formatDate(r[1], "Asia/Yangon", "dd/MM/yyyy") : String(r[1] || "").trim(),
+        techManager: String(r[2] || "").trim(),
+        detailTask: String(r[3] || "").trim(),
+        progress: String(r[4] || "").trim(),
+        dateComplete: r[5] instanceof Date ? Utilities.formatDate(r[5], "Asia/Yangon", "dd/MM/yyyy") : String(r[5] || "").trim()
+      }));
+      
+      function parseDateTs_(dStr) {
+        if (!dStr) return 0;
+        const p = dStr.split("/");
+        if (p.length === 3) {
+          const d = new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]));
+          return isNaN(d.getTime()) ? 0 : d.getTime();
+        }
+        return 0;
+      }
+      planData.sort((a, b) => {
+        const da = parseDateTs_(a.dateAssign);
+        const db = parseDateTs_(b.dateAssign);
+        if (db !== da) return db - da;
+        return (a.techManager || "").localeCompare(b.techManager || "");
+      });
+    }
+    
+    let historySheet = ss.getSheetByName("History Plan Dep");
+    let historyData = [];
+    if (historySheet && historySheet.getLastRow() > 2) {
+      const hRows = historySheet.getRange(3, 1, historySheet.getLastRow() - 2, 6).getValues();
+      historyData = hRows.filter(r => r.some(c => String(c).trim() !== "")).map((r, i) => ({
+        row: i + 3,
+        col_a: String(r[0] || "").trim(),
+        dateAssign: r[1] instanceof Date ? Utilities.formatDate(r[1], "Asia/Yangon", "dd/MM/yyyy") : String(r[1] || "").trim(),
+        techManager: String(r[2] || "").trim(),
+        detailTask: String(r[3] || "").trim(),
+        progress: String(r[4] || "").trim(),
+        dateComplete: r[5] instanceof Date ? Utilities.formatDate(r[5], "Asia/Yangon", "dd/MM/yyyy") : String(r[5] || "").trim()
+      }));
+    }
+    
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const dayOfYear = Math.ceil((now - startOfYear) / 86400000);
+    const weekNumber = Math.ceil(dayOfYear / 7);
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const fmt = d => Utilities.formatDate(d, "Asia/Yangon", "dd/MM/yyyy");
+    
+    let backofficeList = [];
+    if (planSheet && planSheet.getLastRow() >= 2) {
+      const colJRows = planSheet.getRange(2, 10, Math.min(planSheet.getLastRow() - 1, 50), 1).getValues();
+      backofficeList = colJRows.map(r => String(r[0] || "").trim()).filter(v => v !== "");
+    }
+    if (!backofficeList.length) {
+      backofficeList = ["Admin", "Asset", "CM", "Finance", "HR", "M&E", "Manager", "PM", "Transmission"];
+    }
+
+    return json({
+      status: "ok",
+      version: "1.0",
+      timestamp: new Date().toISOString(),
+      data: planData,
+      history: historyData,
+      meta: {
+        totalPlan: planData.length,
+        totalHistory: historyData.length,
+        weekNumber: weekNumber,
+        weekRange: fmt(monday) + " — " + fmt(sunday),
+        sheetName: "Plan Dep",
+        backofficeList: backofficeList
+      },
+      error: null
+    });
+  } catch (err) {
+    return json({ status: "error", version: "1.0", timestamp: new Date().toISOString(), data: [], meta: {}, error: { code: "FETCH_FAIL", message: err.message } });
+  }
+}
+
+function handleGetPlanDepPermit_() {
+  try {
+    const PDEP_SS_ID = "1grwuZpn4gIku2V66WC59-YccEN2yz1ItIuvgeuzO8W8";
+    const ss = SpreadsheetApp.openById(PDEP_SS_ID);
+    let permitSheet = ss.getSheetByName("Permit BI");
+    if (!permitSheet) {
+      permitSheet = ss.insertSheet("Permit BI");
+      permitSheet.getRange(1, 1).setValue("list Gmail edit A:D");
+      permitSheet.getRange(2, 1).setValue("phonghdpxd@gmail.com");
+      permitSheet.getRange(3, 1).setValue("yelwin086683@gmail.com");
+    }
+    const lastRow = permitSheet.getLastRow();
+    let permits = [];
+    if (lastRow > 1) {
+      const rows = permitSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+      permits = rows.filter(r => String(r[0]).trim() !== "").map(r => ({
+        email: String(r[0]).trim().toLowerCase(),
+        role: "ADMIN",
+        dateAdded: Utilities.formatDate(new Date(), "Asia/Yangon", "dd/MM/yyyy")
+      }));
+    }
+    return json({ status: "ok", version: "1.0", timestamp: new Date().toISOString(), data: permits, meta: { total: permits.length }, error: null });
+  } catch (err) {
+    return json({ status: "error", version: "1.0", timestamp: new Date().toISOString(), data: [], meta: {}, error: { code: "PERMIT_FAIL", message: err.message } });
+  }
+}
+
+function handlePlanDepPost_(body) {
+  try {
+    const PDEP_SS_ID = "1grwuZpn4gIku2V66WC59-YccEN2yz1ItIuvgeuzO8W8";
+    const ss = SpreadsheetApp.openById(PDEP_SS_ID);
+    const planSheet = ss.getSheetByName("Plan Dep");
+    if (!planSheet) return json({ status: "error", version: "1.0", timestamp: new Date().toISOString(), data: null, meta: {}, error: { code: "NO_SHEET", message: "Plan Dep sheet not found" } });
+    
+    // 🛡️ Quyền thao tác trực tiếp trên Portal
+    function checkPermit_(email, requiredRole) {
+      return true;
+    }
+    
+    if (body.action === "plan_dep_add") {
+      planSheet.insertRowBefore(3);
+      planSheet.getRange(3, 1, 1, 6).setValues([[
+        "",
+        String(body.dateAssign || "").trim(),
+        String(body.techManager || "").trim(),
+        String(body.detailTask || "").trim(),
+        "",
+        ""
+      ]]);
+      return json({ status: "ok", version: "1.0", timestamp: new Date().toISOString(), data: { action: "added" }, meta: {}, error: null });
+    }
+    
+    if (body.action === "plan_dep_update") {
+      const row = parseInt(body.row);
+      const col = parseInt(body.col);
+      const value = String(body.value || "").trim();
+      if (!row || !col || col < 1 || col > 6) {
+        return json({ status: "error", version: "1.0", timestamp: new Date().toISOString(), data: null, meta: {}, error: { code: "INVALID", message: "Invalid row or column" } });
+      }
+      planSheet.getRange(row, col).setValue(value);
+      return json({ status: "ok", version: "1.0", timestamp: new Date().toISOString(), data: { action: "updated", row: row, col: col }, meta: {}, error: null });
+    }
+    
+    if (body.action === "plan_dep_delete") {
+      const row = parseInt(body.row);
+      if (!row || row < 3) {
+        return json({ status: "error", version: "1.0", timestamp: new Date().toISOString(), data: null, meta: {}, error: { code: "INVALID", message: "Invalid row number" } });
+      }
+      planSheet.deleteRow(row);
+      return json({ status: "ok", version: "1.0", timestamp: new Date().toISOString(), data: { action: "deleted", row: row }, meta: {}, error: null });
+    }
+    
+    return json({ status: "error", version: "1.0", timestamp: new Date().toISOString(), data: null, meta: {}, error: { code: "UNKNOWN", message: "Unknown plan_dep action" } });
+  } catch (err) {
+    return json({ status: "error", version: "1.0", timestamp: new Date().toISOString(), data: null, meta: {}, error: { code: "SERVER_ERROR", message: err.message } });
+  }
+}
+
+function handlePlanDepArchive_() {
+  try {
+    const PDEP_SS_ID = "1grwuZpn4gIku2V66WC59-YccEN2yz1ItIuvgeuzO8W8";
+    const ss = SpreadsheetApp.openById(PDEP_SS_ID);
+    const planSheet = ss.getSheetByName("Plan Dep");
+    if (!planSheet || planSheet.getLastRow() < 3) {
+      return json({ status: "ok", version: "1.0", timestamp: new Date().toISOString(), data: { archived: 0 }, meta: {}, error: null });
+    }
+    let historySheet = ss.getSheetByName("History Plan Dep");
+    if (!historySheet) {
+      historySheet = ss.insertSheet("History Plan Dep");
+      const header = planSheet.getRange(1, 1, 2, 6).getValues();
+      historySheet.getRange(1, 1, 2, 6).setValues(header);
+    }
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1));
+    monday.setHours(0, 0, 0, 0);
+    
+    const lastRow = planSheet.getLastRow();
+    const allData = planSheet.getRange(3, 1, lastRow - 2, 6).getValues();
+    const rowsToArchive = [];
+    
+    for (let i = allData.length - 1; i >= 0; i--) {
+      const dateComplete = allData[i][5];
+      if (dateComplete && dateComplete instanceof Date && dateComplete < monday) {
+        rowsToArchive.push({ index: i + 3, data: allData[i] });
+      } else if (dateComplete && typeof dateComplete === "string" && dateComplete.trim() !== "") {
+        const parts = dateComplete.trim().split("/");
+        if (parts.length === 3) {
+          const parsed = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+          if (!isNaN(parsed.getTime()) && parsed < monday) {
+            rowsToArchive.push({ index: i + 3, data: allData[i] });
+          }
+        }
+      }
+    }
+    
+    let archivedCount = 0;
+    for (const item of rowsToArchive) {
+      historySheet.insertRowBefore(3);
+      historySheet.getRange(3, 1, 1, 6).setValues([item.data]);
+      archivedCount++;
+    }
+    
+    rowsToArchive.sort((a, b) => b.index - a.index);
+    for (const item of rowsToArchive) {
+      planSheet.deleteRow(item.index);
+    }
+    
+    return json({
+      status: "ok",
+      version: "1.0",
+      timestamp: new Date().toISOString(),
+      data: { archived: archivedCount },
+      meta: { message: archivedCount + " completed tasks archived to History Plan Dep" },
+      error: null
+    });
+  } catch (err) {
+    return json({ status: "error", version: "1.0", timestamp: new Date().toISOString(), data: null, meta: {}, error: { code: "ARCHIVE_FAIL", message: err.message } });
+  }
+}
+
+// ============================================================
+// ATTENDANCE COLLECTOR — Morning Attendance & Staff Leave Records
+// v2026-08-17 — Split Team Leader Attendance & Staff Leave into Sheet
+// Sheet ID: 18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54
+// Tabs: "Sum report morning attendance" (Records), "Staff attendance" (Mapping)
+// ============================================================
+
+function handleAttendancePost_(body) {
+  try {
+    const ATT_SS_ID = "18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54";
+    const ss = SpreadsheetApp.openById(ATT_SS_ID);
+    const sumSheet = ss.getSheetByName("Sum report morning attendance");
+    if (!sumSheet) {
+      return json({ status: "error", message: "Sheet 'Sum report morning attendance' not found" });
+    }
+
+    // 1. Build staff lookup map from 'Staff attendance' (Col A: Telegram ID, Col C: Name Telegram, Col F: Full Name, Col H: VMY Code)
+    const staffMap = {};
+    const staffSheet = ss.getSheetByName("Staff attendance");
+    if (staffSheet && staffSheet.getLastRow() > 1) {
+      const staffValues = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 8).getValues();
+      for (let i = 0; i < staffValues.length; i++) {
+        const tgId = String(staffValues[i][0] || "").trim();
+        const tgName = String(staffValues[i][2] || "").trim().toLowerCase();
+        const fullName = String(staffValues[i][5] || "").trim().toLowerCase();
+        const vmyCode = String(staffValues[i][7] || "").trim().toLowerCase();
+        if (tgId) {
+          if (fullName) staffMap[fullName] = tgId;
+          if (tgName) staffMap[tgName] = tgId;
+          if (vmyCode) staffMap[vmyCode] = tgId;
+        }
+      }
+    }
+
+    const items = body.items || [];
+    if (!Array.isArray(items) || items.length === 0) {
+      return json({ status: "error", message: "No attendance items provided" });
+    }
+
+    // 2. Determine base REF sequence
+    let nextRefSeq = 1;
+    if (sumSheet.getLastRow() > 1) {
+      const topRef = String(sumSheet.getRange(2, 1).getValue() || "").trim();
+      const m = topRef.match(/ATT-(\d+)/i);
+      if (m) {
+        nextRefSeq = parseInt(m[1], 10) + 1;
+      } else {
+        nextRefSeq = sumSheet.getLastRow();
+      }
+    }
+
+    // 3. Prepare rows to insert (Strict Top Insertion Rule: insert at Row 2)
+    const rowsToInsert = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const name = String(it.name || "").trim();
+      const normName = name.toLowerCase();
+      let tgId = String(it.telegramId || "").trim();
+      if (!tgId && staffMap[normName]) {
+        tgId = staffMap[normName];
+      }
+      
+      const refStr = "ATT-" + String(nextRefSeq + i).padStart(4, "0");
+      const dateStr = String(it.date || Utilities.formatDate(new Date(), "Asia/Yangon", "dd/MM/yyyy")).trim();
+      const workStr = String(it.work || "").trim();
+      const takeLeaveStr = String(it.takeLeave || "").trim();
+      const halfDayStr = String(it.halfDay || "").trim();
+      const reasonStr = String(it.reason || "").trim();
+
+      rowsToInsert.push([
+        refStr,
+        dateStr,
+        name,
+        workStr,
+        takeLeaveStr,
+        halfDayStr,
+        reasonStr,
+        tgId
+      ]);
+    }
+
+    if (rowsToInsert.length > 0) {
+      sumSheet.insertRowsBefore(2, rowsToInsert.length);
+      sumSheet.getRange(2, 1, rowsToInsert.length, 8).setValues(rowsToInsert);
+    }
+
+    return json({
+      status: "ok",
+      version: "1.0",
+      timestamp: new Date().toISOString(),
+      data: {
+        inserted: rowsToInsert.length,
+        items: rowsToInsert
+      },
+      error: null
+    });
+  } catch (err) {
+    return json({ status: "error", message: err.message, stack: err.stack });
+  }
+}
+
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
-
-
-

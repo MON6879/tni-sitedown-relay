@@ -7,6 +7,15 @@ var DISPATCH_API_BASE = "https://api.github.com/repos/" + DISPATCH_REPO + "/acti
  * 2. Đồng thời kiểm tra: nếu rơi vào nhịp :06 hoặc :36 MMT (:04-:08 hoặc :34-:38) → Dispatch luôn Botlookup Relay
  */
 function dispatchTrain5Min() {
+  // 0. Tự động kiểm tra và khóa Webhook Search Bot 24/7
+  try {
+    if (typeof autoEnforceSearchBotWebhook === "function") {
+      autoEnforceSearchBotWebhook();
+    }
+  } catch (e) {
+    Logger.log("autoEnforceSearchBotWebhook error: " + e.message);
+  }
+
   // 1. Dispatch Train 5-Min
   _dispatchGH("train_5min.yml", "Train5Min");
 

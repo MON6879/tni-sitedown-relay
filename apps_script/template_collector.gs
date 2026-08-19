@@ -103,6 +103,16 @@ function setupTemplateSheet() {
       "TNI0019 ➔ Task & WO Details\ninfo: TNI0019 ➔ Full Infrastructure (Site/Cable/GPON/DIA)\ncons TNI0019 ➔ Civil Construction Progress\nclear TNI0019 ➔ Alarm Clear History\n/t1notclose, /t2notclose, /t3notclose, /t4notclose ➔ Team Open WOs\n/mysite, /mycable, /mydia, /mydata ➔ Personal Assigned Resources",
       "Instant Telegram Chat Response",
       nowStr
+    ],
+    [
+      "TPL-007",
+      "TNI ATTENDANCE GROUP",
+      "Ghế #7 — Ghế Điểm Danh & Template (@SEARCHTNITASKWOBOT)",
+      "Team Attendance Report Template (Team 1-4)",
+      "gõ 'template attendance' hoặc 'template team 1-4' hoặc 'template header'",
+      "Team 01 Attendane report: DD/MM/YY\n1. Staff Name: /Work\n2. Staff Name: /Work\n3. Staff Name: /Work\n(Tương tự cho Team 2, 3, 4)",
+      "Sheet: Template Attendance (Col E:J / F:I)",
+      nowStr
     ]
   ];
   
