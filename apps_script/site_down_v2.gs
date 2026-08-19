@@ -125,7 +125,7 @@ function doPost(e) {
       SpreadsheetApp.flush();
       try { lock.releaseLock(); } catch(eLock) {} // ✅ Nhả lock ngay
 
-      Utilities.sleep(3000); // ⏱️ Chờ đúng 3s + flush để Google Sheets hoàn tất 100% tính toán công thức Cột C và AW7
+      Utilities.sleep(5000); // ⏱️ Chờ đúng 5s + flush để Google Sheets hoàn tất 100% tính toán đồng bộ công thức Cột C
       SpreadsheetApp.flush();
 
       // ✅ THỰC THI GỬI:
