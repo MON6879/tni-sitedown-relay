@@ -665,8 +665,9 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
     }
     hasData = true;
   }
-  // 🛑 KHÔNG CÓ SỰ CỐ THÌ TRẢ VỀ NULL ĐỂ BỎ QUA KHÔNG GỬI
-  if (!hasData) return null;
+  if (!hasData) {
+    lines.push("✅ No incident");
+  }
   return lines.join("\n");
 }
 
@@ -683,7 +684,6 @@ function buildAwAzControlMessage(ts, awaz) {
   lines.push("📅 " + escHtml(ts));
   lines.push("━".repeat(26));
 
-  let totalIncidents = 0;
   for (const t of teamDefs) {
     const teamLines = [];
     let hasData = false;
@@ -704,17 +704,16 @@ function buildAwAzControlMessage(ts, awaz) {
         teamLines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
       }
       hasData = true;
-      totalIncidents++;
     }
+    lines.push("");
+    lines.push(t.emoji + " <b>" + t.label + "</b>");
+    lines.push("─".repeat(20));
     if (hasData) {
-      lines.push("");
-      lines.push(t.emoji + " <b>" + t.label + "</b>");
-      lines.push("─".repeat(20));
       lines.push(...teamLines);
+    } else {
+      lines.push("✅ No incident");
     }
   }
-  // Nếu tất cả các team đều không có sự cố thì không gửi gì
-  if (totalIncidents === 0) return null;
   return lines.join("\n");
 }
 
@@ -742,28 +741,12 @@ function splitMessage(text, maxLen) {
   return chunks;
 }
 
-// 🛡️ HÀM KIỂM TRA NỘI DUNG RỖNG: Nếu không có dữ liệu thực tế thì TUYỆT ĐỐI KHÔNG GỬI
+// 🛡️ HÀM KIỂM TRA NỘI DUNG RỖNG: Đảm bảo có nội dung trước khi gửi Telegram
 function isValidMessageContent_(text) {
   if (!text) return false;
   var s = text.toString().trim();
   if (!s || s === "..." || s === "null" || s === "undefined") return false;
-  
-  // Loại bỏ các chuỗi rỗng toàn dấu phân cách < > | | |
-  var noDelims = s.replace(/[<>|\s\-_.,:]/g, "");
-  if (!noDelims || noDelims.length < 3) return false;
-  
-  // Loại bỏ các tin chỉ chứa No incident hoặc tiêu đề không có nội dung
-  var lines = s.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-  var meaningfulLines = lines.filter(l => {
-    var lo = l.toLowerCase();
-    if (lo.indexOf("no incident") >= 0) return false;
-    if (/^[━─_=\-\s]+$/.test(l)) return false;
-    if (/^(📊|📅|📌|team\s*\d|summary)/i.test(lo) && l.length < 40) return false;
-    return true;
-  });
-  
-  if (meaningfulLines.length === 0) return false;
-  return true;
+  return s.length >= 5;
 }
 
 function sendOrEditTelegram(chatId, text, msgKey, tag) {
