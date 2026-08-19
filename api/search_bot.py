@@ -785,6 +785,32 @@ def get_user_team_number(user_id: int) -> int | None:
 _team_staff_map = {}
 
 def get_team_staff_names(team_num: int) -> list[str]:
+    # 1. Fetch from Template Attendance SSOT (18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54 gid=1366655674)
+    try:
+        import csv
+        url = "https://docs.google.com/spreadsheets/d/18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54/gviz/tq?tqx=out:csv&gid=1366655674"
+        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        if resp.status_code == 200:
+            reader = list(csv.reader(io.StringIO(resp.text)))
+            team_col_map = {1: 5, 2: 6, 3: 7, 4: 8}
+            col_idx = team_col_map.get(team_num, 5)
+            names = []
+            for r in reader[2:]:
+                if len(r) > col_idx:
+                    val = r[col_idx].strip()
+                    if not val:
+                        continue
+                    clean = re.sub(r'^\d+[\.\s\-]+', '', val)
+                    clean = re.sub(r':\s*/.*$', '', clean).strip()
+                    clean = re.sub(r':\s*$', '', clean).strip()
+                    if clean and clean not in names and clean.lower() not in ('nan', 'none', '-'):
+                        names.append(clean)
+            if names:
+                return names
+    except Exception as e:
+        logger.warning(f"Error fetching staff from attendance template: {e}")
+
+    # 2. Fallback to Staff sheet
     global _team_staff_map
     if team_num in _team_staff_map:
         return _team_staff_map[team_num]
@@ -829,8 +855,8 @@ def get_plan_template_text(team_num: int) -> str:
             "VII. List name FT : Name Site ( WO + Task)"
         ]
         
-        for name in matched_staff:
-            lines.append(f"{name}: ")
+        for i, name in enumerate(matched_staff, 1):
+            lines.append(f"{i}. {name}: ")
             
         return "\n".join(lines)
     except Exception as e:
@@ -1575,12 +1601,23 @@ def handle(update: dict) -> None:
                 return
             team_num = None
             if rest:
-                team_arg = rest.upper()
+                team_arg = rest.upper().strip()
                 m = re.match(r"^(T(?:EAM)?\s*([1-4])|[1-4])$", team_arg, re.IGNORECASE)
                 if m:
                     team_num = int(m.group(2) if m.group(2) else m.group(1))
             if not team_num:
-                team_num = get_user_team_number(user_id) or 1
+                chat_title = (msg.get("chat", {}).get("title") or "").lower()
+                cid_str = str(chat_id)
+                if "4215695747" in cid_str or "team 1" in chat_title or "dawei" in chat_title:
+                    team_num = 1
+                elif "4480845549" in cid_str or "team 2" in chat_title or "myeik" in chat_title:
+                    team_num = 2
+                elif "4369170658" in cid_str or "team 3" in chat_title or "bokpyin" in chat_title:
+                    team_num = 3
+                elif "4293741999" in cid_str or "team 4" in chat_title or "kawthoung" in chat_title:
+                    team_num = 4
+                else:
+                    team_num = get_user_team_number(user_id) or 1
             send_daily_plan_template(chat_id, team_num)
             return
 

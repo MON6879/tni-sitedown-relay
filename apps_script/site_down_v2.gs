@@ -498,35 +498,17 @@ function processSummaryAwAz(sheet, isDirectPush) {
     return false;
   }
 
-  // ✅ v660: Chỉ cần đọc AW:AZ 1 lần duy nhất (doPost đã flush+sleep(3s)+flush trước khi gọi hàm này)
+  // ✅ Đọc trực tiếp bảng AW:AZ và gửi nguyên vẹn 100% thông tin có trong ô (thêm Icon)
   let awaz = readAwAz(sheet);
 
-  // Quét 1 lần: Có ít nhất 1 ô chứa sự cố thực tế không?
-  let hasAnyData = false;
-  for (let r = 0; r < awaz.length; r++) {
-    for (let c = 0; c < 4; c++) {
-      if (isRealIncidentData_((awaz[r][c] || "").toString().trim())) {
-        hasAnyData = true;
-        break;
-      }
-    }
-    if (hasAnyData) break;
-  }
-
-  // 🛑 NẾU KHÔNG CÓ SỰ CỐ THỰC SỰ: BỎ QUA HOÀN TOÀN, KHÔNG GỬI VÀ KHÔNG LƯU KEY
-  if (!hasAnyData) {
-    Logger.log("[Luồng AW7] ⚠️ Bảng AW:AZ không có sự cố thực tế → Bỏ qua không gửi Tin 2.");
-    return false;
-  }
-
-  // ✅ ĐỘC LẬP: Lưu ngay khóa AW7 khi đã có dữ liệu thực tế
+  // ✅ ĐỘC LẬP: Lưu ngay khóa AW7
   props.setProperty(TS_KEY_AW7, tsKey);
-  Logger.log("[Luồng AW7] 🆕 Timestamp AW7 có dữ liệu sự cố thực tế: " + tsKey + " → Đang xử lý Tin 2 (SUMMARY)...");
+  Logger.log("[Luồng AW7] 🆕 Timestamp AW7: " + tsKey + " → Đang xử lý Tin 2 (SUMMARY)...");
 
   const teams = ["T1", "T2", "T3", "T4"];
   let sentCount = 0;
 
-  // Gửi sang 4 nhóm Team (Chỉ gửi nhóm nào CÓ SỰ CỐ, không gửi "No incident")
+  // Gửi sang 4 nhóm Team (Gửi nguyên vẹn 100% nội dung ô kèm Icon)
   for (const team of teams) {
     try {
       const chatId = SD_GROUPS[team];
@@ -534,10 +516,7 @@ function processSummaryAwAz(sheet, isDirectPush) {
       const colIdx = AWAZ_COL[team];
       if (colIdx === undefined) continue;
       const msg = buildAwAzTeamMessage(team, tsKey, awaz, colIdx);
-      if (!msg) {
-        Logger.log("[Luồng AW7][" + team + "] Không có sự cố → Bỏ qua không gửi.");
-        continue;
-      }
+      if (!msg) continue;
       sendOrEditTelegram(chatId, msg, "TIN2_" + team, "[Tin2][" + team + "]");
       sentCount++;
     } catch (err) {
@@ -545,7 +524,7 @@ function processSummaryAwAz(sheet, isDirectPush) {
     }
   }
 
-  // Gửi nhóm CONTROL (Chỉ gửi nếu có ít nhất 1 team có sự cố)
+  // Gửi nhóm CONTROL (Tổng hợp cả 4 Team nguyên vẹn 100%)
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
@@ -558,7 +537,7 @@ function processSummaryAwAz(sheet, isDirectPush) {
     }
   }
 
-  // Gửi DM cá nhân (Chỉ gửi nếu có sự cố)
+  // Gửi DM cá nhân
   const ctrlMsg = buildAwAzControlMessage(tsKey, awaz);
   if (ctrlMsg) {
     for (const pid of SD_PERSONAL_IDS) {
@@ -611,33 +590,6 @@ function readAwAz(sheet) {
   return sheet.getRange(7, 49, 9, 4).getValues();
 }
 
-// 🛡️ HELPER: Kiểm tra ô AW:AZ có chứa dữ liệu sự cố thực sự không
-// Quy tắc: Lột bỏ toàn bộ prefix (Site down, Cell down, DG Abnormal, DG Run>16H, Link down) và timestamp.
-// CHỈ coi là có sự cố khi còn lại ít nhất 1 chữ số 1-9 (số lượng > 0) hoặc chữ cái (mã trạm TNI..., tên kỹ sư).
-// Nếu chỉ toàn số 0 (ví dụ = /0 = /0, 0 = 0, 0 =, 0) -> KHÔNG PHẢI SỰ CỐ -> BỎ QUA 100%.
-function isRealIncidentData_(txt) {
-  if (!txt) return false;
-  var s = txt.toString().trim();
-  if (!s) return false;
-  
-  var clean = s
-    .replace(/^[\*_\`\s]*/, '')
-    .replace(/^(Site\s*down|Cell\s*down|DG\s*Abnormal|DG\s*Run\s*>?\s*16H|Link\s*down)\s*:\s*/i, '')
-    .replace(/\d{2}\/\d{2}\/\d{4}[\s\-T]+\d{2}:\d{2}(:\d{2})?/g, '')
-    .replace(/=>/g, '')
-    .replace(/[\s\*_\`=\/\-:,+><]/g, '')
-    .trim();
-
-  if (!clean) return false;
-  var lo = clean.toLowerCase();
-  if (lo === 'noincident' || lo === 'none' || lo === 'nan' || lo === 'null') return false;
-  
-  // Phải có ít nhất 1 chữ số 1-9 (số lượng sự cố > 0) hoặc ký tự chữ cái (mã trạm, tên nhân viên)
-  if (!/[1-9a-zA-Z]/.test(clean)) return false;
-  
-  return true;
-}
-
 function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
   const label   = "Team " + teamKey.replace("T", "");
   const numRows = awaz.length;
@@ -646,10 +598,9 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
   lines.push("📅 " + escHtml(ts));
   lines.push("━".repeat(26));
 
-  let hasData = false;
   for (let r = 0; r < numRows; r++) {
     const txt = ((awaz[r] || [])[colIdx] || "").toString().trim();
-    if (!isRealIncidentData_(txt)) continue;
+    if (!txt || txt === "..." || txt === "null" || txt === "undefined") continue;
     const clean = escHtml(txt.replace(/[*_`]/g, ""));
     if (r < AWAZ_LABELS.length) {
       const labelName = AWAZ_LABELS[r].name;
@@ -663,10 +614,6 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
       const cleanBody = clean.replace(prefixRegex, "");
       lines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
     }
-    hasData = true;
-  }
-  if (!hasData) {
-    lines.push("✅ No incident");
   }
   return lines.join("\n");
 }
@@ -686,10 +633,9 @@ function buildAwAzControlMessage(ts, awaz) {
 
   for (const t of teamDefs) {
     const teamLines = [];
-    let hasData = false;
     for (let r = 0; r < numRows; r++) {
       const txt = ((awaz[r] || [])[t.col] || "").toString().trim();
-      if (!isRealIncidentData_(txt)) continue;
+      if (!txt || txt === "..." || txt === "null" || txt === "undefined") continue;
       const clean = escHtml(txt.replace(/[*_`]/g, ""));
       if (r < AWAZ_LABELS.length) {
         const labelName = AWAZ_LABELS[r].name;
@@ -703,15 +649,12 @@ function buildAwAzControlMessage(ts, awaz) {
         const cleanBody = clean.replace(prefixRegex, "");
         teamLines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
       }
-      hasData = true;
     }
-    lines.push("");
-    lines.push(t.emoji + " <b>" + t.label + "</b>");
-    lines.push("─".repeat(20));
-    if (hasData) {
+    if (teamLines.length > 0) {
+      lines.push("");
+      lines.push(t.emoji + " <b>" + t.label + "</b>");
+      lines.push("─".repeat(20));
       lines.push(...teamLines);
-    } else {
-      lines.push("✅ No incident");
     }
   }
   return lines.join("\n");
