@@ -70,16 +70,16 @@ jobs:
           echo "🚂 Train tick: $(TZ='Asia/Yangon' date '+%Y-%m-%d %H:%M:%S MMT')"
 
           echo "1️⃣ Search Bot (Vercel)..."
-          curl -s -f "https://api.telegram.org/bot8606383435:AAEstcN4Om6_9ZAjs4OoFV2uVlRALgae2Ac/setWebhook?url=https://tni-bot.vercel.app/api/search_bot" || true
+          curl -s -f "https://api.telegram.org/bot8606383435:AAEstcN4Om6_9ZAjs4OoFV2uVlRALgae2Ac/getWebhookInfo" || true
           curl -s -f "https://tni-bot.vercel.app/api/search_bot" || true
 
           echo "2️⃣ Asset Collector (Vercel)..."
-          curl -s -f "https://api.telegram.org/bot8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM/setWebhook?url=https://tni-bot.vercel.app/api/collector" || true
+          curl -s -f "https://api.telegram.org/bot8928677923:AAE_cJuEDH1tUf5v0q5Wf0UjDHlcp_k1lGM/getWebhookInfo" || true
           curl -s -f "https://tni-bot.vercel.app/api/collector" || true
 
           echo "3️⃣ Site Down Relay (Vercel)..."
           curl -s -f "https://tni-sitedown.vercel.app/api/site_down_relay" || true
-          curl -s -f "https://api.telegram.org/bot8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI/setWebhook?url=https://tni-sitedown.vercel.app/api/site_down_relay" || true
+          curl -s -f "https://api.telegram.org/bot8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI/getWebhookInfo" || true
 
           echo "4️⃣ Main GAS Backend..."
           curl -s -L "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=ping" || true
@@ -87,8 +87,8 @@ jobs:
           echo "5️⃣ Auto Copy Paste GAS..."
           curl -s -L "https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec?action=ping" || true
 
-          echo "6️⃣ Construction Bot 10 (GAS) — setWebhook..."
-          curl -s -f "https://api.telegram.org/bot8903841312:AAHQ_LeI19gs2nrqBSInTsgzJXOuv6H8LmE/setWebhook?url=https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec" || true
+          echo "6️⃣ Construction Bot 10 (GAS) — getWebhookInfo..."
+          curl -s -f "https://api.telegram.org/bot8903841312:AAHQ_LeI19gs2nrqBSInTsgzJXOuv6H8LmE/getWebhookInfo" || true
 
           echo "✅ Keepalive done"
 
