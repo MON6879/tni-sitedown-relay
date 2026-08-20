@@ -109,18 +109,23 @@ function doPost(e) {
     if (rawText && !fileId) {
       const textL = rawText.toLowerCase();
 
-      // 1. Tra cứu Attendance & Leave Templates
+      // 1. Tra cứu Attendance & Leave Templates (Strict Anchored Commands — Max 4 words)
       const cleanCmd = textL.split("@")[0].trim();
-      if (cleanCmd.indexOf("template") !== -1 ||
-          cleanCmd.indexOf("attendance") !== -1 ||
-          cleanCmd.indexOf("/attendance") === 0 ||
-          cleanCmd.indexOf("/leave") === 0 ||
-          cleanCmd.indexOf("leave") === 0 ||
-          cleanCmd.indexOf("/header") === 0 ||
-          cleanCmd.indexOf("header") === 0 ||
-          cleanCmd.indexOf("/team") === 0 ||
-          cleanCmd.indexOf("/t1") === 0 || cleanCmd.indexOf("/t2") === 0 ||
-          cleanCmd.indexOf("/t3") === 0 || cleanCmd.indexOf("/t4") === 0) {
+      const isExplicitTemplateCommand = (
+        cleanCmd === "/attendance" || cleanCmd === "attendance" ||
+        cleanCmd === "/att" || cleanCmd === "att" ||
+        cleanCmd === "/leave" || cleanCmd === "leave" ||
+        cleanCmd === "/diemdanh" || cleanCmd === "diemdanh" ||
+        cleanCmd === "/header" || cleanCmd === "header" ||
+        cleanCmd === "/team" || cleanCmd === "/t1" || cleanCmd === "/t2" || cleanCmd === "/t3" || cleanCmd === "/t4" ||
+        cleanCmd === "t1" || cleanCmd === "t2" || cleanCmd === "t3" || cleanCmd === "t4" ||
+        cleanCmd.startsWith("/template") || cleanCmd.startsWith("template ") ||
+        cleanCmd.startsWith("/attendance ") || cleanCmd.startsWith("attendance template") ||
+        cleanCmd.startsWith("/leave ") || cleanCmd.startsWith("leave template") ||
+        cleanCmd.startsWith("/diemdanh ") || cleanCmd.startsWith("diemdanh template")
+      ) && cleanCmd.split(/\s+/).length <= 4;
+
+      if (isExplicitTemplateCommand) {
         const tplReply = handleAttendanceTemplateQuery_(ssId, cleanCmd);
         if (tplReply) {
           sendTelegramMessage_(token, chatId, tplReply);
