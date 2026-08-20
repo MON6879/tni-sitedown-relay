@@ -1116,7 +1116,6 @@ function setupAttendanceBotCommands() {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
   const commands = [
-    { command: "attendance",     description: "Daily Attendance report template (Team 1-4)" },
     { command: "template_team1", description: "Team 1 Attendance template" },
     { command: "template_team2", description: "Team 2 Attendance template" },
     { command: "template_team3", description: "Team 3 Attendance template" },
