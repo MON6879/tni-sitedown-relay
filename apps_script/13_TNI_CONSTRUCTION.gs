@@ -297,8 +297,48 @@ function handleRefuelCollectMessage_(data) {
  */
 function processTelegramUpdate(update) {
   try {
+    var cache = CacheService.getScriptCache();
+
+    // 🛡️ 1. DEDUPLICATION: Chống Telegram webhook retry gửi trùng update_id (Lưu 6 giờ)
+    var updateId = update.update_id;
+    if (updateId) {
+      var cKey = "TG_CONS_UPD_" + updateId;
+      if (cache && cache.get(cKey)) {
+        console.log("⚠️ Duplicate update_id: " + updateId + " -> IGNORE");
+        return;
+      }
+      if (cache) cache.put(cKey, "1", 21600); // 6 giờ dedup
+    }
+
     var message = update.message || update.edited_message || update.channel_post;
     if (!message) return;
+
+    // 🛡️ 2. MESSAGE_ID DEDUPLICATION: Chống gửi lặp lại cùng một message_id
+    if (message.chat && message.message_id) {
+      var mKey = "TG_CONS_MSG_" + message.chat.id + "_" + message.message_id;
+      if (cache && cache.get(mKey)) {
+        console.log("⚠️ Duplicate message_id: " + message.message_id + " in chat " + message.chat.id + " -> IGNORE");
+        return;
+      }
+      if (cache) cache.put(mKey, "1", 21600); // 6 giờ dedup
+    }
+
+    // 🛡️ 3. MEDIA GROUP DEDUPLICATION: Album ảnh chỉ xử lý text/caption 1 lần duy nhất
+    // Khi user gửi album (nhiều ảnh cùng lúc), Telegram tạo 1 webhook riêng cho MỖI ảnh,
+    // mỗi cái có update_id & message_id khác nhau, nhưng CÙNG media_group_id.
+    // → Chỉ ảnh ĐẦU TIÊN trong album được xử lý text → tạo Report.
+    // → Ảnh thứ 2+ chỉ lưu photo vào Drive, KHÔNG tạo Report mới.
+    var isAlbumFirstPhoto = true; // mặc định = true (tin đơn lẻ hoặc ảnh đầu album)
+    if (message.media_group_id) {
+      var mgKey = "TG_CONS_MG_" + message.media_group_id;
+      if (cache && cache.get(mgKey)) {
+        isAlbumFirstPhoto = false; // Ảnh thứ 2+ trong album
+        console.log("📎 Album photo #2+ (media_group_id: " + message.media_group_id + ") → photo-only mode");
+      } else {
+        if (cache) cache.put(mgKey, "1", 600); // 10 phút lock cho album
+        console.log("📎 Album first photo (media_group_id: " + message.media_group_id + ") → full processing");
+      }
+    }
 
     var fromUser = message.from;
     
@@ -351,12 +391,13 @@ function processTelegramUpdate(update) {
         if (isCmdHandled) return;
       }
 
-      // If photo has a long caption -> treat as new report text if it matches headers
-      if (textCaption.length > 10) {
+      // 🛡️ ALBUM GUARD: Chỉ ảnh ĐẦU TIÊN trong album (hoặc ảnh đơn lẻ) mới tạo Report mới
+      // Ảnh thứ 2+ trong album → chỉ lưu photo vào Drive, KHÔNG tạo Report trùng
+      if (isAlbumFirstPhoto && textCaption.length > 10) {
         handleNewTextMessage(userId, userName, chatTitle, textCaption, msgDate, chatId, messageId);
       }
       
-      // Collect photo into active user session
+      // Collect photo into active user session (MỌI ảnh đều lưu Drive)
       handlePhotoMessage(userId, message.photo, msgDate, chatId, messageId);
     }
   } catch (err) {
@@ -495,18 +536,31 @@ function handleSlashCommand(chatId, commandText, messageId) {
 
   if (!rawCmdKey) return false;
 
+  // 🛡️ DEBOUNCE: Chống spam và chống nhiều ảnh cùng album kích hoạt gửi lặp lại
+  var cache = CacheService.getScriptCache();
+  var cmdDebounceKey = "TG_CMD_LOCK_" + chatId + "_" + rawCmdKey.replace(/\W/g, "");
+  if (cache.get(cmdDebounceKey)) {
+    console.log("⚠️ Debouncing duplicate command " + rawCmdKey + " in chat " + chatId);
+    return true; // Đã xử lý lệnh này cách đây ít giây -> Không gửi lặp lại!
+  }
+
   if (rawCmdKey.startsWith('template') || rawCmdKey.startsWith('mau') || rawCmdKey.startsWith('teamplate')) {
+    cache.put(cmdDebounceKey, "1", 4);
     handleTemplateCommand(chatId, commandText, messageId, rangeData);
     return true;
   }
 
   var normCmdKey = rawCmdKey.replace(/_/g, " ").trim();
+  var normCmdKeyCompact = normCmdKey.replace(/\s+/g, "");
 
   for (var i = 0; i < rangeData.length; i++) {
     var keyName = rangeData[i][0] ? rangeData[i][0].toString().trim() : "";
     var cleanKey = keyName.toLowerCase().replace(/_/g, " ").trim();
+    var cleanKeyCompact = cleanKey.replace(/\s+/g, "");
 
-    if (cleanKey !== "" && (cleanKey === normCmdKey || normCmdKey.indexOf(cleanKey) === 0 || cleanKey.indexOf(normCmdKey) === 0)) {
+    // 🔒 STRICT EXACT MATCH: Chỉ khớp chính xác 100% tên lệnh
+    if (cleanKey !== "" && (cleanKey === normCmdKey || cleanKeyCompact === normCmdKeyCompact)) {
+      cache.put(cmdDebounceKey, "1", 4); // Khóa 4 giây chống spam
       var content = rangeData[i][3] ? rangeData[i][3].toString().trim() : "";
 
       if (content !== "") {
@@ -699,6 +753,17 @@ function handleNewTextMessage(userId, userName, chatTitle, textContent, msgDate,
     return;
   }
 
+  // 🛡️ TẦNG 2 — CONTENT HASH DEDUP: Cùng user + cùng nội dung trong 2 phút → IGNORE
+  // Phòng trường hợp media_group_id dedup bị miss hoặc user copy-paste gửi lại
+  var contentDigest = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, userId + "|" + textContent);
+  var contentHash = "TG_CONS_HASH_" + contentDigest.map(function(b) { return (b < 0 ? b + 256 : b).toString(16).padStart(2, '0'); }).join('').substring(0, 16);
+  var dedupCache = CacheService.getScriptCache();
+  if (dedupCache && dedupCache.get(contentHash)) {
+    console.log("⚠️ Duplicate content from user " + userId + " within 2min → IGNORE (hash: " + contentHash + ")");
+    return;
+  }
+  if (dedupCache) dedupCache.put(contentHash, "1", 120); // 2 phút dedup
+
   var sectionValues = parseTemplateSections(textContent, map.templateKeys);
   var activeContentCols = Object.keys(sectionValues).map(Number);
 
@@ -752,9 +817,9 @@ function handleNewTextMessage(userId, userName, chatTitle, textContent, msgDate,
   props.setProperty("ACTIVE_COLS_USER_" + userId, JSON.stringify(activeContentCols));
   props.setProperty("ACTIVE_TIME_USER_" + userId, String(new Date().getTime()));
 
-  var confirmMsg = "✅ Report #" + nextSTT + " saved successfully!";
+  var confirmMsg = "✅ Report #" + nextSTT + " saved successfully!\n📸 All photos auto-saved to #" + nextSTT;
   if (tniCodeStr) {
-    confirmMsg = "✅ Report #" + nextSTT + " (" + tniCodeStr + ") saved successfully!";
+    confirmMsg = "✅ Report #" + nextSTT + " (" + tniCodeStr + ") saved successfully!\n📸 All photos auto-saved to #" + nextSTT;
   }
   sendTelegramMsg(chatId, confirmMsg, messageId);
 
@@ -766,14 +831,22 @@ function handleNewTextMessage(userId, userName, chatTitle, textContent, msgDate,
  * EXCLUSIVELY KEEP ONLY THE CLEAN "📥 DOWNLOAD ALL (N Photos)" LINK LINE AT THE BOTTOM OF THE REPORT CELL!
  * Strips out all individual Photo 1, Photo 2... lines.
  */
-function handlePhotoMessage(userId, photoArray, msgDate, chatId, messageId) {
+function handlePhotoMessage(userId, photoArray, msgDate, chatId, messageId, _retryCount) {
   var props = PropertiesService.getScriptProperties();
   var activeSTT = props.getProperty("ACTIVE_STT_USER_" + userId);
   var activeColsJson = props.getProperty("ACTIVE_COLS_USER_" + userId);
   var activeTimeStr = props.getProperty("ACTIVE_TIME_USER_" + userId);
 
+  // 🛡️ ALBUM RACE CONDITION FIX: Ảnh #2+ trong album có thể đến trước khi ảnh #1 kịp tạo session.
+  // Retry tối đa 2 lần, mỗi lần chờ 3 giây.
   if (!activeSTT) {
-    console.warn("[PHOTO] User " + userId + " sent a photo without an active text session.");
+    var retryCount = _retryCount || 0;
+    if (retryCount < 2) {
+      console.log("[PHOTO] No active session for User " + userId + ". Retry " + (retryCount + 1) + "/2 in 3s...");
+      Utilities.sleep(3000);
+      return handlePhotoMessage(userId, photoArray, msgDate, chatId, messageId, retryCount + 1);
+    }
+    console.warn("[PHOTO] User " + userId + " sent a photo without an active text session (after 2 retries).");
     return;
   }
 
@@ -855,9 +928,9 @@ function handlePhotoMessage(userId, photoArray, msgDate, chatId, messageId) {
     setCellWithHyperlinks(cell, finalCellText);
   });
 
-  if (chatId && messageId) {
-    sendTelegramMsg(chatId, "📷 Photo attached to Report #" + activeSTT + "!", messageId);
-  }
+  // 🔇 SILENT SAVE: Ảnh được lưu im lặng vào Drive → không gửi tin phản hồi từng ảnh
+  // Nguyên lý: Từ text Report #N → text Report #(N+1), mọi ảnh ở giữa đều thuộc Report #N
+  // Tin "✅ Report #N saved successfully!" lúc tạo Report đã là xác nhận đủ
 
   console.log("[PHOTO] Updated single Download All link (" + totalPhotosCount + " photos) for STT #" + activeSTT);
 }
@@ -1255,11 +1328,21 @@ function setTelegramMenuCommands() {
  * 🌐 Webhook & Command Registration Setup
  */
 function setWebhookTniSiteBot() {
-  var newUrl = 'https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec';
+  var newUrl = 'https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec';
   var token = getBotToken();
-  var url = "https://api.telegram.org/bot" + token + "/setWebhook?url=" + encodeURIComponent(newUrl);
+  var url = "https://api.telegram.org/bot" + token + "/setWebhook";
+  var payload = {
+    url: newUrl,
+    allowed_updates: ["message", "edited_message", "channel_post"],
+    drop_pending_updates: true
+  };
 
-  var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  var resp = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
   var result = JSON.parse(resp.getContentText());
 
   if (result.ok) {
