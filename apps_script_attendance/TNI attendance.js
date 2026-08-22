@@ -942,7 +942,6 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
              "🔹 `/t3` — Mẫu Team 3 Main\n" +
              "🔹 `/t3_s1` — Mẫu Team 3 Sub-team 1\n" +
              "🔹 `/t4` — Mẫu Team 4 Main\n" +
-             "🔹 `/attendance` — Mẫu toàn bộ 4 Team\n" +
              "🔹 `/header` — Dòng tiêu đề điểm danh nhanh\n" +
              "🔹 `/leave` — Mẫu xin nghỉ phép cả ngày (Take leave)\n" +
              "🔹 `/leave_half` — Mẫu xin nghỉ phép nửa ngày (Half day)\n" +
@@ -988,7 +987,7 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
 
     let targetCols = null;
     const isS1 = q.indexOf("s1") !== -1 || q.indexOf("sub") !== -1 || q.indexOf("nhom1") !== -1;
-    const isAll = q.indexOf("all") !== -1 || q.indexOf("both") !== -1 || q.indexOf("template_team") !== -1;
+    const isAll = q.indexOf("all") !== -1 || q.indexOf("both") !== -1;
 
     if (/team\s*0?1|\bt1\b|_team1\b|team_1\b|template_t1\b/i.test(q)) {
       if (isS1) targetCols = subTeamColMap["t1_s1"];
@@ -1030,14 +1029,28 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
         if (lines.length > 0) blocks.push(lines.join("\n"));
       }
       return blocks.join("\n\n");
-    } else {
+    } else if (isHeaderOnly) {
       const allCols = [6, 7, 9, 10, 11, 12, 13];
-      const allBlocks = [];
+      const allHeaders = [];
       for (let c = 0; c < allCols.length; c++) {
         const lines = getColumnLines(allCols[c]);
-        if (lines.length > 0) allBlocks.push(lines.join("\n"));
+        if (lines.length > 0) allHeaders.push(lines[0]);
       }
-      return isHeaderOnly ? allBlocks.join("\n") : allBlocks.join("\n\n");
+      return allHeaders.join("\n");
+    } else {
+      // Default: Return Menu to prompt user to choose specific team
+      return "📋 *TNI ATTENDANCE BOT — VUI LÒNG CHỌN TEAM CỦA BẠN:*\n" +
+             "──────────────────────────────\n" +
+             "🔹 `/t1` — Mẫu Team 1 Main (Dawei/Myeik)\n" +
+             "🔹 `/t1_s1` — Mẫu Team 1 Sub-team 1\n" +
+             "🔹 `/t2` — Mẫu Team 2 Main\n" +
+             "🔹 `/t2_s1` — Mẫu Team 2 Sub-team 1\n" +
+             "🔹 `/t3` — Mẫu Team 3 Main\n" +
+             "🔹 `/t3_s1` — Mẫu Team 3 Sub-team 1\n" +
+             "🔹 `/t4` — Mẫu Team 4 Main\n" +
+             "🔹 `/header` — Dòng tiêu đề điểm danh nhanh\n" +
+             "🔹 `/leave` — Mẫu xin nghỉ phép cả ngày\n" +
+             "🔹 `/leave_half` — Mẫu xin nghỉ phép nửa ngày";
     }
   } catch (err) {
     Logger.log("handleAttendanceTemplateQuery_ error: " + err);
