@@ -34,10 +34,11 @@ from telethon.tl.functions.messages import (
 API_ID         = int(os.environ.get("TELEGRAM_API_ID", "0"))
 API_HASH       = os.environ.get("TELEGRAM_API_HASH", "")
 SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
-MAIN_GAS_FALLBACK = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+PRIMARY_GAS_URL = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+SSOT_DEPLOY_ID = "AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA"
 GAS_URL = os.environ.get("APPS_SCRIPT_URL", "").strip()
-if not GAS_URL or "AKfycbzGFdnE" in GAS_URL:
-    GAS_URL = MAIN_GAS_FALLBACK
+if not GAS_URL or SSOT_DEPLOY_ID not in GAS_URL:
+    GAS_URL = PRIMARY_GAS_URL
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
@@ -342,7 +343,11 @@ async def get_reader_ids_with_time(client, chat_id: int, msg_id: int) -> dict:
                 result[uid] = rdate
         return result
     except Exception as e:
-        print(f"    ⚠️  get_reader_ids error: {e}")
+        err_msg = str(e)
+        if "invalid" in err_msg.lower() or "not found" in err_msg.lower():
+            pass  # Tin nhắn đã bị xóa hoặc hết hạn lưu vết đọc (quá 7 ngày)
+        else:
+            print(f"    ⚠️  get_reader_ids error: {e}")
         return {}
 
 
@@ -429,8 +434,13 @@ async def process_group(client, group_key: str, chat_id: int,
     today_note_msg = None
 
     for msg, dt_mm in note_msgs:
-        rid_map = await get_reader_ids_with_time(client, chat_id, msg.id)
-        rid_map = {uid: t for uid, t in rid_map.items() if uid in member_ids}
+        # Telegram API chỉ lưu và trả về danh sách đã đọc (read receipts) trong vòng 7 ngày gần nhất.
+        # Các tin nhắn cũ hơn 7 ngày luôn bị Telegram báo MSG_ID_INVALID.
+        if dt_mm >= d7_start:
+            rid_map = await get_reader_ids_with_time(client, chat_id, msg.id)
+            rid_map = {uid: t for uid, t in rid_map.items() if uid in member_ids}
+        else:
+            rid_map = {}
 
         for uid, read_dt in rid_map.items():
             if uid not in per_person:

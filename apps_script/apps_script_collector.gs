@@ -106,6 +106,8 @@ function doPostCollector_(e) {
         body.action === "collect_attendance") return handleAttendancePost_(body);
     // ── Admin: Set Script Property ─────────────────────────────────────────
     if (body.action === "set_property")      return handleSetProperty_(body);
+    // ── Admin: Clean Test Read Group ───────────────────────────────────────
+    if (body.action === "clean_test_read_group") return handleCleanTestReadGroup_(ss);
     // ── Schedule Sync (Time Rain 5 min) ─────────────────────────────────────
     if (body.action === "sync_schedule")     return handleSyncSchedule_(body);
 
@@ -2902,6 +2904,22 @@ function handleSetProperty_(body) {
     PropertiesService.getScriptProperties().setProperty(key, value || "");
     var verify = PropertiesService.getScriptProperties().getProperty(key);
     return json({ status: "ok", key: key, verified: verify ? verify.substring(0, 10) + "..." : "empty" });
+  } catch (err) {
+    return json({ status: "error", message: err.message });
+  }
+}
+
+// ── Admin: Clean Test Read Group ─────────────────────────────────────────
+function handleCleanTestReadGroup_(ss) {
+  try {
+    var sheet = ss.getSheetByName("Read Group");
+    if (!sheet) return json({ status: "ok", message: "No Read Group sheet" });
+    var val = sheet.getRange("D2").getValue();
+    if (String(val).trim() === "TEST_AGENT") {
+      sheet.deleteRow(2);
+      return json({ status: "ok", deleted: true, val: val });
+    }
+    return json({ status: "ok", deleted: false, val: val });
   } catch (err) {
     return json({ status: "error", message: err.message });
   }
