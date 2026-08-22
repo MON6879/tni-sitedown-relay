@@ -107,7 +107,7 @@ jobs:
 
           # Flags
           NEED_PYTHON=false
-          R1234=false; BOD=false; P5A=false; P5B=false; P5C=false
+          R1234=false; R4=false; BOD=false; P5A=false; P5B=false; P5C=false
           R6=false; R61=false; CABLE=false; REFUEL_REQ=false
           REFUEL_P1=false; REFUEL_P2=false; REFUEL_P21=false; REFUEL_P4=false
           AUDITOR91=false
@@ -126,8 +126,10 @@ jobs:
 
 
           # ═══════ ☀️ MORNING BLOCK (05:00-10:00) ═══════
-          #  05:46 → Reports 1,2,3,4 + BOD + Refuel Request (🤖 Bot API)
-          check_time 05 46 && R1234=true && BOD=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 1+8+11: Reports 1-4 + BOD + Refuel Req (05:46 MMT)"
+          #  05:46 → Reports 1,2,3 + BOD + Refuel Request (🤖 Bot API)
+          check_time 05 46 && R1234=true && BOD=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 1+8+11: Reports 1-3 + BOD + Refuel Req (05:46 MMT)"
+          #  05:51 → Report 4 (Daily EOD Task & Stats) — TOA 12 RIÊNG (+5 phút)
+          check_time 05 51 && R4=true && NEED_PYTHON=true && echo "🚃 Toa 12: Report 4 EOD Task (05:51 MMT)"
           #  05:56 → Cable Daily Report (🤖 Bot API)
           check_time 05 56 && CABLE=true && NEED_PYTHON=true && echo "🚃 Toa 7: Cable Daily Report (05:56 MMT)"
           #  06:06 → Report 5 (Daily Plan - Ca Sáng) (📱 Telethon)
@@ -158,8 +160,10 @@ jobs:
           check_time 14 58 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (14:58 MMT)"
           #  15:26 → Plan 5C Evening (📱 Telethon)
           check_time 15 26 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Evening (15:26 MMT)"
-          #  15:46 → Reports 1,2,3,4 + BOD (🤖 Bot API)
-          check_time 15 46 && R1234=true && BOD=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 1+8+11: Reports 1-4 + BOD + Refuel Req (15:46 MMT)"
+          #  15:46 → Reports 1,2,3 + BOD (🤖 Bot API)
+          check_time 15 46 && R1234=true && BOD=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 1+8+11: Reports 1-3 + BOD + Refuel Req (15:46 MMT)"
+          #  15:51 → Report 4 (Daily EOD Task & Stats) — TOA 12 RIÊNG (+5 phút)
+          check_time 15 51 && R4=true && NEED_PYTHON=true && echo "🚃 Toa 12: Report 4 EOD Task (15:51 MMT)"
           #  15:56 → Cable Daily Report (🤖 Bot API)
           check_time 15 56 && CABLE=true && NEED_PYTHON=true && echo "🚃 Toa 7: Cable Daily Report (15:56 MMT)"
 
@@ -184,6 +188,7 @@ jobs:
           # Output all flags
           echo "need_python=$NEED_PYTHON" >> $GITHUB_OUTPUT
           echo "r1234=$R1234" >> $GITHUB_OUTPUT
+          echo "r4=$R4" >> $GITHUB_OUTPUT
           echo "bod=$BOD" >> $GITHUB_OUTPUT
           echo "p5a=$P5A" >> $GITHUB_OUTPUT
           echo "p5b=$P5B" >> $GITHUB_OUTPUT
@@ -228,14 +233,36 @@ jobs:
       # 🤖 Engine: Bot API (SEND_BOT + REPORT_TASK_BOT + TECHNICAL_DEP_BOT)
       # ⏰ Schedule: 05:48, 15:48 Myanmar
       # ═══════════════════════════════════════════════
-      - name: "📊 Toa 1+11 — Reports 1,2,3,4 + BOD Assign"
+      - name: "📊 Toa 1+11 — Reports 1,2,3 + BOD Assign"
         continue-on-error: true
         if: |
           steps.sched.outputs.r1234 == 'true' ||
           (github.event_name == 'workflow_dispatch' && (
             inputs.report_type == 'Reports 1, 2, 3, 4 - Daily Task & Backlog' ||
-            inputs.report_type == 'Report 3.1 - Asset progress for material' ||
             inputs.report_type == 'Report 2 (BOD) - BOD Assign' ||
+            inputs.report_type == 'All Reports (1, 2, 3, 4, 5, 6 - Full Pipeline)'
+          ))
+        env:
+          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+          REPORT_TASK_BOT_TOKEN: ${{ secrets.REPORT_TASK_BOT_TOKEN }}
+          TECHNICAL_DEP_BOT_TOKEN: ${{ secrets.TECHNICAL_DEP_BOT_TOKEN }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+        run: |
+          python daily_bod_assign.py || true
+          python backlog_send.py --now || true
+
+      # ═══════════════════════════════════════════════
+      # 📋 TOA 12: Report 4 — Daily EOD Task & Stats
+      # 🤖 Engine: Bot API + Telethon (Note reply)
+      # ⏰ Schedule: 05:51, 15:51 Myanmar (+5 phút sau Toa 1+11)
+      # ═══════════════════════════════════════════════
+      - name: "📋 Toa 12 — Report 4 (EOD Task & Stats + Asset 4d + Note)"
+        continue-on-error: true
+        if: |
+          steps.sched.outputs.r4 == 'true' ||
+          (github.event_name == 'workflow_dispatch' && (
+            inputs.report_type == 'Reports 1, 2, 3, 4 - Daily Task & Backlog' ||
+            inputs.report_type == 'Report 3.1 - Asset progress for material' ||
             inputs.report_type == 'All Reports (1, 2, 3, 4, 5, 6 - Full Pipeline)'
           ))
         env:
@@ -250,8 +277,6 @@ jobs:
           if [ "${{ inputs.report_type }}" = "Report 3.1 - Asset progress for material" ]; then
             python cron_send.py --asset_only || true
           else
-            python daily_bod_assign.py || true
-            python backlog_send.py --now || true
             python cron_send.py || true
           fi
 

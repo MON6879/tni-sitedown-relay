@@ -102,22 +102,40 @@ SHEET_CONNECTORS = {
 # ── 2. MA TRẬN LỊCH TRÌNH BÁO CÁO CHUẨN (MASTER SCHEDULE MATRIX) ───────────
 SCHEDULE_RULES = [
     {
-        "report_name": "Reports 1, 2, 3, 4 + BOD (Sáng)",
+        "report_name": "Reports 1, 2, 3 + BOD (Sáng)",
         "group_key": "CONTROL",
         "target_times": ["05:48"],
         "title_patterns": [
-            r"1\.\s*BOD", r"BOD\s*Assign", r"4c\.\s*Asset", r"3\.1\s*Asset", r"Task\s*remain",
-            r"Team\s*1\s*Dawei", r"Technical\s*Dept", r"TL\s*Comparison", r"Daily\s*EOD"
+            r"1\.\s*BOD", r"BOD\s*Assign", r"Task\s*remain",
+            r"Team\s*1\s*Dawei", r"Technical\s*Dept"
         ],
         "max_delay_min": 4
     },
     {
-        "report_name": "Reports 1, 2, 3, 4 + BOD (Chiều)",
+        "report_name": "Reports 1, 2, 3 + BOD (Chiều)",
         "group_key": "CONTROL",
         "target_times": ["15:48"],
         "title_patterns": [
-            r"1\.\s*BOD", r"BOD\s*Assign", r"4c\.\s*Asset", r"3\.1\s*Asset", r"Task\s*remain",
-            r"Team\s*1\s*Dawei", r"Technical\s*Dept", r"TL\s*Comparison", r"Daily\s*EOD"
+            r"1\.\s*BOD", r"BOD\s*Assign", r"Task\s*remain",
+            r"Team\s*1\s*Dawei", r"Technical\s*Dept"
+        ],
+        "max_delay_min": 4
+    },
+    {
+        "report_name": "Report 4 — EOD Task & Stats (Sáng, Toa 12)",
+        "group_key": "CONTROL",
+        "target_times": ["05:53"],
+        "title_patterns": [
+            r"Daily\s*EOD", r"TL\s*Comparison", r"4c\.\s*Asset", r"3\.1\s*Asset"
+        ],
+        "max_delay_min": 4
+    },
+    {
+        "report_name": "Report 4 — EOD Task & Stats (Chiều, Toa 12)",
+        "group_key": "CONTROL",
+        "target_times": ["15:53"],
+        "title_patterns": [
+            r"Daily\s*EOD", r"TL\s*Comparison", r"4c\.\s*Asset", r"3\.1\s*Asset"
         ],
         "max_delay_min": 4
     },

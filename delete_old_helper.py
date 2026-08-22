@@ -9,6 +9,7 @@ Dùng cho: cron_send.py, daily_plan_report.py, daily_read_report.py, check_read_
 """
 
 import asyncio
+import re
 import requests
 
 
@@ -163,7 +164,7 @@ async def delete_by_titles_batch_telethon(
     client,
     bot_token: str,
     chat_to_prefixes: dict, # {chat_id: [prefix1, prefix2, ...]}
-    search_limit: int = 100,
+    search_limit: int = 200,
 ) -> int:
     """
     Quét lịch sử MỖI NHÓM ĐÚNG 1 LẦN (Single-Pass Scanning) và xóa tất cả tin khớp với danh sách prefix.
@@ -202,11 +203,23 @@ async def delete_by_titles_batch_telethon(
 
                 matched = False
                 for pfx in clean_prefixes:
-                    if first_line_clean.startswith(pfx):
+                    if first_line_clean.startswith(pfx) or pfx in first_line_clean:
                         matched = True
                         break
 
-                if matched:
+                # Nhận diện các đoạn cắt (split chunks) của Report 4 / EOD / Search / Asset do Bot gửi
+                is_report4_split_chunk = (
+                    "Search TNIxxxx click here @SEARCHTNITASKWOBOT" in msg.text or
+                    "Part 1 — Search Stats" in msg.text or
+                    "Part 3 — No ID Telegram" in msg.text or
+                    (re.search(r"Day /\d+ of the month=", msg.text) and "WO Remain Detai:" in msg.text) or
+                    "Report — Daily EOD Task" in msg.text or
+                    "Full Report — FT Task Details" in msg.text or
+                    "Report — Employee Task & Rank" in msg.text or
+                    "Asset progress for material" in msg.text
+                )
+
+                if matched or is_report4_split_chunk:
                     try:
                         resp = requests.post(
                             f"https://api.telegram.org/bot{bot_token}/deleteMessage",

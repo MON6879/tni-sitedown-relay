@@ -253,6 +253,12 @@ function doPost(e) {
       }
     }
 
+    // extractedImageName: trích Site/Task name từ caption ảnh (thay thế luồng Gemini AI cũ đã bị xóa)
+    let extractedImageName = "";
+    if (msg.caption) {
+      extractedImageName = String(msg.caption).trim();
+    }
+
     let successCount = 0;
     let replyMsg = "✅ **Recorded #" + nextNum + "**";
     if (extractedImageName) {
