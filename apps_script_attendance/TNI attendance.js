@@ -120,8 +120,11 @@ function doPost(e) {
         cleanCmd === "/leave_half" || cleanCmd === "leave half" || cleanCmd === "/leavehalf" ||
         cleanCmd === "/diemdanh" || cleanCmd === "diemdanh" ||
         cleanCmd === "/header" || cleanCmd === "header" ||
-        cleanCmd === "/team" || cleanCmd === "/t1" || cleanCmd === "/t2" || cleanCmd === "/t3" || cleanCmd === "/t4" ||
-        cleanCmd === "t1" || cleanCmd === "t2" || cleanCmd === "t3" || cleanCmd === "t4" ||
+        cleanCmd === "/team" ||
+        cleanCmd === "/t1" || cleanCmd === "t1" || cleanCmd === "/t1_main" || cleanCmd === "/t1_s1" || cleanCmd === "/t1s1" ||
+        cleanCmd === "/t2" || cleanCmd === "t2" || cleanCmd === "/t2_main" || cleanCmd === "/t2_s1" || cleanCmd === "/t2s1" ||
+        cleanCmd === "/t3" || cleanCmd === "t3" || cleanCmd === "/t3_main" || cleanCmd === "/t3_s1" || cleanCmd === "/t3s1" ||
+        cleanCmd === "/t4" || cleanCmd === "t4" || cleanCmd === "/t4_main" ||
         cleanCmd === "/template_team1" || cleanCmd === "/template_team2" || cleanCmd === "/template_team3" || cleanCmd === "/template_team4" ||
         cleanCmd.startsWith("/template") || cleanCmd.startsWith("template ") ||
         cleanCmd.startsWith("/attendance ") || cleanCmd.startsWith("attendance template") ||
@@ -915,7 +918,7 @@ function logToSheet_(message) {
 function isAttendanceReportText_(text) {
   if (!text) return false;
   const t = text.toLowerCase().trim();
-  if (/team\s*0?[1-4]\s*attendan[ce]+\s*report/i.test(t)) return true;
+  if (/(?:team\s*0?[1-4]|t[1-4])(?:\s*s[1-9])?.*attendan[ce]+.*report/i.test(t)) return true;
   if (/^[^:\n]+:\s*take\s*leave/i.test(t)) return true;
   return false;
 }
@@ -932,11 +935,14 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
     if (q === "/menu" || q === "menu" || q === "/help" || q === "help" || q === "/huongdan") {
       return "📋 *TNI ATTENDANCE BOT — TEMPLATE MENU*\n" +
              "──────────────────────────────\n" +
-             "🔹 `/template_team1` — Mẫu điểm danh Team 1 (T1 & T1 S1)\n" +
-             "🔹 `/template_team2` — Mẫu điểm danh Team 2 (T2 & T2 S1)\n" +
-             "🔹 `/template_team3` — Mẫu điểm danh Team 3 (T3 & T3 S1)\n" +
-             "🔹 `/template_team4` — Mẫu điểm danh Team 4 (T4)\n" +
-             "🔹 `/attendance` — Lấy toàn bộ mẫu điểm danh 4 Team\n" +
+             "🔹 `/t1` — Mẫu Team 1 Main (Dawei/Myeik)\n" +
+             "🔹 `/t1_s1` — Mẫu Team 1 Sub-team 1\n" +
+             "🔹 `/t2` — Mẫu Team 2 Main\n" +
+             "🔹 `/t2_s1` — Mẫu Team 2 Sub-team 1\n" +
+             "🔹 `/t3` — Mẫu Team 3 Main\n" +
+             "🔹 `/t3_s1` — Mẫu Team 3 Sub-team 1\n" +
+             "🔹 `/t4` — Mẫu Team 4 Main\n" +
+             "🔹 `/attendance` — Mẫu toàn bộ 4 Team\n" +
              "🔹 `/header` — Dòng tiêu đề điểm danh nhanh\n" +
              "🔹 `/leave` — Mẫu xin nghỉ phép cả ngày (Take leave)\n" +
              "🔹 `/leave_half` — Mẫu xin nghỉ phép nửa ngày (Half day)\n" +
@@ -961,24 +967,44 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
       return strFull;
     }
 
-    // 2. Team Attendance templates
+    // 2. Team & Sub-team Attendance templates
     // Mapping exact columns in 'Template Attendance' tab:
-    // Team 1: Col F (6) [T1 Main] + Col G (7) [T1 S1]
-    // Team 2: Col I (9) [T2 Main] + Col J (10) [T2 S1]
-    // Team 3: Col K (11) [T3 Main] + Col L (12) [T3 S1]
+    // Team 1: Col F (6) [T1 Main], Col G (7) [T1 S1]
+    // Team 2: Col I (9) [T2 Main], Col J (10) [T2 S1]
+    // Team 3: Col K (11) [T3 Main], Col L (12) [T3 S1]
     // Team 4: Col M (13) [T4 Main]
-    const teamColGroups = {
-      1: [6, 7],
-      2: [9, 10],
-      3: [11, 12],
-      4: [13]
+    const subTeamColMap = {
+      "t1_main": [6],
+      "t1_s1": [7],
+      "t1_all": [6, 7],
+      "t2_main": [9],
+      "t2_s1": [10],
+      "t2_all": [9, 10],
+      "t3_main": [11],
+      "t3_s1": [12],
+      "t3_all": [11, 12],
+      "t4": [13]
     };
 
-    let teamNum = null;
-    if (/team\s*0?1|\bt1\b|_team1\b|team_1\b|template_team1\b|template_t1\b/i.test(q)) teamNum = 1;
-    else if (/team\s*0?2|\bt2\b|_team2\b|team_2\b|template_team2\b|template_t2\b/i.test(q)) teamNum = 2;
-    else if (/team\s*0?3|\bt3\b|_team3\b|team_3\b|template_team3\b|template_t3\b/i.test(q)) teamNum = 3;
-    else if (/team\s*0?4|\bt4\b|_team4\b|team_4\b|template_team4\b|template_t4\b/i.test(q)) teamNum = 4;
+    let targetCols = null;
+    const isS1 = q.indexOf("s1") !== -1 || q.indexOf("sub") !== -1 || q.indexOf("nhom1") !== -1;
+    const isAll = q.indexOf("all") !== -1 || q.indexOf("both") !== -1 || q.indexOf("template_team") !== -1;
+
+    if (/team\s*0?1|\bt1\b|_team1\b|team_1\b|template_t1\b/i.test(q)) {
+      if (isS1) targetCols = subTeamColMap["t1_s1"];
+      else if (isAll) targetCols = subTeamColMap["t1_all"];
+      else targetCols = subTeamColMap["t1_main"];
+    } else if (/team\s*0?2|\bt2\b|_team2\b|team_2\b|template_t2\b/i.test(q)) {
+      if (isS1) targetCols = subTeamColMap["t2_s1"];
+      else if (isAll) targetCols = subTeamColMap["t2_all"];
+      else targetCols = subTeamColMap["t2_main"];
+    } else if (/team\s*0?3|\bt3\b|_team3\b|team_3\b|template_t3\b/i.test(q)) {
+      if (isS1) targetCols = subTeamColMap["t3_s1"];
+      else if (isAll) targetCols = subTeamColMap["t3_all"];
+      else targetCols = subTeamColMap["t3_main"];
+    } else if (/team\s*0?4|\bt4\b|_team4\b|team_4\b|template_t4\b/i.test(q)) {
+      targetCols = subTeamColMap["t4"];
+    }
 
     const maxRow = Math.min(tplSheet.getLastRow(), 35);
 
@@ -997,28 +1023,19 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
       return lines;
     }
 
-    function getTeamBlocks(t) {
-      const cols = teamColGroups[t] || [];
+    if (targetCols) {
       const blocks = [];
-      for (let c = 0; c < cols.length; c++) {
-        const lines = getColumnLines(cols[c]);
-        if (lines.length > 0) {
-          blocks.push(lines.join("\n"));
-        }
+      for (let c = 0; c < targetCols.length; c++) {
+        const lines = getColumnLines(targetCols[c]);
+        if (lines.length > 0) blocks.push(lines.join("\n"));
       }
-      return blocks;
-    }
-
-    if (teamNum && teamColGroups[teamNum]) {
-      const teamBlocks = getTeamBlocks(teamNum);
-      return teamBlocks.join("\n\n");
+      return blocks.join("\n\n");
     } else {
+      const allCols = [6, 7, 9, 10, 11, 12, 13];
       const allBlocks = [];
-      for (let t = 1; t <= 4; t++) {
-        const tBlocks = getTeamBlocks(t);
-        for (let b = 0; b < tBlocks.length; b++) {
-          allBlocks.push(tBlocks[b]);
-        }
+      for (let c = 0; c < allCols.length; c++) {
+        const lines = getColumnLines(allCols[c]);
+        if (lines.length > 0) allBlocks.push(lines.join("\n"));
       }
       return isHeaderOnly ? allBlocks.join("\n") : allBlocks.join("\n\n");
     }
@@ -1056,7 +1073,7 @@ function processAttendanceReportText_(ssId, text, defaultTgId) {
     if (lines.length === 0) return 0;
 
     const items = [];
-    const mTeam = lines[0].match(/team\s*0?([1-4])\s*attendan[ce]+\s*report[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
+    const mTeam = lines[0].match(/(?:team\s*0?([1-4])|t([1-4]))(?:\s*s[1-9])?.*attendan[ce]+.*report[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
 
     if (mTeam) {
       const dateStr = mTeam[2];
