@@ -104,6 +104,8 @@ function doPostCollector_(e) {
     // ── Attendance Collector (Morning Attendance & Staff Leave) ─────────────
     if (body.action === "attendance_add" ||
         body.action === "collect_attendance") return handleAttendancePost_(body);
+    // ── Schedule Sync (Time Rain 5 min) ─────────────────────────────────────
+    if (body.action === "sync_schedule")     return handleSyncSchedule_(body);
 
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
@@ -2885,6 +2887,31 @@ function handleAttendancePost_(body) {
     });
   } catch (err) {
     return json({ status: "error", message: err.message, stack: err.stack });
+  }
+}
+
+// ── Schedule Sync: Ghi bảng thời gian vào tab "Time Rain 5 min" ─────────
+// Body: { action: "sync_schedule", data: [[row1], [row2], ...] }
+// Sheet: 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow → Tab "Time Rain 5 min"
+function handleSyncSchedule_(body) {
+  try {
+    var data = body.data;
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return json({ status: "error", message: "Missing or empty data array" });
+    }
+    var ss = SpreadsheetApp.openById("1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow");
+    var sheet = ss.getSheetByName("Time Rain 5 min");
+    if (!sheet) {
+      return json({ status: "error", message: "Tab 'Time Rain 5 min' not found" });
+    }
+    // Clear toàn bộ rồi ghi mới
+    sheet.clearContents();
+    if (data.length > 0 && data[0].length > 0) {
+      sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+    }
+    return json({ status: "ok", rows_written: data.length });
+  } catch (err) {
+    return json({ status: "error", message: err.message });
   }
 }
 
