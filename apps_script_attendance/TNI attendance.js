@@ -1257,12 +1257,6 @@ function buildSumWorkTab() {
     selectedMonth = currentMonthStr;
   }
 
-  // Phân tích tháng & năm được chọn
-  const mParts = selectedMonth.split("/");
-  const selM = parseInt(mParts[0], 10);
-  const selY = parseInt(mParts[1], 10);
-  const daysInMonth = new Date(selY, selM, 0).getDate();
-
   // 2. Các mốc ngày trọng yếu
   const todayStr = Utilities.formatDate(nowMM, "Asia/Rangoon", "dd/MM/yyyy");
   const d1 = new Date(nowMM.getTime() - 24 * 3600 * 1000);
@@ -1271,6 +1265,34 @@ function buildSumWorkTab() {
   const day2BeforeStr = Utilities.formatDate(d2, "Asia/Rangoon", "dd/MM/yyyy");
   const d7 = new Date(nowMM.getTime() - 7 * 24 * 3600 * 1000);
   const d30 = new Date(nowMM.getTime() - 30 * 24 * 3600 * 1000);
+
+  // Phân tích tháng & năm được chọn
+  const mParts = selectedMonth.split("/");
+  const selM = parseInt(mParts[0], 10);
+  const selY = parseInt(mParts[1], 10);
+  const daysInMonth = new Date(selY, selM, 0).getDate();
+
+  // Xác định tháng hiện tại vs tháng trước vs tháng tương lai
+  const curY = nowMM.getFullYear();
+  const curM = nowMM.getMonth() + 1;
+  const todayDay = nowMM.getDate();
+
+  const isCurrentMonth = (selY === curY && selM === curM);
+  const isPastMonth = (selY < curY) || (selY === curY && selM < curM);
+
+  let elapsedDays = daysInMonth;
+  let colEHeader = "";
+
+  if (isCurrentMonth) {
+    elapsedDays = todayDay;
+    colEHeader = "Số Ngày Đến Nay (Đến " + todayStr.substring(0, 5) + ")";
+  } else if (isPastMonth) {
+    elapsedDays = daysInMonth;
+    colEHeader = "Tổng Ngày (" + selectedMonth + " - Nguyên Tháng)";
+  } else {
+    elapsedDays = 0;
+    colEHeader = "Số Ngày (" + selectedMonth + ")";
+  }
 
   // 3. Tổng hợp danh sách nhân sự đầy đủ (Field Teams + Office)
   const staffSheet = ss.getSheetByName("Staff attendance");
@@ -1440,26 +1462,28 @@ function buildSumWorkTab() {
     }
 
     const totalCong = countWorkMonth + (countHalfMonth * 0.5);
+    const pctWork = elapsedDays > 0 ? (Math.round((countWorkMonth / elapsedDays) * 100) + "%") : "0%";
 
     summaryRows.push([
-      s + 1,
-      staff.name,
-      staff.team,
-      staff.id || "Chưa gán",
-      daysInMonth,
-      countWorkMonth,
-      countLeaveMonth,
-      countHalfMonth,
-      totalCong,
-      todayStatus,
-      yestStatus,
-      day2BeforeStatus,
-      count7DWork + "/7 ngày (" + Math.round((count7DWork / 7) * 100) + "%)",
-      count30DWork + "/30 ngày (" + Math.round((count30DWork / 30) * 100) + "%)"
+      s + 1,                                            // Col A (1): STT
+      staff.name,                                       // Col B (2): Họ & Tên Nhân Viên
+      staff.team,                                       // Col C (3): Bộ Phận / Team
+      staff.id || "Chưa gán",                           // Col D (4): Telegram ID
+      elapsedDays,                                      // Col E (5): Số Ngày Đến Hôm Nay / Nguyên Tháng
+      pctWork,                                          // Col F (6) [MỚI]: % Work / Số Ngày Tháng
+      countWorkMonth,                                   // Col G (7): Tổng Work (Ngày)
+      countLeaveMonth,                                  // Col H (8): Tổng Take Leave
+      countHalfMonth,                                   // Col I (9): Tổng Half Leave
+      totalCong,                                        // Col J (10): Tổng Ngày Công
+      todayStatus,                                      // Col K (11): Hôm Nay
+      yestStatus,                                       // Col L (12): Hôm Qua
+      day2BeforeStatus,                                 // Col M (13): Hôm Kia
+      count7DWork + "/7 ngày (" + Math.round((count7DWork / 7) * 100) + "%)",   // Col N (14): Thống Kê 7 Ngày
+      count30DWork + "/30 ngày (" + Math.round((count30DWork / 30) * 100) + "%)" // Col O (15): Thống Kê 1 Tháng
     ]);
   }
 
-  // 6. Ghi dữ liệu & Định dạng bảng 'Sum work'
+  // 6. Ghi dữ liệu & Định dạng bảng 'Sum work' (15 Cột: A -> O)
   sumWorkSheet.getRange("A1:B1").merge().setValue("📅 THÁNG XEM BÁO CÁO:").setFontWeight("bold").setBackground("#E8F0FE").setFontColor("#1A73E8").setHorizontalAlignment("right").setVerticalAlignment("middle");
   
   const cellC1 = sumWorkSheet.getRange("C1");
@@ -1473,14 +1497,15 @@ function buildSumWorkTab() {
   cellC1.setDataValidation(rule);
 
   sumWorkSheet.getRange("D1:G1").merge().setValue("💡 Bấm vào ô C1 để chọn tháng cần xem báo cáo tổng hợp").setFontStyle("italic").setFontColor("#5F6368").setVerticalAlignment("middle");
-  sumWorkSheet.getRange("H1:N1").merge().setValue("🕒 Cập nhật lúc: " + Utilities.formatDate(nowMM, "Asia/Rangoon", "dd/MM/yyyy HH:mm:ss") + " MMT").setFontColor("#70757A").setFontSize(9).setHorizontalAlignment("right").setVerticalAlignment("middle");
+  sumWorkSheet.getRange("H1:O1").merge().setValue("🕒 Cập nhật lúc: " + Utilities.formatDate(nowMM, "Asia/Rangoon", "dd/MM/yyyy HH:mm:ss") + " MMT").setFontColor("#70757A").setFontSize(9).setHorizontalAlignment("right").setVerticalAlignment("middle");
 
   const tableHeaders = [
     "STT",
     "Họ & Tên Nhân Viên",
     "Bộ Phận / Team",
     "Telegram ID",
-    "Số Ngày Tháng (" + selectedMonth + ")",
+    colEHeader,
+    "% Work / Số Ngày",
     "Tổng Work (Ngày)",
     "Tổng Take Leave",
     "Tổng Half Leave",
@@ -1492,7 +1517,7 @@ function buildSumWorkTab() {
     "Thống Kê 1 Tháng (30N)"
   ];
 
-  sumWorkSheet.getRange("A3:N3").setValues([tableHeaders])
+  sumWorkSheet.getRange("A3:O3").setValues([tableHeaders])
     .setBackground("#1A73E8")
     .setFontColor("#FFFFFF")
     .setFontWeight("bold")
@@ -1503,11 +1528,11 @@ function buildSumWorkTab() {
 
   const oldLastRow = sumWorkSheet.getLastRow();
   if (oldLastRow > 3) {
-    sumWorkSheet.getRange(4, 1, oldLastRow - 3, 14).clearContent().clearFormat();
+    sumWorkSheet.getRange(4, 1, oldLastRow - 3, 15).clearContent().clearFormat();
   }
 
   if (summaryRows.length > 0) {
-    const dataRange = sumWorkSheet.getRange(4, 1, summaryRows.length, 14);
+    const dataRange = sumWorkSheet.getRange(4, 1, summaryRows.length, 15);
     dataRange.setValues(summaryRows)
       .setVerticalAlignment("middle")
       .setFontSize(10);
@@ -1516,14 +1541,16 @@ function buildSumWorkTab() {
     sumWorkSheet.getRange(4, 2, summaryRows.length, 1).setHorizontalAlignment("left").setFontWeight("bold");
     sumWorkSheet.getRange(4, 3, summaryRows.length, 1).setHorizontalAlignment("center");
     sumWorkSheet.getRange(4, 4, summaryRows.length, 1).setHorizontalAlignment("center");
-    sumWorkSheet.getRange(4, 5, summaryRows.length, 5).setHorizontalAlignment("center");
-    sumWorkSheet.getRange(4, 10, summaryRows.length, 3).setHorizontalAlignment("center");
-    sumWorkSheet.getRange(4, 13, summaryRows.length, 2).setHorizontalAlignment("center");
+    sumWorkSheet.getRange(4, 5, summaryRows.length, 1).setHorizontalAlignment("center");
+    sumWorkSheet.getRange(4, 6, summaryRows.length, 1).setHorizontalAlignment("center").setFontWeight("bold").setFontColor("#1A73E8");
+    sumWorkSheet.getRange(4, 7, summaryRows.length, 4).setHorizontalAlignment("center");
+    sumWorkSheet.getRange(4, 11, summaryRows.length, 3).setHorizontalAlignment("center");
+    sumWorkSheet.getRange(4, 14, summaryRows.length, 2).setHorizontalAlignment("center");
 
     for (let r = 0; r < summaryRows.length; r++) {
       const rowNum = 4 + r;
       if (r % 2 === 1) {
-        sumWorkSheet.getRange(rowNum, 1, 1, 14).setBackground("#F8F9FA");
+        sumWorkSheet.getRange(rowNum, 1, 1, 15).setBackground("#F8F9FA");
       }
     }
     dataRange.setBorder(true, true, true, true, true, true, "#DADCE0", SpreadsheetApp.BorderStyle.SOLID);
@@ -1533,16 +1560,17 @@ function buildSumWorkTab() {
   sumWorkSheet.setColumnWidth(2, 200);  // Họ Tên
   sumWorkSheet.setColumnWidth(3, 140);  // Team
   sumWorkSheet.setColumnWidth(4, 120);  // Telegram ID
-  sumWorkSheet.setColumnWidth(5, 120);  // Số ngày tháng
-  sumWorkSheet.setColumnWidth(6, 110);  // Tổng Work
-  sumWorkSheet.setColumnWidth(7, 120);  // Tổng Take Leave
-  sumWorkSheet.setColumnWidth(8, 120);  // Tổng Half Leave
-  sumWorkSheet.setColumnWidth(9, 120);  // Tổng Ngày Công
-  sumWorkSheet.setColumnWidth(10, 160); // Hôm Nay
-  sumWorkSheet.setColumnWidth(11, 160); // Hôm Qua
-  sumWorkSheet.setColumnWidth(12, 160); // Hôm Kia
-  sumWorkSheet.setColumnWidth(13, 150); // 7 Ngày
-  sumWorkSheet.setColumnWidth(14, 160); // 1 Tháng
+  sumWorkSheet.setColumnWidth(5, 140);  // Số ngày tháng
+  sumWorkSheet.setColumnWidth(6, 130);  // % Work / Số Ngày
+  sumWorkSheet.setColumnWidth(7, 110);  // Tổng Work
+  sumWorkSheet.setColumnWidth(8, 120);  // Tổng Take Leave
+  sumWorkSheet.setColumnWidth(9, 120);  // Tổng Half Leave
+  sumWorkSheet.setColumnWidth(10, 120); // Tổng Ngày Công
+  sumWorkSheet.setColumnWidth(11, 160); // Hôm Nay
+  sumWorkSheet.setColumnWidth(12, 160); // Hôm Qua
+  sumWorkSheet.setColumnWidth(13, 160); // Hôm Kia
+  sumWorkSheet.setColumnWidth(14, 150); // 7 Ngày
+  sumWorkSheet.setColumnWidth(15, 160); // 1 Tháng
 
   Logger.log("✅ Bảng 'Sum work' đã cập nhật thành công cho tháng " + selectedMonth + " với " + summaryRows.length + " nhân sự!");
 }
