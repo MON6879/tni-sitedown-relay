@@ -588,7 +588,9 @@ function buildGeneralTab() {
       continue;
     }
 
-    if (!shortName) continue;
+    if (!shortName || shortName.toLowerCase().indexOf("nyi nyi") !== -1 || fullName.toLowerCase().indexOf("nyi nyi") !== -1) {
+      continue;
+    }
 
     const stats = attendanceMap[tgId] || {
       todayCount: 0, yestCount: 0, day2BeforeCount: 0, count7D: 0, countMonth: 0,
@@ -1300,7 +1302,7 @@ function buildSumWorkTab() {
             const m = line.match(/^(?:\d+[\.\)]\s*)?([^:]+)/);
             if (m) {
               const name = m[1].trim();
-              if (name && !staffSet.has(name.toLowerCase())) {
+              if (name && name.toLowerCase().indexOf("nyi nyi") === -1 && !staffSet.has(name.toLowerCase())) {
                 staffSet.add(name.toLowerCase());
                 staffList.push({ name: name, team: cfg.name, id: "" });
               }
@@ -1322,7 +1324,7 @@ function buildSumWorkTab() {
       const teamResp = String(row[12] || "").trim();
       const teamName = dep ? dep : (teamResp || "Office");
 
-      if (name) {
+      if (name && name.toLowerCase().indexOf("nyi nyi") === -1) {
         const key = name.toLowerCase();
         const existing = staffList.find(s => s.name.toLowerCase() === key);
         if (existing) {
