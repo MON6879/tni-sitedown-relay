@@ -104,6 +104,8 @@ function doPostCollector_(e) {
     // ── Attendance Collector (Morning Attendance & Staff Leave) ─────────────
     if (body.action === "attendance_add" ||
         body.action === "collect_attendance") return handleAttendancePost_(body);
+    // ── Admin: Set Script Property ─────────────────────────────────────────
+    if (body.action === "set_property")      return handleSetProperty_(body);
     // ── Schedule Sync (Time Rain 5 min) ─────────────────────────────────────
     if (body.action === "sync_schedule")     return handleSyncSchedule_(body);
 
@@ -2887,6 +2889,21 @@ function handleAttendancePost_(body) {
     });
   } catch (err) {
     return json({ status: "error", message: err.message, stack: err.stack });
+  }
+}
+
+// ── Admin: Set Script Property ───────────────────────────────────────────
+// Body: { action: "set_property", key: "GITHUB_PAT", value: "ghp_xxx" }
+function handleSetProperty_(body) {
+  try {
+    var key = body.key;
+    var value = body.value;
+    if (!key) return json({ status: "error", message: "Missing key" });
+    PropertiesService.getScriptProperties().setProperty(key, value || "");
+    var verify = PropertiesService.getScriptProperties().getProperty(key);
+    return json({ status: "ok", key: key, verified: verify ? verify.substring(0, 10) + "..." : "empty" });
+  } catch (err) {
+    return json({ status: "error", message: err.message });
   }
 }
 
