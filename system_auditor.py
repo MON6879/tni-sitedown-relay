@@ -76,26 +76,38 @@ BOT_REGISTRY = {
     },
     "Construction Bot 10 (@8903841312)": {
         "token": "8903841312:AAHQ_LeI19gs2nrqBSInTsgzJXOuv6H8LmE",
-        "expected_url": "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec",
-        "ping_url": "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=get_general"
+        "expected_url": "https://tni-bot.vercel.app/api/plan_dep",
+        "ping_url": "https://tni-bot.vercel.app/api/plan_dep"
+    },
+    "Attendance Bot (@8628370628)": {
+        "token": "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw",
+        "expected_url": "https://tni-bot.vercel.app/api/attendance",
+        "ping_url": "https://tni-bot.vercel.app/api/attendance"
     }
 }
 
 GAS_SERVICES = {
-    "TNI Main GAS Backend (@357 SSOT)": {
-        "url": "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=get_general"
+    "TNI Main GAS Backend (@368 SSOT)": {
+        "url": "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=ping"
     },
-    "Standalone Site Down GAS Backend (@83 SSOT)": {
+    "Standalone Site Down GAS Backend (@89 SSOT)": {
         "url": "https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec?action=admin_audit_sitedown"
     },
+    "TNI Attendance GAS Backend (@48 SSOT)": {
+        "url": "https://script.google.com/macros/s/AKfycbzI2TvupaD38LcUdyDPLBZrniFMCAN_3SbTX3St1u-G_otgEdZxquEZ-TUivx7jSZNxDg/exec"
+    },
     "BI Portal Backend (Plan Dep)": {
-        "url": "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=get_plan_dep"
+        "url": "https://tni-bot.vercel.app/api/plan_dep"
     }
 }
 
 SHEET_CONNECTORS = {
     "Sheet 10_TNI_SITE_DOWN (GID=0)": "https://docs.google.com/spreadsheets/d/1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow/gviz/tq?tqx=out:csv&gid=0",
     "Sheet Task remain (GID=133591305)": "https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/gviz/tq?tqx=out:csv&gid=133591305",
+    "Sheet Read Group (GID=870080250)": "https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/gviz/tq?tqx=out:csv&gid=870080250",
+    "Sheet Construction (1ViXXv5...)": "https://docs.google.com/spreadsheets/d/1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8/gviz/tq?tqx=out:csv&gid=0",
+    "Sheet Attendance (18zQB4i...)": "https://docs.google.com/spreadsheets/d/18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54/gviz/tq?tqx=out:csv&gid=0",
+    "Sheet Time Rain 5 min (GID=2003037043)": "https://docs.google.com/spreadsheets/d/1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow/gviz/tq?tqx=out:csv&gid=2003037043",
     "Sheet Auto Copy Config (GID=0)": "https://docs.google.com/spreadsheets/d/19RBlwehMC6BLoueaTEzsJHMx4puB0CTE5i5x79-uI6c/gviz/tq?tqx=out:csv&gid=0"
 }
 
