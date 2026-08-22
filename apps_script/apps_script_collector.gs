@@ -43,8 +43,14 @@ function doPostCollector_(e) {
     const ss    = SpreadsheetApp.openById(SHEET_ID);
     const sheet = getDataSheet(ss);
 
-    // Route Telegram webhook format (site down bot) → doPostSiteDown
-    if (body.message || body.channel_post) return doPostSiteDown_(e);
+    // Route Telegram webhook format fallback
+    if (body.message || body.channel_post) {
+      if (typeof processTelegramUpdate === "function") {
+        processTelegramUpdate(body);
+        return ContentService.createTextOutput(JSON.stringify({ ok: true, status: "processed" })).setMimeType(ContentService.MimeType.JSON);
+      }
+      return ContentService.createTextOutput(JSON.stringify({ status: "ignored" })).setMimeType(ContentService.MimeType.JSON);
+    }
 
     if (body.action === "add")              return handleAdd(sheet, body);
     if (body.action === "done")             return handleDone(sheet, ss, body);
