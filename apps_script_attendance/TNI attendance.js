@@ -41,6 +41,10 @@ function doGet(e) {
     buildGeneralTab();
     return ContentService.createTextOutput("General tab updated successfully");
   }
+  if (action === "build_sum_work") {
+    buildSumWorkTab();
+    return ContentService.createTextOutput("Sum work tab updated successfully");
+  }
   // Chẩn đoán: kiểm tra GEMINI_API_KEY và ảnh mẫu cột O
   if (action === "check_props") {
     const props = PropertiesService.getScriptProperties();
@@ -147,6 +151,7 @@ function doPost(e) {
           const nowMM = new Date();
           const timeStr = Utilities.formatDate(nowMM, "Asia/Rangoon", "HH:mm");
           sendTelegramMessage_(token, chatId, "✅ Attendance saved (" + timeStr + ") — Recorded " + count + " staff to Sheet.");
+          try { buildSumWorkTab(); } catch(eSum) { Logger.log("Lỗi buildSumWorkTab: " + eSum.message); }
           return ContentService.createTextOutput("Attendance recorded: " + count);
         }
       }
@@ -323,8 +328,9 @@ function doPost(e) {
 
     if (successCount > 0) {
       sendTelegramMessage_(token, chatId, replyMsg);
-      // ✅ Tự động cập nhật bảng General sau khi nhận ảnh mới thành công
+      // ✅ Tự động cập nhật bảng General & Sum work sau khi nhận ảnh mới thành công
       try { buildGeneralTab(); } catch(eGeneral) { Logger.log("Lỗi buildGeneralTab: " + eGeneral.message); }
+      try { buildSumWorkTab(); } catch(eSum) { Logger.log("Lỗi buildSumWorkTab: " + eSum.message); }
     } else {
       sendTelegramMessage_(token, chatId, "⚠️ Today's attendance for you/your group has already been recorded for this time slot.");
     }
@@ -1191,13 +1197,17 @@ function setupAttendanceBotCommands() {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
   const commands = [
-    { command: "template_team1", description: "Team 1 Attendance template" },
-    { command: "template_team2", description: "Team 2 Attendance template" },
-    { command: "template_team3", description: "Team 3 Attendance template" },
-    { command: "template_team4", description: "Team 4 Attendance template" },
-    { command: "leave",          description: "Full-day leave template (Take leave)" },
-    { command: "leave_half",     description: "Half-day leave template (Half day)" },
-    { command: "header",         description: "Header-only attendance template" }
+    { command: "menu",           description: "Danh muc lenh & Mau diem danh" },
+    { command: "t1",             description: "Mau diem danh Team 1 Main" },
+    { command: "t1_s1",          description: "Mau diem danh Team 1 Sub-team 1" },
+    { command: "t2",             description: "Mau diem danh Team 2 Main" },
+    { command: "t2_s1",          description: "Mau diem danh Team 2 Sub-team 1" },
+    { command: "t3",             description: "Mau diem danh Team 3 Main" },
+    { command: "t3_s1",          description: "Mau diem danh Team 3 Sub-team 1" },
+    { command: "t4",             description: "Mau diem danh Team 4 Main" },
+    { command: "header",         description: "Dong tieu de diem danh nhanh" },
+    { command: "leave",          description: "Mau xin nghi phep ca ngay" },
+    { command: "leave_half",     description: "Mau xin nghi phep nua ngay" }
   ];
   
   const urlDefault = "https://api.telegram.org/bot" + token + "/setMyCommands";
@@ -1216,5 +1226,328 @@ function setupAttendanceBotCommands() {
   
   Logger.log("✅ Attendance bot commands registered successfully.");
 }
+
+// ── BẢNG TỔNG HỢP CÔNG THEO THÁNG — TAB SUM WORK (GID: 1895020121) ──
+function buildSumWorkTab() {
+  const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+  let sumWorkSheet = ss.getSheetByName("Sum work");
+  if (!sumWorkSheet) {
+    sumWorkSheet = ss.insertSheet("Sum work");
+  }
+
+  // 1. Xác định tháng được chọn ở ô C1
+  let selectedMonth = "";
+  try {
+    selectedMonth = String(sumWorkSheet.getRange("C1").getValue() || "").trim();
+  } catch(e) {}
+
+  const nowMM = new Date();
+  const currentMonthStr = Utilities.formatDate(nowMM, "Asia/Rangoon", "MM/yyyy");
+  if (!selectedMonth || !/^\d{2}\/\d{4}$/.test(selectedMonth)) {
+    selectedMonth = currentMonthStr;
+  }
+
+  // Phân tích tháng & năm được chọn
+  const mParts = selectedMonth.split("/");
+  const selM = parseInt(mParts[0], 10);
+  const selY = parseInt(mParts[1], 10);
+  const daysInMonth = new Date(selY, selM, 0).getDate();
+
+  // 2. Các mốc ngày trọng yếu
+  const todayStr = Utilities.formatDate(nowMM, "Asia/Rangoon", "dd/MM/yyyy");
+  const d1 = new Date(nowMM.getTime() - 24 * 3600 * 1000);
+  const yestStr = Utilities.formatDate(d1, "Asia/Rangoon", "dd/MM/yyyy");
+  const d2 = new Date(nowMM.getTime() - 2 * 24 * 3600 * 1000);
+  const day2BeforeStr = Utilities.formatDate(d2, "Asia/Rangoon", "dd/MM/yyyy");
+  const d7 = new Date(nowMM.getTime() - 7 * 24 * 3600 * 1000);
+  const d30 = new Date(nowMM.getTime() - 30 * 24 * 3600 * 1000);
+
+  // 3. Tổng hợp danh sách nhân sự đầy đủ (Field Teams + Office)
+  const staffSheet = ss.getSheetByName("Staff attendance");
+  const tplSheet = ss.getSheetByName("Template Attendance");
+  
+  const staffList = [];
+  const staffSet = new Set();
+
+  // A. Nạp từ Template Attendance (Field Teams)
+  if (tplSheet && tplSheet.getLastRow() >= 1) {
+    const teamConfigs = [
+      { name: "Team 1", col: 6 },
+      { name: "Team 1 S1", col: 7 },
+      { name: "Team 2", col: 9 },
+      { name: "Team 2 S1", col: 10 },
+      { name: "Team 3", col: 11 },
+      { name: "Team 3 S1", col: 12 },
+      { name: "Team 4", col: 13 },
+      { name: "Office", col: 5 }
+    ];
+    const maxR = Math.min(tplSheet.getLastRow(), 35);
+    for (let tc = 0; tc < teamConfigs.length; tc++) {
+      const cfg = teamConfigs[tc];
+      if (cfg.col <= tplSheet.getLastColumn()) {
+        const vals = tplSheet.getRange(1, cfg.col, maxR, 1).getValues();
+        for (let r = 1; r < vals.length; r++) {
+          const line = String(vals[r][0] || "").trim();
+          if (line) {
+            const m = line.match(/^(?:\d+[\.\)]\s*)?([^:]+)/);
+            if (m) {
+              const name = m[1].trim();
+              if (name && !staffSet.has(name.toLowerCase())) {
+                staffSet.add(name.toLowerCase());
+                staffList.push({ name: name, team: cfg.name, id: "" });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // B. Nạp từ Staff Attendance (Office & Bổ sung Telegram ID)
+  if (staffSheet && staffSheet.getLastRow() >= 2) {
+    const staffVals = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 14).getValues();
+    for (let i = 0; i < staffVals.length; i++) {
+      const row = staffVals[i];
+      const tgId = String(row[0] || "").trim();
+      const name = String(row[5] || row[2] || "").trim();
+      const dep = String(row[10] || "").trim();
+      const teamResp = String(row[12] || "").trim();
+      const teamName = dep ? dep : (teamResp || "Office");
+
+      if (name) {
+        const key = name.toLowerCase();
+        const existing = staffList.find(s => s.name.toLowerCase() === key);
+        if (existing) {
+          if (tgId) existing.id = tgId;
+        } else {
+          staffSet.add(key);
+          staffList.push({ name: name, team: teamName, id: tgId });
+        }
+      }
+    }
+  }
+
+  // 4. Đọc toàn bộ lịch sử điểm danh từ 'Sum report morning attendance'
+  const sumReportSheet = ss.getSheetByName("Sum report morning attendance");
+  const records = [];
+  if (sumReportSheet && sumReportSheet.getLastRow() >= 2) {
+    const rVals = sumReportSheet.getRange(2, 1, sumReportSheet.getLastRow() - 1, 8).getValues();
+    for (let i = 0; i < rVals.length; i++) {
+      const row = rVals[i];
+      const dateRaw = row[1];
+      const name = String(row[2] || "").trim();
+      const isWork = String(row[3] || "").trim().toLowerCase() === "work";
+      const isTakeLeave = String(row[4] || "").trim().toLowerCase() === "take leave";
+      const isHalf = String(row[5] || "").trim().toLowerCase().indexOf("half") !== -1;
+      const tgId = String(row[7] || "").trim();
+
+      let dObj = null;
+      let dStr = "";
+      if (dateRaw instanceof Date) {
+        dObj = dateRaw;
+        dStr = Utilities.formatDate(dateRaw, "Asia/Rangoon", "dd/MM/yyyy");
+      } else {
+        const rawS = String(dateRaw || "").trim().split(" ")[0];
+        const p = rawS.split(/[\/\-\.]/);
+        if (p.length === 3) {
+          let day = parseInt(p[0], 10);
+          let month = parseInt(p[1], 10);
+          let yr = parseInt(p[2], 10);
+          if (yr < 100) yr += 2000;
+          dObj = new Date(yr, month - 1, day);
+          dStr = (day < 10 ? "0" + day : day) + "/" + (month < 10 ? "0" + month : month) + "/" + yr;
+        }
+      }
+
+      if (name && dObj) {
+        const mStr = (dObj.getMonth() + 1 < 10 ? "0" + (dObj.getMonth() + 1) : (dObj.getMonth() + 1)) + "/" + dObj.getFullYear();
+        records.push({
+          dateObj: dObj,
+          dateStr: dStr,
+          monthStr: mStr,
+          name: name.toLowerCase(),
+          id: tgId,
+          work: isWork,
+          takeLeave: isTakeLeave,
+          halfDay: isHalf
+        });
+      }
+    }
+  }
+
+  // 5. Thống kê số liệu chi tiết cho từng nhân viên
+  const summaryRows = [];
+  for (let s = 0; s < staffList.length; s++) {
+    const staff = staffList[s];
+    const key = staff.name.toLowerCase();
+
+    let countWorkMonth = 0;
+    let countLeaveMonth = 0;
+    let countHalfMonth = 0;
+
+    let todayStatus = "❌ Chưa báo";
+    let yestStatus = "❌ Chưa báo";
+    let day2BeforeStatus = "❌ Chưa báo";
+
+    let count7DWork = 0;
+    let count30DWork = 0;
+
+    for (let r = 0; r < records.length; r++) {
+      const rec = records[r];
+      const match = (rec.name === key) || (staff.id && rec.id && rec.id === staff.id);
+      if (!match) continue;
+
+      if (rec.monthStr === selectedMonth) {
+        if (rec.work) countWorkMonth++;
+        if (rec.takeLeave) countLeaveMonth++;
+        if (rec.halfDay) countHalfMonth++;
+      }
+
+      if (rec.dateStr === todayStr) {
+        if (rec.work) todayStatus = "✅ Work";
+        else if (rec.halfDay) todayStatus = "🌓 Half Day";
+        else if (rec.takeLeave) todayStatus = "🏖️ Take Leave";
+      }
+      if (rec.dateStr === yestStr) {
+        if (rec.work) yestStatus = "✅ Work";
+        else if (rec.halfDay) yestStatus = "🌓 Half Day";
+        else if (rec.takeLeave) yestStatus = "🏖️ Take Leave";
+      }
+      if (rec.dateStr === day2BeforeStr) {
+        if (rec.work) day2BeforeStatus = "✅ Work";
+        else if (rec.halfDay) day2BeforeStatus = "🌓 Half Day";
+        else if (rec.takeLeave) day2BeforeStatus = "🏖️ Take Leave";
+      }
+
+      if (rec.dateObj >= d7) {
+        if (rec.work) count7DWork += 1;
+        else if (rec.halfDay) count7DWork += 0.5;
+      }
+      if (rec.dateObj >= d30) {
+        if (rec.work) count30DWork += 1;
+        else if (rec.halfDay) count30DWork += 0.5;
+      }
+    }
+
+    const totalCong = countWorkMonth + (countHalfMonth * 0.5);
+
+    summaryRows.push([
+      s + 1,
+      staff.name,
+      staff.team,
+      staff.id || "Chưa gán",
+      daysInMonth,
+      countWorkMonth,
+      countLeaveMonth,
+      countHalfMonth,
+      totalCong,
+      todayStatus,
+      yestStatus,
+      day2BeforeStatus,
+      count7DWork + "/7 ngày (" + Math.round((count7DWork / 7) * 100) + "%)",
+      count30DWork + "/30 ngày (" + Math.round((count30DWork / 30) * 100) + "%)"
+    ]);
+  }
+
+  // 6. Ghi dữ liệu & Định dạng bảng 'Sum work'
+  sumWorkSheet.getRange("A1:B1").merge().setValue("📅 THÁNG XEM BÁO CÁO:").setFontWeight("bold").setBackground("#E8F0FE").setFontColor("#1A73E8").setHorizontalAlignment("right").setVerticalAlignment("middle");
+  
+  const cellC1 = sumWorkSheet.getRange("C1");
+  cellC1.setValue(selectedMonth).setFontWeight("bold").setFontSize(12).setHorizontalAlignment("center").setBackground("#FFFFFF").setBorder(true, true, true, true, false, false, "#1A73E8", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+
+  const monthList = [
+    "08/2026", "07/2026", "06/2026", "05/2026", "04/2026", "03/2026", "02/2026", "01/2026",
+    "09/2026", "10/2026", "11/2026", "12/2026"
+  ];
+  const rule = SpreadsheetApp.newDataValidation().requireValueInList(monthList, true).setAllowInvalid(true).build();
+  cellC1.setDataValidation(rule);
+
+  sumWorkSheet.getRange("D1:G1").merge().setValue("💡 Bấm vào ô C1 để chọn tháng cần xem báo cáo tổng hợp").setFontStyle("italic").setFontColor("#5F6368").setVerticalAlignment("middle");
+  sumWorkSheet.getRange("H1:N1").merge().setValue("🕒 Cập nhật lúc: " + Utilities.formatDate(nowMM, "Asia/Rangoon", "dd/MM/yyyy HH:mm:ss") + " MMT").setFontColor("#70757A").setFontSize(9).setHorizontalAlignment("right").setVerticalAlignment("middle");
+
+  const tableHeaders = [
+    "STT",
+    "Họ & Tên Nhân Viên",
+    "Bộ Phận / Team",
+    "Telegram ID",
+    "Số Ngày Tháng (" + selectedMonth + ")",
+    "Tổng Work (Ngày)",
+    "Tổng Take Leave",
+    "Tổng Half Leave",
+    "Tổng Ngày Công",
+    "Hôm Nay (" + todayStr + ")",
+    "Hôm Qua (" + yestStr + ")",
+    "Hôm Kia (" + day2BeforeStr + ")",
+    "Thống Kê 7 Ngày",
+    "Thống Kê 1 Tháng (30N)"
+  ];
+
+  sumWorkSheet.getRange("A3:N3").setValues([tableHeaders])
+    .setBackground("#1A73E8")
+    .setFontColor("#FFFFFF")
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle")
+    .setWrap(true);
+  sumWorkSheet.setRowHeight(3, 36);
+
+  const oldLastRow = sumWorkSheet.getLastRow();
+  if (oldLastRow > 3) {
+    sumWorkSheet.getRange(4, 1, oldLastRow - 3, 14).clearContent().clearFormat();
+  }
+
+  if (summaryRows.length > 0) {
+    const dataRange = sumWorkSheet.getRange(4, 1, summaryRows.length, 14);
+    dataRange.setValues(summaryRows)
+      .setVerticalAlignment("middle")
+      .setFontSize(10);
+
+    sumWorkSheet.getRange(4, 1, summaryRows.length, 1).setHorizontalAlignment("center");
+    sumWorkSheet.getRange(4, 2, summaryRows.length, 1).setHorizontalAlignment("left").setFontWeight("bold");
+    sumWorkSheet.getRange(4, 3, summaryRows.length, 1).setHorizontalAlignment("center");
+    sumWorkSheet.getRange(4, 4, summaryRows.length, 1).setHorizontalAlignment("center");
+    sumWorkSheet.getRange(4, 5, summaryRows.length, 5).setHorizontalAlignment("center");
+    sumWorkSheet.getRange(4, 10, summaryRows.length, 3).setHorizontalAlignment("center");
+    sumWorkSheet.getRange(4, 13, summaryRows.length, 2).setHorizontalAlignment("center");
+
+    for (let r = 0; r < summaryRows.length; r++) {
+      const rowNum = 4 + r;
+      if (r % 2 === 1) {
+        sumWorkSheet.getRange(rowNum, 1, 1, 14).setBackground("#F8F9FA");
+      }
+    }
+    dataRange.setBorder(true, true, true, true, true, true, "#DADCE0", SpreadsheetApp.BorderStyle.SOLID);
+  }
+
+  sumWorkSheet.setColumnWidth(1, 55);   // STT
+  sumWorkSheet.setColumnWidth(2, 200);  // Họ Tên
+  sumWorkSheet.setColumnWidth(3, 140);  // Team
+  sumWorkSheet.setColumnWidth(4, 120);  // Telegram ID
+  sumWorkSheet.setColumnWidth(5, 120);  // Số ngày tháng
+  sumWorkSheet.setColumnWidth(6, 110);  // Tổng Work
+  sumWorkSheet.setColumnWidth(7, 120);  // Tổng Take Leave
+  sumWorkSheet.setColumnWidth(8, 120);  // Tổng Half Leave
+  sumWorkSheet.setColumnWidth(9, 120);  // Tổng Ngày Công
+  sumWorkSheet.setColumnWidth(10, 160); // Hôm Nay
+  sumWorkSheet.setColumnWidth(11, 160); // Hôm Qua
+  sumWorkSheet.setColumnWidth(12, 160); // Hôm Kia
+  sumWorkSheet.setColumnWidth(13, 150); // 7 Ngày
+  sumWorkSheet.setColumnWidth(14, 160); // 1 Tháng
+
+  Logger.log("✅ Bảng 'Sum work' đã cập nhật thành công cho tháng " + selectedMonth + " với " + summaryRows.length + " nhân sự!");
+}
+
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    const sheet = e.range.getSheet();
+    if (sheet.getName() === "Sum work" && e.range.getA1Notation() === "C1") {
+      buildSumWorkTab();
+    }
+  } catch(err) {
+    Logger.log("onEdit error: " + err);
+  }
+}
+
 
 
