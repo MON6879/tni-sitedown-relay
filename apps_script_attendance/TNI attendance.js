@@ -112,13 +112,17 @@ function doPost(e) {
       // 1. Tra cứu Attendance & Leave Templates (Strict Anchored Commands — Max 4 words)
       const cleanCmd = textL.split("@")[0].trim();
       const isExplicitTemplateCommand = (
+        cleanCmd === "/menu" || cleanCmd === "menu" ||
+        cleanCmd === "/help" || cleanCmd === "help" ||
         cleanCmd === "/attendance" || cleanCmd === "attendance" ||
         cleanCmd === "/att" || cleanCmd === "att" ||
         cleanCmd === "/leave" || cleanCmd === "leave" ||
+        cleanCmd === "/leave_half" || cleanCmd === "leave half" || cleanCmd === "/leavehalf" ||
         cleanCmd === "/diemdanh" || cleanCmd === "diemdanh" ||
         cleanCmd === "/header" || cleanCmd === "header" ||
         cleanCmd === "/team" || cleanCmd === "/t1" || cleanCmd === "/t2" || cleanCmd === "/t3" || cleanCmd === "/t4" ||
         cleanCmd === "t1" || cleanCmd === "t2" || cleanCmd === "t3" || cleanCmd === "t4" ||
+        cleanCmd === "/template_team1" || cleanCmd === "/template_team2" || cleanCmd === "/template_team3" || cleanCmd === "/template_team4" ||
         cleanCmd.startsWith("/template") || cleanCmd.startsWith("template ") ||
         cleanCmd.startsWith("/attendance ") || cleanCmd.startsWith("attendance template") ||
         cleanCmd.startsWith("/leave ") || cleanCmd.startsWith("leave template") ||
@@ -923,48 +927,69 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
     if (!tplSheet || tplSheet.getLastRow() < 1) return null;
 
     const q = queryText.toLowerCase().trim();
+
+    // 0. Menu / Help Commands
+    if (q === "/menu" || q === "menu" || q === "/help" || q === "help" || q === "/huongdan") {
+      return "📋 *TNI ATTENDANCE BOT — TEMPLATE MENU*\n" +
+             "──────────────────────────────\n" +
+             "🔹 `/template_team1` — Mẫu điểm danh Team 1 (T1 & T1 S1)\n" +
+             "🔹 `/template_team2` — Mẫu điểm danh Team 2 (T2 & T2 S1)\n" +
+             "🔹 `/template_team3` — Mẫu điểm danh Team 3 (T3 & T3 S1)\n" +
+             "🔹 `/template_team4` — Mẫu điểm danh Team 4 (T4)\n" +
+             "🔹 `/attendance` — Lấy toàn bộ mẫu điểm danh 4 Team\n" +
+             "🔹 `/header` — Dòng tiêu đề điểm danh nhanh\n" +
+             "🔹 `/leave` — Mẫu xin nghỉ phép cả ngày (Take leave)\n" +
+             "🔹 `/leave_half` — Mẫu xin nghỉ phép nửa ngày (Half day)\n" +
+             "──────────────────────────────\n" +
+             "📸 *Điểm danh tự động:* Gửi ảnh chụp mặt kèm vị trí vào nhóm!";
+    }
+
     const isLeave = q.indexOf("leave") !== -1 || q.indexOf("nghi") !== -1 || q.indexOf("phep") !== -1;
     const isHeaderOnly = q.indexOf("header") !== -1 || q.indexOf("title") !== -1 || q.indexOf("short") !== -1;
 
-    // Leave templates (Cols A & B)
+    // 1. Leave templates (Cols A & B)
     if (isLeave) {
       const isHalf = q.indexOf("half") !== -1 || q.indexOf("nuangay") !== -1 || q.indexOf("1/2") !== -1;
       const isFull = q.indexOf("full") !== -1 || q.indexOf("cangay") !== -1;
       const isAll = q.indexOf("all") !== -1 || q.indexOf("both") !== -1;
-      const colA = tplSheet.getRange(1, 1, Math.min(tplSheet.getLastRow(), 10), 1).getValues().map(r => String(r[0] || "").trim()).filter(Boolean);
-      const colB = tplSheet.getRange(1, 2, Math.min(tplSheet.getLastRow(), 10), 1).getValues().map(r => String(r[0] || "").trim()).filter(Boolean);
       
-      const strA = colA.length > 0 ? colA.join("\n") : "Full Name: take leave half day\nReason:";
-      const strB = colB.length > 0 ? colB.join("\n") : "Full Name: Take leave\nReason:";
+      const strHalf = "Full Name: take leave half day\nReason:";
+      const strFull = "Full Name: Take leave\nReason:";
 
-      if (isAll) return strA + "\n\n" + strB;
-      if (isHalf) return strA;
-      return strB;
+      if (isAll) return strFull + "\n\n" + strHalf;
+      if (isHalf) return strHalf;
+      return strFull;
     }
 
-    // Team Attendance templates (Cols F:I -> Col idx 6, 7, 8, 9 in 1-based)
-    const teamColMap = { 1: 6, 2: 7, 3: 8, 4: 9 };
+    // 2. Team Attendance templates
+    // Mapping exact columns in 'Template Attendance' tab:
+    // Team 1: Col F (6) [T1 Main] + Col G (7) [T1 S1]
+    // Team 2: Col I (9) [T2 Main] + Col J (10) [T2 S1]
+    // Team 3: Col K (11) [T3 Main] + Col L (12) [T3 S1]
+    // Team 4: Col M (13) [T4 Main]
+    const teamColGroups = {
+      1: [6, 7],
+      2: [9, 10],
+      3: [11, 12],
+      4: [13]
+    };
+
     let teamNum = null;
-    if (/team\s*0?1|\bt1\b|_team1\b|team_1\b|template_team1\b|\b1\b/i.test(q)) teamNum = 1;
-    else if (/team\s*0?2|\bt2\b|_team2\b|team_2\b|template_team2\b|\b2\b/i.test(q)) teamNum = 2;
-    else if (/team\s*0?3|\bt3\b|_team3\b|team_3\b|template_team3\b|\b3\b/i.test(q)) teamNum = 3;
-    else if (/team\s*0?4|\bt4\b|_team4\b|team_4\b|template_team4\b|\b4\b/i.test(q)) teamNum = 4;
+    if (/team\s*0?1|\bt1\b|_team1\b|team_1\b|template_team1\b|template_t1\b/i.test(q)) teamNum = 1;
+    else if (/team\s*0?2|\bt2\b|_team2\b|team_2\b|template_team2\b|template_t2\b/i.test(q)) teamNum = 2;
+    else if (/team\s*0?3|\bt3\b|_team3\b|team_3\b|template_team3\b|template_t3\b/i.test(q)) teamNum = 3;
+    else if (/team\s*0?4|\bt4\b|_team4\b|team_4\b|template_team4\b|template_t4\b/i.test(q)) teamNum = 4;
 
-    const nowMM = new Date();
-    const dateShort = Utilities.formatDate(nowMM, "Asia/Rangoon", "dd/MM/yy");
+    const maxRow = Math.min(tplSheet.getLastRow(), 35);
 
-    function getTeamLines(t) {
-      const colIdx = teamColMap[t];
+    function getColumnLines(colIdx) {
       if (!colIdx) return [];
-      const vals = tplSheet.getRange(1, colIdx, Math.min(tplSheet.getLastRow(), 30), 1).getValues();
+      const vals = tplSheet.getRange(1, colIdx, maxRow, 1).getValues();
       const lines = [];
       for (let r = 0; r < vals.length; r++) {
         let v = String(vals[r][0] || "").trim();
         if (v) {
           if (v.toLowerCase().indexOf("total:") === 0) continue;
-          if (r === 0 && v.toLowerCase().indexOf("report:") !== -1) {
-            v = "Team 0" + t + " Attendane report: " + dateShort;
-          }
           lines.push(v);
           if (isHeaderOnly && lines.length >= 1) break;
         }
@@ -972,16 +997,30 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
       return lines;
     }
 
-    if (teamNum && teamColMap[teamNum]) {
-      const lines = getTeamLines(teamNum);
-      return lines.join("\n");
-    } else {
+    function getTeamBlocks(t) {
+      const cols = teamColGroups[t] || [];
       const blocks = [];
-      for (let t = 1; t <= 4; t++) {
-        const lines = getTeamLines(t);
-        if (lines.length > 0) blocks.push(lines.join("\n"));
+      for (let c = 0; c < cols.length; c++) {
+        const lines = getColumnLines(cols[c]);
+        if (lines.length > 0) {
+          blocks.push(lines.join("\n"));
+        }
       }
-      return isHeaderOnly ? blocks.join("\n") : blocks.join("\n\n");
+      return blocks;
+    }
+
+    if (teamNum && teamColGroups[teamNum]) {
+      const teamBlocks = getTeamBlocks(teamNum);
+      return teamBlocks.join("\n\n");
+    } else {
+      const allBlocks = [];
+      for (let t = 1; t <= 4; t++) {
+        const tBlocks = getTeamBlocks(t);
+        for (let b = 0; b < tBlocks.length; b++) {
+          allBlocks.push(tBlocks[b]);
+        }
+      }
+      return isHeaderOnly ? allBlocks.join("\n") : allBlocks.join("\n\n");
     }
   } catch (err) {
     Logger.log("handleAttendanceTemplateQuery_ error: " + err);
