@@ -600,10 +600,13 @@ def build_master_audit_report():
     schedule_res = telethon_data.get("schedule_results", [])
     duplicate_res = telethon_data.get("duplicate_results", [])
     quality_res = telethon_data.get("quality_results", [])
+    telethon_err = telethon_data.get("error") if not telethon_data.get("available") else None
 
     # 3. Tính toán sự cố (Chỉ tính status FAIL là lỗi thực sự)
     fail_checks = sum(1 for c in (webhook_res + gas_res + sheets_res) if c["status"] == "FAIL")
     warn_checks = sum(1 for c in (webhook_res + gas_res + sheets_res) if c["status"] == "WARN")
+    if telethon_err and "duplicated" in telethon_err.lower():
+        warn_checks += 1
 
     missed_count = sum(1 for s in schedule_res if s["status"] == "FAIL")
     delay_count = sum(1 for s in schedule_res if s["status"] == "WARN")
@@ -626,6 +629,11 @@ def build_master_audit_report():
     lines.append(f"⏰ <b>Thời gian:</b> {now_mmt} (MMT)")
     lines.append(f"❌ <b>Tổng sự cố:</b> {total_incidents} Lỗi" + (f" | ⚠️ {warn_checks + delay_count} Cảnh báo" if (warn_checks + delay_count) > 0 else ""))
     lines.append("──────────────────────────")
+
+    # 0. Báo cáo lỗi Telethon Auth
+    if telethon_err:
+        lines.append(f"\n🔐 <b>CẢNH BÁO PHIÊN TELETHON:</b>")
+        lines.append(f"   ⚠️ <i>Không thể đọc tin Telegram: {telethon_err[:100]}</i>")
 
     # 1. Báo cáo lỗi Chất Lượng Nội Dung & Quân Số
     if quality_res:
