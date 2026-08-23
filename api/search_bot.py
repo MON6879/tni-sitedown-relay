@@ -428,6 +428,14 @@ def setup_bot_menu_commands():
         {"command": "t2waitcd",     "description": "Team 2 Wait CD WOs"},
         {"command": "t3waitcd",     "description": "Team 3 Wait CD WOs"},
         {"command": "t4waitcd",     "description": "Team 4 Wait CD WOs"},
+        {"command": "eta",          "description": "ETA Site Down - All Teams"},
+        {"command": "eta_t1",       "description": "ETA Site Down - Team 1"},
+        {"command": "eta_t1_s1",    "description": "ETA Site Down - Team 1 S1"},
+        {"command": "eta_t2",       "description": "ETA Site Down - Team 2"},
+        {"command": "eta_t2_s1",    "description": "ETA Site Down - Team 2 S1"},
+        {"command": "eta_t3",       "description": "ETA Site Down - Team 3"},
+        {"command": "eta_t3_s1",    "description": "ETA Site Down - Team 3 S1"},
+        {"command": "eta_t4",       "description": "ETA Site Down - Team 4"},
         {"command": "request_enter_site", "description": "Request enter Site towerco format"},
         {"command": "mysite",       "description": "All Site you control"},
         {"command": "mycable",      "description": "All your cable route"},
@@ -447,6 +455,79 @@ def setup_bot_menu_commands():
         )
     except Exception as ex:
         logger.error(f"setup_bot_menu_commands: {ex}")
+
+
+# ── ETA Site Down ──────────────────────────────────────────────────────────────
+SD_SHEET_ID = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow"
+SD_GID = "0"
+
+def get_eta_site_down(team_filter="ALL"):
+    """Đọc ETA từ Site Down sheet, lọc theo team (Col G), trả plain text."""
+    try:
+        csv_url = f"https://docs.google.com/spreadsheets/d/{SD_SHEET_ID}/export?format=csv&gid={SD_GID}"
+        resp = requests.get(csv_url, timeout=15)
+        resp.raise_for_status()
+        import csv, io
+        reader = csv.reader(io.StringIO(resp.text))
+        rows = list(reader)
+        if len(rows) < 6:
+            return "Không có dữ liệu."
+
+        # Row 5 (index 4) = header, Col E (index 4) = timestamp
+        update_ts = rows[4][4] if len(rows[4]) > 4 else ""
+
+        team_order = ["T1", "T1 S1", "T2", "T2 S1", "T3", "T3 S1", "T4"]
+        sites = {t: [] for t in team_order}
+
+        for i in range(5, len(rows)):
+            row = rows[i]
+            if len(row) < 14:
+                continue
+            site_id = (row[5] or "").strip()  # Col F
+            team = (row[6] or "").strip().upper()  # Col G
+            eta_raw = (row[13] or "").strip()  # Col N
+
+            if not re.match(r"^TNI\d{3,5}$", site_id, re.IGNORECASE):
+                continue
+            if not re.match(r"^T\d", team):
+                continue
+
+            eta = eta_raw
+            if eta.upper().startswith("ETA:"):
+                eta = eta[4:].strip()
+
+            matched_team = None
+            for t in team_order:
+                if team == t.upper().replace(" ", " "):
+                    matched_team = t
+                    break
+            if not matched_team:
+                continue
+
+            if team_filter != "ALL" and matched_team.upper() != team_filter.upper():
+                continue
+
+            sites[matched_team].append({"site": site_id, "eta": eta})
+
+        has_data = any(len(v) > 0 for v in sites.values())
+        if not has_data:
+            return f"{update_ts}\nKhông có site down."
+
+        lines = [update_ts]
+        display_order = team_order if team_filter == "ALL" else [team_filter]
+        for t_name in display_order:
+            if t_name not in sites or not sites[t_name]:
+                continue
+            lines.append("")
+            lines.append(t_name)
+            for s in sites[t_name]:
+                lines.append(f"{s['site']} ETA: {s['eta']}")
+
+        return "\n".join(lines)
+    except Exception as ex:
+        logger.error(f"get_eta_site_down error: {ex}")
+        return f"Lỗi đọc ETA: {ex}"
+
 
 # ── ULTRA-FAST HIGH-PERFORMANCE SEARCH ENGINE (Parallel + SWR + O(1) Hash Indexing) ──
 from concurrent.futures import ThreadPoolExecutor
@@ -1552,6 +1633,17 @@ def handle(update: dict) -> None:
         parts = clean_text.split(maxsplit=1)
         first_word = parts[0][1:].lower().split("@")[0]  # e.g. "/t4notclose@bot" -> "t4notclose"
         rest = parts[1] if len(parts) > 1 else ""
+
+        if first_word.startswith("eta"):
+            eta_map = {
+                "eta": "ALL", "eta_t1": "T1", "eta_t1_s1": "T1 S1",
+                "eta_t2": "T2", "eta_t2_s1": "T2 S1",
+                "eta_t3": "T3", "eta_t3_s1": "T3 S1", "eta_t4": "T4"
+            }
+            team_f = eta_map.get(first_word, "ALL")
+            reply = get_eta_site_down(team_f)
+            tg_send(chat_id, reply)
+            return
 
         if first_word in ("request_enter_site", "request_site_enter", "site_access", "siteaccess", "site_enter", "request_site"):
             passed_site = rest.upper().strip() if rest else "TNI0401"
