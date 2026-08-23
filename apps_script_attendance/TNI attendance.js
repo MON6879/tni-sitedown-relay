@@ -1281,6 +1281,18 @@ function setupAttendanceBotCommands() {
     contentType: "application/json",
     payload: JSON.stringify({ commands: commands, scope: { type: "all_group_chats" } })
   });
+
+  UrlFetchApp.fetch(urlGroups, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({ commands: commands, scope: { type: "all_private_chats" } })
+  });
+
+  UrlFetchApp.fetch(urlGroups, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({ commands: commands, scope: { type: "all_chat_administrators" } })
+  });
   
   Logger.log("✅ Attendance bot commands registered successfully.");
 }
