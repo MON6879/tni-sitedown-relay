@@ -1248,7 +1248,6 @@ function setupAttendanceBotCommands() {
 
   // ── Menu chung (Daily Attendance group + private + default) — KHÔNG có ETA ──
   var attCmds = [
-    { command: "menu",           description: "Danh muc lenh & Mau diem danh" },
     { command: "sum_work",       description: "Bao cao tong hop chuyen can thang" },
     { command: "office",         description: "Mau diem danh Van Phong (Col E)" },
     { command: "t1",             description: "Mau diem danh Team 1 Main" },
