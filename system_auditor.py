@@ -93,7 +93,7 @@ GAS_SERVICES = {
     "Standalone Site Down GAS Backend (@89 SSOT)": {
         "url": "https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec?action=admin_audit_sitedown"
     },
-    "TNI Attendance GAS Backend (@48 SSOT)": {
+    "TNI Attendance GAS Backend (@58 SSOT)": {
         "url": "https://script.google.com/macros/s/AKfycbzI2TvupaD38LcUdyDPLBZrniFMCAN_3SbTX3St1u-G_otgEdZxquEZ-TUivx7jSZNxDg/exec"
     },
     "BI Portal Backend (Plan Dep)": {
@@ -106,13 +106,26 @@ SHEET_CONNECTORS = {
     "Sheet Task remain (GID=133591305)": "https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/gviz/tq?tqx=out:csv&gid=133591305",
     "Sheet Read Group (GID=870080250)": "https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/gviz/tq?tqx=out:csv&gid=870080250",
     "Sheet Construction (1ViXXv5...)": "https://docs.google.com/spreadsheets/d/1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8/gviz/tq?tqx=out:csv&gid=0",
-    "Sheet Attendance (18zQB4i...)": "https://docs.google.com/spreadsheets/d/18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54/gviz/tq?tqx=out:csv&gid=0",
+    "Sheet Attendance Morning (GID=0)": "https://docs.google.com/spreadsheets/d/18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54/gviz/tq?tqx=out:csv&gid=0",
+    "Sheet Sum work (GID=1895020121)": "https://docs.google.com/spreadsheets/d/18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54/gviz/tq?tqx=out:csv&gid=1895020121",
     "Sheet Time Rain 5 min (GID=2003037043)": "https://docs.google.com/spreadsheets/d/1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow/gviz/tq?tqx=out:csv&gid=2003037043",
     "Sheet Auto Copy Config (GID=0)": "https://docs.google.com/spreadsheets/d/19RBlwehMC6BLoueaTEzsJHMx4puB0CTE5i5x79-uI6c/gviz/tq?tqx=out:csv&gid=0"
 }
 
 # ── 2. MA TRẬN LỊCH TRÌNH BÁO CÁO CHUẨN (MASTER SCHEDULE MATRIX) ───────────
 SCHEDULE_RULES = [
+    {
+        "report_name": "Báo Cáo Tổng Hợp Chuyên Cần Tháng (Sum Work)",
+        "group_key": "CONTROL",
+        "target_times": ["09:00"],
+        "title_patterns": [
+            r"BÁO\s*CÁO\s*TỔNG\s*HỢP\s*CHUYÊN\s*CẦN",
+            r"CHUYÊN\s*CẦN\s*THÁNG",
+            r"Sum\s*work",
+            r"TNI\s*OPERATIONS.*NHÂN\s*SỰ"
+        ],
+        "max_delay_min": 15
+    },
     {
         "report_name": "Reports 1, 2, 3 + BOD (Sáng)",
         "group_key": "CONTROL",

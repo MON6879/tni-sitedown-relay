@@ -49,6 +49,10 @@ function doGet(e) {
     const ok = sendMonthlyAttendanceSummaryToControl();
     return ContentService.createTextOutput(ok ? "Control summary sent successfully" : "Failed to send control summary");
   }
+  if (action === "setup_morning_trigger") {
+    setupMorningAttendanceSummaryTrigger();
+    return ContentService.createTextOutput("Morning trigger set for 09:00 MMT");
+  }
   // Chẩn đoán: kiểm tra GEMINI_API_KEY và ảnh mẫu cột O
   if (action === "check_props") {
     const props = PropertiesService.getScriptProperties();
@@ -1726,7 +1730,7 @@ function sendMonthlyAttendanceSummaryToControl(targetChatId) {
 }
 
 /**
- * Trigger tự động gửi báo cáo tổng hợp chuyên cần buổi sáng vào nhóm CONTROL (08:30 MMT)
+ * Trigger tự động gửi báo cáo tổng hợp chuyên cần buổi sáng vào nhóm CONTROL đúng lúc 09:00 MMT
  */
 function setupMorningAttendanceSummaryTrigger() {
   const triggers = ScriptApp.getProjectTriggers();
@@ -1738,10 +1742,10 @@ function setupMorningAttendanceSummaryTrigger() {
   ScriptApp.newTrigger("sendMonthlyAttendanceSummaryToControl")
     .timeBased()
     .everyDays(1)
-    .atHour(8)
+    .atHour(9)
     .inTimezone("Asia/Rangoon")
     .create();
-  Logger.log("✅ Đã thiết lập trigger tự động gửi báo cáo buổi sáng lúc 08:30 MMT sang nhóm CONTROL.");
+  Logger.log("✅ Đã thiết lập trigger tự động gửi báo cáo buổi sáng lúc 09:00 MMT sang nhóm CONTROL.");
 }
 
 
