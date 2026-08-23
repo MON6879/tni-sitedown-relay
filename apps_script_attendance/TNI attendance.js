@@ -45,6 +45,10 @@ function doGet(e) {
     buildSumWorkTab();
     return ContentService.createTextOutput("Sum work tab updated successfully");
   }
+  if (action === "send_control_summary") {
+    const ok = sendMonthlyAttendanceSummaryToControl();
+    return ContentService.createTextOutput(ok ? "Control summary sent successfully" : "Failed to send control summary");
+  }
   // Chẩn đoán: kiểm tra GEMINI_API_KEY và ảnh mẫu cột O
   if (action === "check_props") {
     const props = PropertiesService.getScriptProperties();
@@ -136,6 +140,14 @@ function doPost(e) {
         cleanCmd.startsWith("/leave ") || cleanCmd.startsWith("leave template") ||
         cleanCmd.startsWith("/diemdanh ") || cleanCmd.startsWith("diemdanh template")
       ) && cleanCmd.split(/\s+/).length <= 4;
+
+      if (cleanCmd === "/sum_work" || cleanCmd === "sum_work" || cleanCmd === "/baocao_thang" || cleanCmd === "/monthly_report") {
+        const sumText = getMonthlyAttendanceSummaryText();
+        if (sumText) {
+          sendTelegramMessage_(token, chatId, sumText);
+          return ContentService.createTextOutput("Monthly summary sent");
+        }
+      }
 
       if (isExplicitTemplateCommand) {
         const tplReply = handleAttendanceTemplateQuery_(ssId, cleanCmd);
@@ -1207,6 +1219,7 @@ function setupAttendanceBotCommands() {
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
   const commands = [
     { command: "menu",           description: "Danh muc lenh & Mau diem danh" },
+    { command: "sum_work",       description: "Bao cao tong hop chuyen can thang" },
     { command: "office",         description: "Mau diem danh Van Phong (Col E)" },
     { command: "t1",             description: "Mau diem danh Team 1 Main" },
     { command: "t1_s1",          description: "Mau diem danh Team 1 Sub-team 1" },
@@ -1585,6 +1598,150 @@ function onEdit(e) {
   } catch(err) {
     Logger.log("onEdit error: " + err);
   }
+}
+
+/**
+ * Xây dựng nội dung tin nhắn báo cáo tổng hợp chuyên cần tháng
+ */
+function getMonthlyAttendanceSummaryText() {
+  try {
+    const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+    let sumWorkSheet = ss.getSheetByName("Sum work");
+    if (!sumWorkSheet || sumWorkSheet.getLastRow() < 4) {
+      buildSumWorkTab();
+      sumWorkSheet = ss.getSheetByName("Sum work");
+    }
+    if (!sumWorkSheet || sumWorkSheet.getLastRow() < 4) return null;
+
+    const selectedMonth = String(sumWorkSheet.getRange("C1").getValue() || "").trim();
+    const lastRow = sumWorkSheet.getLastRow();
+    const dataVals = sumWorkSheet.getRange(4, 1, lastRow - 3, 15).getValues();
+
+    const teams = {};
+    let daysPassed = "";
+
+    for (let i = 0; i < dataVals.length; i++) {
+      const r = dataVals[i];
+      const name = String(r[1] || "").trim();
+      let team = String(r[2] || "").trim();
+      const dVal = String(r[4] || "").trim();
+      const pct = String(r[5] || "").trim();
+      const work = r[6];
+      const leave = r[7];
+      const half = r[8];
+      const cong = r[9];
+
+      if (!name || name === "0" || name.length < 2 || name.toLowerCase().indexOf("nyi nyi") !== -1) continue;
+      if (!daysPassed && dVal) daysPassed = dVal;
+      if (!team) team = "Khác";
+
+      if (!teams[team]) teams[team] = [];
+      teams[team].push({
+        name: name,
+        days: dVal,
+        pct: pct,
+        work: work,
+        leave: leave,
+        half: half,
+        cong: cong
+      });
+    }
+
+    const teamIcons = {
+      "Team 1": "🟠", "Team 1 S1": "🟠",
+      "Team 2": "🔵", "Team 2 S1": "🔵",
+      "Team 3": "🟢", "Team 3 S1": "🟢",
+      "Team 4": "🟡", "Office": "🏢"
+    };
+
+    const msgLines = [
+      "📊 *BÁO CÁO TỔNG HỢP CHUYÊN CẦN THÁNG " + selectedMonth + "*",
+      "🏢 *TNI OPERATIONS — TOÀN BỘ ĐƠN VỊ & NHÂN SỰ*",
+      "──────────────────────────────",
+      "📅 *Số ngày báo cáo đến hôm nay:* " + (daysPassed || "23") + " ngày",
+      ""
+    ];
+
+    let totalStaff = 0;
+    let totWork = 0;
+    let totLeave = 0;
+
+    for (const tName in teams) {
+      const members = teams[tName];
+      totalStaff += members.length;
+      const icon = teamIcons[tName] || "🔹";
+      msgLines.push(icon + " *" + tName.toUpperCase() + "* (" + members.length + " NS)");
+
+      for (let m = 0; m < members.length; m++) {
+        const it = members[m];
+        totWork += Number(it.work) || 0;
+        totLeave += Number(it.leave) || 0;
+        const halfVal = Number(it.half) || 0;
+        const hStr = halfVal > 0 ? " (🌓" + halfVal + ")" : "";
+        msgLines.push((m + 1) + ". " + it.name + ": *" + it.work + "/" + it.days + " (" + it.pct + ")* | 🏖️ Leave: " + it.leave + hStr);
+      }
+      msgLines.push("");
+    }
+
+    msgLines.push("──────────────────────────────");
+    msgLines.push("👥 *Tổng nhân sự:* " + totalStaff + " người | 💼 *Tổng Work:* " + totWork + " | 🏖️ *Tổng Leave:* " + totLeave);
+
+    return msgLines.join("\n");
+  } catch (e) {
+    Logger.log("getMonthlyAttendanceSummaryText error: " + e.message);
+    return null;
+  }
+}
+
+/**
+ * Gửi báo cáo tổng hợp chuyên cần tháng sang Group Control (-5251698940)
+ */
+function sendMonthlyAttendanceSummaryToControl(targetChatId) {
+  try {
+    const reportText = getMonthlyAttendanceSummaryText();
+    if (!reportText) return false;
+
+    const chatId = targetChatId || "-5251698940";
+    const props = PropertiesService.getScriptProperties();
+    const token = props.getProperty("CONTROL_BOT_TOKEN") || "8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A";
+
+    const url = "https://api.telegram.org/bot" + token + "/sendMessage";
+    const resp = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify({
+        chat_id: chatId,
+        text: reportText,
+        parse_mode: "Markdown"
+      }),
+      muteHttpExceptions: true
+    });
+
+    Logger.log("Send control summary response: " + resp.getResponseCode() + " " + resp.getContentText());
+    return resp.getResponseCode() === 200;
+  } catch (err) {
+    Logger.log("sendMonthlyAttendanceSummaryToControl error: " + err.message);
+    return false;
+  }
+}
+
+/**
+ * Trigger tự động gửi báo cáo tổng hợp chuyên cần buổi sáng vào nhóm CONTROL (08:30 MMT)
+ */
+function setupMorningAttendanceSummaryTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "sendMonthlyAttendanceSummaryToControl") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger("sendMonthlyAttendanceSummaryToControl")
+    .timeBased()
+    .everyDays(1)
+    .atHour(8)
+    .inTimezone("Asia/Rangoon")
+    .create();
+  Logger.log("✅ Đã thiết lập trigger tự động gửi báo cáo buổi sáng lúc 08:30 MMT sang nhóm CONTROL.");
 }
 
 
