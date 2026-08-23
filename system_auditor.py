@@ -93,7 +93,7 @@ GAS_SERVICES = {
     "Standalone Site Down GAS Backend (@89 SSOT)": {
         "url": "https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec?action=admin_audit_sitedown"
     },
-    "TNI Attendance GAS Backend (@58 SSOT)": {
+    "TNI Attendance GAS Backend (@68 SSOT)": {
         "url": "https://script.google.com/macros/s/AKfycbzI2TvupaD38LcUdyDPLBZrniFMCAN_3SbTX3St1u-G_otgEdZxquEZ-TUivx7jSZNxDg/exec"
     },
     "BI Portal Backend (Plan Dep)": {
