@@ -145,6 +145,25 @@ function doPost(e) {
         cleanCmd.startsWith("/diemdanh ") || cleanCmd.startsWith("diemdanh template")
       ) && cleanCmd.split(/\s+/).length <= 4;
 
+      // ── ETA Site Down per Team ──────────────────────────────────────────────
+      var etaTeamFilter = null;
+      if (cleanCmd === "/eta_t1" || cleanCmd === "eta_t1" || cleanCmd === "/eta t1") etaTeamFilter = "T1";
+      else if (cleanCmd === "/eta_t1_s1" || cleanCmd === "eta_t1_s1" || cleanCmd === "/eta_t1s1" || cleanCmd === "/eta t1 s1") etaTeamFilter = "T1 S1";
+      else if (cleanCmd === "/eta_t2" || cleanCmd === "eta_t2" || cleanCmd === "/eta t2") etaTeamFilter = "T2";
+      else if (cleanCmd === "/eta_t2_s1" || cleanCmd === "eta_t2_s1" || cleanCmd === "/eta_t2s1" || cleanCmd === "/eta t2 s1") etaTeamFilter = "T2 S1";
+      else if (cleanCmd === "/eta_t3" || cleanCmd === "eta_t3" || cleanCmd === "/eta t3") etaTeamFilter = "T3";
+      else if (cleanCmd === "/eta_t3_s1" || cleanCmd === "eta_t3_s1" || cleanCmd === "/eta_t3s1" || cleanCmd === "/eta t3 s1") etaTeamFilter = "T3 S1";
+      else if (cleanCmd === "/eta_t4" || cleanCmd === "eta_t4" || cleanCmd === "/eta t4") etaTeamFilter = "T4";
+      else if (cleanCmd === "/eta" || cleanCmd === "eta" || cleanCmd === "/eta_all") etaTeamFilter = "ALL";
+
+      if (etaTeamFilter) {
+        const etaText = getEtaSiteDownByTeam_(etaTeamFilter);
+        if (etaText) {
+          sendTelegramMessage_(token, chatId, etaText);
+          return ContentService.createTextOutput("ETA sent for " + etaTeamFilter);
+        }
+      }
+
       if (cleanCmd === "/sum_work" || cleanCmd === "sum_work" || cleanCmd === "/baocao_thang" || cleanCmd === "/monthly_report") {
         const sumText = getMonthlyAttendanceSummaryText();
         if (sumText) {
@@ -1224,6 +1243,14 @@ function setupAttendanceBotCommands() {
   const commands = [
     { command: "menu",           description: "Danh muc lenh & Mau diem danh" },
     { command: "sum_work",       description: "Bao cao tong hop chuyen can thang" },
+    { command: "eta",            description: "ETA Site Down - Tat ca Team" },
+    { command: "eta_t1",         description: "ETA Site Down - Team 1" },
+    { command: "eta_t1_s1",      description: "ETA Site Down - Team 1 S1" },
+    { command: "eta_t2",         description: "ETA Site Down - Team 2" },
+    { command: "eta_t2_s1",      description: "ETA Site Down - Team 2 S1" },
+    { command: "eta_t3",         description: "ETA Site Down - Team 3" },
+    { command: "eta_t3_s1",      description: "ETA Site Down - Team 3 S1" },
+    { command: "eta_t4",         description: "ETA Site Down - Team 4" },
     { command: "office",         description: "Mau diem danh Van Phong (Col E)" },
     { command: "t1",             description: "Mau diem danh Team 1 Main" },
     { command: "t1_s1",          description: "Mau diem danh Team 1 Sub-team 1" },
@@ -1726,6 +1753,116 @@ function sendMonthlyAttendanceSummaryToControl(targetChatId) {
   } catch (err) {
     Logger.log("sendMonthlyAttendanceSummaryToControl error: " + err.message);
     return false;
+  }
+}
+
+/**
+ * Đọc dữ liệu Site Down từ bảng 10_TNI_SITE_DOWN (GID=0) và trả về danh sách ETA theo Team.
+ * Đọc trực tiếp Cột F (Site ID), Cột G (Team), Cột N (ETA), Cột H (Duration), Cột I (Operator),
+ * Cột J (Power), Cột K (Township), Cột L (Name FT).
+ * Sheet ID: 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow, GID=0
+ * Dữ liệu bắt đầu từ dòng 7 (sau header) — dùng Cột F (TNI...) và Cột G (T1/T2/...) làm anchor.
+ * @param {string} teamFilter - "T1", "T1 S1", "T2", "T2 S1", "T3", "T3 S1", "T4", hoặc "ALL"
+ */
+function getEtaSiteDownByTeam_(teamFilter) {
+  try {
+    const sdSs = SpreadsheetApp.openById("1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow");
+    const sdSheet = sdSs.getSheetByName("Input Site down Telegram");
+    if (!sdSheet) {
+      Logger.log("ETA: Sheet 'Input Site down Telegram' not found");
+      return null;
+    }
+
+    // Đọc A1 để lấy timestamp cập nhật
+    const a1Val = String(sdSheet.getRange("A1").getValue() || "").trim();
+    // Lấy timestamp từ F5 (header row marker = "23/08/26 07:08")
+    const f5Val = String(sdSheet.getRange("F5").getValue() || "").trim();
+    const updateTs = f5Val || a1Val;
+
+    const lastRow = sdSheet.getLastRow();
+    if (lastRow < 7) return "📡 *ETA Site Down*\n\n_Không có dữ liệu site down._";
+
+    // Đọc Cột F:N (cột 6 đến 14) từ dòng 6 đến cuối
+    const dataRange = sdSheet.getRange(6, 6, lastRow - 5, 9); // F=6, G=7, H=8, I=9, J=10, K=11, L=12, M=13, N=14
+    const vals = dataRange.getValues();
+
+    var sites = {};
+    var teamOrder = ["T1", "T1 S1", "T2", "T2 S1", "T3", "T3 S1", "T4"];
+    var teamIcons = {"T1": "🟠", "T1 S1": "🟠", "T2": "🔵", "T2 S1": "🔵", "T3": "🟢", "T3 S1": "🟢", "T4": "🟡"};
+
+    for (var i = 0; i < vals.length; i++) {
+      var siteId  = String(vals[i][0] || "").trim();   // Col F — TNI0041
+      var team    = String(vals[i][1] || "").trim();   // Col G — T1, T1 S1, T2 etc.
+      var dur     = String(vals[i][2] || "").trim();   // Col H — Duration (1.65)
+      var oper    = String(vals[i][3] || "").trim();   // Col I — Operator (MyTel)
+      var power   = String(vals[i][4] || "").trim();   // Col J — Power model
+      var twp     = String(vals[i][5] || "").trim();   // Col K — Township
+      var nameFt  = String(vals[i][6] || "").trim();   // Col L — Name FT
+      // Col M = index 7 (filter flag)
+      var etaRaw  = String(vals[i][8] || "").trim();   // Col N — "ETA: 8h30 Am"
+
+      // Validate: phải có SiteID dạng TNI và Team dạng T1/T2/T3/T4
+      if (!siteId || !siteId.match(/^TNI\d{3,5}$/i)) continue;
+      if (!team || !team.match(/^T\d/i)) continue;
+
+      // Normalize team: "T1" = "T1", "T1 S1" = "T1 S1"
+      if (teamFilter !== "ALL" && team !== teamFilter) continue;
+
+      if (!sites[team]) sites[team] = [];
+      
+      var eta = etaRaw;
+      if (eta.indexOf("ETA:") === 0) eta = eta.substring(4).trim();
+
+      sites[team].push({
+        siteId: siteId,
+        duration: dur,
+        operator: oper,
+        power: power,
+        township: twp,
+        nameFt: nameFt,
+        eta: eta
+      });
+    }
+
+    // Kiểm tra có dữ liệu không
+    var hasData = false;
+    for (var t in sites) { if (sites[t].length > 0) { hasData = true; break; } }
+    if (!hasData) {
+      var noDataTeam = teamFilter === "ALL" ? "Tất cả Team" : teamFilter;
+      return "📡 *ETA Site Down — " + noDataTeam + "*\n\n✅ _Không có site nào đang down._";
+    }
+
+    var lines = [];
+    lines.push("📡 *ETA SITE DOWN" + (teamFilter === "ALL" ? " — TẤT CẢ" : " — " + teamFilter) + "*");
+    lines.push("⏱ _Cập nhật: " + (updateTs || "N/A") + "_");
+    lines.push("──────────────────────────────");
+
+    var displayOrder = teamFilter === "ALL" ? teamOrder : [teamFilter];
+    var totalSites = 0;
+
+    for (var d = 0; d < displayOrder.length; d++) {
+      var tName = displayOrder[d];
+      if (!sites[tName] || sites[tName].length === 0) continue;
+      var icon = teamIcons[tName] || "🔹";
+      lines.push("");
+      lines.push(icon + " *" + tName.toUpperCase() + "* (" + sites[tName].length + " site)");
+      totalSites += sites[tName].length;
+
+      for (var s = 0; s < sites[tName].length; s++) {
+        var st = sites[tName][s];
+        var etaDisplay = st.eta ? st.eta : "Chưa cập nhật";
+        lines.push((s + 1) + ". `" + st.siteId + "` | " + st.duration + "h | " + st.operator + " | " + st.township + " | " + st.nameFt + "\n   📌 *ETA:* " + etaDisplay);
+      }
+    }
+
+    lines.push("");
+    lines.push("──────────────────────────────");
+    lines.push("📊 *Tổng:* " + totalSites + " site đang down");
+
+    return lines.join("\n");
+  } catch (err) {
+    Logger.log("getEtaSiteDownByTeam_ error: " + err.message);
+    return "⚠️ Lỗi khi lấy dữ liệu ETA: " + err.message;
   }
 }
 
