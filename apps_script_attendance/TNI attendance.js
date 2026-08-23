@@ -1244,9 +1244,37 @@ function processAttendanceReportText_(ssId, text, defaultTgId) {
 function setupAttendanceBotCommands() {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
-  const commands = [
+  const url = "https://api.telegram.org/bot" + token + "/setMyCommands";
+
+  // ── Menu chung (Daily Attendance group + private + default) — KHÔNG có ETA ──
+  var attCmds = [
     { command: "menu",           description: "Danh muc lenh & Mau diem danh" },
     { command: "sum_work",       description: "Bao cao tong hop chuyen can thang" },
+    { command: "office",         description: "Mau diem danh Van Phong (Col E)" },
+    { command: "t1",             description: "Mau diem danh Team 1 Main" },
+    { command: "t1_s1",          description: "Mau diem danh Team 1 S1" },
+    { command: "t2",             description: "Mau diem danh Team 2 Main" },
+    { command: "t2_s1",          description: "Mau diem danh Team 2 S1" },
+    { command: "t3",             description: "Mau diem danh Team 3 Main" },
+    { command: "t3_s1",          description: "Mau diem danh Team 3 S1" },
+    { command: "t4",             description: "Mau diem danh Team 4 Main" },
+    { command: "header",         description: "Dong tieu de diem danh nhanh" },
+    { command: "leave",          description: "Mau xin nghi phep ca ngay" },
+    { command: "leave_half",     description: "Mau xin nghi phep nua ngay" }
+  ];
+
+  // Default scope
+  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
+    payload: JSON.stringify({ commands: attCmds }) });
+  // All group chats
+  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
+    payload: JSON.stringify({ commands: attCmds, scope: { type: "all_group_chats" } }) });
+  // All private chats
+  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
+    payload: JSON.stringify({ commands: attCmds, scope: { type: "all_private_chats" } }) });
+
+  // ── Menu riêng cho 4 Group Team — CÓ ETA ──
+  var etaCmds = [
     { command: "eta",            description: "ETA Site Down - Tat ca Team" },
     { command: "eta_t1",         description: "ETA Site Down - Team 1" },
     { command: "eta_t1_s1",      description: "ETA Site Down - Team 1 S1" },
@@ -1254,47 +1282,30 @@ function setupAttendanceBotCommands() {
     { command: "eta_t2_s1",      description: "ETA Site Down - Team 2 S1" },
     { command: "eta_t3",         description: "ETA Site Down - Team 3" },
     { command: "eta_t3_s1",      description: "ETA Site Down - Team 3 S1" },
-    { command: "eta_t4",         description: "ETA Site Down - Team 4" },
-    { command: "office",         description: "Mau diem danh Van Phong (Col E)" },
-    { command: "t1",             description: "Mau diem danh Team 1 Main" },
-    { command: "t1_s1",          description: "Mau diem danh Team 1 Sub-team 1" },
-    { command: "t2",             description: "Mau diem danh Team 2 Main" },
-    { command: "t2_s1",          description: "Mau diem danh Team 2 Sub-team 1" },
-    { command: "t3",             description: "Mau diem danh Team 3 Main" },
-    { command: "t3_s1",          description: "Mau diem danh Team 3 Sub-team 1" },
-    { command: "t4",             description: "Mau diem danh Team 4 Main" },
-    { command: "header",         description: "Dong tieu de diem danh nhanh" },
-    { command: "leave",          description: "Mau xin nghi phep ca ngay" },
-    { command: "leave_half",     description: "Mau xin nghi phep nua ngay" }
+    { command: "eta_t4",         description: "ETA Site Down - Team 4" }
   ];
-  
-  const urlDefault = "https://api.telegram.org/bot" + token + "/setMyCommands";
-  UrlFetchApp.fetch(urlDefault, {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify({ commands: commands })
-  });
 
-  const urlGroups = "https://api.telegram.org/bot" + token + "/setMyCommands";
-  UrlFetchApp.fetch(urlGroups, {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify({ commands: commands, scope: { type: "all_group_chats" } })
-  });
+  var teamGroupIds = [
+    "-1004215695747",  // TNI TEAM 1 PLAN - ALARM
+    "-1004480845549",  // TNI TEAM 2 PLAN - ALARM
+    "-1004369170658",  // TNI TEAM 3 PLAN - ALARM
+    "-1004293741999"   // TNI TEAM 4 PLAN - ALARM
+  ];
 
-  UrlFetchApp.fetch(urlGroups, {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify({ commands: commands, scope: { type: "all_private_chats" } })
-  });
+  for (var g = 0; g < teamGroupIds.length; g++) {
+    try {
+      UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
+        payload: JSON.stringify({
+          commands: etaCmds,
+          scope: { type: "chat", chat_id: teamGroupIds[g] }
+        })
+      });
+    } catch (e) {
+      Logger.log("setMyCommands for " + teamGroupIds[g] + " error: " + e.message);
+    }
+  }
 
-  UrlFetchApp.fetch(urlGroups, {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify({ commands: commands, scope: { type: "all_chat_administrators" } })
-  });
-  
-  Logger.log("✅ Attendance bot commands registered successfully.");
+  Logger.log("✅ Attendance bot commands registered: general + ETA per team group.");
 }
 
 // ── BẢNG TỔNG HỢP CÔNG THEO THÁNG — TAB SUM WORK (GID: 1895020121) ──
