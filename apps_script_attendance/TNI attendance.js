@@ -1271,6 +1271,12 @@ function setupAttendanceBotCommands() {
   // All private chats
   UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
     payload: JSON.stringify({ commands: attCmds, scope: { type: "all_private_chats" } }) });
+  // All chat administrators — xóa scope cũ rồi set lại
+  var delUrl = "https://api.telegram.org/bot" + token + "/deleteMyCommands";
+  UrlFetchApp.fetch(delUrl, { method: "post", contentType: "application/json",
+    payload: JSON.stringify({ scope: { type: "all_chat_administrators" } }) });
+  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
+    payload: JSON.stringify({ commands: attCmds, scope: { type: "all_chat_administrators" } }) });
 
   // ── Menu riêng cho 4 Group Team — CÓ ETA ──
   var etaCmds = [
