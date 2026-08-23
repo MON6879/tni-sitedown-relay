@@ -53,6 +53,10 @@ function doGet(e) {
     setupMorningAttendanceSummaryTrigger();
     return ContentService.createTextOutput("Morning trigger set for 09:00 MMT");
   }
+  if (action === "setup_commands") {
+    setupAttendanceBotCommands();
+    return ContentService.createTextOutput("Bot commands updated");
+  }
   // Chẩn đoán: kiểm tra GEMINI_API_KEY và ảnh mẫu cột O
   if (action === "check_props") {
     const props = PropertiesService.getScriptProperties();
