@@ -34,11 +34,10 @@ from telethon.tl.functions.messages import (
 API_ID         = int(os.environ.get("TELEGRAM_API_ID", "0"))
 API_HASH       = os.environ.get("TELEGRAM_API_HASH", "")
 SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
-PRIMARY_GAS_URL = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
-SSOT_DEPLOY_ID = "AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA"
+MAIN_GAS_FALLBACK = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
 GAS_URL = os.environ.get("APPS_SCRIPT_URL", "").strip()
-if not GAS_URL or SSOT_DEPLOY_ID not in GAS_URL:
-    GAS_URL = PRIMARY_GAS_URL
+if not GAS_URL or "AKfycbzGFdnE" in GAS_URL:
+    GAS_URL = MAIN_GAS_FALLBACK
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
@@ -123,7 +122,7 @@ def get_team_members_from_sheet() -> dict:
 
         for idx in range(HEADER_ROWS, len(df)):
             sheet_row = idx + 1
-            if sheet_row < 4 or (32 < sheet_row < 52) or sheet_row > 55:
+            if sheet_row < 4 or (37 < sheet_row < 52) or sheet_row > 55:
                 continue
 
             row = df.iloc[idx]
@@ -133,9 +132,9 @@ def get_team_members_from_sheet() -> dict:
             col_e = str(row.iloc[COL_E]).strip() if not pd.isna(row.iloc[COL_E]) else ""
 
             if col_a.lower() in ("nan", "none", ""): col_a = ""
-            if col_b.lower() in ("nan", "none", ""): col_b = ""
+            if col_b.lower() in ("nan", "none", "", "0"): continue
             if col_c.lower() in ("nan", "none", ""): col_c = ""
-            if col_e.lower() in ("nan", "none", ""): col_e = ""
+            if col_e.lower() in ("nan", "none", "", "0"): col_e = ""
 
             is_tl = 52 <= sheet_row <= 55
             team_str = col_a.upper()
@@ -343,11 +342,7 @@ async def get_reader_ids_with_time(client, chat_id: int, msg_id: int) -> dict:
                 result[uid] = rdate
         return result
     except Exception as e:
-        err_msg = str(e)
-        if "invalid" in err_msg.lower() or "not found" in err_msg.lower():
-            pass  # Tin nhắn đã bị xóa hoặc hết hạn lưu vết đọc (quá 7 ngày)
-        else:
-            print(f"    ⚠️  get_reader_ids error: {e}")
+        print(f"    ⚠️  get_reader_ids error: {e}")
         return {}
 
 
@@ -434,13 +429,8 @@ async def process_group(client, group_key: str, chat_id: int,
     today_note_msg = None
 
     for msg, dt_mm in note_msgs:
-        # Telegram API chỉ lưu và trả về danh sách đã đọc (read receipts) trong vòng 7 ngày gần nhất.
-        # Các tin nhắn cũ hơn 7 ngày luôn bị Telegram báo MSG_ID_INVALID.
-        if dt_mm >= d7_start:
-            rid_map = await get_reader_ids_with_time(client, chat_id, msg.id)
-            rid_map = {uid: t for uid, t in rid_map.items() if uid in member_ids}
-        else:
-            rid_map = {}
+        rid_map = await get_reader_ids_with_time(client, chat_id, msg.id)
+        rid_map = {uid: t for uid, t in rid_map.items() if uid in member_ids}
 
         for uid, read_dt in rid_map.items():
             if uid not in per_person:

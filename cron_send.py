@@ -1932,7 +1932,7 @@ async def main():
             emp_table_msg = build_team_employee_summary_table(team_key, members, now_str)
             if emp_table_msg:
                 groups.setdefault(SEND_BOT_TOKEN, []).append(
-                    (0, emp_table_msg, str(gid), "TEAM_GROUP_4C_TABLE_HTML")
+                    (0, emp_table_msg, str(gid), "TEAM_GROUP_4C_TABLE")
                 )
 
         # Build và gửi bảng so sánh TL vào CONTROL
@@ -1997,85 +1997,73 @@ async def main():
         str(TELEGRAM_GROUPS["T4"]): "CRON_TEAM_T4_FULL",
     }
 
-    # ── Delete-per-team: xóa tin cũ ngay trước khi gửi tin mới cho TỪNG team ──
+    # ── Delete old messages theo tiêu đề (Telethon Batch) + fallback GAS msg_id ──
     # STRICT RULE: TIN NÀO XÓA TIN NẤY — cron_send.py CHỈ XÓA tin Report 4 & Report 3.1 của chính mình!
-    team_prefixes = [
-        "📋 4. Report — Daily EOD Task & Stats",
-        "📋 4a. Report — Daily EOD Task & Stats",
-        "📓 4b. Full Report",
-        "📊 4c. Report — Employee Task & Rank",
-        "📦 4c. Asset progress for material",
-        "📦 4d. Asset progress for material",
-        "4d. Asset progress for material",
-        "📦 3.1 Asset progress for material",
-        "3.1 Asset progress for material",
-    ]
-    control_prefixes = [
-        "📋 1. Report — Technical Dept Task Progress",
-        "📋 8. Report — Technical Dep Assign to Team",
-        "📋 4. Report — TL Comparison",
-        "📋 4a. Report — Daily EOD Task & Stats",
-        "📦 4c. Asset progress for material",
-        "4c. Asset progress for material",
-        "📦 3.1 Asset progress for material",
-        "3.1 Asset progress for material",
-    ]
+    if SEND_BOT_TOKEN and TELEGRAM_SESSION and TELEGRAM_API_ID:
+        team_prefixes = [
+            "📋 4. Report — Daily EOD Task & Stats",
+            "📋 4a. Report — Daily EOD Task & Stats",
+            "📓 4b. Full Report",
+            "📊 4c. Report — Employee Task & Rank",
+            "📦 4c. Asset progress for material",
+            "📦 4d. Asset progress for material",
+            "4d. Asset progress for material",
+            "📦 3.1 Asset progress for material",
+            "3.1 Asset progress for material",
+        ]
+        chat_to_prefixes = {del_cid: team_prefixes for del_cid in CHATID_TO_KEY.keys()}
+        chat_to_prefixes[str(CONTROL_CHAT_ID)] = [
+            "📋 1. Report — Technical Dept Task Progress",
+            "📋 8. Report — Technical Dep Assign to Team",
+            "📋 4. Report — TL Comparison",
+            "📋 4a. Report — Daily EOD Task & Stats",
+            "📦 4c. Asset progress for material",
+            "4c. Asset progress for material",
+            "📦 3.1 Asset progress for material",
+            "3.1 Asset progress for material",
+        ]
 
-    async def delete_old_for_chat(tg_client_ref, chat_id_str, prefixes_list):
-        """Xóa tin cũ cho 1 chat cụ thể — Telethon + GAS fallback."""
-        if tg_client_ref:
-            try:
-                await delete_by_titles_batch_telethon(tg_client_ref, SEND_BOT_TOKEN, {chat_id_str: prefixes_list})
-            except Exception as tg_err:
-                logger.warning(f"Telethon delete {chat_id_str}: {tg_err}")
+        try:
+            async with TelegramClient(
+                StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH
+            ) as tg_client:
+                logger.info("🗑️ Delete old messages by batch (Telethon Fast Scan - Strict Report 4/3.1 only)...")
+                await delete_by_titles_batch_telethon(tg_client, SEND_BOT_TOKEN, chat_to_prefixes)
+        except Exception as tg_err:
+            logger.warning(f"Telethon batch delete lỗi: {tg_err}")
+
+        # Tầng 2: Dual Clean qua GAS Properties msg_id Cache (Xóa triệt để các msg_id cũ đã lưu)
         if APPS_SCRIPT_URL:
             try:
-                gas_key = CHATID_TO_KEY.get(chat_id_str, "")
-                if gas_key:
-                    delete_old_messages_bot(SEND_BOT_TOKEN, chat_id_str, APPS_SCRIPT_URL, gas_key)
-                gas_key_full = CHATID_TO_KEY_FULL.get(chat_id_str, "")
-                if gas_key_full:
-                    delete_old_messages_bot(SEND_BOT_TOKEN, chat_id_str, APPS_SCRIPT_URL, gas_key_full)
-            except Exception as gas_err:
-                logger.warning(f"GAS delete {chat_id_str}: {gas_err}")
+                for del_cid, del_key in CHATID_TO_KEY.items():
+                    delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
+                for del_cid, del_key in CHATID_TO_KEY_FULL.items():
+                    delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
+                delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_CONTROL")
+                delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_DETAIL")
+                delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_EOD_CONTROL")
+            except Exception as gas_del_err:
+                logger.warning(f"GAS msg_id delete warning: {gas_del_err}")
+    elif APPS_SCRIPT_URL and SEND_BOT_TOKEN:
+        # Fallback nếu không có Telethon session
+        for del_cid, del_key in CHATID_TO_KEY.items():
+            delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
+        for del_cid, del_key in CHATID_TO_KEY_FULL.items():
+            delete_old_messages_bot(SEND_BOT_TOKEN, del_cid, APPS_SCRIPT_URL, del_key)
+        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_CONTROL")
+        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_TECHDEP_DETAIL")
+        delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "CRON_EOD_CONTROL")
 
-    # Mở 1 Telethon session dùng chung cho toàn bộ delete-per-team
-    tg_del_client = None
-    if SEND_BOT_TOKEN and TELEGRAM_SESSION and TELEGRAM_API_ID:
-        try:
-            tg_del_client = TelegramClient(StringSession(TELEGRAM_SESSION), TELEGRAM_API_ID, TELEGRAM_API_HASH)
-            await tg_del_client.connect()
-            logger.info("🗑️ Telethon delete client connected (per-team mode)")
-        except Exception as tg_err:
-            logger.warning(f"Telethon connect lỗi: {tg_err}")
-            tg_del_client = None
 
-
-    # ── Gửi tất cả messages (delete-per-team trước khi send-per-team) ──
+    # ── Gửi tất cả messages ──
     collected_msgids = {}      # gas_key → list[int]
     pinned_report4_msgids = {}  # str(chat_id) → msg_id — dùng để Telethon reply Note
-    deleted_chats = set()       # Track chat_ids đã xóa tin cũ
     for token, items in groups.items():
         bot_name = items[0][3] if items else "BOT"
         logger.info(f"--- {bot_name}: {len(items)} messages ---")
         async with Bot(token=token) as bot:
             for sheet_row, msg, cid, label in items:
-                # DELETE-PER-TEAM: Xóa tin cũ cho chat này TRƯỚC KHI gửi tin mới
-                if str(cid) not in deleted_chats:
-                    pfx = control_prefixes if str(cid) == str(CONTROL_CHAT_ID) else team_prefixes
-                    logger.info(f"🗑️ Delete old for chat {cid} before sending...")
-                    await delete_old_for_chat(tg_del_client, str(cid), pfx)
-                    # GAS CONTROL keys riêng
-                    if str(cid) == str(CONTROL_CHAT_ID) and APPS_SCRIPT_URL:
-                        for ck in ["CRON_TECHDEP_CONTROL", "CRON_TECHDEP_DETAIL", "CRON_EOD_CONTROL"]:
-                            try:
-                                delete_old_messages_bot(SEND_BOT_TOKEN, str(cid), APPS_SCRIPT_URL, ck)
-                            except Exception:
-                                pass
-                    deleted_chats.add(str(cid))
-            for sheet_row, msg, cid, label in items:
-                parse = "HTML" if "_HTML" in label else None
-                result, msg_ids = await send_msg(bot, cid, msg, f"{label} row{sheet_row}", parse_mode=parse)
+                result, msg_ids = await send_msg(bot, cid, msg, f"{label} row{sheet_row}")
                 if result:
                     ok += 1
                     # Thu thập msg_id của bản tin 4b/4 để tài khoản @phongha79 reply Note (không gọi pin_chat_message để tránh thông báo hệ thống)
@@ -2103,13 +2091,6 @@ async def main():
     if APPS_SCRIPT_URL:
         for gas_key, ids in collected_msgids.items():
             save_msgids(APPS_SCRIPT_URL, gas_key, ids)
-
-    # ── Đóng Telethon delete client ──
-    if tg_del_client:
-        try:
-            await tg_del_client.disconnect()
-        except Exception:
-            pass
 
     logger.info(f"📊 Done: ✅{ok} | ❌{fail}")
 

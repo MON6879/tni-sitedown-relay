@@ -76,142 +76,99 @@ BOT_REGISTRY = {
     },
     "Construction Bot 10 (@8903841312)": {
         "token": "8903841312:AAHQ_LeI19gs2nrqBSInTsgzJXOuv6H8LmE",
-        "expected_url": "https://tni-bot.vercel.app/api/plan_dep",
-        "ping_url": "https://tni-bot.vercel.app/api/plan_dep"
-    },
-    "Attendance Bot (@8628370628)": {
-        "token": "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw",
-        "expected_url": "https://tni-bot.vercel.app/api/attendance",
-        "ping_url": "https://tni-bot.vercel.app/api/attendance"
+        "expected_url": "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec",
+        "ping_url": "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=get_general"
     }
 }
 
 GAS_SERVICES = {
-    "TNI Main GAS Backend (@368 SSOT)": {
-        "url": "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=ping"
+    "TNI Main GAS Backend (@357 SSOT)": {
+        "url": "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=get_general"
     },
-    "Standalone Site Down GAS Backend (@89 SSOT)": {
+    "Standalone Site Down GAS Backend (@83 SSOT)": {
         "url": "https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec?action=admin_audit_sitedown"
     },
-    "TNI Attendance GAS Backend (@68 SSOT)": {
-        "url": "https://script.google.com/macros/s/AKfycbzI2TvupaD38LcUdyDPLBZrniFMCAN_3SbTX3St1u-G_otgEdZxquEZ-TUivx7jSZNxDg/exec"
-    },
     "BI Portal Backend (Plan Dep)": {
-        "url": "https://tni-bot.vercel.app/api/plan_dep"
+        "url": "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=get_plan_dep"
     }
 }
 
 SHEET_CONNECTORS = {
     "Sheet 10_TNI_SITE_DOWN (GID=0)": "https://docs.google.com/spreadsheets/d/1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow/gviz/tq?tqx=out:csv&gid=0",
     "Sheet Task remain (GID=133591305)": "https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/gviz/tq?tqx=out:csv&gid=133591305",
-    "Sheet Read Group (GID=870080250)": "https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/gviz/tq?tqx=out:csv&gid=870080250",
-    "Sheet Construction (1ViXXv5...)": "https://docs.google.com/spreadsheets/d/1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8/gviz/tq?tqx=out:csv&gid=0",
-    "Sheet Attendance Morning (GID=0)": "https://docs.google.com/spreadsheets/d/18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54/gviz/tq?tqx=out:csv&gid=0",
-    "Sheet Sum work (GID=1895020121)": "https://docs.google.com/spreadsheets/d/18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54/gviz/tq?tqx=out:csv&gid=1895020121",
-    "Sheet Time Rain 5 min (GID=2003037043)": "https://docs.google.com/spreadsheets/d/1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow/gviz/tq?tqx=out:csv&gid=2003037043",
     "Sheet Auto Copy Config (GID=0)": "https://docs.google.com/spreadsheets/d/19RBlwehMC6BLoueaTEzsJHMx4puB0CTE5i5x79-uI6c/gviz/tq?tqx=out:csv&gid=0"
 }
 
 # ── 2. MA TRẬN LỊCH TRÌNH BÁO CÁO CHUẨN (MASTER SCHEDULE MATRIX) ───────────
 SCHEDULE_RULES = [
     {
-        "report_name": "Báo Cáo Tổng Hợp Chuyên Cần Tháng (Sum Work)",
+        "report_name": "Reports 1, 2, 3, 4 + BOD (Sáng)",
         "group_key": "CONTROL",
-        "target_times": ["09:00"],
+        "target_times": ["05:46", "05:48", "05:51"],
         "title_patterns": [
-            r"BÁO\s*CÁO\s*TỔNG\s*HỢP\s*CHUYÊN\s*CẦN",
-            r"CHUYÊN\s*CẦN\s*THÁNG",
-            r"Sum\s*work",
-            r"TNI\s*OPERATIONS.*NHÂN\s*SỰ"
+            r"1\.\s*BOD", r"BOD\s*Assign", r"4c\.\s*Asset", r"3\.1\s*Asset", r"Task\s*remain",
+            r"Team\s*1\s*Dawei", r"Technical\s*Dept", r"TL\s*Comparison", r"Daily\s*EOD"
         ],
-        "max_delay_min": 15
+        "max_delay_min": 5
     },
     {
-        "report_name": "Reports 1, 2, 3 + BOD (Sáng)",
+        "report_name": "Reports 1, 2, 3, 4 + BOD (Chiều)",
         "group_key": "CONTROL",
-        "target_times": ["05:48"],
+        "target_times": ["15:46", "15:48", "15:51"],
         "title_patterns": [
-            r"1\.\s*BOD", r"BOD\s*Assign", r"Task\s*remain",
-            r"Team\s*1\s*Dawei", r"Technical\s*Dept"
+            r"1\.\s*BOD", r"BOD\s*Assign", r"4c\.\s*Asset", r"3\.1\s*Asset", r"Task\s*remain",
+            r"Team\s*1\s*Dawei", r"Technical\s*Dept", r"TL\s*Comparison", r"Daily\s*EOD"
         ],
-        "max_delay_min": 4
-    },
-    {
-        "report_name": "Reports 1, 2, 3 + BOD (Chiều)",
-        "group_key": "CONTROL",
-        "target_times": ["15:48"],
-        "title_patterns": [
-            r"1\.\s*BOD", r"BOD\s*Assign", r"Task\s*remain",
-            r"Team\s*1\s*Dawei", r"Technical\s*Dept"
-        ],
-        "max_delay_min": 4
-    },
-    {
-        "report_name": "Report 4 — EOD Task & Stats (Sáng, Toa 12)",
-        "group_key": "CONTROL",
-        "target_times": ["05:53"],
-        "title_patterns": [
-            r"Daily\s*EOD", r"TL\s*Comparison", r"4c\.\s*Asset", r"3\.1\s*Asset"
-        ],
-        "max_delay_min": 4
-    },
-    {
-        "report_name": "Report 4 — EOD Task & Stats (Chiều, Toa 12)",
-        "group_key": "CONTROL",
-        "target_times": ["15:53"],
-        "title_patterns": [
-            r"Daily\s*EOD", r"TL\s*Comparison", r"4c\.\s*Asset", r"3\.1\s*Asset"
-        ],
-        "max_delay_min": 4
+        "max_delay_min": 5
     },
     {
         "report_name": "Report 5A (Plan EOD)",
         "group_key": "CONTROL",
         "target_times": ["18:41"],
         "title_patterns": [r"5\.\s*Report.*Plan", r"Plan\s*EOD"],
-        "max_delay_min": 4
+        "max_delay_min": 5
     },
     {
         "report_name": "Report 5B (Plan Update)",
         "group_key": "CONTROL",
         "target_times": ["19:11"],
         "title_patterns": [r"5\.\s*Report.*Plan", r"Plan\s*Update"],
-        "max_delay_min": 4
+        "max_delay_min": 5
     },
     {
         "report_name": "Report 5C (Plan Sáng/Chiều)",
         "group_key": "CONTROL",
         "target_times": ["06:06", "08:28", "09:56", "15:26", "22:06"],
         "title_patterns": [r"5\.\s*Report.*Plan", r"Daily\s*Plan"],
-        "max_delay_min": 4
+        "max_delay_min": 5
     },
     {
         "report_name": "Report 6 (Read Status)",
         "group_key": "CONTROL",
         "target_times": ["08:48", "14:58", "17:18", "19:41"],
         "title_patterns": [r"6\.\s*Daily\s*Note\s*Read", r"Read\s*Report"],
-        "max_delay_min": 4
+        "max_delay_min": 5
     },
     {
         "report_name": "Report 6.1 (Site Clear Today)",
         "group_key": "CONTROL",
         "target_times": ["07:18", "10:18", "14:18", "17:18"],
         "title_patterns": [r"6\.1\s*Site\s*Clear", r"Site\s*Clear\s*Today"],
-        "max_delay_min": 4
+        "max_delay_min": 5
     },
     {
         "report_name": "Cable Daily Report",
         "group_key": "CONTROL",
         "target_times": ["05:56", "15:56"],
         "title_patterns": [r"Cable", r"Cáp"],
-        "max_delay_min": 4
+        "max_delay_min": 5
     },
     {
         "report_name": "Refuel Request Report",
         "group_key": "REFUEL",
-        "target_times": ["05:48", "05:56", "07:06", "13:06", "15:56"],
+        "target_times": ["05:46", "05:48", "07:06", "13:06", "15:46"],
         "title_patterns": [r"Refuel", r"Yêu\s*cầu.*dầu", r"Request\s*Refuel"],
-        "max_delay_min": 4
+        "max_delay_min": 5
     }
 ]
 
@@ -496,7 +453,10 @@ async def audit_telegram_messages_telethon():
                 # Phân nhóm tin nhắn theo dòng đầu tiên (tiêu đề) đã chuẩn hóa
                 title_map = {}
                 for m in msgs:
-                    clean_title = re.sub(r"[\*\_`#\[\]\(\)\d\/\:\s\-]", "", m["first_line"][:40]).lower()
+                    # Nhận diện phần multipart (ví dụ: Part 1/3, Part 2/3, Part 3/3) để không gom chung
+                    part_match = re.search(r'\(Part\s*(\d+)\s*/\s*(\d+)\)', m["first_line"], re.IGNORECASE)
+                    part_suffix = f"_part_{part_match.group(1)}" if part_match else ""
+                    clean_title = re.sub(r"[\*\_`#\[\]\(\)\d\/\:\s\-]", "", m["first_line"][:40]).lower() + part_suffix
                     if len(clean_title) < 5:
                         continue
                     if clean_title not in title_map:
@@ -512,8 +472,13 @@ async def audit_telegram_messages_telethon():
                             m2 = item_list[i+1]
                             diff_sec = abs((m2["date"] - m1["date"]).total_seconds())
 
-                            # Nếu 2 tin cùng loại gửi cách nhau < 180s (3 phút) -> NHÂN ĐÔI
-                            if diff_sec <= 180:
+                            # Kiểm tra nội dung: Chỉ báo lỗi nhân đôi nếu cùng nội dung giống nhau (hoặc cùng gửi trong < 60s với nội dung trùng)
+                            t1_clean = re.sub(r"\s+", " ", m1["text"][:120]).strip().lower()
+                            t2_clean = re.sub(r"\s+", " ", m2["text"][:120]).strip().lower()
+                            is_same_content = (t1_clean == t2_clean) or (diff_sec <= 30 and t1_clean[:60] == t2_clean[:60])
+
+                            # Nếu 2 tin cùng loại và cùng nội dung gửi cách nhau < 180s -> NHÂN ĐÔI THỰC SỰ
+                            if diff_sec <= 180 and is_same_content:
                                 duplicate_results.append({
                                     "group": gkey,
                                     "title": m1["first_line"][:35],
@@ -613,13 +578,10 @@ def build_master_audit_report():
     schedule_res = telethon_data.get("schedule_results", [])
     duplicate_res = telethon_data.get("duplicate_results", [])
     quality_res = telethon_data.get("quality_results", [])
-    telethon_err = telethon_data.get("error") if not telethon_data.get("available") else None
 
     # 3. Tính toán sự cố (Chỉ tính status FAIL là lỗi thực sự)
     fail_checks = sum(1 for c in (webhook_res + gas_res + sheets_res) if c["status"] == "FAIL")
     warn_checks = sum(1 for c in (webhook_res + gas_res + sheets_res) if c["status"] == "WARN")
-    if telethon_err and "duplicated" in telethon_err.lower():
-        warn_checks += 1
 
     missed_count = sum(1 for s in schedule_res if s["status"] == "FAIL")
     delay_count = sum(1 for s in schedule_res if s["status"] == "WARN")
@@ -642,11 +604,6 @@ def build_master_audit_report():
     lines.append(f"⏰ <b>Thời gian:</b> {now_mmt} (MMT)")
     lines.append(f"❌ <b>Tổng sự cố:</b> {total_incidents} Lỗi" + (f" | ⚠️ {warn_checks + delay_count} Cảnh báo" if (warn_checks + delay_count) > 0 else ""))
     lines.append("──────────────────────────")
-
-    # 0. Báo cáo lỗi Telethon Auth
-    if telethon_err:
-        lines.append(f"\n🔐 <b>CẢNH BÁO PHIÊN TELETHON:</b>")
-        lines.append(f"   ⚠️ <i>Không thể đọc tin Telegram: {telethon_err[:100]}</i>")
 
     # 1. Báo cáo lỗi Chất Lượng Nội Dung & Quân Số
     if quality_res:

@@ -9,7 +9,6 @@ Dùng cho: cron_send.py, daily_plan_report.py, daily_read_report.py, check_read_
 """
 
 import asyncio
-import re
 import requests
 
 
@@ -164,7 +163,7 @@ async def delete_by_titles_batch_telethon(
     client,
     bot_token: str,
     chat_to_prefixes: dict, # {chat_id: [prefix1, prefix2, ...]}
-    search_limit: int = 200,
+    search_limit: int = 100,
 ) -> int:
     """
     Quét lịch sử MỖI NHÓM ĐÚNG 1 LẦN (Single-Pass Scanning) và xóa tất cả tin khớp với danh sách prefix.
@@ -212,7 +211,7 @@ async def delete_by_titles_batch_telethon(
                     "Search TNIxxxx click here @SEARCHTNITASKWOBOT" in msg.text or
                     "Part 1 — Search Stats" in msg.text or
                     "Part 3 — No ID Telegram" in msg.text or
-                    (re.search(r"Day /\d+ of the month=", msg.text) and "WO Remain Detai:" in msg.text) or
+                    ("Day /30 of the month=" in msg.text and "WO Remain Detai:" in msg.text) or
                     "Report — Daily EOD Task" in msg.text or
                     "Full Report — FT Task Details" in msg.text or
                     "Report — Employee Task & Rank" in msg.text or
