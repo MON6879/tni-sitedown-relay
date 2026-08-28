@@ -45,14 +45,15 @@
    - Trong Google Apps Script, **tất cả file `.gs` trong cùng 1 dự án dùng chung Global Scope**.
    - TUYỆT ĐỐI KHÔNG được khai báo trùng tên biến toàn cục (`var GH_REPO`, `const CONFIG_SS_ID`...) giữa các file trong cùng 1 dự án.
    - Mỗi dự án GAS chỉ chứa các file LIÊN QUAN TRỰC TIẾP với nhau. Tách riêng chức năng vào đúng dự án theo bảng phân bổ bên dưới.
-   - **4 DỰ ÁN GAS CHUẨN (KHÔNG THÊM, KHÔNG BỚT)**:
+   - **5 DỰ ÁN GAS CHUẨN (KHÔNG THÊM, KHÔNG BỚT)**:
 
    | # | Tên Dự Án GAS | Script ID | Chức Năng | Các File `.gs` Bên Trong |
    |---|---|---|---|---|
-   | 1 | 🌟 **TNI** | `1rvgWwrAMDbqtmqw...` | Bot 10 Thi công + Dispatch GitHub + Auto Copy | `13_TNI_CONSTRUCTION.gs`, `14_GITHUB_DISPATCH.gs`, `auto_copy_processor.gs` |
-   | 2 | 📡 **TNI Site Down Bot** | `1fgIR_frjlOHBt4o...` | Site Down Relay + Refuel GAS | `site_down_v2.gs`, `apps_script_refuel.gs` |
+   | 1 | 🌟 **TNI** | `1rvgWwrAMDbqtmqw...` | Bot 10 Thi công + Dispatch GitHub + Auto Copy + Dashboard + Collector + Daily Report + Cable + MDG + Refuel + Cross Check + ICT | `13_TNI_CONSTRUCTION.gs`, `14_GITHUB_DISPATCH.gs`, `auto_copy_processor.gs`, `apps_script_collector.gs`, `apps_script_cable.gs`, `apps_script_mdg.gs`, `apps_script_refuel.gs`, `apps_script_refuel_plan.gs`, `10_DASHBOARD_REPORT.gs`, `cross_check_wo.gs`, `daily_bod_assign_notify.gs`, `daily_report_collector.gs`, `daily_report_scheduler.gs`, `daily_report_trigger.gs`, `input_ict_tinh_tien.gs`, `template_collector.gs`, `Code.gs` (17 files total) |
+   | 2 | 📡 **TNI Site Down Bot** | `1fgIR_frjlOHBt4o...` | Site Down Relay ĐỘC LẬP (Khóa Thép @89) | `site_down_v2.gs`, `apps_script_refuel.gs` |
    | 3 | 👤 **TNI Attendance Bot** | `166XawHNCvkXmo...` | Điểm danh nhân viên | `attendance.gs` |
    | 4 | 💰 **TC** | `1QsNLLXKtxo3wK...` | Quản Lý Tài Chính (QLTC) | `QLTC.gs` |
+   | 5 | 🏛️ **TNI BI Portal Backend** | `1G790B-ZHinJUQKHr-u0F2NDiaxNDjfYYSo84QysD2c3b9VGZCeevUKCU` | Backend độc lập cho BI Portal (Plan - Result Dep, Permit BI, History) | `bi_backend.gs` |
 
 7. **Xử Lý Gia Tăng Chống Timeout (Incremental Processing)** *(MỚI v599)*:
    - GAS có giới hạn **tối đa 6 phút** mỗi lần thực thi. TUYỆT ĐỐI KHÔNG viết script xử lý toàn bộ dữ liệu mỗi lần chạy.
@@ -71,20 +72,139 @@
 | 🔵 **GITHUB ACTIONS** | **Reports 1, 2, 3, 4 + BOD** | `cron_send.py`, `daily_bod_assign.py` | GitHub (`MON6879` — 05:48 & 15:48 MMT) | Báo cáo công việc hàng ngày 4 Team & BOD Assign (Dung sai ±3p) |
 | 🔵 **GITHUB ACTIONS** | **Report 5A, 5B, 5C (Plan)** | `daily_plan_report.py` | GitHub (`MON6879` — theo lịch 7 mốc) | Báo cáo Kế hoạch Ngày/EOD/Update (Dung sai ±3p) |
 | 🔵 **GITHUB ACTIONS** | **Report 6 (Read Status)** | `daily_read_report.py` | GitHub (`MON6879` — 08:48, 14:58, 17:18, 19:41) | Báo cáo xác nhận đọc Note qua Telethon (Dung sai ±3p) |
+| 🔵 **GITHUB ACTIONS** | **Report 6.1 (Site Clear Today)** | `site_clear_report.py` | GitHub (`MON6879` — 07:18, 10:18, 14:18, 17:18 MMT) | Báo cáo sự cố Clear trong ngày theo Team từ tab Site down Clear Morning |
 | 🔵 **GITHUB ACTIONS** | **Cable & Refuel Reports** | `cable_report.py`, `refuel_plan_report.py` | GitHub (`MON6879` — theo lịch) | Báo cáo Cáp đứt và Kế hoạch cấp dầu máy phát |
-| 🔵 **GITHUB ACTIONS** | **Site Down Relay Độc lập** | `botlookup_relay.yml` / `botlookup_relay.py` | GitHub (`MON6879` — Cron `3,33 * * * *` UTC + GAS dispatch cửa sổ chặt) | Cào dữ liệu trạm sập NOC Pro bằng Telethon, sleep chính xác đến :06/:36 MMT |
+| 🔵 **GITHUB ACTIONS** | **Site Down Relay (Toa SD ƯU TIÊN 1)** | `train_5min.yml` / `botlookup_relay.py` | GitHub (`MON6879` — Toa SD chạy ĐẦU TIÊN mỗi nhịp :06/:36 MMT trong train) | Cào dữ liệu trạm sập NOC Pro bằng Telethon, chạy tuần tự TRƯỚC mọi report khác |
 
 ---
+
+### 🛡️ 0.2. NGUYÊN TẮC PHÒNG CHỐNG LỖI TÁI PHÁT (ANTI-REGRESSION PRINCIPLES)
+
+> ⚠️ **BÀI HỌC TỪ AUDIT**: Đã từng xảy ra 2 lỗi nghiêm trọng do thiếu cơ chế cô lập lỗi trong YAML và hardcode Chat ID. Các nguyên tắc sau được đặt ra để ngăn chặn triệt để sự cố tương tự.
+
+1. **Rule 1: `|| true` Bắt Buộc (Fault Isolation)**:
+   - Mọi dòng lệnh `run: python ...` trong BẤT KỲ file workflow YAML nào BẮT BUỘC phải được thêm `|| true` ở cuối. KHÔNG có ngoại lệ.
+   - Điều này đảm bảo một báo cáo lỗi sẽ không làm chết dây chuyền các báo cáo phía sau (Zero Cascading Failure). Trước khi commit, phải kiểm tra kỹ.
+
+2. **Rule 2: Chat ID Tập Trung (No Hardcoded IDs)**:
+   - TẤT CẢ các Telegram Chat ID BẮT BUỘC phải được import từ file cấu hình trung tâm `tni_config.py` (trong dictionary `TELEGRAM_GROUPS`).
+   - TUYỆT ĐỐI KHÔNG hardcode Chat ID trực tiếp vào trong từng script riêng lẻ (ví dụ: cấm viết `CONTROL_CHAT_ID = -1005251698940`).
+   - Bất kỳ script mới nào cũng phải khai báo: `from tni_config import TELEGRAM_GROUPS`.
+
+3. **Rule 3: Checklist Trước Khi Commit Workflow**:
+   - Trước khi commit thay đổi cho các file `.github/workflows/*.yml`, BẮT BUỘC chạy lệnh kiểm tra: `grep 'run: python' <file.yml> | grep -v '|| true'`
+   - Nếu có kết quả trả về, lệnh commit bị CHẶN (BLOCKED).
+
+4. **Rule 4: Checklist Trước Khi Tạo Script Mới**:
+   - Mọi script Python mới phải import ID từ `tni_config.py`. TUYỆT ĐỐI không tự định nghĩa mã ID thủ công để tránh nhầm lẫn prefix `-100`.
+
+5. **Rule 5: Khóa Chặt Mốc Giờ Kép Tàu 5 Phút (Train Schedule Dual-Tick Alignment)** *(v731)*:
+   - Các mốc giờ kiểm tra trong `train_5min.yml` BẮT BUỘC phải cài đặt cơ chế kiểm tra mốc kép (Dual-Tick Match) bám sát các tick tàu 5 phút (:01, :06, :11, :16, :21, :26, :31, :36, :41, :46, :51, :56 MMT), ví dụ `(check_time 07 18 || check_time 07 16)`, `(check_time 08 28 || check_time 08 26)`, `(check_time 08 48 || check_time 08 46)` để kháng trễ hàng đợi GitHub Runner 100%.
+
+6. **Rule 6: Khóa Chặt Bộ Lọc Hàng Đọc Quân Số Nhân Sự (Row 4-38 & 52-55)** *(v731)*:
+   - Bảng Task Sheet GID `133591305` phân bổ nhân viên từ Row 4 đến Row 38 (Hàng 38 là Kyaw Nyein Thu thuộc Team 4) và Team Leaders ở Row 52-55. CẤM TUYỆT ĐỐI việc cắt sớm tại hàng 37 (`37 < sheet_row < 52`) làm rụng quân số của Team 4. Bộ lọc chuẩn bất biến là `if sheet_row < 4 or (38 < sheet_row < 52) or sheet_row > 55: continue`.
+
+7. **Rule 7: Khóa Cố Định Workflow Name Khi Dispatch Từ GAS Cloud** *(v731)*:
+   - Hàm `triggerDailyWorkflow()` trên GAS Cloud khi dispatch GitHub Actions BẮT BUỘC phải trỏ đúng tên file workflow đang hoạt động (`train_5min.yml/dispatches`), kèm bảng ánh xạ `reportMap` chuẩn hóa, CẤM TUYỆT ĐỐI dùng tên file cũ đã xóa/đổi tên (`daily_reports.yml`).
+
+---
+
+### 🚂 0.3. QUY TRÌNH CHUẨN THÊM TOA MỚI (NEW TOA ONBOARDING PROCEDURE)
+
+> ⚠️ **QUY TẮC BẮT BUỘC**: Khi thêm bất kỳ Toa (báo cáo) mới nào vào hệ thống, PHẢI tuân thủ **ĐÚNG THỨ TỰ** 8 bước dưới đây. KHÔNG được bỏ bước, KHÔNG được đảo thứ tự.
+
+#### BƯỚC 1: Tạo Script Python
+```
+□ Import Chat ID từ tni_config.py: `from tni_config import TELEGRAM_GROUPS`
+□ Import delete helper: `from delete_old_helper import delete_old_messages_bot, save_msgids`
+□ KHÔNG hardcode Chat ID — dùng TELEGRAM_GROUPS["T1"], TELEGRAM_GROUPS["T2"]...
+□ KHÔNG hardcode GAS URL — dùng os.getenv("APPS_SCRIPT_URL") + MAIN_GAS_FALLBACK
+□ Xử lý data rỗng: return/continue im lặng, KHÔNG gửi tin rỗng
+□ GAS Cache key: đặt tên UNIQUE (VD: "SITE_CLEAR_REPORT_T{n}"), KHÔNG trùng key có sẵn
+```
+
+#### BƯỚC 2: Thêm Step vào `train_5min.yml`
+```yaml
+# TEMPLATE BẮT BUỘC — Copy và điền vào:
+      # ═══════════════════════════════════════════════
+      # 📋 TOA [SỐ]: [TÊN BÁO CÁO]
+      # 🤖 Engine: [Bot API / Telethon + Bot API]
+      # ⏰ Schedule: [GIỜ GỬI] Myanmar
+      # ═══════════════════════════════════════════════
+      - name: "📋 Toa [SỐ] — [TÊN]"
+        continue-on-error: true          # ← BẮT BUỘC (Lớp 1: System-level)
+        if: |
+          steps.sched.outputs.[FLAG] == 'true' ||
+          (github.event_name == 'workflow_dispatch' && inputs.report_type == '[TÊN OPTION]')
+        env:
+          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+        run: python [script].py || true  # ← BẮT BUỘC (Lớp 2: Bash-level)
+```
+```
+□ Có continue-on-error: true
+□ Có || true ở cuối lệnh run
+□ Flag output UNIQUE (không trùng flag có sẵn)
+□ Env variables đầy đủ (Bot Token + GAS URL + Telethon nếu cần)
+```
+
+#### BƯỚC 3: Thêm `check_time()` vào Schedule Check
+```
+□ Thêm dòng check_time [GIỜ] [FLAG] vào block bash trong step "Schedule Check"
+□ Đảm bảo GIỜ không trùng/chồng chéo với Toa khác (kiểm tra bảng lịch trình)
+□ Thêm echo "$FLAG = ..." vào phần debug output
+□ Thêm echo "[FLAG]=$[FLAG]" >> $GITHUB_OUTPUT
+```
+
+#### BƯỚC 4: Thêm Workflow Dispatch Option
+```
+□ Thêm tên báo cáo vào danh sách `options:` trong `workflow_dispatch.inputs.report_type`
+□ Đảm bảo tên khớp CHÍNH XÁC với giá trị trong `if:` condition của Step
+```
+
+#### BƯỚC 5: Kiểm Tra Trước Commit (GATE CHECK)
+```bash
+# Chạy 3 lệnh kiểm tra — NẾU BẤT KỲ LỆNH NÀO CÓ KẾT QUẢ → CHẶN COMMIT:
+grep 'run: python' train_5min.yml | grep -v '|| true'           # Phải = 0 dòng
+grep 'name:.*Toa' train_5min.yml | grep -v 'continue-on-error'  # Phải = 0 dòng  
+grep -c 'continue-on-error: true' train_5min.yml                # Phải = tổng số step
+```
+
+#### BƯỚC 6: Đồng Bộ 3 Repo
+```
+□ Copy script mới + train_5min.yml sang: tni-sitedown, Task and WO, tni-search
+□ Nếu thêm config mới vào tni_config.py → đồng bộ tni_config.py sang 3 repo
+```
+
+#### BƯỚC 7: Cập Nhật Tài Liệu
+```
+□ system_map.md: Thêm Toa mới vào bảng Train Manifest + bảng lịch trình
+□ SYSTEM_DOC.md: Cập nhật mô tả chức năng (nếu cần)
+□ AGENTS.md: Cập nhật bảng Webhook (nếu có Bot/Endpoint mới)
+□ history/backup_context_vXXX.md: Tạo snapshot mới
+```
+
+#### BƯỚC 8: Commit & Push + Xác Nhận
+```
+□ git add -A → git commit → git push
+□ Chờ mốc giờ tự động gần nhất, xác nhận báo cáo mới gửi thành công
+□ Báo cáo cho người dùng: Chuyến Tàu, Số Toa, Số Ghế đã sửa đổi
+```
+
+> 💡 **MẸO CHỐNG CHỒNG CHÉO**: Trước khi chọn giờ gửi cho Toa mới, liệt kê TẤT CẢ các mốc giờ hiện có bằng: `grep 'check_time' train_5min.yml` — chọn mốc giờ TRỐNG, cách mốc gần nhất ít nhất 3 phút.
+
+---
+
 
 ### 🌐 1. Ma trận phụ thuộc Endpoints & Apps Script URLs:
 
 | Tên chức năng / Bot | Endpoint Webhook / Deployment | Apps Script Web App URL | Các file Python liên quan (Phải đồng bộ `MAIN_GAS_FALLBACK`) | Workflow / Docs liên quan (Phải đồng bộ) |
 |---|---|---|---|---|
-| **Main & Asset Collector Bot** (`@TNIASSETorderREQUEST_BOT`) | `https://tni-bot.vercel.app/api/collector` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@302`) | `api/collector.py`, `daily_read_report.py`, `daily_plan_report.py`, `daily_bod_assign.py`, `cron_send.py`, `backlog_send.py` | `system_map.md`, `SYSTEM_DOC.md`, `AGENTS.md` |
+| **Main & Asset Collector Bot** (`@TNIASSETorderREQUEST_BOT`) | `https://tni-bot.vercel.app/api/collector` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@302`) | `api/collector.py`, `daily_read_report.py`, `daily_plan_report.py`, `daily_bod_assign.py`, `cron_send.py`, `backlog_send.py`, `site_clear_report.py` | `system_map.md`, `SYSTEM_DOC.md`, `AGENTS.md` |
 | **Search Bot** (`@SEARCHTNITASKWOBOT`) | `https://tni-bot.vercel.app/api/search_bot` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@302`) | `api/search_bot.py` | `system_map.md`, `SYSTEM_DOC.md`, `AGENTS.md` |
 | **Refuel Collector & Plan Bot** | Apps Script Web App | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` (Version `@71`) | `api/refuel_collector.py`, `refuel_send.py`, `refuel_plan_report.py` | `system_map.md`, `SYSTEM_DOC.md` |
-| **Site Down Bot (Relay)** (`@tni_site_down_bot`) | `https://tni-bot.vercel.app/api/site_down_relay` | `AKfycbxVi0BGDW7B_KBxcSEdw3yuHB9Rs2BemQEYeKDwsybJQdmQv-_0HqyGHjpZI6jupxll/exec` | `api/site_down_relay.py`, `botlookup_relay.py` | `system_map.md`, `SYSTEM_DOC.md` |
-| **Construction Bot** (`@8903841312`) | Apps Script Web App (merged into Main GAS @302) | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec` | `.github/workflows/keepalive_construction.yml` | `system_map.md`, `SYSTEM_DOC.md` |
+| **Site Down Bot (Relay)** (`@tni_site_down_bot`) | `https://tni-bot.vercel.app/api/site_down_relay` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@349`) | `api/site_down_relay.py`, `botlookup_relay.py` | `system_map.md`, `SYSTEM_DOC.md` |
+| **Construction Bot** (`@8903841312`) | `https://tni-bot.vercel.app/api/construction` (Vercel Proxy) | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec` | `api/construction.py` | `system_map.md`, `SYSTEM_DOC.md` |
 
 ---
 
@@ -99,9 +219,10 @@
 | **Báo cáo Kế hoạch Update (Report 5B)** | **19:11 PM MMT** | Toa Report 5B Update | 19:11 MMT | `daily_plan_report.py` | Teams 1..4, CONTROL |
 | **Báo cáo Kế hoạch Sáng (Report 5C)** | **06:06, 08:28, 09:56, 15:26, 22:06 MMT** | Toa Report 5C Morning | `06:06`, `08:28`, `09:56`, `15:26`, `22:06` MMT | `daily_plan_report.py` | Teams 1..4, CONTROL |
 | **Báo cáo Lượt đọc (Report 6)** | **08:48, 14:58, 17:18, 19:41 MMT** | Toa Report 6 Read | `08:48`, `14:58`, `17:18`, `19:41` MMT | `daily_read_report.py` | Teams 1..4, CONTROL |
+| **Báo cáo 6.1 Site Clear Today** | **07:18, 10:18, 14:18, 17:18 MMT** | Toa 6.1 Site Clear | `07:18`, `10:18`, `14:18`, `17:18` MMT | `site_clear_report.py` | Teams 1..4, CONTROL |
 | **Cable Report** | **05:56, 15:56 MMT** | Toa Cable | 05:56, 15:56 MMT | `cable_report.py` | CABLE Group |
-| **Refuel Request Report** | **05:48, 05:56, 07:06, 13:06, 15:56 MMT** | Toa Refuel Request | `05:48`, `05:56`, `07:06`, `13:06`, `15:56` MMT | `refuel_plan_report.py` | REFUEL Group |
-| **Site Down Relay** | **Mỗi giờ (:06 & :36 MMT)** | Độc lập `botlookup_relay.yml` (cron: `3,33 * * * *` UTC) | Chạy độc lập ~:03/:33 UTC (bù queue ~3-5p) | `botlookup_relay.py` | CONTROL |
+| **Site Down Detail (Ghế SD-DETAIL-1)** | **Mỗi giờ (:06 & :36 MMT)** | Độc lập `botlookup_relay.yml` (cron: `3,33 * * * *` UTC) | Chạy độc lập ~:03/:33 UTC | `botlookup_relay.py` | CONTROL, T1, T2, T3, T4 |
+| **Incident Summary AW7 (Ghế SD-SUMMARY-2)** | **Khi ô AW7 đổi giờ** | Apps Script Polling / Manual Trigger | Độc lập 100% — Chỉ gửi khi ô AW7 có giờ mới | `site_down_v2.gs` | CONTROL, T1, T2, T3, T4 |
 
 ---
 
@@ -1136,20 +1257,17 @@ KHÔNG ĐỤNG: dòng 245-256 trong api/collector.py
 ```
 ✅ ĐÃ XÁC NHẬN HOẠT ĐỘNG 28/06/2026
 Flow:
-  - Tin nhắn chứa keyword (Order, Revoke...) -> api/collector.py gửi POST đến GAS action "add"
-  - GAS apps_script_collector.js:handleAdd(sheet, body) ghi:
-      - Cột A: REF (Số thứ tự tự tăng = row - 1)
+  - Tin nhắn chứa keyword (Order, Revoke, Destroys...) -> api/collector.py gửi POST đến GAS action "add"
+  - Menu Telegram tự động đồng bộ 5 phút 1 lần từ Cột A sheet Config (tab Config gid=1236389870)
+  - GAS apps_script_collector.gs:handleAdd(sheet, body) ghi:
+      - Cột A: REF (Số thứ tự tự tăng = row - 1, chèn tại Row 2)
       - Cột B: Date Sent (Thời gian gửi)
       - Cột C: Telegram ID (ID người gửi)
       - Cột D: Content (Nội dung tin nhắn gốc)
       - Cột E: Asset action done (Mặc định trống)
-  - Ảnh gửi kèm -> upload qua action "add_photo" bằng Base64 -> lưu Drive -> ghi link vào cột F–Q (tối đa 12 ảnh)
+      - Cột F: Photo Download All Folder Link (Tự động tạo folder riêng Asset_#ID trên Drive và gán link vào Cột F)
+  - Ảnh gửi kèm -> upload qua action "add_photo" bằng Base64 -> tạo folder con Asset_#XXXXX -> ghi link folder vào DUY NHẤT Cột F
   - Xác nhận hoàn thành -> action "done" -> ghi "Done + ngày giờ + tên Admin" vào cột E
-
-KHÔNG ĐỤNG:
-  - Hàm handleAdd() dòng 166-212 trong apps_script_collector.js
-  - Hàm handleAddPhoto() dòng 219-315 trong apps_script_collector.js
-  - Hàm handleDone() dòng 318-380 trong apps_script_collector.js
 ```
 
 ### 7. Auto Copy & Delete Processor (auto_copy_processor.js)
@@ -1185,5 +1303,70 @@ Flow:
 KHÔNG ĐỤNG:
   - Logic gửi gộp và xóa tin cũ trong combined_bot.py và cron_send.py
 ```
+
+---
+
+### 9. PHÂN TÍCH NGUYÊN NHÂN GỐC RỄ LỖI LẶP LẠI & GIẢI PHÁP TRIỆT ĐỂ (v641 — 18/08/2026)
+
+> ⚠️ **BÀI HỌC KIỂM TOÁN TỐI THƯỢNG (ZERO-REPEAT DEFECT POLICY)**:
+> Mọi sự cố lặp lại trong hệ thống đều do 4 lỗ hổng cấu trúc sau gây ra và đã được bọc thép 100%:
+
+1. **Lỗi Chồng Lấn Cửa Sổ Hẹn Giờ (Timing Window Overlap)**:
+   - *Nguyên nhân*: Hàm `check_time` dùng dung sai `±3 phút` trên chu kỳ chạy 5 phút $\rightarrow$ Cửa sổ rộng 7 phút làm 2 chuyến tàu liên tiếp (`09:53` và `09:58`) đều khớp cùng một mốc `09:56` $\rightarrow$ Gửi đúp 2 bản tin!
+   - *Giải pháp*: Siết chặt dung sai về **`±2 phút`** (khớp đúng 5 phút phân vùng). Mỗi mục tiêu chỉ khớp DUY NHẤT 1 nhịp chạy.
+
+2. **Lỗi Trượt Regex Xóa Tin Cũ Do Emoji & Mismatch Bot Token**:
+   - *Nguyên nhân*: Tiêu đề có chèn emoji `🔄` hoặc `📋` ở đầu khiến hàm `startswith()` bị trượt hoàn toàn; đồng thời `tg_delete_by_title` không nhận đúng `bot_token` dẫn đến lấy nhầm ID bot khác và không xóa được tin cũ.
+   - *Giải pháp*: Chuyển toàn bộ sang **`substring in (không phân biệt hoa/thường)`** và truyền tường minh `bot_token` cho từng loại báo cáo.
+
+3. **Lỗi Lệch Webhook Endpoint Của Bot Sang Dự Án Khác**:
+   - *Nguyên nhân*: Bot 10 Construction (`@8903841312`) bị cài nhầm URL của dự án TC Finance $\rightarrow$ Sinh lỗi `302 Found`, `handleTelegramWebhook_ is not defined`, và timeout $\rightarrow$ Bot bị câm khi nhân viên gửi lệnh `/team_received_material` hoặc `Pro TNIxxxx`.
+   - *Giải pháp*: Khóa cứng Webhook về Main GAS Deployment `@335`, bổ sung hàm định tuyến `handleTelegramWebhook_()`.
+
+4. **Lỗi Trôi Tin Nhắn Khi Kiểm Toán Telethon**:
+   - *Nguyên nhân*: `system_auditor.py` chỉ quét `limit=80` tin $\rightarrow$ Đến 09:00 tin sáng lúc 06:06 bị trôi ra ngoài $\rightarrow$ Báo sai là MISSED.
+   - *Giải pháp*: Nâng `limit=250` tin nhắn để bao trọn 100% dữ liệu từ đầu ngày.
+
+---
+
+### 10. MA TRẬN 10 GHẾ GIÁM SÁT CẢNH BÁO SỚM TOÀN HỆ THỐNG (FULL SENTINEL SEATS)
+
+| Mã Ghế Giám Sát | Phân Hệ Đảm Nhiệm | Chỉ Số Giám Sát Sớm | Hành Động Khi Phát Hiện Lỗi |
+|---|---|---|---|
+| **`Ghế AUDITOR-1.1`** | Reports 1, 2, 3, 4 + BOD | Đúng giờ 05:48 & 15:48 MMT | Báo trễ > 4p về Telegram DM Admin |
+| **`Ghế AUDITOR-2.1`** | Cable Daily Report | Đúng giờ 05:56 & 15:56 MMT tại Group CABLE | Báo trễ / Sheet cáp lỗi về DM Admin |
+| **`Ghế AUDITOR-3.1`** | Refuel Request & Plans (1, 2, 2.1, 4) | Nhận diện đúp tin, lọc trùng theo trạm | Báo nhân đôi / lệch giờ về DM Admin |
+| **`Ghế AUDITOR-4.1`** | Daily Plan (5A, 5B, 5C) | 7 mốc giờ Plan Sáng/Chiều/EOD/Update | Báo thiếu plan / trễ ca về DM Admin |
+| **`Ghế SD-DETAIL-1`** | Site Down Detail (Cột A $\rightarrow$ Cột C) | Cào Botlookup :06/:36 $\rightarrow$ Ghi Cột A $\rightarrow$ Gửi Chi tiết 4 Team & CONTROL (Hình 3) | Báo nghẽn dán cột A / đứt tin Cột C về DM Admin |
+| **`Ghế SD-SUMMARY-2`** | Incident Summary Matrix (Cột AW:AZ) | Độc lập 100% — Chỉ gửi khi ô AW7 có mốc giờ MỚI (Hình 1 & 2) | Cấm gửi kèm khi dán Cột A / Báo lỗi AW7 về DM Admin |
+| **`Ghế TC-1`** | Construction Bot 10 | Phản hồi lệnh `/team_received_material`, `Pro`, ảnh Drive | Báo Webhook 302 / Bot câm về DM Admin |
+| **`Ghế AUDITOR-9.1`** | Master System Sentinel | Sức khỏe 4 Webhooks, 3 GAS Endpoints, 3 Sheets | Gửi Alert đỏ 🚨 trực tiếp về DM Admin |
+| **`Ghế AUDITOR-9.2`** | Web BI Portal (19 Tables & Modals) | Đồng bộ 100% dữ liệu giữa Google Sheets vs Web DOM | Cảnh báo lệch ngày / đứt cáp DOM về DM Admin |
+| **`Ghế AUDITOR-DM`** | Kênh Cảnh Báo Độc Quyền | Chat ID: `6859790680` (Ha Duc Phong) | **Tuyệt đối KHÔNG spam vào Group chung** |
+| **`Ghế GAS-OPS-1`** | Quản Trị GAS Tổng (QLTC_GAS) | 17 files .gs vận hành (Cable, MDG, Refuel, Daily, BOD) | Báo lỗi cú pháp / xung đột hàm về DM Admin |
+| **`Ghế EXT-OPS-HUB`** | Cổng Ngoại Giao GAS Tổng | Webhook Search Bot, Asset Collector, BI Portal Plan Dep | Báo đứt kết nối / Timeout 302 về DM Admin |
+| **`Ghế GAS-SITEDOWN-2`** | Quản Trị GAS Site Down | 1 file `site_down_v2.gs` độc lập trên `apps_script_sitedown` | Báo lỗi parse Cột C / AW7 về DM Admin |
+| **`Ghế EXT-SITEDOWN-RELAY`**| Cổng Ngoại Giao Site Down | Webhook `@tni_site_down_bot`, cào Cột A `:06/:36` MMT | Báo nghẽn cào / đứt tin về DM Admin |
+| **`Ghế GAS-CONSTRUCTION-3`**| Quản Trị GAS Xây Dựng | Logic tiến độ vật tư hạ tầng trên `apps_script_tc` | Báo lỗi Drive / Sheet TC về DM Admin |
+| **`Ghế EXT-TC-CONSTRUCTION`**| Cổng Ngoại Giao Construction | Webhook Bot `@8903841312` (`10 TNI_SITE`) | Báo Bot câm / mất phản hồi về DM Admin |
+| **`Ghế GAS-ATTENDANCE-4`** | Quản Trị GAS Điểm Danh | Logic điểm danh trên `apps_script_attendance` | Báo lỗi Sheet điểm danh về DM Admin |
+| **`Ghế EXT-ATTENDANCE-BOT`** | Cổng Ngoại Giao Điểm Danh | Webhook Bot Điểm Danh `@8628370628` | Báo trễ nhận diện ảnh về DM Admin |
+| **`Ghế GAS-VERIFY-0`** | Xác Nhận Đủ File GAS | `QLTC_GAS` = 17 files, `apps_script_sitedown` = 1 file | DỪNG NGAY nếu thiếu file, KHÔNG push! |
+| **`Ghế GAS-PUSH-1`** | Đẩy Code Lên GAS Cloud | `npx clasp push` (theo đúng thư mục chuyên biệt) | Báo lỗi push / xung đột về DM Admin |
+| **`Ghế GAS-DEPLOY-2`** | Deploy Đè Đúng Deployment | `npx clasp deploy -i [DEPLOYMENT_ID_CHUẨN] -d "..."` | DỪNG nếu dùng sai Deployment ID! |
+| **`Ghế GAS-AUDIT-3`** | Xác Minh Cloud = Local | `npx clasp pull` + `Compare-Object` — PHẢI = 0 khác biệt | Báo lệch code Cloud vs Local về DM Admin |
+
+---
+
+### 11. 📜 QUY TẮC "LÊN TÀU CÓ GHẾ — 1 KHỐI THỐNG NHẤT" (UNIVERSAL RAIL & SEAT ONBOARDING PROTOCOL)
+
+> ⚠️ **QUY TẮC BẮT BUỘC 100% CHO MỌI THÀNH PHẦN MỚI**:
+> Khi thêm mới bất kỳ Tác Vụ, Bot, Script, Google Sheet Tab, hoặc Web Component nào, BẮT BUỘC phải thực hiện đủ **5 Bước Lên Tàu**:
+> 1. **Bước 1 (Đăng Ký Toa & Ghế)**: Khai báo rõ thuộc Chuyến Tàu số mấy (#1-#4), Toa Tàu số mấy, và Mã Ghế Đồng Bộ trong `UNIFIED_TRAIN_MATRIX.md` & `system_map.md`.
+> 2. **Bước 2 (Gắn Lịch Trình Chuẩn Kháng Trễ)**: Định tuyến qua `train_5min.yml` với dung sai chuẩn $\pm 2$ phút (không dùng $\pm 3$p hay $\pm 14$p) và luôn bọc `|| true`.
+> 3. **Bước 3 (Bọc Thép Chống Trùng)**: Luôn tích hợp cơ chế xóa tin cũ `tg_delete_by_title(chat_id, "Từ Khóa", bot_token)` với cơ chế `substring in`.
+> 4. **Bước 4 (Khai Báo Vào Sentinel Auditor)**: Đăng ký rule kiểm tra tự động vào `system_auditor.py` để được bảo vệ bởi `Ghế AUDITOR-9.1`.
+> 5. **Bước 5 (Đồng Bộ 8 Bước LƯU ĐI & Test Live)**: Chạy `master_sync_all.py` đồng bộ 3 repo, push GitHub và xác nhận HTTP 200 trước khi bàn giao!
+
 
 
