@@ -24,8 +24,11 @@ on:
           - 'Auto'
           - 'All Reports (1, 2, 3, 4, 5, 6 - Full Pipeline)'
           - 'Reports 1, 2, 3, 4 - Daily Task & Backlog'
+          - 'Report 1, 2, 3 - Daily Backlog (DG & Task)'
+          - 'Report 3 - Main DG Material Need'
           - 'Report 3.1 - Asset progress for material'
           - 'Report 2 (BOD) - BOD Assign'
+          - 'Report 4 - Daily EOD Task & Stats'
           - 'Report 5A - Plan EOD'
           - 'Report 5B - Plan Update'
           - 'Report 5C - Plan Morning'
@@ -36,7 +39,6 @@ on:
           - 'Task - Refuel Plan Report 1'
           - 'Task - Refuel Plan Report 2'
           - 'Task - Refuel Plan Report 2.1 - FT Monitor Days'
-
           - 'Task - Refuel Plan Report 4'
           - 'Task - All Refuel Reports'
           - 'Task - Check Read Status'
@@ -136,28 +138,28 @@ jobs:
           check_time 06 06 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Report 5 Daily Plan Morning (06:06 MMT)"
           #  07:06 → Refuel Request Catch-up (🤖 Bot API)
           check_time 07 06 && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 8: Refuel Req Catch-up (07:06 MMT)"
-          #  07:18 → Report 6.1 Site Clear Today (🤖 Bot API)
-          check_time 07 18 && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (07:18 MMT)"
-          #  08:48 → Report 6 Read Report (Ca 1) (📱 Telethon)
-          check_time 08 48 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (08:48 MMT)"
-          #  08:28 → Plan 5C Morning
-          check_time 08 28 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Morning"
+          #  07:16 / 07:18 → Report 6.1 Site Clear Today (🤖 Bot API)
+          (check_time 07 18 || check_time 07 16) && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (07:18 MMT)"
+          #  08:26 / 08:28 → Plan 5C Morning
+          (check_time 08 28 || check_time 08 26) && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Morning (08:28 MMT)"
+          #  08:46 / 08:48 → Report 6 Read Report (Ca 1) (📱 Telethon)
+          (check_time 08 48 || check_time 08 46) && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (08:48 MMT)"
           #  09:00 → Ghế AUDITOR-9.1 (Master System Audit)
           check_time 09 00 && AUDITOR91=true && NEED_PYTHON=true && echo "🚃 Toa Auditor: Ghế AUDITOR-9.1 (09:00 MMT)"
           #  09:56 → Plan 5C Morning
           check_time 09 56 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Morning (09:56 MMT)"
-          #  10:18 → Report 6.1 Site Clear Today (🤖 Bot API)
-          check_time 10 18 && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (10:18 MMT)"
+          #  10:16 / 10:18 → Report 6.1 Site Clear Today (🤖 Bot API)
+          (check_time 10 18 || check_time 10 16) && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (10:18 MMT)"
 
           # ═══════ 🌤️ AFTERNOON BLOCK (13:00-16:30) ═══════
           #  13:06 → Refuel Request (🤖 Bot API)
           check_time 13 06 && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 8: Refuel Request (13:06 MMT)"
           #  13:11 → Refuel Plan (Report 2 Cấp Dầu - Ca 1) (📱 Telethon)
           check_time 13 11 && REFUEL_P1=true && REFUEL_P2=true && REFUEL_P21=true && NEED_PYTHON=true && echo "🚃 Refuel Plan (13:11 MMT)"
-          #  14:18 → Report 6.1 Site Clear Today (🤖 Bot API)
-          check_time 14 18 && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (14:18 MMT)"
-          #  14:58 → Report 6 Read Report (Ca 2) (📱 Telethon)
-          check_time 14 58 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (14:58 MMT)"
+          #  14:16 / 14:18 → Report 6.1 Site Clear Today (🤖 Bot API)
+          (check_time 14 18 || check_time 14 16) && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (14:18 MMT)"
+          #  14:56 / 14:58 → Report 6 Read Report (Ca 2) (📱 Telethon)
+          (check_time 14 58 || check_time 14 56) && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (14:58 MMT)"
           #  15:26 → Plan 5C Evening (📱 Telethon)
           check_time 15 26 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Evening (15:26 MMT)"
           #  15:46 → Reports 1,2,3 + BOD (🤖 Bot API)
@@ -170,8 +172,8 @@ jobs:
           # 🚨 Site Down Relay: ĐÃ TÁCH HẲN sang botlookup_relay.yml (cron 6,36 UTC = :36,:06 MMT)
 
           # ═══════ 🌙 EVENING BLOCK (17:00-22:30) ═══════
-          #  17:18 → Report 6 & Report 6.1
-          check_time 17 18 && R6=true && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6+6.1: Report 6 + Report 6.1 Site Clear Today (17:18 MMT)"
+          #  17:16 / 17:18 → Report 6 & Report 6.1
+          (check_time 17 18 || check_time 17 16) && R6=true && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6+6.1: Report 6 + Report 6.1 Site Clear Today (17:18 MMT)"
           #  18:06 → Refuel Plan 2
           check_time 18 06 && REFUEL_P2=true && REFUEL_P21=true && NEED_PYTHON=true && echo "🚃 Toa 10: Refuel Plan 2 (18:06 MMT)"
           #  18:41 → Report 5 (Daily Plan - Ca Chiều / EOD Plan vs Actual) (📱 Telethon)
@@ -239,6 +241,8 @@ jobs:
           steps.sched.outputs.r1234 == 'true' ||
           (github.event_name == 'workflow_dispatch' && (
             inputs.report_type == 'Reports 1, 2, 3, 4 - Daily Task & Backlog' ||
+            inputs.report_type == 'Report 1, 2, 3 - Daily Backlog (DG & Task)' ||
+            inputs.report_type == 'Report 3 - Main DG Material Need' ||
             inputs.report_type == 'Report 2 (BOD) - BOD Assign' ||
             inputs.report_type == 'All Reports (1, 2, 3, 4, 5, 6 - Full Pipeline)'
           ))
@@ -248,8 +252,14 @@ jobs:
           TECHNICAL_DEP_BOT_TOKEN: ${{ secrets.TECHNICAL_DEP_BOT_TOKEN }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
         run: |
-          python daily_bod_assign.py || true
-          python backlog_send.py --now || true
+          if [ "${{ inputs.report_type }}" = "Report 2 (BOD) - BOD Assign" ]; then
+            python daily_bod_assign.py || true
+          elif [ "${{ inputs.report_type }}" = "Report 3 - Main DG Material Need" ] || [ "${{ inputs.report_type }}" = "Report 1, 2, 3 - Daily Backlog (DG & Task)" ]; then
+            python backlog_send.py --now || true
+          else
+            python daily_bod_assign.py || true
+            python backlog_send.py --now || true
+          fi
 
       # ═══════════════════════════════════════════════
       # 📋 TOA 12: Report 4 — Daily EOD Task & Stats
@@ -262,6 +272,7 @@ jobs:
           steps.sched.outputs.r4 == 'true' ||
           (github.event_name == 'workflow_dispatch' && (
             inputs.report_type == 'Reports 1, 2, 3, 4 - Daily Task & Backlog' ||
+            inputs.report_type == 'Report 4 - Daily EOD Task & Stats' ||
             inputs.report_type == 'Report 3.1 - Asset progress for material' ||
             inputs.report_type == 'All Reports (1, 2, 3, 4, 5, 6 - Full Pipeline)'
           ))
