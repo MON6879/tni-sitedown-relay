@@ -70,7 +70,7 @@
 | 🟢 **GAS SCHEDULER** | **GitHub Dispatch Trigger** | `14_GITHUB_DISPATCH.gs` | Google Cloud (Trigger 5 phút) | **Hẹn giờ CHÍNH** — dispatch `train_5min.yml` (5p) + `botlookup_relay.yml` (chỉ trong cửa sổ :03-:05/:33-:35 MMT) |
 | 🔵 **GITHUB ACTIONS** | **Toa 0 Keepalive** | `train_5min.yml` | GitHub (`MON6879` — **GAS dispatch** mỗi 5 phút) | Sưởi ấm Vercel API & khóa khôi phục `setWebhook` 6 Bot |
 | 🔵 **GITHUB ACTIONS** | **Reports 1, 2, 3, 4 + BOD** | `cron_send.py`, `daily_bod_assign.py` | GitHub (`MON6879` — 05:48 & 15:48 MMT) | Báo cáo công việc hàng ngày 4 Team & BOD Assign (Dung sai ±3p) |
-| 🔵 **GITHUB ACTIONS** | **Report 5A, 5B, 5C (Plan)** | `daily_plan_report.py` | GitHub (`MON6879` — theo lịch 7 mốc) | Báo cáo Kế hoạch Ngày/EOD/Update (Dung sai ±3p) |
+| 🔵 **GITHUB ACTIONS** | **Report 5A, 5B, 5C (Plan)** | `daily_plan_report.py` | GitHub (`MON6879` — theo lịch 7 mốc) | Báo cáo Kế hoạch Ngày/EOD/Update đọc 100% từ Google Sheet SSOT qua Bot API (Zero Telethon) |
 | 🔵 **GITHUB ACTIONS** | **Report 6 (Read Status)** | `daily_read_report.py` | GitHub (`MON6879` — 08:48, 14:58, 17:18, 19:41) | Báo cáo xác nhận đọc Note qua Telethon (Dung sai ±3p) |
 | 🔵 **GITHUB ACTIONS** | **Report 6.1 (Site Clear Today)** | `site_clear_report.py` | GitHub (`MON6879` — 07:18, 10:18, 14:18, 17:18 MMT) | Báo cáo sự cố Clear trong ngày theo Team từ tab Site down Clear Morning |
 | 🔵 **GITHUB ACTIONS** | **Cable & Refuel Reports** | `cable_report.py`, `refuel_plan_report.py` | GitHub (`MON6879` — theo lịch) | Báo cáo Cáp đứt và Kế hoạch cấp dầu máy phát |
