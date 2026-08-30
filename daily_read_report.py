@@ -383,7 +383,7 @@ async def process_group(client, group_key: str, chat_id: int,
         for p in group_participants:
             uid = p["id"]
             member_ids.add(uid)
-            per_person[uid] = {"name": p["name"], "id": uid, "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0}
+            per_person[uid] = {"name": p["name"], "id": uid, "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0, "read_time": None}
     else:
         for s in staff_list:
             name = s["name"]
@@ -408,7 +408,8 @@ async def process_group(client, group_key: str, chat_id: int,
             per_person[key] = {
                 "name": name,
                 "id": matched_id,
-                "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0
+                "d0": 0, "d1": 0, "d2": 0, "d7": 0, "month": 0,
+                "read_time": None
             }
 
     member_count = len(per_person)
@@ -469,6 +470,12 @@ async def process_group(client, group_key: str, chat_id: int,
                 pp["d1"] = 1
             elif dt_mm >= today_start:
                 pp["d0"] = 1
+                # 🕐 Lưu giờ đọc THỰC TẾ từng người (từ Telegram API)
+                if read_dt is not None:
+                    rdt = read_dt
+                    if rdt.tzinfo is None:
+                        rdt = rdt.replace(tzinfo=timezone.utc)
+                    pp["read_time"] = rdt.astimezone(MYANMAR_TZ).strftime("%H:%M")
 
         if dt_mm >= today_start and today_note_msg is None:
             today_note_msg = msg
@@ -568,14 +575,18 @@ async def main():
         def member_lines(per_member):
             lines = []
             for p in per_member:
+                rt = p.get("read_time") or "—"
                 if p["d0"]:
                     icon = "🟩"
+                    time_str = f"🕐{rt}"
                 elif not p.get("id"):
                     icon = "🟥"  # Chưa tham gia / Chưa khớp ID Telegram
+                    time_str = "N/A"
                 else:
                     icon = "🟨"  # Đã vào nhóm nhưng chưa đọc bài
+                    time_str = "—"
                 lines.append(
-                    f"  {icon} {p['name']}: "
+                    f"  {icon} {p['name']}: {time_str}  "
                     f"3Day:{p['d0']}/{p['d1']}/{p['d2']}  "
                     f"7Day:{p['d7']}  Month:{p['month']}"
                 )
@@ -710,9 +721,11 @@ def log_read_group_to_gas(all_results: dict, date_str: str, now_str: str):
     for gk, r in all_results.items():
         note_msg = r.get("note_preview", "")
         for p in r.get("per_member", []):
+            # 🕐 Giờ đọc thực tế từng người (từ Telegram API), không phải giờ chạy report
+            individual_time = p.get("read_time") or "—"
             rec = {
                 "date": date_str,
-                "time": now_str,
+                "time": individual_time,
                 "team": gk,
                 "name": p["name"],
                 "telegram_id": str(p.get("id", "")),
