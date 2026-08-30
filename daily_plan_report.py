@@ -1174,7 +1174,7 @@ async def scan_plan_tomorrow(client, group_key: str, chat_id: int,
                         fallback_result = candidate
     except Exception as e:
         logger.error(f"scan_plan_tomorrow {group_key} error: {e}")
-    return fallback_result if fallback_result else result
+    return fallback_result if fallback_result else {"found": False, "sent_time": "", "content": "", "plan": None}
 
 
 def calc_3day_completion_rate(all_plans: list, team_comparisons: dict,
