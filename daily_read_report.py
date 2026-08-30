@@ -624,13 +624,16 @@ async def main():
             print(f"📤 Report sent to {gk}")
             await asyncio.sleep(1)
 
-        # ── 2. Send consolidated report to CONTROL ──
+        # ── 2. Ghi dữ liệu lượt đọc vào Google Sheet tab 'Read Group' TRƯỚC khi gửi CONTROL ──
+        # (Tránh crash MessageTooLong làm mất dữ liệu Sheet)
+        log_read_group_to_gas(all_results, date_str, now_str)
+
+        # ── 3. Send consolidated report to CONTROL ──
         lines = [
             f"📋 6. Report — Daily Note Read Report — Summary",
             f"📅 {date_str}  |  🕐 {now_str}",
             f"⏰ Read Window: 04:00 - 23:59 Myanmar",
             f"📅 Cycle: {cycle_str}",
-            f"📌 Shows who read the Note message during the active window (04:00 - 23:59) today.",
             divider,
         ]
 
@@ -684,12 +687,16 @@ async def main():
                         await client.delete_messages(control_id, [old_m.id], revoke=True)
                     except Exception: pass
         except Exception: pass
-        sent = await client.send_message(control_id, report)
-        save_msgids(GAS_URL, "READREPORT_CONTROL", [sent.id])
-        print(f"📤 Consolidated report sent to CONTROL SITE")
 
-        # ── 3. Ghi dữ liệu lượt đọc vào Google Sheet tab 'Read Group' ──
-        log_read_group_to_gas(all_results, date_str, now_str)
+        # 🛡️ Cắt report nếu quá 4096 ký tự (Telegram limit)
+        try:
+            if len(report) > 4096:
+                report = report[:4090] + "\n[...]"
+            sent = await client.send_message(control_id, report)
+            save_msgids(GAS_URL, "READREPORT_CONTROL", [sent.id])
+            print(f"📤 Consolidated report sent to CONTROL SITE")
+        except Exception as ctrl_err:
+            print(f"⚠️ CONTROL report send error: {ctrl_err}")
 
     print(f"\n[{myanmar_now()}] 🎉 Complete!")
 
