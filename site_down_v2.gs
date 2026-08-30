@@ -348,6 +348,12 @@ function processSiteDownColC(sheet, isDirectPush) {
     return false;
   }
 
+  // 🛡️ FRESHNESS CHECK: Bỏ qua nếu dữ liệu quá cũ (>30 phút so với hiện tại)
+  if (!isDataFresh_(storeKey, 30)) {
+    Logger.log("[Luồng A1] ⏭️ Dữ liệu quá cũ (>30 phút): " + storeKey + " → Bỏ qua Luồng 1");
+    props.setProperty(TS_KEY_A1, storeKey); // Lưu key để không gửi lại lần sau
+    return false;
+  }
 
   // ✅ v660: Lưu ngay khóa A1 — Sheet ổn định, chỉ cần so timestamp cũ/mới
   props.setProperty(TS_KEY_A1, storeKey);
@@ -477,6 +483,13 @@ function processSummaryAwAz(sheet, isDirectPush) {
     return false;
   }
 
+  // 🛡️ FRESHNESS CHECK: Bỏ qua nếu dữ liệu quá cũ (>30 phút so với hiện tại)
+  if (!isDataFresh_(tsKey, 30)) {
+    Logger.log("[Luồng AW7] ⏭️ Dữ liệu quá cũ (>30 phút): " + tsKey + " → Bỏ qua Luồng 2");
+    props.setProperty(TS_KEY_AW7, tsKey); // Lưu key để không gửi lại lần sau
+    return false;
+  }
+
   // ✅ Đọc trực tiếp bảng AW:AZ và gửi nguyên vẹn 100% thông tin có trong ô (thêm Icon)
   let awaz = readAwAz(sheet);
 
@@ -535,6 +548,41 @@ function processSummaryAwAz(sheet, isDirectPush) {
 // ============================================================
 // HELPER PARSERS & UTILITIES
 // ============================================================
+
+/**
+ * 🛡️ FRESHNESS CHECK: Kiểm tra timestamp dữ liệu có quá cũ không
+ * Nếu dữ liệu cách hiện tại > maxMinutes phút → return false (quá cũ, bỏ qua)
+ * @param {string} tsStr - Timestamp dạng "dd/MM/yyyy HH:mm" hoặc "dd/MM/yyyy HH:mm:ss"
+ * @param {number} maxMinutes - Số phút tối đa cho phép (mặc định 30)
+ * @returns {boolean} true = còn tươi, false = quá cũ
+ */
+function isDataFresh_(tsStr, maxMinutes) {
+  if (!tsStr) return true; // Không parse được → cho qua (fallback an toàn)
+  maxMinutes = maxMinutes || 30;
+
+  // Bóc tách dd/MM/yyyy HH:mm(:ss)
+  var m = tsStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return true; // Không parse được (VD: RAW_...) → cho qua
+
+  // Interpret timestamp as Myanmar time (UTC+6:30 = +390 phút)
+  var myanmarOffsetMs = 390 * 60 * 1000;
+  var dataUtcMs = Date.UTC(
+    parseInt(m[3], 10),           // year
+    parseInt(m[2], 10) - 1,       // month (0-indexed)
+    parseInt(m[1], 10),           // day
+    parseInt(m[4], 10),           // hour
+    parseInt(m[5], 10),           // minute
+    m[6] ? parseInt(m[6], 10) : 0 // second
+  ) - myanmarOffsetMs;
+
+  var nowUtcMs = new Date().getTime();
+  var diffMin = (nowUtcMs - dataUtcMs) / 60000;
+
+  Logger.log("[isDataFresh_] Data: " + tsStr + " | Now MMT: " + Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy HH:mm") + " | Diff: " + diffMin.toFixed(1) + " min | Fresh: " + (diffMin <= maxMinutes));
+
+  return diffMin <= maxMinutes;
+}
+
 function parseA1Timestamp(sheet) {
   const maxRow = Math.min(sheet.getLastRow(), 50);
   if (maxRow < 1) return null;
