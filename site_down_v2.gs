@@ -408,7 +408,7 @@ function processSiteDownColC(sheet, isDirectPush) {
   if (controlId) {
     try {
       const colorizedSites = rawSites.map(l => colorizeTeams(l));
-      const msg = [...header, "", ...colorizedSites].join("\n");
+      const msg = addKeywordIcons([...header, "", ...colorizedSites].join("\n"));
       if (msg) {
         sendOrEditTelegramPre(controlId, msg, "TIN1_CONTROL", "[Tin1][CONTROL]");
       }
