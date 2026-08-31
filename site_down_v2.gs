@@ -44,11 +44,14 @@ const LAST_UPDATE_KEY = "SD_LAST_UPDATE_ID";          // Offset Telegram polling
 const AWAZ_COL = { T1: 0, T2: 1, T3: 2, T4: 3 };
 
 const AWAZ_LABELS = [
-  { emoji: "⚡", name: "Site down"   },
-  { emoji: "🔴", name: "Cell down"   },
-  { emoji: "⚙️", name: "DG Abnormal" },
-  { emoji: "⏱️", name: "DG Run>16H"  },
-  { emoji: "🔗", name: "Link down"   },
+  { emoji: "⚡", name: "Site down"                },
+  { emoji: "🔴", name: "Cell down"                },
+  { emoji: "⚙️", name: "DG Abnormal"              },
+  { emoji: "⏱️", name: "DG Run>16H"               },
+  { emoji: "🔗", name: "Link down"                },
+  { emoji: "🌡️", name: "Battery Temperature High" },
+  { emoji: "💨", name: "Smoke"                    },
+  { emoji: "🚪", name: "DOOR"                     },
 ];
 
 const TEAM_COLORS = { T1: "🟠", T2: "🔵", T3: "🟢", T4: "🟡" };
@@ -614,7 +617,8 @@ function parseAW7Timestamp(sheet) {
 }
 
 function readAwAz(sheet) {
-  return sheet.getRange(7, 49, 9, 4).getValues();
+  // ✅ Mở rộng dải ô AW7:AZ16 (10 dòng từ dòng 7 đến dòng 16)
+  return sheet.getRange(7, 49, 10, 4).getValues();
 }
 
 function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
@@ -627,19 +631,23 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
 
   for (let r = 0; r < numRows; r++) {
     const txt = ((awaz[r] || [])[colIdx] || "").toString().trim();
-    if (!txt || txt === "..." || txt === "null" || txt === "undefined") continue;
-    const clean = escHtml(txt.replace(/[*_`]/g, ""));
+    if (!txt || txt === "..." || txt === "null" || txt === "undefined" || txt === "-" || txt === "0") continue;
+    const cleanRaw = txt.replace(/[*_`]/g, "");
     if (r < AWAZ_LABELS.length) {
-      const labelName = AWAZ_LABELS[r].name;
+      const labelDef = AWAZ_LABELS[r];
+      const labelName = labelDef.name;
       const prefixRegex = new RegExp("^" + labelName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
-      const cleanBody = clean.replace(prefixRegex, "");
-      lines.push(AWAZ_LABELS[r].emoji + " <b>" + labelName + ":</b> " + cleanBody);
+      const bodyRaw = cleanRaw.replace(prefixRegex, "").trim();
+      lines.push(labelDef.emoji + " <b>" + escHtml(labelName) + ":</b> " + escHtml(bodyRaw));
     } else {
-      const lm = txt.match(/^([^:]+):/);
-      const lb = lm ? lm[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
-      const prefixRegex = new RegExp("^" + lb.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
-      const cleanBody = clean.replace(prefixRegex, "");
-      lines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
+      const lm = cleanRaw.match(/^([^:]+):\s*(.*)$/);
+      if (lm) {
+        const lb = lm[1].trim();
+        const body = lm[2].trim();
+        lines.push("📌 <b>" + escHtml(lb) + ":</b> " + escHtml(body));
+      } else {
+        lines.push("📌 " + escHtml(cleanRaw));
+      }
     }
   }
   return lines.join("\n");
@@ -662,19 +670,23 @@ function buildAwAzControlMessage(ts, awaz) {
     const teamLines = [];
     for (let r = 0; r < numRows; r++) {
       const txt = ((awaz[r] || [])[t.col] || "").toString().trim();
-      if (!txt || txt === "..." || txt === "null" || txt === "undefined") continue;
-      const clean = escHtml(txt.replace(/[*_`]/g, ""));
+      if (!txt || txt === "..." || txt === "null" || txt === "undefined" || txt === "-" || txt === "0") continue;
+      const cleanRaw = txt.replace(/[*_`]/g, "");
       if (r < AWAZ_LABELS.length) {
-        const labelName = AWAZ_LABELS[r].name;
+        const labelDef = AWAZ_LABELS[r];
+        const labelName = labelDef.name;
         const prefixRegex = new RegExp("^" + labelName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
-        const cleanBody = clean.replace(prefixRegex, "");
-        teamLines.push(AWAZ_LABELS[r].emoji + " <b>" + labelName + ":</b> " + cleanBody);
+        const bodyRaw = cleanRaw.replace(prefixRegex, "").trim();
+        teamLines.push(labelDef.emoji + " <b>" + escHtml(labelName) + ":</b> " + escHtml(bodyRaw));
       } else {
-        const lm = txt.match(/^([^:]+):/);
-        const lb = lm ? lm[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
-        const prefixRegex = new RegExp("^" + lb.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
-        const cleanBody = clean.replace(prefixRegex, "");
-        teamLines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
+        const lm = cleanRaw.match(/^([^:]+):\s*(.*)$/);
+        if (lm) {
+          const lb = lm[1].trim();
+          const body = lm[2].trim();
+          teamLines.push("📌 <b>" + escHtml(lb) + ":</b> " + escHtml(body));
+        } else {
+          teamLines.push("📌 " + escHtml(cleanRaw));
+        }
       }
     }
     if (teamLines.length > 0) {
