@@ -6,7 +6,7 @@
 > 3. **CẤM Tự Tiện Vào Xem / Sửa (Zero Arbitrary Access/Modification)**: Tuyệt đối KHÔNG ĐƯỢC tự ý mở file, đọc code, sửa đổi, gộp file, xóa bỏ hay tái cấu trúc (refactor) bất kỳ thành phần nào của phân hệ Site Down khi CHƯA CÓ MẬT KHẨU!
 > 4. **Phạm Vi Đóng Băng Bất Biến**:
 >    - File GAS: `apps_script_sitedown/site_down_v2.gs` (1 file độc lập duy nhất).
->    - Deployment ID: `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` (Version `@89`).
+>    - Deployment ID: `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` (Version `@92`).
 >    - Luồng Relay: `botlookup_relay.py` (chạy nhịp :06 và :36 MMT).
 >    - Bảng Tính: `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow` (GID 0).
 ---
@@ -131,6 +131,23 @@
 > 2. **Không Bỏ Cuộc Khi Gián Đoạn (Persistent Continuation)**: Khi gặp lỗi gián đoạn (timeout, disconnected, network error, browser cache, API error...), BẮT BUỘC phải tự động kiên trì tiếp tục thực hiện từng bước, retry liên tục cho đến khi hoàn tất trọn vẹn 100% mục tiêu, KHÔNG được dừng lại giữa chừng rồi báo cáo hoàn thành ảo!
 > 3. **Nhìn Thấy Hết Dữ Liệu Thực Tế Mới Đưa Phương Án (Look at All Real Data First)**: Trước khi đề xuất phương án hoặc viết code, BẮT BUỘC phải dùng script/query quét và đọc trực tiếp 100% dữ liệu nguồn thực tế (Google Sheets, Live Web DOM, Telegram API, GAS), nhìn thấy toàn bộ các dòng, cột, modal, table rồi mới đưa ra giải pháp xử lý triệt để, KHÔNG được giả định hay đoán mò!
 > 4. **Kiểm Tra Thực Tế & Đầy Đủ Bằng Chứng (Live Output Verification)**: Sau khi thực hiện, phải kiểm tra live (HTTP 200, grep so khớp, live log), chứng minh đã chạy thông suốt rồi mới bàn giao cho Người Dùng.
+
+---
+
+# 🛡️ STRICT BI PORTAL ENCAPSULATION & DATA ISOLATION RULE: ĐÓNG GÓI CHẶT THẺ DOM & GHẾ NÀO GIÁM SÁT BẢNG NẤY — TUYỆT ĐỐI CẤM TRÀN THẺ & CẤM RÂU ÔNG NỌ CẮM CẰM BÀ KIA (ZERO-LEAKING DOM & DEDICATED SUB-SEAT POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (BI DOM ENCAPSULATION & SUB-SEAT ISOLATION POLICY)**:
+> 1. **Khóa Chặt Thẻ DOM Vào Đúng Tab Panel (Strict DOM Encapsulation)**: Mọi bảng biểu, thẻ card, danh sách, modal và form trên BI Portal (`index.html`, `executive_dashboard.html`) BẮT BUỘC phải nằm trọn vẹn 100% bên trong đúng thẻ chứa `<div id="[ten-panel]-panel" class="tab-panel">...</div>`. TUYỆT ĐỐI CẤM để bất kỳ thẻ `card`, `table`, `section` nào nằm trôi nổi bên ngoài các tab panel khiến nó hiển thị tràn sang các tab khác!
+> 2. **Kiểm Tra DOM BeautifulSoup Bắt Buộc Trước Khi Bàn Giao (Mandatory DOM Leakage Audit)**: Trước khi báo "Đã Xong" hoặc deploy BI Portal, AI BẮT BUỘC phải chạy script phân tích cây DOM (`BeautifulSoup`) để kiểm tra `Cards outside tab-panel == 0`. CẤM chỉ kiểm tra HTTP 200 hay grep từ khóa chuỗi mà bỏ qua cây cấu trúc DOM!
+> 3. **Ghế Nào Giám Sát Bảng Nấy — Đúng Sheet Nguồn, Cấm Lấy Nhầm Bảng (Dedicated Sub-Seat per Table)**: Mỗi bảng dữ liệu trên BI Portal phải được quản lý bởi một Ghế Giám Sát chuyên biệt (Sub-Seat) đọc đúng 100% dữ liệu từ đúng Sheet ID / Tab GID quy định, TUYỆT ĐỐI CẤM tiện tay lấy chéo dữ liệu, gộp chung hoặc làm sai lệch nghiệp vụ ("tránh râu ông nọ cắm cằm bà kia"):
+>    - **Tab 1: Executive Summary** ➔ Nguồn Sheet `Team All Find` (Tab `Sum all WO Team`, GID `1840482617`).
+>    - **Tab 2: Department Assign** ➔ Nguồn Sheet `Team All Find` (Tab `Progress Team Task and WO+Oil`, GID `159298579`, Cột K-P).
+>    - **Tab 3: WO Detail (7 Bảng Raw)** ➔ Nguồn Sheet `Team All Find` (Tab `Progress Team Task and WO+Oil`, GID `159298579`, Cột A-CJ).
+>    - **Tab 4: BOD Assign** ➔ Nguồn Sheet `Team All Find` (Tab `BOD assign`, GID `1482565085`).
+>    - **Tab 5: Plan - Result Dep** ➔ Nguồn GAS Dự Án 5 `TNI BI Portal Backend` (Script ID `1G790B-ZHinJUQKHr-u0F2NDiaxNDjfYYSo84QysD2c3b9VGZCeevUKCU`).
+>    - **Tab 6: System Guide** ➔ Bản đồ hướng dẫn toàn hệ thống Bot & Lịch báo cáo Burmese Time.
+>    - **Tab 7: Gmail Access List** ➔ Phân quyền truy cập đa tài khoản theo vai trò (Role-Based Access Control).
+> 4. **Đồng Bộ Song Song Cả 2 HTML & Cả 2 Repositories (Dual HTML & Dual Repo Parity)**: Mọi thay đổi trên BI Portal BẮT BUỘC phải đồng bộ 100% giữa `index.html` và `executive_dashboard.html`, và commit đẩy lên cả 2 repo `phonghdpxd-cmd/tni-bot` (`Task and WO`) và `MON6879/TNI-DONE` (`tni-search`).
 
 ---
 
