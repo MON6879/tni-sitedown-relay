@@ -637,7 +637,11 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
       const labelDef = AWAZ_LABELS[r];
       const labelName = labelDef.name;
       const prefixRegex = new RegExp("^" + labelName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
-      const bodyRaw = cleanRaw.replace(prefixRegex, "").trim();
+      let bodyRaw = cleanRaw.replace(prefixRegex, "").trim();
+      // Tách | Battery Temperature High / Smoke / DOOR thành dòng riêng + icon
+      bodyRaw = bodyRaw.replace(/\|\s*Battery Temperature High:/gi, "\n🌡️ Battery Temperature High:");
+      bodyRaw = bodyRaw.replace(/\|\s*Smoke:/gi, "\n💨 Smoke:");
+      bodyRaw = bodyRaw.replace(/\|\s*DOOR:/gi, "\n🚪 DOOR:");
       lines.push(labelDef.emoji + " <b>" + escHtml(labelName) + ":</b> " + escHtml(bodyRaw));
     } else {
       const lm = cleanRaw.match(/^([^:]+):\s*(.*)$/);
@@ -676,7 +680,11 @@ function buildAwAzControlMessage(ts, awaz) {
         const labelDef = AWAZ_LABELS[r];
         const labelName = labelDef.name;
         const prefixRegex = new RegExp("^" + labelName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
-        const bodyRaw = cleanRaw.replace(prefixRegex, "").trim();
+        let bodyRaw = cleanRaw.replace(prefixRegex, "").trim();
+        // Tách | Battery Temperature High / Smoke / DOOR thành dòng riêng + icon
+        bodyRaw = bodyRaw.replace(/\|\s*Battery Temperature High:/gi, "\n🌡️ Battery Temperature High:");
+        bodyRaw = bodyRaw.replace(/\|\s*Smoke:/gi, "\n💨 Smoke:");
+        bodyRaw = bodyRaw.replace(/\|\s*DOOR:/gi, "\n🚪 DOOR:");
         teamLines.push(labelDef.emoji + " <b>" + escHtml(labelName) + ":</b> " + escHtml(bodyRaw));
       } else {
         const lm = cleanRaw.match(/^([^:]+):\s*(.*)$/);
@@ -930,6 +938,11 @@ function addKeywordIcons(text) {
      let icon = (c && c !== "0" && c !== "-" && c.toLowerCase() !== "none") ? "❌" : "✅";
      return "\n" + icon + " " + keyword + " " + dataStr;
   });
+
+  // Battery Temperature High, Smoke, DOOR — xuống hàng + icon riêng
+  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(Battery Temperature High:)/gi, "\n🌡️ Battery Temperature High:");
+  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(Smoke:)/gi, "\n💨 Smoke:");
+  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(DOOR:)/gi, "\n🚪 DOOR:");
 
   s = s.replace(/(?:🔥\s*)+Dont\s+Forget/gi, "🔥 Dont Forget");
   s = s.replace(/(?:🕒\s*)+Duty:/gi, "🕒 Duty:");
