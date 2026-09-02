@@ -34,10 +34,12 @@ from telethon.tl.functions.messages import (
 API_ID         = int(os.environ.get("TELEGRAM_API_ID", "0"))
 API_HASH       = os.environ.get("TELEGRAM_API_HASH", "")
 SESSION_STRING = os.environ.get("TELEGRAM_SESSION", "")
-MAIN_GAS_FALLBACK = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
-GAS_URL = os.environ.get("APPS_SCRIPT_URL", "").strip()
-if not GAS_URL or "AKfycbzGFdnE" in GAS_URL:
-    GAS_URL = MAIN_GAS_FALLBACK
+PRIMARY_GAS_URL = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+raw_gas_url    = os.environ.get("APPS_SCRIPT_URL", "").strip()
+if "AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA" in raw_gas_url:
+    GAS_URL = raw_gas_url
+else:
+    GAS_URL = PRIMARY_GAS_URL
 
 MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
 
@@ -743,22 +745,30 @@ def log_read_group_to_gas(all_results: dict, date_str: str, now_str: str):
     # 1. Ghi log các đội vận hành chính vào tab 'Read Group'
     if records_main:
         try:
-            requests.post(GAS_URL, json={
+            resp = requests.post(GAS_URL, json={
                 "action": "log_read_group",
                 "records": records_main
             }, timeout=30)
-            print(f"  💾 Logged {len(records_main)} records to 'Read Group' tab")
+            res_json = resp.json() if resp.status_code == 200 else {}
+            if resp.status_code == 200 and res_json.get("status") == "ok":
+                print(f"  💾 Logged {len(records_main)} records to 'Read Group' tab successfully ✅")
+            else:
+                print(f"  ⚠️ Failed to log to Read Group tab: HTTP {resp.status_code} - {resp.text}")
         except Exception as e:
             print(f"  ⚠️ Failed to log to Read Group tab: {e}")
 
     # 2. Ghi log phân hệ Refuel vào tab 'Read Group Refuel'
     if records_refuel:
         try:
-            requests.post(GAS_URL, json={
+            resp = requests.post(GAS_URL, json={
                 "action": "log_read_group_refuel",
                 "records": records_refuel
             }, timeout=30)
-            print(f"  💾 Logged {len(records_refuel)} records to 'Read Group Refuel' tab")
+            res_json = resp.json() if resp.status_code == 200 else {}
+            if resp.status_code == 200 and res_json.get("status") == "ok":
+                print(f"  💾 Logged {len(records_refuel)} records to 'Read Group Refuel' tab successfully ✅")
+            else:
+                print(f"  ⚠️ Failed to log to Read Group Refuel tab: HTTP {resp.status_code} - {resp.text}")
         except Exception as e:
             print(f"  ⚠️ Failed to log to Read Group Refuel tab: {e}")
 
