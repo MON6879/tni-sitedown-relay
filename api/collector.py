@@ -21,7 +21,7 @@ APPS_SCRIPT_URL        = os.environ.get("APPS_SCRIPT_URL", "").strip().strip("\u
 CABLE_APPS_SCRIPT_URL  = os.environ.get("CABLE_APPS_SCRIPT_URL", "").strip().lstrip('\ufeff')
 
 MAIN_GAS_FALLBACK = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
-if not APPS_SCRIPT_URL or "AKfycbzGFdnE" in APPS_SCRIPT_URL:
+if not APPS_SCRIPT_URL or "AKfycbz-NZlBk8q2" not in APPS_SCRIPT_URL:
     APPS_SCRIPT_URL = MAIN_GAS_FALLBACK
 
 try:
@@ -30,7 +30,7 @@ except ValueError:
     CABLE_CHAT_ID = -5531350787
 
 MDG_APPS_SCRIPT_URL = os.environ.get("MDG_APPS_SCRIPT_URL", "").strip().lstrip('\ufeff')
-if not MDG_APPS_SCRIPT_URL or "AKfycbzGFdnE" in MDG_APPS_SCRIPT_URL or "AKfycbzZmFw" in MDG_APPS_SCRIPT_URL:
+if not MDG_APPS_SCRIPT_URL or "AKfycbz-NZlBk8q2" not in MDG_APPS_SCRIPT_URL:
     MDG_APPS_SCRIPT_URL = MAIN_GAS_FALLBACK
 
 try:
@@ -80,18 +80,19 @@ def fetch_config_templates(force: bool = False) -> dict:
         keywords = []
         for row in rows[1:]:  # Skip Header 'Field Name'
             val = (row[0] if row else "").strip()
-            if val:
-                lines.append(val)
-                if ":" in val:
-                    kw = val.split(":")[0].strip().lower()
-                    mapping[kw] = val
-                    if kw not in keywords:
-                        keywords.append(kw)
-                else:
-                    first_word = val.split()[0].strip().lower()
-                    mapping[first_word] = val
-                    if first_word not in keywords:
-                        keywords.append(first_word)
+            if not val or val.lower() == "field name":
+                continue
+            lines.append(val)
+            if ":" in val:
+                kw = val.split(":")[0].strip().lower()
+                mapping[kw] = val
+                if kw not in keywords:
+                    keywords.append(kw)
+            else:
+                first_word = val.split()[0].strip().lower()
+                mapping[first_word] = val
+                if first_word not in keywords:
+                    keywords.append(first_word)
         if lines:
             _config_templates_cache = {"all": lines, "map": mapping}
             _config_templates_ts = now
@@ -104,6 +105,44 @@ def fetch_config_templates(force: bool = False) -> dict:
     if _config_templates_cache:
         return _config_templates_cache
     return {"all": [], "map": {}}
+
+_change_oil_template_cache = None
+_change_oil_template_ts = 0
+
+def fetch_change_oil_template(force: bool = False) -> str:
+    """Fetch Column F from 'Cable permit ID' tab in Google Sheet 1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y."""
+    global _change_oil_template_cache, _change_oil_template_ts
+    now = time.time()
+    if not force and _change_oil_template_cache and (now - _change_oil_template_ts < 300):
+        return _change_oil_template_cache
+
+    try:
+        url = "https://docs.google.com/spreadsheets/d/1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y/gviz/tq?tqx=out:csv&sheet=Cable%20permit%20ID"
+        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        if resp.status_code == 200:
+            import csv, io
+            rows = list(csv.reader(io.StringIO(resp.text)))
+            lines = []
+            now_mm = datetime.now(TZ_MM)
+            date_today = now_mm.strftime("%d/%m/%Y")
+            for r in rows:
+                if len(r) > 5 and r[5].strip():
+                    line = r[5].strip()
+                    if line.lower().startswith("change oil mdg:"):
+                        line = f"Change Oil MDG: {date_today}"
+                    lines.append(line)
+            if lines:
+                _change_oil_template_cache = "\n".join(lines)
+                _change_oil_template_ts = now
+                return _change_oil_template_cache
+    except Exception as ex:
+        logger.warning(f"fetch_change_oil_template error: {ex}")
+
+    if _change_oil_template_cache:
+        return _change_oil_template_cache
+    now_mm = datetime.now(TZ_MM)
+    date_today = now_mm.strftime("%d/%m/%Y")
+    return f"Change Oil MDG: {date_today}\nSite MDG: \nType oil: \nHour for MDG 8KVA: \nKW for MDG 8KVA: \nNote: "
 
 def sync_telegram_menu_commands(force: bool = False) -> bool:
     """Sync Telegram Bot Menu Commands from Google Sheet Config Tab Column A every 5 minutes."""
@@ -120,12 +159,16 @@ def sync_telegram_menu_commands(force: bool = False) -> bool:
         first_part = l.split(":")[0].strip() if ":" in l else l.split()[0].strip()
         cmd = first_part.lower().replace(" ", "_").replace("-", "_")
         cmd = "".join(c for c in cmd if c.isalnum() or c == "_")[:32]
-        if cmd and cmd not in seen:
+        if cmd and cmd not in seen and cmd != "field_name":
             seen.add(cmd)
             desc = f"Get {first_part} template"
             commands.append({"command": cmd, "description": desc[:256]})
 
-    for def_cmd, def_desc in [("done", "Get Done template"), ("find", "Search tasks, WOs, or site details")]:
+    for def_cmd, def_desc in [
+        ("done", "Get Done template"),
+        ("inventory", "Inventory fuel report template"),
+        ("change_oil", "Change oil MDG template")
+    ]:
         if def_cmd not in seen:
             seen.add(def_cmd)
             commands.append({"command": def_cmd, "description": def_desc})
@@ -335,6 +378,31 @@ def parse_inv_fields(text: str) -> dict:
             val = re.sub(r"^[:\s]+", "", val).strip()
             if field in NUMERIC_FIELDS:
                 # Chỉ giữ lại số và dấu chấm thập phân, bỏ đơn vị
+                num = re.sub(r"[^\d.]", "", val)
+                val = num if num else val
+            result[field] = val
+    return result
+
+# ── Change Oil MDG: field list ───────────────────────────────────────────
+OIL_FIELDS_LIST = [
+    "change oil mdg", "site mdg", "type oil",
+    "hour for mdg 8kva", "kw for mdg 8kva", "note"
+]
+
+def parse_oil_fields(text: str) -> dict:
+    """Extract Change Oil MDG field values.
+    Numeric fields: chỉ lấy số (vd: '120hrs'→'120', '8kw'→'8').
+    """
+    NUMERIC_FIELDS = {"hour for mdg 8kva", "kw for mdg 8kva"}
+    result = {}
+    for field in OIL_FIELDS_LIST:
+        word_pattern = r"\s+".join(re.escape(w) for w in field.split())
+        pattern = rf"(?i){word_pattern}\s*:\s*(.+?)(?=\n|$)"
+        m = re.search(pattern, text)
+        if m:
+            val = m.group(1).strip()
+            val = re.sub(r"^[:\s]+", "", val).strip()
+            if field in NUMERIC_FIELDS:
                 num = re.sub(r"[^\d.]", "", val)
                 val = num if num else val
             result[field] = val
@@ -731,7 +799,7 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
         if status == "ok":
             photo_num = result.get("photoNum", "")
             msg_type = result.get("type", "")
-            prefix = "⛽" if msg_type == "INV" else "📷"
+            prefix = "⛽" if msg_type == "INV" else ("🛢️" if msg_type == "OIL" else "📷")
             await bot.send_message(
                 chat_id,
                 f"{prefix} <b>REF:{ref_show}</b> | Photo {photo_num} saved",
@@ -764,13 +832,14 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
             await bot.send_message(
                 chat_id,
                 "👋 <b>TNI MDG Run & Inventory Bot</b>\n\n"
-                "Available template command:\n"
-                "• /inventory - Inventory report template\n\n"
-                "<i>Tap the command to receive the template, then copy and fill out.</i>",
+                "Available template commands:\n"
+                "• /inventory - Inventory report template\n"
+                "• /change_oil - Change oil MDG template\n\n"
+                "<i>Tap any command to receive the template, then copy and fill out.</i>",
                 parse_mode="HTML"
             )
             return
-        elif cmd == "/inventory":
+        elif cmd in ("/inventory", "/inventory_fuel"):
             await bot.send_message(
                 chat_id,
                 "Inventory fuel:\n"
@@ -784,6 +853,10 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
                 parse_mode="HTML"
             )
             return
+        elif cmd in ("/change_oil", "/oil", "/change_oil_mdg", "/oil_mdg"):
+            tpl = fetch_change_oil_template()
+            await bot.send_message(chat_id, tpl, parse_mode="HTML")
+            return
 
     # ── Confirm reply ────────────────────────────────────────────────────
     if text.lower() == "confirm" and msg.reply_to_message:
@@ -794,6 +867,8 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
             action_name = "mdg_confirm"
             if "INVENTORY" in reply_text.upper():
                 action_name = "inv_confirm"
+            elif "CHANGE OIL" in reply_text.upper() or "OIL" in reply_text.upper():
+                action_name = "oil_confirm"
             
             result = post_mdg_sheet({
                 "action":       action_name,
@@ -812,8 +887,51 @@ async def handle_mdg(msg, bot, now, user, sender_name, sender_id):
                 await bot.send_message(chat_id, f"⚠️ Confirm failed: {err}", parse_mode="HTML")
         return
 
-    # ── Inventory Report message (Strict Rule: Requires "inventory fuel" AND "dg id: tni") ──
+    # ── Change Oil MDG Report message (Strict Rule: Requires "change oil" AND "site mdg") ──
     text_l = text.lower()
+    has_oil_kw = "change oil" in text_l or "change oil mdg" in text_l
+    has_site_mdg = "site mdg" in text_l or "site id" in text_l
+
+    if has_oil_kw and has_site_mdg:
+        lines_oil = text.splitlines()
+        oil_start_idx = next(
+            (i for i, ln in enumerate(lines_oil) if "change oil" in ln.lower()),
+            0
+        )
+        oil_text = "\n".join(lines_oil[oil_start_idx:]).strip()
+        if oil_start_idx > 0:
+            logger.info(f"[OIL] Trimmed {oil_start_idx} header line(s) before Change Oil section")
+
+        fields = parse_oil_fields(oil_text)
+        site_mdg = fields.get("site mdg", "")
+
+        payload = {
+            "action":      "oil_add",
+            "date":        now.strftime("%d/%m/%Y"),
+            "time":        now.strftime("%H:%M"),
+            "sender_name": sender_name,
+            "sender_id":   sender_id,
+            "fields":      fields,
+            "raw":         oil_text,
+        }
+
+        result = post_mdg_sheet(payload)
+
+        if result.get("status") == "ok":
+            ref = result.get("ref") or str(result.get("row", "???")).zfill(5)
+            site_show = html.escape(site_mdg) if site_mdg else "—"
+            await bot.send_message(
+                chat_id,
+                f"🛢️ <b>REF:{ref}</b> | 🪑 <b>Ghế 2C: Change Oil MDG</b> | {site_show} | {now.strftime('%d/%m/%Y %H:%M')}\n"
+                f"✅ Reply <code>Confirm</code> to close | 📸 Photo → reply this msg",
+                parse_mode="HTML",
+            )
+        else:
+            err = html.escape(result.get("message", "Apps Script error"))
+            await bot.send_message(chat_id, f"⚠️ Failed to record: {err}", parse_mode="HTML")
+        return
+
+    # ── Inventory Report message (Strict Rule: Requires "inventory fuel" AND "dg id: tni") ──
     has_inv_kw = "inventory fuel" in text_l
     has_dg_tni = "dg id: tni" in text_l or "dg id:tni" in text_l or ("dg id:" in text_l and "tni" in text_l)
 
@@ -1021,9 +1139,10 @@ async def handle(data: dict):
                     await bot.send_message(
                         chat_id,
                         "👋 <b>TNI MDG Run & Inventory Bot</b>\n\n"
-                        "Available template command:\n"
-                        "• /inventory - Inventory report template\n\n"
-                        "<i>Tap the command to receive the template, then copy and fill out.</i>",
+                        "Available template commands:\n"
+                        "• /inventory - Inventory report template\n"
+                        "• /change_oil - Change oil MDG template\n\n"
+                        "<i>Tap any command to receive the template, then copy and fill out.</i>",
                         parse_mode="HTML"
                     )
                 else:
@@ -1035,25 +1154,19 @@ async def handle(data: dict):
                         "• /revoke - Revoke template\n"
                         "• /move - Move template\n"
                         "• /export - Export template\n"
-                        "• /done - Done template\n"
-                        "• /find - Search tasks, WOs, or site details\n\n"
+                        "• /done - Done template\n\n"
                         "<i>Tap any command to receive the template, then copy and fill out.</i>",
                         parse_mode="HTML"
                     )
                 return
-
+            elif cmd in ("/change_oil", "/oil", "/change_oil_mdg", "/oil_mdg"):
+                tpl = fetch_change_oil_template()
+                await bot.send_message(chat_id, tpl, parse_mode="HTML")
+                return
             else:
                 tpl_txt = get_template_text(cmd)
                 if tpl_txt:
                     await bot.send_message(chat_id, tpl_txt, parse_mode="HTML")
-                    return
-                elif cmd == "/find" and chat_id != MDG_CHAT_ID:
-                    await bot.send_message(
-                        chat_id,
-                        "🔍 <b>How to Search:</b>\n\n"
-                        "Just send the site code (e.g. <code>TNI0001</code>) or staff name directly to the bot to search for tasks, WOs, or site details.",
-                        parse_mode="HTML"
-                    )
                     return
 
         # ── Done ──────────────────────────────────────────────────────────
