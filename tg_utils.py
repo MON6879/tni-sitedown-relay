@@ -30,12 +30,17 @@ def _bot_token(bot_token: str = None):
         "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME"
     ).strip()
 
+PRIMARY_GAS_URL = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+
 def _gas_url():
-    return (
+    raw = (
         os.environ.get("APPS_SCRIPT_URL") or
         os.environ.get("REFUEL_APPS_SCRIPT_URL") or
         ""
     ).strip()
+    if "AKfycbz-NZlBk8q2" in raw:
+        return raw
+    return PRIMARY_GAS_URL
 
 # ── GAS BotState: lưu/đọc message_id ──────────────────────────────────────
 
@@ -85,7 +90,7 @@ def tg_delete(chat_id: str, msg_id, bot_token: str = None):
 def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300, bot_token: str = None) -> int:
     """
     Dùng Telethon để scan lịch sử chat, tìm TẤT CẢ tin nhắn từ bot
-    có cùng tiêu đề (title_prefix), xóa hết qua Bot API.
+    có chứa tiêu đề (title_prefix) trong 6 dòng đầu, xóa hết qua Bot API hoặc Telethon.
     Fallback: không làm gì nếu không có Telethon session.
     """
     api_id   = _tg_api_id()
@@ -113,16 +118,28 @@ def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300,
         try:
             async with TelegramClient(StringSession(session), api_id, api_hash) as client:
                 async for msg in client.iter_messages(int(chat_id), limit=search_limit):
-                    # Lọc tin nhắn từ bot theo sender_id (không cần cache entity)
-                    if msg.sender_id != bot_id:
-                        continue
                     if not msg.text:
                         continue
-                    first_line = msg.text.split("\n")[0].strip()
-                    # Telethon render <b>text</b> thành **text** — cần strip trước khi so sánh
-                    first_line_clean = first_line.replace("**", "").replace("__", "").strip()
-                    if title_prefix.lower() not in first_line_clean.lower():
+
+                    # 1. Xóa Note reply gửi từ user @Phongha79 nếu có
+                    if any(k in msg.text for k in ["@Raja HO", "Refuel Team Sent Plan", "Aung MinPaing_VCM", "Note: Above are the end-of-day", "Note: 📋 1. Report"]):
+                        try:
+                            await client.delete_messages(int(chat_id), [msg.id], revoke=True)
+                            deleted += 1
+                            logger.info(f"[del_title] 🗑️ Xóa Note msg_id={msg.id} ({chat_id})")
+                        except Exception as ex:
+                            logger.warning(f"[del_title] ⚠️ Xóa Note lỗi: {ex}")
                         continue
+
+                    # 2. Lọc tin của Bot
+                    if bot_id and msg.sender_id != bot_id:
+                        continue
+
+                    # Lấy 6 dòng đầu (hoặc toàn bộ phần header) để so sánh tiêu đề
+                    header_clean = "\n".join(msg.text.split("\n")[:6]).replace("**", "").replace("__", "").replace("📦", "").strip()
+                    if title_prefix.lower() not in header_clean.lower():
+                        continue
+
                     try:
                         resp = requests.post(
                             f"https://api.telegram.org/bot{token}/deleteMessage",
@@ -132,9 +149,11 @@ def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300,
                         result = resp.json()
                         if result.get("ok") or "not found" in result.get("description", "").lower():
                             deleted += 1
-                            logger.info(f"[del_title] Xóa msg_id={msg.id} ('{title_prefix[:30]}'...)")
+                            logger.info(f"[del_title] 🗑️ Bot API xóa msg_id={msg.id} ('{title_prefix[:30]}'...)")
                         else:
-                            logger.warning(f"[del_title] ⚠️ msg_id={msg.id}: {result.get('description')}")
+                            await client.delete_messages(int(chat_id), [msg.id], revoke=True)
+                            deleted += 1
+                            logger.info(f"[del_title] 🗑️ Telethon xóa msg_id={msg.id} (revoke=True)")
                     except Exception as ex:
                         logger.warning(f"[del_title] ❌ msg_id={msg.id}: {ex}")
         except Exception as telethon_ex:
