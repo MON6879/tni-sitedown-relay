@@ -131,6 +131,18 @@ jobs:
           }
 
 
+          # check_time_exact <hour> <target_minute> — dung sai ±2 phút cho các mốc đơn lẻ duy nhất (kháng trùng lặp nhịp 5p)
+          check_time_exact() {
+            local TH=$1 TM=$2
+            local CURR_MIN=$(( 10#$H * 60 + 10#$M ))
+            local TARG_MIN=$(( 10#$TH * 60 + 10#$TM ))
+            local DIFF=$(( CURR_MIN - TARG_MIN ))
+            [ $DIFF -lt 0 ] && DIFF=$(( -DIFF ))
+            [ $DIFF -le 2 ] && return 0
+            return 1
+          }
+
+
           # ═══════ ☀️ MORNING BLOCK (05:00-10:00) ═══════
           #  05:46 → Reports 1,2,3 + BOD + Refuel Request (🤖 Bot API)
           check_time 05 46 && R1234=true && BOD=true && REFUEL_REQ=true && NEED_PYTHON=true && echo "🚃 Toa 1+8+11: Reports 1-3 + BOD + Refuel Req (05:46 MMT)"
@@ -147,8 +159,8 @@ jobs:
           (check_time 08 28 || check_time 08 26) && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Morning (08:28 MMT)"
           #  08:46 / 08:48 → Report 6 Read Report (Ca 1) (📱 Telethon)
           (check_time 08 48 || check_time 08 46) && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (08:48 MMT)"
-          #  09:00 → Ghế AUDITOR-9.1 (Master System Audit)
-          check_time 09 00 && AUDITOR91=true && NEED_PYTHON=true && echo "🚃 Toa Auditor: Ghế AUDITOR-9.1 (09:00 MMT)"
+          #  09:00 → Ghế AUDITOR-9.1 (Master System Audit — Chạy đúng 1 lần duy nhất)
+          check_time_exact 09 00 && AUDITOR91=true && NEED_PYTHON=true && echo "🚃 Toa Auditor: Ghế AUDITOR-9.1 (09:00 MMT)"
           #  09:56 → Plan 5C Morning
           check_time 09 56 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Morning (09:56 MMT)"
           #  10:16 / 10:18 → Report 6.1 Site Clear Today & Refuel Group 9 Read Report (10:16 MMT)

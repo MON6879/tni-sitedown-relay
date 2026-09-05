@@ -180,19 +180,20 @@ async def main():
             control_blocks.append(f"【{t_name}】\n" + "\n".join([f"• {rec}" for rec in records]))
             await asyncio.sleep(0.5)
 
-        # Gửi bản tổng hợp cho CONTROL nếu có dữ liệu
-        if control_blocks and CONTROL_CHAT_ID:
+        # Gửi bản tổng hợp cho CONTROL
+        if CONTROL_CHAT_ID:
             if APPS_SCRIPT_URL:
                 try:
                     delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, "SITE_CLEAR_REPORT_CONTROL")
                 except Exception as ex:
                     logger.warning(f"Lỗi xóa tin cũ Control: {ex}")
 
+            content_section = "\n\n".join(control_blocks) if control_blocks else "✅ 0 site clear incidents recorded today."
             ctrl_lines = [
                 "📋 6.1 Report — Site Clear Today — ALL TEAMS",
                 f"📅 {now_str}",
                 "━━━━━━━━━━━━━━━━━━━━",
-                "\n\n".join(control_blocks),
+                content_section,
             ]
             ctrl_text = "\n".join(ctrl_lines)
             ok, ctrl_ids = await send_msg(bot, CONTROL_CHAT_ID, ctrl_text, "Control Report 6.1")
