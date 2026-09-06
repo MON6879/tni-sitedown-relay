@@ -7,7 +7,12 @@ Tiện ích chung cho tất cả scripts báo cáo:
 - tg_delete_by_title(): xóa TẤT CẢ tin cũ cùng tiêu đề qua Telethon
 - get_msg_id() / set_msg_id(): đọc/ghi state từ GAS
 """
-import os, asyncio, requests, logging
+import os, re, asyncio, requests, logging
+from dotenv import load_dotenv
+
+load_dotenv()
+load_dotenv("Task and WO/.env")
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +121,8 @@ def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300,
             logger.warning(f"tg_delete_by_title: getMe lỗi: {ex}")
 
         try:
+            clean_pfx = re.sub(r'^[^\w\[]+', '', title_prefix).strip()
+            bot_msg_ids = []
             async with TelegramClient(StringSession(session), api_id, api_hash) as client:
                 async for msg in client.iter_messages(int(chat_id), limit=search_limit):
                     if not msg.text:
@@ -135,29 +142,46 @@ def tg_delete_by_title(chat_id: str, title_prefix: str, search_limit: int = 300,
                     if bot_id and msg.sender_id != bot_id:
                         continue
 
-                    # Lấy 6 dòng đầu (hoặc toàn bộ phần header) để so sánh tiêu đề
-                    header_clean = "\n".join(msg.text.split("\n")[:6]).replace("**", "").replace("__", "").replace("📦", "").strip()
-                    if title_prefix.lower() not in header_clean.lower():
-                        continue
+                    # Lấy 6 dòng đầu để so sánh tiêu đề - "TIN NÀO XÓA TIN NẤY"
+                    header_clean = "\n".join(msg.text.split("\n")[:6]).replace("**", "").replace("__", "").replace("📦", "").strip().lower()
+                    matched = False
+                    pfx_lower = title_prefix.lower()
 
+                    # Phân biệt bản tin theo tiêu đề:
+                    # Đã gộp "TNI REQUEST REFUEL" + "PLAN & PROGRESS" thành 1 tin
+                    # → Khi prefix = "tni request refuel", xóa cả 2 loại tin cũ
+                    if "tni request refuel" in pfx_lower:
+                        if "tni request refuel" in header_clean or "plan & progress" in header_clean:
+                            matched = True
+                    elif "plan & progress" in pfx_lower:
+                        if "plan & progress" in header_clean or "tni request refuel" in header_clean:
+                            matched = True
+                    elif clean_pfx and len(clean_pfx) >= 4 and clean_pfx.lower() in header_clean:
+                        matched = True
+
+                    if matched:
+                        bot_msg_ids.append(msg.id)
+
+                # Batch xóa tất cả tin bot khớp tiêu đề bằng Telethon
+                if bot_msg_ids:
                     try:
-                        resp = requests.post(
-                            f"https://api.telegram.org/bot{token}/deleteMessage",
-                            json={"chat_id": int(chat_id), "message_id": msg.id},
-                            timeout=10,
-                        )
-                        result = resp.json()
-                        if result.get("ok") or "not found" in result.get("description", "").lower():
-                            deleted += 1
-                            logger.info(f"[del_title] 🗑️ Bot API xóa msg_id={msg.id} ('{title_prefix[:30]}'...)")
-                        else:
-                            await client.delete_messages(int(chat_id), [msg.id], revoke=True)
-                            deleted += 1
-                            logger.info(f"[del_title] 🗑️ Telethon xóa msg_id={msg.id} (revoke=True)")
+                        await client.delete_messages(int(chat_id), bot_msg_ids, revoke=True)
+                        deleted += len(bot_msg_ids)
+                        logger.info(f"[del_title] 🗑️ Telethon batch xóa {len(bot_msg_ids)} msg_ids: {bot_msg_ids}")
                     except Exception as ex:
-                        logger.warning(f"[del_title] ❌ msg_id={msg.id}: {ex}")
+                        logger.warning(f"[del_title] ⚠️ Telethon batch xóa lỗi: {ex}, fallback Bot API")
+                        for mid in bot_msg_ids:
+                            try:
+                                resp = requests.post(
+                                    f"https://api.telegram.org/bot{token}/deleteMessage",
+                                    json={"chat_id": int(chat_id), "message_id": mid},
+                                    timeout=6,
+                                )
+                                if resp.json().get("ok"):
+                                    deleted += 1
+                            except Exception:
+                                pass
         except Exception as telethon_ex:
-            # FloodWait hoặc lỗi session → bỏ qua xóa, không block bước gửi tin
             logger.warning(f"[del_title] ⚠️ Telethon lỗi (bỏ qua xóa): {telethon_ex}")
         return deleted
 
@@ -206,7 +230,7 @@ def tg_send_fresh(chat_id: str, text: str, state_key: str = None,
         r = requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
             json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
-            timeout=20
+            timeout=45
         )
         result = r.json()
         if result.get("ok"):
