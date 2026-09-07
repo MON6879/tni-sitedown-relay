@@ -848,17 +848,25 @@ def get_today_reads_from_sheet(date_str: str) -> dict:
             name = rec.get("name", "")
             if not (team in result and name):
                 continue
-            # Parse trend_3day "1/0/1" → d1, d2
+            # Parse trend_3day "1/0/1" → d1, d2 — safe parse, không crash
             trend = rec.get("trend_3day", "1/0/0")
             parts = trend.replace("'", "").split("/")
-            d1 = int(parts[1]) if len(parts) > 1 else 0
-            d2 = int(parts[2]) if len(parts) > 2 else 0
+            try:
+                d1 = int(float(parts[1])) if len(parts) > 1 and parts[1].strip() else 0
+                d2 = int(float(parts[2])) if len(parts) > 2 and parts[2].strip() else 0
+            except (ValueError, TypeError):
+                d1, d2 = 0, 0
+            try:
+                d7    = int(float(rec.get("count_7day",  0) or 0))
+                month = int(float(rec.get("count_month", 0) or 0))
+            except (ValueError, TypeError):
+                d7, month = 0, 0
             result[team][name] = {
                 "time":  rec.get("time", "—") or "—",
                 "d1":    d1,
                 "d2":    d2,
-                "d7":    int(rec.get("count_7day", 0)),
-                "month": int(rec.get("count_month", 0)),
+                "d7":    d7,
+                "month": month,
             }
         return result
     except Exception as e:
