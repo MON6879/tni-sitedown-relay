@@ -602,31 +602,37 @@ async def main():
         sheet_reads = get_today_reads_from_sheet(date_str)
         # sheet_reads = {"T1": {"Tên": "HH:MM", ...}, "T2": {...}, ...}
 
-        # ── 3. Helper: build per-member lines dùng dữ liệu từ sheet (tổng hợp) ──
+        # ── 3. Helper: build per-member lines — 100% dữ liệu từ sheet ──
         def member_lines_from_sheet(per_member, team_key):
-            """Build report lines, đánh dấu Read/Unread dựa theo sheet (nguồn tổng hợp cả ngày)."""
+            """Build report lines. Readers: tất cả stats từ sheet (giờ mới nhất + 3Day/7Day/Month).
+            Unread: dùng d1/d2/d7/month từ Telethon scan hiện tại (lịch sử)."""
             team_sheet = sheet_reads.get(team_key, {})
             lines = []
             for p in per_member:
                 name = p["name"]
-                # Kiểm tra tên trong sheet (đã đọc hôm nay từ bất kỳ run nào)
-                read_time = team_sheet.get(name)
-                if read_time:
+                rec = team_sheet.get(name)   # None nếu chưa đọc hôm nay
+                if rec:
+                    # ── ĐÃ ĐỌC: lấy giờ và stats TỪ SHEET (tổng hợp cả ngày) ──
                     icon = "🟩"
-                    time_str = f"🕐{read_time}"
-                    d0_val = 1
+                    time_str = f"🕐{rec['time']}"
+                    d0, d1, d2  = 1, rec["d1"], rec["d2"]
+                    d7, month   = rec["d7"], rec["month"]
                 elif not p.get("id"):
+                    # ── CHƯA VÀO NHÓM ──
                     icon = "🟥"
                     time_str = "N/A"
-                    d0_val = 0
+                    d0, d1, d2  = 0, p["d1"], p["d2"]
+                    d7, month   = p["d7"], p["month"]
                 else:
+                    # ── CHƯA ĐỌC HÔM NAY ──
                     icon = "🟨"
                     time_str = "—"
-                    d0_val = 0
+                    d0, d1, d2  = 0, p["d1"], p["d2"]
+                    d7, month   = p["d7"], p["month"]
                 lines.append(
                     f"  {icon} {name}: {time_str}  "
-                    f"3Day:{d0_val}/{p['d1']}/{p['d2']}  "
-                    f"7Day:{p['d7']}  Month:{p['month']}"
+                    f"3Day:{d0}/{d1}/{d2}  "
+                    f"7Day:{d7}  Month:{month}"
                 )
             return lines
 
@@ -637,6 +643,7 @@ async def main():
             cnt_not_joined = sum(1 for p in per_member if not p.get("id"))
             cnt_unread = len(per_member) - cnt_read - cnt_not_joined
             return cnt_read, max(0, cnt_unread), cnt_not_joined
+
 
         # ── 4. Gửi per-team report vào từng nhóm Team ──
         for gk in ("T1", "T2", "T3", "T4"):
@@ -817,8 +824,9 @@ def log_read_group_to_gas(all_results: dict, date_str: str, now_str: str):
 
 def get_today_reads_from_sheet(date_str: str) -> dict:
     """Đọc từ Sheet 'Read Group' danh sách tất cả người đã đọc trong ngày date_str.
-    Returns: { "T1": {"Tên": "HH:MM", ...}, "T2": {...}, "T3": {...}, "T4": {...} }
-    Đây là dữ liệu TỔ HỢP cả ngày (tích lũy từ nhiều lần chạy).
+    Returns:
+      { "T1": { "Tên": {"time":"09:04","d1":0,"d2":1,"d7":3,"month":5}, ... }, ... }
+    Nguồn tổng hợp cả ngày — tích lũy từ nhiều lần chạy (UPSERT giờ đọc mới nhất).
     """
     result = {"T1": {}, "T2": {}, "T3": {}, "T4": {}, "CONTROL": {}}
     if not GAS_URL:
@@ -834,13 +842,24 @@ def get_today_reads_from_sheet(date_str: str) -> dict:
             return result
         data = resp.json()
         records = data.get("records", [])
-        print(f"  📊 Sheet 'Read Group' today ({date_str}): {len(records)} readers found")
+        print(f"  📊 Sheet 'Read Group' today ({date_str}): {len(records)} readers")
         for rec in records:
             team = rec.get("team", "")
             name = rec.get("name", "")
-            time = rec.get("time", "—")
-            if team in result and name:
-                result[team][name] = time
+            if not (team in result and name):
+                continue
+            # Parse trend_3day "1/0/1" → d1, d2
+            trend = rec.get("trend_3day", "1/0/0")
+            parts = trend.replace("'", "").split("/")
+            d1 = int(parts[1]) if len(parts) > 1 else 0
+            d2 = int(parts[2]) if len(parts) > 2 else 0
+            result[team][name] = {
+                "time":  rec.get("time", "—") or "—",
+                "d1":    d1,
+                "d2":    d2,
+                "d7":    int(rec.get("count_7day", 0)),
+                "month": int(rec.get("count_month", 0)),
+            }
         return result
     except Exception as e:
         print(f"  ⚠️ get_today_reads_from_sheet error: {e}")
