@@ -486,9 +486,11 @@ function processSummaryAwAz(sheet, isDirectPush) {
     return false;
   }
 
-  // 🛡️ FRESHNESS CHECK: Bỏ qua nếu dữ liệu quá cũ (>30 phút so với hiện tại)
-  if (!isDataFresh_(tsKey, 30)) {
-    Logger.log("[Luồng AW7] ⏭️ Dữ liệu quá cũ (>30 phút): " + tsKey + " → Bỏ qua Luồng 2");
+  // 🛡️ FRESHNESS CHECK: Bỏ qua nếu dữ liệu quá cũ (>60 phút so với hiện tại)
+  // ⚠️ Dùng 60 phút (không phải 30) vì relay chạy :06 và :36 → khoảng cách tối đa 36 phút
+  // Nếu dùng 30 phút sẽ block khi AW7 update lúc X:00 và GAS chạy lúc X:36
+  if (!isDataFresh_(tsKey, 60)) {
+    Logger.log("[Luồng AW7] ⏭️ Dữ liệu quá cũ (>60 phút): " + tsKey + " → Bỏ qua Luồng 2");
     props.setProperty(TS_KEY_AW7, tsKey); // Lưu key để không gửi lại lần sau
     return false;
   }
