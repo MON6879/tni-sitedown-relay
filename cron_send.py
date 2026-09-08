@@ -601,9 +601,10 @@ def build_asset_msg(now_str, asset_data):
             f" | {s.get('d0',0)} /{s.get('done_d0',0)}"
             f"  7Day: {s.get('d6',0)} /{s.get('done_d6',0)}"
             f"  Month: {s.get('d15',0)} /{s.get('done_d15',0)}"
+            f"  All: {s.get('total',0)} /{s.get('done',0)}"
         )
 
-    PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15"]
+    PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15","total","done"]
 
     lines = [f"📦 4d. Asset progress for material – {now_str}", "━━━━━━━━━━━━━━━━━━━━"]
 
@@ -710,9 +711,10 @@ def build_team_asset_msg(team_key, now_str, asset_data):
             f" | {s.get('d0',0)} /{s.get('done_d0',0)}"
             f"  7Day: {s.get('d6',0)} /{s.get('done_d6',0)}"
             f"  Month: {s.get('d15',0)} /{s.get('done_d15',0)}"
+            f"  All: {s.get('total',0)} /{s.get('done',0)}"
         )
 
-    PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15"]
+    PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15","total","done"]
 
     key_lines = []
     for at in action_types:
