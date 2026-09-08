@@ -1666,11 +1666,8 @@ async def run_morning():
     """Run morning report mode."""
     now = myanmar_now()
     now_str = now.strftime("%d/%m/%Y %H:%M")
-    # Sau 14:00 MMT trong ngày → Tự động nhảy cộng +1 ngày để làm Plan cho ngày mai
-    if now.hour >= 14:
-        target_date = now + timedelta(days=1)
-    else:
-        target_date = now
+    # Report 5.1 luôn luôn là báo cáo Plan của ngày hôm nay (today)
+    target_date = now
     date_str = target_date.strftime("%d/%m/%Y")
     delete_prefix = "PLAN_MRN"
 
@@ -1789,8 +1786,6 @@ async def run_morning():
             lines.append(divider)
 
             # ── Plan submission status for target date (deadline section) ──
-            next_day = target_date + timedelta(days=1)
-            next_day_str = next_day.strftime("%d/%m/%Y")
             lines.append(f"📅 Plan for {date_str} — Submission Status:")
             for st in subteams:
                 pt = plan_today_status.get(st, {"found": False})
@@ -1801,7 +1796,7 @@ async def run_morning():
                 else:
                     lines.append(
                         f"   ⚠️ {st}: NOT SUBMITTED"
-                        f" — Deadline: before 07:00 on {next_day_str}"
+                        f" — Deadline: before 07:00 on {date_str}"
                     )
             lines.append(divider)
 
