@@ -97,6 +97,11 @@ jobs:
           curl -s -f "https://api.telegram.org/bot8758104446:AAH3o7lMCxBXn70ThAXweH1DddmRkJrgwWo/getWebhookInfo" || true
           curl -s -f "https://tni-bot.vercel.app/api/cable_bot" || true
 
+          echo "8️⃣ Solution Clear Bot 1C (Vercel & GAS Keepalive)..."
+          curl -s -f "https://api.telegram.org/bot8992199719:AAFVEOjFP39mcZXa8btqLK0TyqU79NJMcvM/getWebhookInfo" || true
+          curl -s -f "https://tni-bot.vercel.app/api/solution_clear" || true
+          curl -s -L "https://script.google.com/macros/s/AKfycbyatJQAAHIG4jKHbc4zy-AoTiMHpXSzBm_3SpL8eap5duYCHqNSSKBKyOAmT82XTzgYog/exec?action=ping" || true
+
           echo "✅ Keepalive done"
 
       # ═══════════════════════════════════════════════
