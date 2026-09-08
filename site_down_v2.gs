@@ -346,17 +346,16 @@ function processSiteDownColC(sheet, isDirectPush) {
   const props   = PropertiesService.getScriptProperties();
   const lastKey = props.getProperty(TS_KEY_A1) || "";
 
+
+  // 🛑 DEDUP: Nếu timestamp A1 không đổi → bỏ qua (đã gửi rồi)
+  // Logic đúng: storeKey mới ≠ lastKey → GỬI NGAY. Không cần freshness check.
   if (storeKey === lastKey && !isDirectPush) {
     Logger.log("[Luồng A1] Timestamp A1 không đổi (" + storeKey.substring(0, 30) + ") → Bỏ qua Luồng 1");
     return false;
   }
 
-  // 🛡️ FRESHNESS CHECK: Bỏ qua nếu dữ liệu quá cũ (>30 phút so với hiện tại)
-  if (!isDataFresh_(storeKey, 30)) {
-    Logger.log("[Luồng A1] ⏭️ Dữ liệu quá cũ (>30 phút): " + storeKey + " → Bỏ qua Luồng 1");
-    props.setProperty(TS_KEY_A1, storeKey); // Lưu key để không gửi lại lần sau
-    return false;
-  }
+  // ✅ Timestamp mới → gửi ngay lập tức (không giới hạn thời gian)
+  Logger.log("[Luồng A1] 🆕 Timestamp mới: " + storeKey + " (cũ: " + lastKey.substring(0,30) + ") → Gửi ngay!");
 
   // ✅ v660: Lưu ngay khóa A1 — Sheet ổn định, chỉ cần so timestamp cũ/mới
   props.setProperty(TS_KEY_A1, storeKey);
