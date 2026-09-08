@@ -1,5 +1,6 @@
 """
 cron_send.py — GitHub Actions Cron Job: gửi task remain + management report.
+# v20260907-All-field-fix: All:total/done added to fmt_period in build_asset_msg & build_team_asset_msg
 Dùng 3 bot theo dải row trong sheet Task remain (gid=133591305):
   Row 4-32:  @TNIREPORTTASK_BOT        (nhân viên)
   Row 33-59: SEND_BOT                  (team leaders)
@@ -32,7 +33,7 @@ REPORT_TASK_BOT_TOKEN   = os.getenv("REPORT_TASK_BOT_TOKEN", "")
 TECHNICAL_DEP_BOT_TOKEN = os.getenv("TECHNICAL_DEP_BOT_TOKEN", "")
 MAIN_GAS_FALLBACK   = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
 APPS_SCRIPT_URL   = os.getenv("APPS_SCRIPT_URL", "").strip()
-if not APPS_SCRIPT_URL or "AKfycbzGFdnE" in APPS_SCRIPT_URL or APPS_SCRIPT_URL == MAIN_GAS_FALLBACK:
+if not APPS_SCRIPT_URL or "AKfycbz-NZlBk8q2" not in APPS_SCRIPT_URL:
     APPS_SCRIPT_URL = MAIN_GAS_FALLBACK
 TELEGRAM_API_ID         = int(os.getenv("TELEGRAM_API_ID", "0"))
 TELEGRAM_API_HASH       = os.getenv("TELEGRAM_API_HASH", "")
@@ -622,8 +623,8 @@ def build_asset_msg(now_str, asset_data):
                 team_total[k] += s.get(k, 0)
         lines.append(f"   📅 {fmt_period(team_total)}")
 
-    # Grand total
-    lines.append(f"📊 Total:")
+    # Grand total - Tổng hợp tất cả TNI
+    lines.append(f"🏷️ 🌐 Total TNI:")
     for at in action_types:
         sq = get_action_square(at)
         val = fmt(grand.get(at,{}))
@@ -635,7 +636,7 @@ def build_asset_msg(now_str, asset_data):
         g = grand.get(at, {})
         for k in PERIOD_KEYS:
             g_period[k] += g.get(k, 0)
-    lines.append(f"📅 Total  {fmt_period(g_period)}")
+    lines.append(f"   📅 {fmt_period(g_period)}")
 
     return "\n".join(lines)
 
@@ -647,7 +648,7 @@ def build_team_asset_section(team_key: str, asset_data: dict) -> str:
 
     action_types = asset_data.get("actionTypes", [])
     stats = asset_data.get("stats", {})
-    PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15"]
+    PERIOD_KEYS = ["d0","d1","d2","d6","d15","done_d0","done_d1","done_d2","done_d6","done_d15","total","done"]
 
     key_lines = []
     has_data = False
@@ -675,6 +676,7 @@ def build_team_asset_section(team_key: str, asset_data: dict) -> str:
         f"3Day: {team_total.get('d2',0)}/{team_total.get('d1',0)}/{team_total.get('d0',0)}"
         f"  7Day: {team_total.get('d6',0)}"
         f"  Month: {team_total.get('d15',0)} ({cycle_str})"
+        f"  All: {team_total.get('total',0)}/{team_total.get('done',0)}"
     )
 
     return (
@@ -721,7 +723,7 @@ def build_team_asset_msg(team_key, now_str, asset_data):
         sq = get_action_square(at)
         val = fmt(stats.get(at,{}).get(team_key,{}))
         key_lines.append(f"   {sq} {at}: {val}")
-    
+
     # Calculate period totals for this team
     team_total = {k: 0 for k in PERIOD_KEYS}
     for at in action_types:
@@ -2169,6 +2171,101 @@ async def main():
 
 
 
+
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SHARE ETA REMINDER — Gửi smart template mỗi 30 phút (04:00-23:00 MMT)
+# ✅ = đã có ETA trong sheet,  • = còn pending
+# Chạy ngay sau site down relay (2 phút sau :06/:36 → tức :08/:38)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def send_share_eta_reminders():
+    """Gửi ETA reminder thông minh đến các nhóm Team.
+    - Đọc sheet GID 1509154642 lấy các site đã có ETA hôm nay
+    - Build message: ✅ cho site đã xong, • cho site còn pending
+    - XÓA tin cũ trước khi gửi tin mới (key: 'eta_reminder_{team}')
+    - Chỉ chạy trong khoảng 04:00 - 23:00 MMT
+    """
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "api"))
+    try:
+        from search_bot import build_smart_eta_reminder
+    except ImportError as e:
+        logger.error(f"send_share_eta_reminders import error: {e}")
+        return
+
+    now = datetime.now(TZ_MM)
+    hour = now.hour
+    if hour < 4 or hour >= 23:
+        logger.info(f"share_eta reminder: ngoài giờ hoạt động ({hour}:xx), bỏ qua")
+        return
+
+    # Import tg_utils để xóa/lưu message_id
+    try:
+        from tg_utils import tg_delete, get_msg_id, set_msg_id
+        has_tg_utils = True
+    except ImportError:
+        has_tg_utils = False
+        logger.warning("send_share_eta_reminders: tg_utils not available, no delete-old support")
+
+    logger.info("📢 send_share_eta_reminders: Bắt đầu gửi ETA reminder...")
+
+    try:
+        results = build_smart_eta_reminder("ALL")
+    except Exception as e:
+        logger.error(f"build_smart_eta_reminder error: {e}")
+        return
+
+    team_chat_map = {
+        "T1":    str(TELEGRAM_GROUPS.get("T1", "")),
+        "T1 S1": str(TELEGRAM_GROUPS.get("T1", "")),
+        "T2":    str(TELEGRAM_GROUPS.get("T2", "")),
+        "T2 S1": str(TELEGRAM_GROUPS.get("T2", "")),
+        "T3":    str(TELEGRAM_GROUPS.get("T3", "")),
+        "T3 S1": str(TELEGRAM_GROUPS.get("T3", "")),
+        "T4":    str(TELEGRAM_GROUPS.get("T4", "")),
+    }
+
+    token = os.getenv("SEARCH_BOT_TOKEN") or os.getenv("SEND_BOT_TOKEN", "")
+
+    sent_count = 0
+    for t_name, msg_text, has_pending in results:
+        chat_id = team_chat_map.get(t_name, "")
+        if not chat_id:
+            logger.warning(f"share_eta reminder: Không tìm thấy chat_id cho {t_name}")
+            continue
+
+        # Key riêng cho mỗi team — "tin nào xóa tin nấy"
+        state_key = f"eta_reminder_{t_name.replace(' ', '_')}"
+
+        # 1. Xóa tin cũ (nếu có)
+        if has_tg_utils:
+            old_msg_id = get_msg_id(state_key)
+            if old_msg_id:
+                tg_delete(chat_id, old_msg_id, bot_token=token)
+                logger.info(f"🗑️ Đã xóa tin cũ {state_key} msg_id={old_msg_id}")
+
+        # 2. Gửi tin mới
+        try:
+            resp = requests.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": msg_text, "parse_mode": ""},
+                timeout=15
+            )
+            if resp.status_code == 200:
+                new_msg_id = resp.json().get("result", {}).get("message_id", "")
+                logger.info(f"✅ share_eta reminder → {t_name} ({chat_id}): msg_id={new_msg_id}")
+                sent_count += 1
+                # 3. Lưu message_id mới để lần sau xóa
+                if has_tg_utils and new_msg_id:
+                    set_msg_id(state_key, new_msg_id)
+            else:
+                logger.warning(f"share_eta reminder → {t_name}: HTTP {resp.status_code} {resp.text[:100]}")
+        except Exception as e:
+            logger.error(f"share_eta reminder → {t_name}: {e}")
+
+    logger.info(f"📢 send_share_eta_reminders: xong, đã gửi {sent_count} tin")
 
