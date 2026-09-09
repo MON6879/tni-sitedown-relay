@@ -423,7 +423,6 @@ def setup_bot_menu_commands():
         {"command": "myolt",        "description": "All Site have OLT"},
         {"command": "mysn",         "description": "All SN you control"},
         {"command": "mydata",       "description": "All your personal stats"},
-        {"command": "daily",        "description": "Daily Result template"},
         {"command": "daily_result", "description": "Daily Result template"},
         {"command": "help",         "description": "Show help menu"},
     ]
@@ -447,7 +446,7 @@ def setup_bot_menu_commands():
         team_groups[chat_id_str] = grp_cmds
 
     common_group = [
-        {"command": "daily", "description": "Daily Result template"},
+        {"command": "daily_result", "description": "Daily Result template"},
     ]
     try:
         base_url = f"https://api.telegram.org/bot{TOKEN}/setMyCommands"
@@ -461,11 +460,11 @@ def setup_bot_menu_commands():
 
         # 1. Default scope — full commands
         requests.post(base_url, json={"commands": commands}, timeout=10)
-        # 2. All group chats — chỉ daily (plan riêng từng team)
+        # 2. All group chats — chỉ daily_result (plan riêng từng team)
         requests.post(base_url, json={"commands": common_group, "scope": {"type": "all_group_chats"}}, timeout=10)
         # 3. All private chats — full commands
         requests.post(base_url, json={"commands": commands, "scope": {"type": "all_private_chats"}}, timeout=10)
-        # 4. Per-team group — Plan riêng + daily cho cả thành viên và admin
+        # 4. Per-team group — Plan riêng + daily_result cho cả thành viên và admin
         for chat_id, p_cmds in team_groups.items():
             team_menu = p_cmds + common_group
             cid_int = int(chat_id)
@@ -554,10 +553,11 @@ def get_eta_site_down(team_filter="ALL"):
 def get_eta_share_templates(team_filter="ALL"):
     """Build pre-filled ETA update templates per team/subteam.
     Sections (4):
-      1.1 🔴 Cell Down                 (Parsed from Col C alarm breakdown)
-      1.2 ⚙️ DG Abnormal              (Parsed from Col C alarm breakdown)
-      1.3 ❌ DG Run >16H               (Parsed from Col C alarm breakdown)
-      1.4 📡 Site Down                (Parsed from Col E site down list)
+      1.1 🔴 Cell Down                 (Row with label 'Cell down' in Sheet GID 0)
+      1.2 ⚙️ DG Abnormal              (Row with label 'DG Abnormal' in Sheet GID 0)
+      1.3 ❌ DG Run >16H               (Row with label 'DG Run>16H' in Sheet GID 0)
+      1.4 📡 Site Down                (Row with label 'Site down' in Sheet GID 0)
+    Reads separated columns BP..BW (rows 5..9) where each team and subteam has its own column.
     Returns list of (team_name, template_text).
     """
     try:
@@ -570,6 +570,7 @@ def get_eta_share_templates(team_filter="ALL"):
         if len(rows) < 6:
             return []
 
+        # 1. Update timestamp from Row 0 Col 0
         update_ts = ""
         if len(rows) > 0 and len(rows[0]) > 0:
             m_ts = re.search(r'(\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2})', rows[0][0])
@@ -578,87 +579,95 @@ def get_eta_share_templates(team_filter="ALL"):
         if not update_ts:
             update_ts = datetime.now(TZ_MM).strftime("%d/%m/%Y %H:%M")
 
-        team_rows = {"T1": 3, "T2": 4, "T3": 5, "T4": 6}
+        # 2. Dynamically locate header row containing team names
+        header_row_idx = None
+        team_col_map = {}
+        for r_idx in range(min(15, len(rows))):
+            row = rows[r_idx]
+            found_teams = {}
+            for c_idx, val in enumerate(row):
+                v = (val or "").strip()
+                v_norm = re.sub(r'\s+', ' ', v).upper()
+                if v_norm in ('T1', 'T1 S1', 'T2', 'T2 S1', 'T3', 'T3 S1', 'T4'):
+                    found_teams[v_norm] = c_idx
+            if len(found_teams) >= 4:
+                header_row_idx = r_idx
+                team_col_map = found_teams
+                break
 
-        alarm_patterns = [
-            ("1.1", "🔴", "Cell Down",                r'Cell down:\s*(?:[*/]\d+.*?[=:])\s*(.*?)(?:\|\s*DG|\s*$)'),
-            ("1.2", "⚙️", "DG Abnormal",             r'DG Abnormal:\s*(?:[*/]\d+.*?[=:])\s*(.*?)(?:\|\s*DG Run|\s*$)'),
-            ("1.3", "❌", "DG Run >16H",              r'DG Run\s*>?\s*16H?:\s*(?:[*/]\d+.*?[=:])\s*(.*?)(?:\|\s*Link|\s*$)'),
+        if not header_row_idx:
+            header_row_idx = 4
+            team_col_map = {'T1': 68, 'T1 S1': 69, 'T2': 70, 'T2 S1': 71, 'T3': 72, 'T3 S1': 73, 'T4': 74}
+
+        label_col = min(team_col_map.values()) - 1
+
+        section_defs = [
+            ("1.1", "🔴", "Cell Down", [r'cell\s*down']),
+            ("1.2", "⚙️", "DG Abnormal", [r'dg\s*abnormal']),
+            ("1.3", "❌", "DG Run >16H", [r'dg\s*run']),
+            ("1.4", "📡", "Site Down", [r'site\s*down']),
         ]
 
-        # Parse 1.4 Site Down per team & subteam from rows 5+ (Col E & Col G)
-        sd_by_team = {
-            "T1": [], "T1 S1": [],
-            "T2": [], "T2 S1": [],
-            "T3": [], "T3 S1": [],
-            "T4": []
-        }
-        for i in range(5, len(rows)):
-            row = rows[i]
-            if len(row) > 6:
-                team_val = (row[6] or "").strip().upper()
-                tni_m = re.search(r"(TNI\d+)", row[4]) or re.search(r"(TNI\d+)", row[5] if len(row) > 5 else "")
-                if tni_m:
-                    tni = tni_m.group(1).upper()
-                    if team_val in sd_by_team:
-                        if tni not in sd_by_team[team_val]:
-                            sd_by_team[team_val].append(tni)
-                    else:
-                        for k in ["T1", "T2", "T3", "T4"]:
-                            if team_val == k or team_val.startswith(k + " "):
-                                if tni not in sd_by_team[k]:
-                                    sd_by_team[k].append(tni)
+        sec_rows = {}
+        for r_idx in range(header_row_idx + 1, min(header_row_idx + 8, len(rows))):
+            row = rows[r_idx]
+            lbl = (row[label_col] if label_col < len(row) else "").strip()
+            for sec_num, icon, title, patterns in section_defs:
+                if sec_num in sec_rows:
+                    continue
+                for pat in patterns:
+                    if re.search(pat, lbl, re.IGNORECASE):
+                        sec_rows[sec_num] = r_idx
+                        break
 
-        # Determine which teams/subteams to build for
+        # Fallback if section rows not found by label
+        default_sec_offsets = {"1.1": 1, "1.2": 2, "1.3": 3, "1.4": 4}
+        for sec_num, off in default_sec_offsets.items():
+            if sec_num not in sec_rows and (header_row_idx + off) < len(rows):
+                sec_rows[sec_num] = header_row_idx + off
+
+        # Determine target teams
+        teams_all = ["T1", "T1 S1", "T2", "T2 S1", "T3", "T3 S1", "T4"]
         if team_filter == "ALL":
-            target_teams = ["T1", "T1 S1", "T2", "T2 S1", "T3", "T3 S1", "T4"]
+            target_teams = teams_all
         else:
-            tf = team_filter.upper()
-            if tf in ("T1", "T2", "T3", "T4"):
+            tf = team_filter.upper().strip()
+            if tf in ("T1", "T2", "T3"):
+                target_teams = [tf, f"{tf} S1"]
+            elif tf in ("T4", "T1 S1", "T2 S1", "T3 S1"):
                 target_teams = [tf]
-                sub_key = f"{tf} S1"
-                if sub_key in sd_by_team and sd_by_team[sub_key]:
-                    target_teams.append(sub_key)
             else:
                 target_teams = [tf]
 
         results = []
         for t_name in target_teams:
-            is_subteam = (" S" in t_name)
-            sd_items = sd_by_team.get(t_name, [])
-
-            # Subteam chỉ tạo tin khi thực sự có trạm site down
-            if is_subteam and not sd_items:
+            c_idx = team_col_map.get(t_name)
+            if c_idx is None:
                 continue
 
             lines = [f"📋 {t_name} — ETA Update {update_ts}"]
+            total_sites = 0
 
-            # Đối với team chính (T1, T2, T3, T4): lấy 1.1 đến 1.3 từ Col C
-            if not is_subteam:
-                r_idx = team_rows.get(t_name)
-                c_text = rows[r_idx][2] if r_idx is not None and r_idx < len(rows) and len(rows[r_idx]) > 2 else ""
+            for sec_num, icon, title, _ in section_defs:
+                r_idx = sec_rows.get(sec_num)
+                items = []
+                if r_idx is not None and r_idx < len(rows) and c_idx < len(rows[r_idx]):
+                    cell_val = rows[r_idx][c_idx]
+                    tnis = re.findall(r'(TNI\d+)', cell_val, re.IGNORECASE)
+                    seen = set()
+                    items = [x.upper() for x in tnis if not (x.upper() in seen or seen.add(x.upper()))]
+                total_sites += len(items)
+                if items:
+                    lines.append(f"{sec_num} {icon} {title}: {len(items)} site")
+                    lines.extend([f"• {c} + FT + ETA:" for c in items])
+                else:
+                    lines.append(f"{sec_num} {icon} {title}:")
+                    lines.append("• (none)")
 
-                for num, icon, label, pat in alarm_patterns:
-                    m = re.search(pat, c_text, re.IGNORECASE)
-                    items = []
-                    if m:
-                        tnis = re.findall(r'(TNI\d+)', m.group(1))
-                        seen = set()
-                        items = [x.upper() for x in tnis if not (x.upper() in seen or seen.add(x.upper()))]
-                    if items:
-                        lines.append(f"{num} {icon} {label}: {len(items)} site")
-                        lines.extend([f"• {c} + FT + ETA:" for c in items])
-                    else:
-                        lines.append(f"{num} {icon} {label}:")
-                        lines.append("• (none)")
-
-            # 1.4 Site Down from Col E/G
-            if sd_items:
-                lines.append(f"1.4 📡 Site Down: {len(sd_items)} site")
-                lines.extend([f"• {c} + FT + ETA:" for c in sd_items])
-            elif not is_subteam:
-                lines.append("1.4 📡 Site Down:")
-                lines.append("• (none)")
+            # Skip subteam if 0 total sites in ALL mode to prevent spamming empty templates
+            is_subteam = (" S" in t_name)
+            if is_subteam and total_sites == 0 and team_filter == "ALL":
+                continue
 
             results.append((t_name, "\n".join(lines)))
 
@@ -667,6 +676,7 @@ def get_eta_share_templates(team_filter="ALL"):
     except Exception as ex:
         logger.error(f"get_eta_share_templates error: {ex}")
         return []
+
 
 ETA_SHARE_GID = "1509154642"  # Tab "Team leader share ETA" in SD_SHEET_ID
 
@@ -678,7 +688,7 @@ def get_today_eta_from_sheet():
     Title rows: col A bắt đầu bằng '📋' → bỏ qua.
     Trả về dict {TNI_CODE: {ft_eta, eta_date, section, sender}}.
     - eta_date: ngày thực hiện ETA (extracted); nếu không có date trong FT+ETA → dùng submission date
-    - Ưu tiên entry đã có ft_eta (đã điền) trong ngày
+    - Submission mới hơn trong ngày với ft_eta ghi đè submission cũ hơn
     """
     try:
         today = datetime.now(TZ_MM).strftime("%d/%m/%Y")
@@ -718,8 +728,16 @@ def get_today_eta_from_sheet():
             if not eta_date:
                 eta_date = date_val
 
-            # Ưu tiên entry đã có ft_eta (đã điền)
-            if tni not in eta_map or (not eta_map[tni]["ft_eta"] and ft_eta):
+            # Ghi nhận lần đầu hoặc cập nhật nếu submission sau có điền ft_eta
+            if tni not in eta_map:
+                eta_map[tni] = {
+                    "ft_eta":   ft_eta,
+                    "eta_date": eta_date,
+                    "section":  (row[4] or "").strip(),
+                    "sender":   sender,
+                }
+            elif ft_eta:
+                # Submission mới hơn có điền FT+ETA → ghi đè dữ liệu cũ hơn
                 eta_map[tni] = {
                     "ft_eta":   ft_eta,
                     "eta_date": eta_date,
@@ -783,8 +801,8 @@ def build_smart_eta_reminder(team_filter="ALL"):
                 lines_out.append(stripped)
                 continue
 
-            # Site line: "• TNIxxxx + FT + ETA:"
-            m = re.match(r'^•\s*(TNI\d+)\s*\+\s*FT\s*\+\s*ETA:\s*$', stripped, re.IGNORECASE)
+            # Site line: "• TNIxxxx + FT + ETA:" hoặc "✅ TNIxxxx + FT+ETA:"
+            m = re.match(r'^(?:•|✅)\s*(TNI\d+)\s*\+\s*FT\s*\+?\s*ETA:', stripped, re.IGNORECASE)
             if m:
                 tni = m.group(1).upper()
                 entry = eta_map.get(tni, {})
@@ -799,13 +817,13 @@ def build_smart_eta_reminder(team_filter="ALL"):
                         lines_out.append(f"✅ {tni} + FT+ETA: {ft_eta_raw}{date_label}")
                     elif eta_dt and eta_dt < today_dt:
                         # ETA Date đã qua → pending lại
-                        lines_out.append(stripped)
+                        lines_out.append(f"• {tni} + FT + ETA:")
                         has_pending = True
                     else:
                         # Không parse được date → show ✅
                         lines_out.append(f"✅ {tni} + FT+ETA: {ft_eta_raw}")
                 else:
-                    lines_out.append(stripped)
+                    lines_out.append(f"• {tni} + FT + ETA:")
                     has_pending = True
                 continue
 
