@@ -27,7 +27,7 @@ except ImportError:
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-BOT_VERSION = "v4.2"
+BOT_VERSION = "v4.3"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 SEARCH_BOT_TOKEN_SSOT = "8606383435:AAEstcN4Om6_9ZAjs4OoFV2uVlRALgae2Ac"
@@ -423,42 +423,63 @@ def setup_bot_menu_commands():
         {"command": "myolt",        "description": "All Site have OLT"},
         {"command": "mysn",         "description": "All SN you control"},
         {"command": "mydata",       "description": "All your personal stats"},
+        {"command": "daily",        "description": "Daily Result template"},
+        {"command": "daily_result", "description": "Daily Result template"},
         {"command": "help",         "description": "Show help menu"},
     ]
 
     # ── Build per-group menu dynamically from ETA_GROUP_CONFIG ───────────────
     team_groups = {}
     for chat_id_str, cfg in ETA_GROUP_CONFIG.items():
-        t_key   = cfg["team"]
-        t_num   = t_key[1:]
-        subs    = cfg["subteams"]
+        t_key   = cfg["team"]       # "T1"
+        t_num   = t_key[1:]         # "1"
+        subs    = cfg["subteams"]   # ["S1"] hoặc []
         label   = cfg["label"]
 
         grp_cmds = []
+        # Plan main team
+        grp_cmds.append({"command": f"plan_t{t_num}", "description": f"Plan Template - {t_key}"})
+        # Plan subteams
+        for s in subs:
+            s_num = s[1:]
+            grp_cmds.append({"command": f"plan_t{t_num}_s{s_num}", "description": f"Plan Template - {t_key} {s}"})
+
         team_groups[chat_id_str] = grp_cmds
+
+    common_group = [
+        {"command": "daily", "description": "Daily Result template"},
+    ]
     try:
         base_url = f"https://api.telegram.org/bot{TOKEN}/setMyCommands"
         del_url = f"https://api.telegram.org/bot{TOKEN}/deleteMyCommands"
 
-        # 1. Xóa sạch mọi scope toàn cục có thể rò rỉ sang group chat (default, all_group_chats, all_chat_administrators)
-        for sc in [{"type": "default"}, {"type": "all_group_chats"}, {"type": "all_chat_administrators"}]:
-            try:
-                requests.post(del_url, json={"scope": sc}, timeout=10)
-            except Exception:
-                pass
+        # Delete any conflicting global admin scope
+        try:
+            requests.post(del_url, json={"scope": {"type": "all_chat_administrators"}}, timeout=10)
+        except Exception:
+            pass
 
-        # 2. XÓA TRIỆT ĐỂ lệnh của Bot 3D trong tất cả các nhóm Team để Bot 1C quản lý độc quyền menu 1..6
-        for chat_id in team_groups.keys():
-            cid_int = int(chat_id)
-            try:
-                requests.post(del_url, json={"scope": {"type": "chat", "chat_id": cid_int}}, timeout=10)
-                requests.post(del_url, json={"scope": {"type": "chat_administrators", "chat_id": cid_int}}, timeout=10)
-            except Exception:
-                pass
-
-        # 3. CHỈ ĐĂNG KÝ LỆNH CHO CHAT RIÊNG (Private Chats / DM) VỚI BOT 3D — TUYỆT ĐỐI KHÔNG HIỆN TRONG GROUP
+        # 1. Default scope — full commands
+        requests.post(base_url, json={"commands": commands}, timeout=10)
+        # 2. All group chats — chỉ daily (plan riêng từng team)
+        requests.post(base_url, json={"commands": common_group, "scope": {"type": "all_group_chats"}}, timeout=10)
+        # 3. All private chats — full commands
         requests.post(base_url, json={"commands": commands, "scope": {"type": "all_private_chats"}}, timeout=10)
-        logger.info(f"Bot 3D commands registered exclusively to all_private_chats ({len(commands)} commands)")
+        # 4. Per-team group — Plan riêng + daily cho cả thành viên và admin
+        for chat_id, p_cmds in team_groups.items():
+            team_menu = p_cmds + common_group
+            cid_int = int(chat_id)
+            # Scope 1: chat (toàn bộ thành viên trong nhóm)
+            requests.post(base_url, json={
+                "commands": team_menu,
+                "scope": {"type": "chat", "chat_id": cid_int}
+            }, timeout=10)
+            # Scope 2: chat_administrators (cho quản trị viên nhóm)
+            requests.post(base_url, json={
+                "commands": team_menu,
+                "scope": {"type": "chat_administrators", "chat_id": cid_int}
+            }, timeout=10)
+        logger.info(f"Bot 3D commands registered: private={len(commands)}, per-group={len(team_groups)} groups")
     except Exception as ex:
         logger.error(f"setup_bot_menu_commands: {ex}")
 
@@ -1937,9 +1958,10 @@ def handle(update: dict) -> None:
     if user.get("is_bot"):
         return
 
-    # ── PHOTO (Daily Result photo collection handed over exclusively to Bot 1C) ──
+    # ── PHOTO ──────────────────────────────────────────────────────────────
     if "photo" in msg:
-        # Bot 3D ignores photo uploads — handled exclusively by Bot 1C (@TNICLEARSITEBOT)
+        file_id = msg["photo"][-1]["file_id"]
+        submit_photo(chat_id, user_id, file_id)
         return
 
     text = (msg.get("text") or "").strip()
@@ -2044,9 +2066,39 @@ def handle(update: dict) -> None:
             send_help_menu(chat_id)
             return
 
-        # ❌ Bot 3D BỎ trả lời lệnh Plan và Daily Result (theo yêu cầu: chuyển toàn bộ sang Bot 1C đảm nhiệm)
-        if first_word in ("daily", "daily_result", "dailyresult") or first_word.startswith("plan"):
-            logger.info(f"[3D] Skip responding to {first_word} — handed over to Bot 1C")
+        if first_word in ("daily", "daily_result", "dailyresult"):
+            if is_duplicate_search and is_duplicate_search(chat_id, user_id, "DAILY"):
+                return
+            send_daily_template(chat_id)
+            return
+
+        if first_word.startswith("plan"):
+            if is_duplicate_search and is_duplicate_search(chat_id, user_id, f"PLAN:{first_word}"):
+                return
+            # /plan_t3 → "T3", /plan_t3_s1 → "T3 S1", /plan → auto-detect
+            plan_map = {
+                "plan_t1": "T1", "plan_t1_s1": "T1 S1",
+                "plan_t2": "T2", "plan_t2_s1": "T2 S1",
+                "plan_t3": "T3", "plan_t3_s1": "T3 S1",
+                "plan_t4": "T4",
+            }
+            team_filter = plan_map.get(first_word)
+            if not team_filter:
+                # /plan hoặc /dailyplan → auto-detect theo chat_id/title
+                chat_title = (msg.get("chat", {}).get("title") or "").lower()
+                cid_str = str(chat_id)
+                if "4215695747" in cid_str or "team 1" in chat_title or "dawei" in chat_title:
+                    team_filter = "T1"
+                elif "4480845549" in cid_str or "team 2" in chat_title or "myeik" in chat_title:
+                    team_filter = "T2"
+                elif "4369170658" in cid_str or "team 3" in chat_title or "bokpyin" in chat_title:
+                    team_filter = "T3"
+                elif "4293741999" in cid_str or "team 4" in chat_title or "kawthoung" in chat_title:
+                    team_filter = "T4"
+                else:
+                    tn = get_user_team_number(user_id) or 1
+                    team_filter = f"T{tn}"
+            send_daily_plan_template(chat_id, team_filter)
             return
 
         if first_word in ("id", "myid"):
@@ -2114,14 +2166,50 @@ def handle(update: dict) -> None:
             tg_send(chat_id, f"✅ <b>Attendance saved ({time_str})</b> — Recorded {count} staff to Sheet.")
             return
 
-    # ── 1. DAILY PLAN SUBMIT (Chuyển sang Bot 1C @TNICLEARSITEBOT đảm nhiệm duy nhất) ──
+    # ── 1. DAILY PLAN SUBMIT (PRIORITY #1: Process plan BEFORE SSOT classify to prevent TNI code hijacking) ──
     if is_daily_plan(clean_text) or is_daily_plan(text):
-        logger.info("[3D] Skip collecting Daily Plan — handled exclusively by Bot 1C")
-        return
+        # 🛑 Bỏ qua edited_message — chỉ thu thập lần đầu, không lặp khi TL sửa bài
+        if update.get("edited_message"):
+            logger.info("Skipping edited_message for Daily Plan — no re-collection")
+            return
 
-    # ── 2. DAILY REPORT SUBMIT (Chuyển sang Bot 1C @TNICLEARSITEBOT đảm nhiệm duy nhất) ──
+        msg_id = msg.get("message_id")
+        if msg_id and msg_id in _processed_plan_msg_ids:
+            logger.info(f"Skipping duplicate Daily Plan webhook msg_id={msg_id}")
+            return
+        if msg_id:
+            _processed_plan_msg_ids.add(msg_id)
+            if len(_processed_plan_msg_ids) > 500:
+                _processed_plan_msg_ids.clear()
+
+        chat_title = msg.get("chat", {}).get("title", "")
+        date_str, team_str, content = parse_plan_fields(text, chat_id, chat_title)
+        if date_str and team_str:
+            msg_date = msg.get("date")
+            now_mm = datetime.fromtimestamp(msg_date, TZ_MM) if msg_date else datetime.now(TZ_MM)
+            clean_plan_text = text.strip()
+            while clean_plan_text and re.match(r'^(?:3\.\s*)?TNI\s*PERSONAL\s*FIND\s*TASK[^\n]*\n?', clean_plan_text, re.IGNORECASE):
+                clean_plan_text = re.sub(r'^(?:3\.\s*)?TNI\s*PERSONAL\s*FIND\s*TASK[^\n]*\n?', '', clean_plan_text, flags=re.IGNORECASE).strip()
+            submitted_at = now_mm.strftime('%d/%m/%Y %H:%M:%S')
+            res = store_daily_plan_to_sheet(date_str, team_str, clean_plan_text, msg_id=msg_id, submitted_at=submitted_at)
+            ref = res.get("ref")
+            dup = res.get("duplicate", False)
+
+            if not ref or ref == "?" or "OK" in str(ref):
+                ref_show = fetch_max_plan_ref()
+            else:
+                ref_show = ref
+
+            time_str = now_mm.strftime('%H:%M:%S')
+
+            action_label = "Daily Plan (Updated)" if dup else "Daily Plan"
+            tg_send(chat_id, f"📋 <b>{action_label}</b> ✅ #<b>{ref_show}</b> | 📍 <b>{team_str}</b> | 🗓️ <b>{date_str} {time_str}</b>")
+            return
+
+    # ── 2. DAILY REPORT SUBMIT (PRIORITY #2: Process daily report BEFORE SSOT classify) ──
     if is_daily(clean_text) or is_daily(text):
-        logger.info("[3D] Skip collecting Daily Result — handled exclusively by Bot 1C")
+        msg_date = msg.get("date")
+        submit_daily(chat_id, user_id, first_name, text, msg_date)
         return
 
     # ── CLASSIFY QUERY VIA SSOT ENGINE FIRST ──
@@ -2185,9 +2273,9 @@ def handle(update: dict) -> None:
         for chunk in split_messages(header + reply): tg_send(chat_id, chunk)
         return
 
-    # ── DAILY REPORT SUBMIT (Handed over to Bot 1C) ──
+    # ── DAILY REPORT SUBMIT ──
     if is_daily(clean_text):
-        logger.info("[3D] Skip collecting Daily Result — handled exclusively by Bot 1C")
+        submit_daily(chat_id, user_id, first_name, clean_text)
         return
 
     # ── STAFF PERSONAL LOOKUP (mysite / mycable / mydia / mydata / myolt) ──
