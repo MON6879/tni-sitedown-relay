@@ -926,3 +926,120 @@ Mọi thao tác cài đặt hoặc khôi phục Webhook Telegram đều phải �
 > 1. **Đọc Đúng Bảng Phân Tách Từng Cột Riêng (Columns BP..BW)**: Mọi logic tạo template và reminder ETA BẮT BUỘC đọc từ bảng phân tách cột riêng cho từng Team và Subteam (`T1`, `T1 S1`, `T2`, `T2 S1`, `T3`, `T3 S1`, `T4` tại columns BP..BW, rows 5..9 trên Sheet GID 0). Tuyệt đối CẤM gộp chung subteam vào main team hoặc bỏ qua các mục 1.1..1.4 của subteam!
 > 2. **Ghi Nhận Phản Hồi Linh Hoạt & Đè Mới Nhất**: Hàm thu thập ETA trên GAS (`collectEtaShare_`) BẮT BUỘC chấp nhận mọi loại dấu gạch (`[-—–]`), mọi loại bullet (`(?:•|✅|\*|-)`), và map đúng mục 1.4 thành "1.4 Site Down". Trên Python, dữ liệu nộp sau trong ngày có FT+ETA BẮT BUỘC ghi đè dữ liệu cũ hơn.
 > 3. **Làm Mới Nhắc Nhở 30 Phút Bằng Bucket**: Chốt chặn chống trùng lặp nhắc nhở ETA trong `cron_send.py` BẮT BUỘC dùng bucket 30 phút (`HH_11` và `HH_41`) để đảm bảo mỗi nhịp :11 và :41 MMT đều gửi bản cập nhật sống mới nhất kèm xóa tin cũ, TUYỆT ĐỐI KHÔNG chặn gửi chỉ vì timestamp bảng nguồn botlookup chưa thay đổi.
+
+---
+
+# 🏗️ POST-MORTEM RULE — 09/09/2026: QUY CHUẨN 10 CỘT BẢNG INPUT CONSTRUCTION (COL H TEMPLATE, COL I CONTENT + PHOTOS, COL J PO ĐIỀN TAY) (RULE PM-13)
+
+> ### Nguồn gốc: **Phân Hệ TNI Construction (Bot 10 TNI_SITE)** (`13_TNI_CONSTRUCTION.gs` / QLTC_GAS @409)
+> - **Lỗi & Bất Cập Thực Tế (09/09/2026)**:
+>   1. Layout cũ dàn trải 20 cột (Delivery, Team received material, Plan, Upgraded, Revoked material, Degraded, Solared...) khiến mỗi dòng chỉ có 1 ô dữ liệu còn 11 ô khác bị trống, khó xem và quản lý.
+>   2. Khi ảnh đến mà phiên activeCols rỗng, bot fallback mù quáng về Cột 8 (`Delivery`), khiến ảnh của mọi công việc khác (như `Upgraded`, `Solared`...) bị nhét nhầm vào cột `Delivery`.
+>   3. Cột `PO` và `Name TNI` không có ranh giới rõ ràng, thiếu chỗ điền tay mã PO độc lập.
+> - **Yêu Cầu Chuẩn Hóa Của Người Dùng**:
+>   "Cột H này lấy tương ứng khi có người cập nhật theo template và cột H giống như tiêu đề còn cột I là nội dung tất cả của người gởi và cột J là là cột Po điền tay"
+>   "Tôi đã tạo sheet mới bạn sửa lại và thu thập lại từ đầu cho sheet này: Input Construction (GID 397336359)"
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   Kiến trúc đa cột (multi-column) cố định mỗi loại template vào 1 cột riêng không phù hợp với nhu cầu tổng hợp động và dễ gây lỗi fallback sai cột khi nhận ảnh.
+>
+> ### 🔴 RULE PM-13: CẤU TRÚC 10 CỘT CHUẨN CHO SHEET INPUT CONSTRUCTION VÀ GOM TOÀN BỘ TEXT + ẢNH VÀO CỘT I
+> 1. **Cấu Trúc 10 Cột Bất Biến Của Sheet `Input Construction`**:
+>    - `Col A (1)`: `REF` (STT tự tăng bắt đầu lại từ 1).
+>    - `Col B (2)`: `ID Telegram` (Telegram User ID).
+>    - `Col C (3)`: `Tên theo telegram in group` (Tên hiển thị Telegram).
+>    - `Col D (4)`: `Date time sent group` (Thời gian gửi tin: `dd/MM/yyyy HH:mm`).
+>    - `Col E (5)`: `Date Conten` (Ngày nội dung trích xuất từ tin nhắn: `dd/MM/yyyy`).
+>    - `Col F (6)`: `Team` (Team trích xuất: `TEAM 1`, `TEAM 2`, `TEAM 3`, `TEAM 4`).
+>    - `Col G (7)`: `Name TNI` (Mã trạm TNI tự trích xuất, hỗ trợ điền tay đè nếu cần).
+>    - `Col H (8)`: `Template` (Tiêu đề loại báo cáo lấy tương ứng theo Cột A của tab `Template Cons`, vd: `Delivery`, `Upgraded`, `Plan`, `Team received material`, `Solared`...).
+>    - `Col I (9)`: `Content` (Toàn bộ nội dung văn bản của người gửi + link ảnh `📥 DOWNLOAD ALL (N Photos)` nối ở cuối ô).
+>    - `Col J (10)`: `PO` (Dành riêng cho người quản lý tự điền tay mã PO — Bot TUYỆT ĐỐI KHÔNG BAO GIỜ ghi đè lên Cột J).
+> 2. **Ảnh Chỉ Gom Vào Cột I — Tuyệt Đối Cấm Rơi Sang Cột Khác**:
+>    Mọi link Drive `📥 DOWNLOAD ALL (N Photos): [URL]` của ảnh gửi trong cửa sổ 10 phút BẮT BUỘC chỉ được nối vào cuối ô Cột I (`Content`) của dòng STT tương ứng. TUYỆT ĐỐI CẤM fallback về Cột H hoặc bất kỳ cột nào khác!
+> 3. **Tự Động Khởi Tạo Đúng 10 Cột Khi Tạo Mới**:
+>    Hàm `ensureConstructionSheetHeaders_` BẮT BUỘC thiết lập đúng 10 cột chuẩn trên tab `Input Construction` và xóa mọi cột thừa vượt quá 10 cột.
+
+---
+
+# 📊 POST-MORTEM RULE — 09/09/2026: CÔNG THỨC MẢNG TỔNG HỢP TAB GENERAL (PO, TEMPLATE, SỐ LƯỢNG HOÀN THÀNH, TEXTJOIN CỘT G) & CHỐNG LỖI DÒNG MA KHI BẢNG RỖNG (RULE PM-14)
+
+> ### Nguồn gốc: **Bảng Tổng Hợp TNI Construction (Tab General, GID 983482833)** (`13_TNI_CONSTRUCTION.gs` / QLTC_GAS @415)
+> - **Lỗi & Bất Cập Thực Tế (09/09/2026)**:
+>   1. Khi bảng `Input Construction` trống (chỉ có dòng tiêu đề), công thức mảng động bọc ngoài bằng `IFERROR(LET(... HSTACK(uPairs, counts, sites)), "")` sinh ra 1 dòng "ma" chứa giá trị rỗng và số 0 (`['', '0', '', '']`).
+>   2. **Nguyên Nhân Gốc (Root Cause)**: Trong Google Sheets, khi bọc `IFERROR` ngoài cùng một mảng tạo bởi `HSTACK`, việc bọc lỗi diễn ra trên từng ô tử riêng biệt (element-wise). Do hàm `COUNTIFS(rawPO, p, rawTmpl, t)` trả về kết quả số `0` (không phải mã lỗi), ô này không bị `IFERROR` bắt, dẫn đến mảng không rỗng hoàn toàn mà bung ra 1 hàng `['', '0', '', '']`.
+> - **Yêu Cầu Chuẩn Hóa Của Người Dùng**:
+>   "tạo cho tôi 1 file tổng hợp 1 là PO trước đến unique Cột H và đến cột số lượng hoàn thành theo cột H và textjoin(" , " các cột G trong sheet https://docs.google.com/spreadsheets/d/1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8/edit?gid=983482833#gid=983482833"
+>
+> ### 🔴 RULE PM-14: QUY CHUẨN BẢNG TỔNG HỢP TAB GENERAL VÀ TẦNG BẢO VỆ COUNTA TRƯỚC KHI GỌI FILTER/MAP
+> 1. **Cấu Trúc 4 Cột Bất Biến Của Tab `General`**:
+>    - `Col A (1)`: `PO` (Sắp xếp theo thứ tự bảng chữ cái của mã PO điền tay ở Col J của `Input Construction`).
+>    - `Col B (2)`: `Template` (Các loại template unique trích xuất từ Col H của `Input Construction` theo từng PO).
+>    - `Col C (3)`: `Số lượng hoàn thành` (Đếm số lượng báo cáo hoàn thành theo cặp `PO` + `Template` bằng `COUNTIFS`).
+>    - `Col D (4)`: `Danh sách trạm (Name TNI)` (Gộp các mã trạm TNI duy nhất hoàn thành bằng `TEXTJOIN(", ", TRUE, UNIQUE(FILTER(...)))`).
+> 2. **Chốt Chặn `COUNTA = 0` Bắt Buộc Trong Công Thức Mảng Động**:
+>    Mọi công thức mảng tổng hợp động (`LET`, `FILTER`, `HSTACK`, `MAP`) BẮT BUỘC phải kiểm tra `IF(COUNTA('Input Construction'!H2:H)=0, "", LET(...))` ngay từ đầu trước khi gọi `FILTER` và `MAP`. TUYỆT ĐỐI CẤM chỉ bọc `IFERROR(HSTACK(...))` ở ngoài cùng vì Google Sheets đánh giá lỗi theo từng phần tử (element-wise), khiến các hàm đếm như `COUNTIFS` trả về `0` (không phải error) và tạo ra dòng ma `['', '0', '', '']` khi bảng tính nguồn chưa có dữ liệu!
+
+---
+
+# 🛑 POST-MORTEM RULE — 09/09/2026: NGẮT TOÀN DIỆN TAB CŨ COLLECT DATA (GID 1235005577) & KHÓA DUY NHẤT VÀO INPUT CONSTRUCTION (GID 397336359) (RULE PM-15)
+
+> ### Nguồn gốc: **Phân Hệ TNI Construction (Bot 10 TNI_SITE)** (`13_TNI_CONSTRUCTION.gs` / QLTC_GAS @417)
+> - **Lỗi & Yêu Cầu Của Người Dùng (09/09/2026)**:
+>   "thu thập giống cơ chế sheet cũ và ngắt thu của link này luôn https://docs.google.com/spreadsheets/d/1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8/edit?gid=1235005577#gid=1235005577"
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   Tab cũ `Collect Data` (GID `1235005577`) với cấu trúc 20 cột cũ cần được bọc thép ngắt hoàn toàn khỏi luồng thu thập. Trong code còn lưu biến `SHEET_COLLECT_LEGACY: 'Collect Data'` có nguy cơ gây nhầm lẫn hoặc ghi đè nếu dev sau gọi lại.
+>
+> ### 🔴 RULE PM-15: NGẮT THU THẬP TAB COLLECT DATA VÀ GIỮ CƠ CHẾ GOM LINK ẢNH VÀO CỘT I
+> 1. **Ngắt Hoàn Toàn Thu Thập Vào Tab `Collect Data` (GID `1235005577`)**:
+>    TUYỆT ĐỐI CẤM mọi hoạt động ghi, chèn dòng hoặc thu thập mới vào tab `Collect Data`. Toàn bộ dữ liệu báo cáo mới 100% BẮT BUỘC chỉ được ghi vào tab `Input Construction` (GID `397336359`). Xóa bỏ hoàn toàn mọi biến `SHEET_COLLECT_LEGACY` khỏi mã nguồn.
+> 2. **Giữ Nguyên Cơ Chế Thu Thập Ảnh Như Sheet Cũ Vào Cột I**:
+>    Cơ chế thu thập ảnh được giữ nguyên vẹn 100% theo chuẩn của sheet cũ: Toàn bộ ảnh gửi trong vòng 10 phút được lưu vào Google Drive (`2.10 TNI PHOTO CONSTRUCTION/Report_STT_xxx`), và dòng link tải toàn bộ ảnh `📥 DOWNLOAD ALL (N Photos): [URL]` được nối vào cuối ô văn bản tại Cột I (`Content`).
+
+---
+
+# ⛽ POST-MORTEM RULE — 09/09/2026: QUY CHUẨN MẪU TEMPLATE INVENTORY FUEL, PARSER CHỐNG NHẢY DÒNG & BẢO TOÀN NGUYÊN VẸN CỘT SHEET (RULE PM-16)
+
+> ### Nguồn gốc: **Phân Hệ Thu Thập Inventory Fuel (Ghế 2B / Bot @TNIASSETorderREQUEST_BOT)** (`api/collector.py`, `apps_script_mdg.gs` / QLTC_GAS @421, Sheet `Inventory Main DG` tab GID 0 trên `1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y`)
+> - **Lỗi & Yêu Cầu Của Người Dùng (09/09/2026)**:
+>   "Inventory fuel:
+>   DG ID: TNIXXXX
+>   Fuel cm: 
+>   Fuel %: 
+>   KWH in CSU: 
+>   DG Kwh : 
+>   DG Rh: 
+>   Note: sửa lại template"
+>   "cột thu thập thì giữ nguyên"
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. Template cũ dùng các trường `Fuel level:`, `Kwh:`, `Rh:`. Người dùng đổi sang `KWH in CSU:`, `DG Kwh :`, `DG Rh:`.
+>   2. Hàm `parse_inv_fields()` cũ dùng regex `\s*:\s*(.+?)(?=\n|$)`. Do `\s` trong Python khớp cả dấu xuống dòng `\n`, nên khi một trường để trống trên cùng dòng (ví dụ `Inventory fuel:`), regex sẽ nuốt tiếp dòng sau, dẫn đến `f["inventory fuel"]` bị gán nhầm thành `"DG ID: TNI0051"`.
+>   3. Người dùng yêu cầu nghiêm ngặt *"cột thu thập thì giữ nguyên"*, nên không được thêm/bớt/đổi tên 27 cột của Sheet `Inventory Main DG`. Cần ánh xạ vị trí tương ứng: `KWH in CSU` vào Col I (`Fuel Level`), `DG Kwh` vào Col J (`KWh`), `DG Rh` vào Col K (`RH`), trong khi toàn văn báo cáo vẫn bảo toàn 100% tại Col O (`Raw Content`).
+>
+> ### 🔴 RULE PM-16: BẢO TOÀN NGUYÊN VẸN CỘT THU THẬP & REGEX PARSER CHỐNG NHẢY DÒNG
+> 1. **Bảo Toàn 100% Cột Thu Thập (Zero Sheet Schema Mutation)**:
+>    Khi người dùng yêu cầu cập nhật template nhưng chỉ thị *"cột thu thập thì giữ nguyên"*, TUYỆT ĐỐI CẤM chèn thêm cột, xóa cột hay sửa header trên Google Sheet. Các trường mới phải được ánh xạ vào đúng cột sẵn có theo thứ tự logic hoặc lưu trữ an toàn, đảm bảo không phá vỡ liên kết của các cột downstream (Confirm, Photos, Raw Content).
+> 2. **Regex Parser Tuyệt Đối Cấm Nuốt Dòng Bằng `\s*`**:
+>    Khi bóc tách key-value từ tin nhắn chat, BẮT BUỘC dùng regex neo dòng `rf"(?i)(?:^|[\r\n])[^\w\r\n]*{word_pattern}[ \t]*:[ \t]*(.*?)(?=\r?\n|$)"` thay vì `\s*:\s*`. Khoảng trắng trước/sau dấu hai chấm `:` CHỈ được dùng `[ \t]*` để không bao giờ nuốt sang dòng kế tiếp khi trường hiện tại để trống.
+> 3. **Đồng Bộ Đồng Thời 2 Nhánh Lấy Mẫu Template**:
+>    Khi sửa template trả về từ lệnh `/...`, BẮT BUỘC sửa đồng thời ở cả nhánh xử lý chuyên biệt theo nhóm (`handle_mdg`) VÀ nhánh lệnh tổng (`handle`), đảm bảo người dùng gõ lệnh ở group làm việc hay gửi tin riêng (DM) với Bot đều nhận đúng mẫu chuẩn 100%.
+---
+
+# 📊 POST-MORTEM RULE — 09/09/2026: KHÓA CỨNG DẢI Ô BẰNG `INDIRECT` CHO CÁC BẢNG TỔNG HỢP LIÊN KẾT SHEET CÓ CHÈN DÒNG ĐẦU (RULE PM-17)
+
+> ### Nguồn gốc: **Bảng Tổng Hợp TNI Construction (Tab General, GID 983482833)** (`13_TNI_CONSTRUCTION.gs` / QLTC_GAS @423, Sheet `1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8`)
+> - **Lỗi Thực Tế (09/09/2026)**:
+>   Khi bot thu thập dữ liệu chèn dòng mới vào dòng 2 của bảng nguồn (`sheet.insertRowsBefore(2, 1)`), Google Sheets tự động tịnh tiến (shift) mọi tham chiếu dải ô trong công thức của bảng tổng hợp từ `H2:H`, `J2:J`, `G2:G` thành `H3:H`, `H4:H`, `H5:H`... Điều này khiến bảng tổng hợp hoàn toàn bỏ qua các dòng mới nhất ở đầu bảng, dẫn đến `COUNTA = 0` và bảng tổng hợp bị trắng trơn!
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   Tham chiếu dải ô thông thường (kể cả dùng dấu `$` như `$H$2:$H`) vẫn bị Google Sheets tự động trượt chỉ số dòng khi có thao tác `insertRowsBefore(2)` xảy ra phía trên hoặc ngay tại dòng bắt đầu của dải ô.
+>
+> ### 🔴 RULE PM-17: BẮT BUỘC DÙNG `INDIRECT` CHO CÁC DẢI Ô TRONG CÔNG THỨC MẢNG TỔNG HỢP
+> 1. **Khóa Tuyệt Đối Dải Ô Bằng `INDIRECT` (Zero Row-Shift Guarantee)**:
+>    Khi viết công thức mảng tổng hợp (`LET`, `FILTER`, `UNIQUE`, `MAP`, `COUNTIFS`) đọc dữ liệu từ một sheet có cơ chế chèn dòng ở đầu (`insertRowsBefore(2)` hoặc `insertRowsBefore(3)`), BẮT BUỘC phải bọc tất cả các dải ô nguồn trong hàm `INDIRECT` dạng chuỗi văn bản cố định:
+>    - `INDIRECT("'Input Construction'!H2:H")`
+>    - `INDIRECT("'Input Construction'!J2:J")`
+>    - `INDIRECT("'Input Construction'!G2:G")`
+>    TUYỆT ĐỐI CẤM dùng tham chiếu dải ô trần (`'Input Construction'!H2:H`) vì sẽ bị tịnh tiến trượt dòng sau mỗi lần bot nộp báo cáo!
+> 2. **Xử Lý Điều Kiện Logic Boolean Trong `FILTER` Khi Tham Chiếu Trống**:
+>    Trong biểu thức điều kiện của `FILTER`, để so khớp chính xác cả trường hợp ô có giá trị và ô hoàn toàn rỗng/trống (`""`), BẮT BUỘC dùng biểu thức đại số boolean đồng nhất kích thước:
+>    `((p="")*((rawPO="")+(ISBLANK(rawPO))) + (p<>"")*(rawPO=p))*(rawTmpl=t)`
+>    TUYỆT ĐỐI CẤM dùng `IF(scalar, array, array)` bên trong `LAMBDA` vì sẽ làm co mảng về 1 phần tử scalar, gây lỗi lệch kích thước dải ô `#VALUE! (FILTER has mismatched range sizes)`.
