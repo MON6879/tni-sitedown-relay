@@ -44,11 +44,14 @@ const LAST_UPDATE_KEY = "SD_LAST_UPDATE_ID";          // Offset Telegram polling
 const AWAZ_COL = { T1: 0, T2: 1, T3: 2, T4: 3 };
 
 const AWAZ_LABELS = [
-  { emoji: "⚡", name: "Site down"   },
-  { emoji: "🔴", name: "Cell down"   },
-  { emoji: "⚙️", name: "DG Abnormal" },
-  { emoji: "⏱️", name: "DG Run>16H"  },
-  { emoji: "🔗", name: "Link down"   },
+  { emoji: "⚡", name: "Site down"                },
+  { emoji: "🔴", name: "Cell down"                },
+  { emoji: "⚙️", name: "DG Abnormal"              },
+  { emoji: "⏱️", name: "DG Run>16H"               },
+  { emoji: "🔗", name: "Link down"                },
+  { emoji: "🌡️", name: "Battery Temperature High" },
+  { emoji: "💨", name: "Smoke"                    },
+  { emoji: "🚪", name: "DOOR"                     },
 ];
 
 const TEAM_COLORS = { T1: "🟠", T2: "🔵", T3: "🟢", T4: "🟡" };
@@ -176,6 +179,12 @@ function doPost(e) {
       const sent1 = processSiteDownColC(sheet, true);
       const sent2 = processSummaryAwAz(sheet, false);
       return _json({ ok: true, sent_tin1: sent1, sent_tin2: sent2 });
+    }
+
+    if (action === "trigger_bot2d_eta") {
+      const skipDelay = data.skip_delay === true;
+      const ok = triggerBot2dEta_(skipDelay);
+      return _json({ ok: ok, action: "trigger_bot2d_eta" });
     }
 
     if (action === "get_note_b2b5") {
@@ -343,17 +352,16 @@ function processSiteDownColC(sheet, isDirectPush) {
   const props   = PropertiesService.getScriptProperties();
   const lastKey = props.getProperty(TS_KEY_A1) || "";
 
+
+  // 🛑 DEDUP: Nếu timestamp A1 không đổi → bỏ qua (đã gửi rồi)
+  // Logic đúng: storeKey mới ≠ lastKey → GỬI NGAY. Không cần freshness check.
   if (storeKey === lastKey && !isDirectPush) {
     Logger.log("[Luồng A1] Timestamp A1 không đổi (" + storeKey.substring(0, 30) + ") → Bỏ qua Luồng 1");
     return false;
   }
 
-  // 🛡️ FRESHNESS CHECK: Bỏ qua nếu dữ liệu quá cũ (>30 phút so với hiện tại)
-  if (!isDataFresh_(storeKey, 30)) {
-    Logger.log("[Luồng A1] ⏭️ Dữ liệu quá cũ (>30 phút): " + storeKey + " → Bỏ qua Luồng 1");
-    props.setProperty(TS_KEY_A1, storeKey); // Lưu key để không gửi lại lần sau
-    return false;
-  }
+  // ✅ Timestamp mới → gửi ngay lập tức (không giới hạn thời gian)
+  Logger.log("[Luồng A1] 🆕 Timestamp mới: " + storeKey + " (cũ: " + lastKey.substring(0,30) + ") → Gửi ngay!");
 
   // ✅ v660: Lưu ngay khóa A1 — Sheet ổn định, chỉ cần so timestamp cũ/mới
   props.setProperty(TS_KEY_A1, storeKey);
@@ -436,7 +444,37 @@ function processSiteDownColC(sheet, isDirectPush) {
   const sentSlot = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHH") + (now.getMinutes() < 30 ? "_00" : "_30");
   props.setProperty("SD_LAST_SENT_SLOT", sentSlot);
   Logger.log("[Luồng A1] ✅ Hoàn tất gửi Tin 1!");
+
+  // ⏱️ LIÊN KẾT BOT 5T -> BOT 2D: Đợi đúng 30 giây rồi kích hoạt Bot 2D phát tin ETA Update
+  triggerBot2dEta_();
+
   return true;
+}
+
+/**
+ * ⏱️ LIÊN KẾT BOT 5T -> BOT 2D:
+ * Sau khi Bot 5T gửi xong tin Site Down vào các nhóm, đợi đúng 30 giây
+ * rồi kích hoạt Bot 2D (2. TNI Auto Report Daily) phát bản tin ETA Update ngay lập tức.
+ */
+function triggerBot2dEta_(skipDelay) {
+  if (!skipDelay) {
+    Logger.log("⏳ Bot 5T đã gửi xong Tin 1. Bắt đầu đếm đúng 30 giây để kích hoạt Bot 2D (ETA Update)...");
+    Utilities.sleep(30000);
+  } else {
+    Logger.log("⚡ Kích hoạt Bot 2D ngay lập tức (skipDelay=true)...");
+  }
+  try {
+    const url = "https://tni-bot.vercel.app/api/search_bot?action=send_eta_reminders";
+    const resp = UrlFetchApp.fetch(url, {
+      method: "get",
+      muteHttpExceptions: true
+    });
+    Logger.log("✅ Kích hoạt Bot 2D (ETA Update) thành công: HTTP " + resp.getResponseCode() + " | " + resp.getContentText().substring(0, 120));
+    return true;
+  } catch(e) {
+    Logger.log("❌ Lỗi kích hoạt Bot 2D qua Webhook: " + e.message);
+    return false;
+  }
 }
 
 
@@ -477,18 +515,15 @@ function processSummaryAwAz(sheet, isDirectPush) {
   // 🔍 DEBUG: Log so sánh cụ thể
   Logger.log("[Luồng AW7] tsKey=[" + tsKey + "] lastTs=[" + lastTs + "] match=" + (tsKey === lastTs));
 
-  // 🛑 1. NẾU GIỜ KHÔNG THAY ĐỔI AW7 THÌ BỎ QUA (TRỪ KHI DIRECT PUSH)
+  // 🛑 DEDUP: Nếu timestamp AW7 không đổi → bỏ qua (đã gửi rồi)
+  // Logic đúng: tsKey mới ≠ lastTs → GỬI NGAY. Không cần freshness check.
   if (tsKey === lastTs && !isDirectPush) {
     Logger.log("[Luồng AW7] Timestamp AW7 không đổi (" + tsKey + ") → Bỏ qua Luồng 2");
     return false;
   }
 
-  // 🛡️ FRESHNESS CHECK: Bỏ qua nếu dữ liệu quá cũ (>30 phút so với hiện tại)
-  if (!isDataFresh_(tsKey, 30)) {
-    Logger.log("[Luồng AW7] ⏭️ Dữ liệu quá cũ (>30 phút): " + tsKey + " → Bỏ qua Luồng 2");
-    props.setProperty(TS_KEY_AW7, tsKey); // Lưu key để không gửi lại lần sau
-    return false;
-  }
+  // ✅ Timestamp mới → gửi ngay lập tức (không giới hạn thời gian)
+  Logger.log("[Luồng AW7] 🆕 Timestamp mới: " + tsKey + " (cũ: " + lastTs + ") → Gửi ngay!");
 
   // ✅ Đọc trực tiếp bảng AW:AZ và gửi nguyên vẹn 100% thông tin có trong ô (thêm Icon)
   let awaz = readAwAz(sheet);
@@ -614,7 +649,8 @@ function parseAW7Timestamp(sheet) {
 }
 
 function readAwAz(sheet) {
-  return sheet.getRange(7, 49, 9, 4).getValues();
+  // ✅ Mở rộng dải ô AW7:AZ16 (10 dòng từ dòng 7 đến dòng 16)
+  return sheet.getRange(7, 49, 10, 4).getValues();
 }
 
 function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
@@ -627,19 +663,27 @@ function buildAwAzTeamMessage(teamKey, ts, awaz, colIdx) {
 
   for (let r = 0; r < numRows; r++) {
     const txt = ((awaz[r] || [])[colIdx] || "").toString().trim();
-    if (!txt || txt === "..." || txt === "null" || txt === "undefined") continue;
-    const clean = escHtml(txt.replace(/[*_`]/g, ""));
+    if (!txt || txt === "..." || txt === "null" || txt === "undefined" || txt === "-" || txt === "0") continue;
+    const cleanRaw = txt.replace(/[*_`]/g, "");
     if (r < AWAZ_LABELS.length) {
-      const labelName = AWAZ_LABELS[r].name;
+      const labelDef = AWAZ_LABELS[r];
+      const labelName = labelDef.name;
       const prefixRegex = new RegExp("^" + labelName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
-      const cleanBody = clean.replace(prefixRegex, "");
-      lines.push(AWAZ_LABELS[r].emoji + " <b>" + labelName + ":</b> " + cleanBody);
+      let bodyRaw = cleanRaw.replace(prefixRegex, "").trim();
+      // Tách | Battery Temperature High / Smoke / DOOR thành dòng riêng + icon
+      bodyRaw = bodyRaw.replace(/\|\s*Battery Temperature High:/gi, "\n🌡️ Battery Temperature High:");
+      bodyRaw = bodyRaw.replace(/\|\s*Smoke:/gi, "\n💨 Smoke:");
+      bodyRaw = bodyRaw.replace(/\|\s*DOOR:/gi, "\n🚪 DOOR:");
+      lines.push(labelDef.emoji + " <b>" + escHtml(labelName) + ":</b> " + escHtml(bodyRaw));
     } else {
-      const lm = txt.match(/^([^:]+):/);
-      const lb = lm ? lm[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
-      const prefixRegex = new RegExp("^" + lb.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
-      const cleanBody = clean.replace(prefixRegex, "");
-      lines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
+      const lm = cleanRaw.match(/^([^:]+):\s*(.*)$/);
+      if (lm) {
+        const lb = lm[1].trim();
+        const body = lm[2].trim();
+        lines.push("📌 <b>" + escHtml(lb) + ":</b> " + escHtml(body));
+      } else {
+        lines.push("📌 " + escHtml(cleanRaw));
+      }
     }
   }
   return lines.join("\n");
@@ -662,19 +706,27 @@ function buildAwAzControlMessage(ts, awaz) {
     const teamLines = [];
     for (let r = 0; r < numRows; r++) {
       const txt = ((awaz[r] || [])[t.col] || "").toString().trim();
-      if (!txt || txt === "..." || txt === "null" || txt === "undefined") continue;
-      const clean = escHtml(txt.replace(/[*_`]/g, ""));
+      if (!txt || txt === "..." || txt === "null" || txt === "undefined" || txt === "-" || txt === "0") continue;
+      const cleanRaw = txt.replace(/[*_`]/g, "");
       if (r < AWAZ_LABELS.length) {
-        const labelName = AWAZ_LABELS[r].name;
+        const labelDef = AWAZ_LABELS[r];
+        const labelName = labelDef.name;
         const prefixRegex = new RegExp("^" + labelName.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
-        const cleanBody = clean.replace(prefixRegex, "");
-        teamLines.push(AWAZ_LABELS[r].emoji + " <b>" + labelName + ":</b> " + cleanBody);
+        let bodyRaw = cleanRaw.replace(prefixRegex, "").trim();
+        // Tách | Battery Temperature High / Smoke / DOOR thành dòng riêng + icon
+        bodyRaw = bodyRaw.replace(/\|\s*Battery Temperature High:/gi, "\n🌡️ Battery Temperature High:");
+        bodyRaw = bodyRaw.replace(/\|\s*Smoke:/gi, "\n💨 Smoke:");
+        bodyRaw = bodyRaw.replace(/\|\s*DOOR:/gi, "\n🚪 DOOR:");
+        teamLines.push(labelDef.emoji + " <b>" + escHtml(labelName) + ":</b> " + escHtml(bodyRaw));
       } else {
-        const lm = txt.match(/^([^:]+):/);
-        const lb = lm ? lm[1].replace(/[*_`]/g, "").trim() : "Row " + (r + 1);
-        const prefixRegex = new RegExp("^" + lb.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&") + "\\s*:\\s*", "i");
-        const cleanBody = clean.replace(prefixRegex, "");
-        teamLines.push("📌 <b>" + escHtml(lb) + ":</b> " + cleanBody);
+        const lm = cleanRaw.match(/^([^:]+):\s*(.*)$/);
+        if (lm) {
+          const lb = lm[1].trim();
+          const body = lm[2].trim();
+          teamLines.push("📌 <b>" + escHtml(lb) + ":</b> " + escHtml(body));
+        } else {
+          teamLines.push("📌 " + escHtml(cleanRaw));
+        }
       }
     }
     if (teamLines.length > 0) {
@@ -918,6 +970,11 @@ function addKeywordIcons(text) {
      let icon = (c && c !== "0" && c !== "-" && c.toLowerCase() !== "none") ? "❌" : "✅";
      return "\n" + icon + " " + keyword + " " + dataStr;
   });
+
+  // Battery Temperature High, Smoke, DOOR — xuống hàng + icon riêng
+  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(Battery Temperature High:)/gi, "\n🌡️ Battery Temperature High:");
+  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(Smoke:)/gi, "\n💨 Smoke:");
+  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(DOOR:)/gi, "\n🚪 DOOR:");
 
   s = s.replace(/(?:🔥\s*)+Dont\s+Forget/gi, "🔥 Dont Forget");
   s = s.replace(/(?:🕒\s*)+Duty:/gi, "🕒 Duty:");

@@ -181,6 +181,12 @@ function doPost(e) {
       return _json({ ok: true, sent_tin1: sent1, sent_tin2: sent2 });
     }
 
+    if (action === "trigger_bot2d_eta") {
+      const skipDelay = data.skip_delay === true;
+      const ok = triggerBot2dEta_(skipDelay);
+      return _json({ ok: ok, action: "trigger_bot2d_eta" });
+    }
+
     if (action === "get_note_b2b5") {
       const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
       const sheet = getSheetByGid(ss, SD_SHEET_GID);
@@ -438,7 +444,37 @@ function processSiteDownColC(sheet, isDirectPush) {
   const sentSlot = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHH") + (now.getMinutes() < 30 ? "_00" : "_30");
   props.setProperty("SD_LAST_SENT_SLOT", sentSlot);
   Logger.log("[Luồng A1] ✅ Hoàn tất gửi Tin 1!");
+
+  // ⏱️ LIÊN KẾT BOT 5T -> BOT 2D: Đợi đúng 30 giây rồi kích hoạt Bot 2D phát tin ETA Update
+  triggerBot2dEta_();
+
   return true;
+}
+
+/**
+ * ⏱️ LIÊN KẾT BOT 5T -> BOT 2D:
+ * Sau khi Bot 5T gửi xong tin Site Down vào các nhóm, đợi đúng 30 giây
+ * rồi kích hoạt Bot 2D (2. TNI Auto Report Daily) phát bản tin ETA Update ngay lập tức.
+ */
+function triggerBot2dEta_(skipDelay) {
+  if (!skipDelay) {
+    Logger.log("⏳ Bot 5T đã gửi xong Tin 1. Bắt đầu đếm đúng 30 giây để kích hoạt Bot 2D (ETA Update)...");
+    Utilities.sleep(30000);
+  } else {
+    Logger.log("⚡ Kích hoạt Bot 2D ngay lập tức (skipDelay=true)...");
+  }
+  try {
+    const url = "https://tni-bot.vercel.app/api/search_bot?action=send_eta_reminders";
+    const resp = UrlFetchApp.fetch(url, {
+      method: "get",
+      muteHttpExceptions: true
+    });
+    Logger.log("✅ Kích hoạt Bot 2D (ETA Update) thành công: HTTP " + resp.getResponseCode() + " | " + resp.getContentText().substring(0, 120));
+    return true;
+  } catch(e) {
+    Logger.log("❌ Lỗi kích hoạt Bot 2D qua Webhook: " + e.message);
+    return false;
+  }
 }
 
 
