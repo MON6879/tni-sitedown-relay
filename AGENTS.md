@@ -1043,3 +1043,38 @@ Mọi thao tác cài đặt hoặc khôi phục Webhook Telegram đều phải �
 >    Trong biểu thức điều kiện của `FILTER`, để so khớp chính xác cả trường hợp ô có giá trị và ô hoàn toàn rỗng/trống (`""`), BẮT BUỘC dùng biểu thức đại số boolean đồng nhất kích thước:
 >    `((p="")*((rawPO="")+(ISBLANK(rawPO))) + (p<>"")*(rawPO=p))*(rawTmpl=t)`
 >    TUYỆT ĐỐI CẤM dùng `IF(scalar, array, array)` bên trong `LAMBDA` vì sẽ làm co mảng về 1 phần tử scalar, gây lỗi lệch kích thước dải ô `#VALUE! (FILTER has mismatched range sizes)`.
+
+---
+
+# 📋 POST-MORTEM RULE — 10/09/2026: CHUẨN HÓA REPORT 5A, 5B, ĐIỀU HƯỚNG CONTROL & CẤM GỬI TRACEBACK RA TELEGRAM (RULE PM-18)
+
+> ### Nguồn gốc: **Phân hệ Báo Cáo Daily Plan & Results (Report 5)** (`daily_plan_report.py`, `api/search_bot.py`, Bot 3D `@SEARCHTNITASKWOBOT`, Bot 2D)
+> - **Lỗi Thực Tế (10/09/2026)**:
+>   1. Tiêu đề và định dạng tin Report 5 bị lộn xộn, hiển thị tiền tố `5.1 Report` và `5. Report [Updated]` không đồng nhất; gửi nội dung toàn văn quá dài vào nhóm CONTROL gây loãng và khó theo dõi.
+>   2. Bot 3D quăng toàn bộ Python traceback (`File "/var/task/api/search_bot.py", line 2176, in do_POST`) ra nhóm chat khi nhận webhook Daily Plan từ Team Leader.
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. `api/search_bot.py` tại khối xử lý lỗi webhook `do_POST` cố tình dùng `tg_send(chat_id, f"⚠️ Error:\n<pre>{html.escape(tb[:2000])}</pre>")`, làm lộ toàn bộ vết lỗi hệ thống ra nhóm Telegram làm việc của người dùng.
+>   2. Thiếu quy chuẩn phân luồng rõ ràng giữa 2 loại báo cáo: Plan trong ngày (5A) và So sánh Kế hoạch vs Kết quả (5B). Nhóm CONTROL bị nhận bản tin tổng hợp 5B quá dài kèm toàn bộ raw text của tất cả các team thay vì chỉ cần bản tóm tắt tình trạng nộp plan.
+>   3. Danh sách `GROUPS` trong `daily_plan_report.py` duyệt qua cả `REFUEL` và `MDG` thay vì chỉ 4 Team (`T1, T2, T3, T4`).
+>
+> ### 🔴 RULE PM-18: CHUẨN HÓA REPORT 5A, REPORT 5B & ZERO TRACEBACK IN TELEGRAM
+> 1. **Chuẩn Hóa Tiêu Đề & Bố Cục Report 5A (`📋 5A. Plan daily`)**:
+>    - **Nhóm 4 Team (`T1, T2, T3, T4`)**: Tiêu đề chuẩn `📋 5A. Plan daily ({date_str}) — {team_name}`. Bố cục gồm 5 khối:
+>      ① Header + ngày giờ (`📅 DD/MM/YYYY | 🕐 HH:MM`)
+>      ② `📝 Plans for {date_str}:` kèm trạng thái `Submitted ✓` (kèm giờ) hoặc `Not yet submitted`, và toàn văn kế hoạch `📋 Plan Content ({team}):`
+>      ③ `📊 Submission History: 3Day: d2/d1/d0 | 7Day: d7 | Month: month`
+>      ④ `📈 3-Day Completion Rate:` chi tiết tỷ lệ hoàn thành 3 ngày gần nhất
+>      ⑤ `📝 Plan Tomorrow ({tomorrow_str}):` trạng thái nộp kế hoạch ngày mai của các subteams.
+> 2. **Chuẩn Hóa Tiêu Đề & Bố Cục Report 5B (`📋 5B. Plan today compare Result`)**:
+>    - **Nhóm 4 Team (`T1, T2, T3, T4`)**: Tiêu đề chuẩn `📋 5B. Plan today compare Result ({date_str}) — {team_name}`.
+>    - Bố cục gồm: Header -> Stats Plan -> Plan vs Actual -> FT Plan & Actual Summary (chi tiết theo từng FT: Plan, Completed, Remaining, Report status, Submission stats) -> Plan Tomorrow.
+> 3. **Quy Tắc Phân Luồng Nhóm CONTROL (Zero 5B & Concise 5A Summary Only)**:
+>    - **TUYỆT ĐỐI CẤM gửi Report 5B chi tiết vào nhóm CONTROL** vì dung lượng quá dài làm loãng luồng chỉ huy.
+>    - **Nhóm CONTROL CHỈ NHẬN DUY NHẤT 1 tin Report 5A Summary** ngắn gọn tổng hợp trạng thái 4 Team:
+>      `📋 5A. Plan daily ({date_str}) — Summary (All Teams)`
+>      Liệt kê từng Team (`🏷️ Team X: ✅ Plan Submitted ✓` hoặc `⚠️ NOT SUBMITTED`), thống kê 3Day/7Day/Month, tổng số team đã nộp (`📊 Status: X/Y Teams Submitted`) và `📈 Overall 3-Day Completion`. TUYỆT ĐỐI KHÔNG dump raw content vào CONTROL.
+> 4. **CẤM Tuyệt Đối Quăng Traceback Ra Telegram (Zero Traceback in Chat)**:
+>    - Webhook handler (`search_bot.py`, `doPost`) TUYỆT ĐỐI CẤM gọi `tg_send` gửi traceback hoặc chuỗi lỗi nội bộ (`<pre>{tb}</pre>`) vào bất kỳ nhóm chat hay DM nào.
+>    - Mọi ngoại lệ BẮT BUỘC chỉ được ghi log kỹ thuật nội bộ (`logger.error(traceback.format_exc())` hoặc `Logger.log()`).
+> 5. **Tách Biệt Nhóm Quản Lý 5A & 5B (Strict 4-Team Scope)**:
+>    - Biến `GROUPS` trong `daily_plan_report.py` BẮT BUỘC lọc đúng 4 Team: `{k: v for k, v in TELEGRAM_GROUPS.items() if k in ("T1", "T2", "T3", "T4")}`. TUYỆT ĐỐI CẤM gửi 5A/5B sang các nhóm chuyên biệt khác như REFUEL hay MDG.
