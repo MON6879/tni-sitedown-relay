@@ -8,9 +8,10 @@ on:
         required: false
         default: 'false'
         type: boolean
-  schedule:
-    # Chạy mỗi giờ tại phút 3 và 33 UTC (tương đương 09:33 và 10:03 MMT, script sẽ sleep đến :06 và :36)
-    - cron: '3,33 * * * *'
+# schedule:
+#   # 🚫 VÔ HIỆU HÓA HOÀN TOÀN: Site Down đã được gộp vào 1 Đoàn Tàu 5-Min Train tuần tự duy nhất (train_5min.yml)
+#   # Tuyệt đối KHÔNG bật lại cron riêng để tránh xung đột IP và khóa Session Telegram!
+#   - cron: '3,33 * * * *'
 
 concurrency:
   group: botlookup-relay

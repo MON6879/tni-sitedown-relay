@@ -11,6 +11,19 @@
 >    - Bảng Tính: `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow` (GID 0).
 ---
 
+# 🚂 STRICT SINGLE-TRAIN RULE: 1 ĐOÀN TÀU THỜI GIAN TUẦN TỰ DUY NHẤT — TUYỆT ĐỐI CẤM TỰ Ý TÁCH WORKFLOW / TÁCH CRON RIÊNG (STRICT SINGLE UNIFIED SEQUENTIAL TRAIN POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SINGLE UNIFIED SEQUENTIAL TRAIN POLICY)**:
+> 1. **1 Đoàn Tàu Thời Gian Tuần Tự Duy Nhất (Single Sequential Train Engine)**: Toàn bộ các tác vụ định kỳ của hệ thống bao gồm: **Toa Site Down Relay (:06 / :36 MMT)**, Keepalive ping, Report 1, 2, 3, 4, 5A, 5B, 5C, 6, 6.1, Refuel (Request, P1, P2, P4, Read), Auditor 9.1 và Toa ETA BẮT BUỘC phải nằm trong **1 WORKFLOW DUY NHẤT** (`train_5min.yml`), chạy trên **1 MÁY ẢO DUY NHẤT** tại mỗi nhịp 5 phút.
+> 2. **Chạy Tuần Tự Từng Toa (Sequential Execution — Zero Parallel Collisions)**: Mọi Toa trong Tàu chạy theo thứ tự từ trên xuống dưới trên cùng một máy ảo runner. Khi Toa Site Down chạy thì các Toa khác chờ; Toa Site Down xong mới đến các Toa tiếp theo. **1 tài khoản Telegram duy nhất** được dùng an toàn 100%, không bao giờ có 2 tiến trình MTProto kết nối cùng lúc từ 2 IP khác nhau.
+> 3. **TUYỆT ĐỐI CẤM Tự Ý Tách Workflow / Tách Cron Riêng (Zero Independent Split Workflows)**:
+>    - AI TUYỆT ĐỐI CẤM tự ý tách bất kỳ phân hệ nào (Site Down, Refuel, Report...) ra thành một workflow `.github/workflows/*.yml` độc lập có cron schedule riêng.
+>    - Bất kỳ workflow độc lập nào (`botlookup_relay.yml`, v.v.) BẮT BUỘC phải bị vô hiệu hóa lịch chạy tự động (`schedule: cron`).
+>    - TUYỆT ĐỐI CẤM kích hoạt đồng thời 2 cron train trên 2 repository khác nhau. Duy nhất chỉ có 1 đầu tàu active.
+> 4. **Khắc Phục Lỗi Bằng Cách Tối Ưu Tuần Tự — CẤM Rẽ Nhánh**: Nếu một tác vụ bị chậm hoặc lỗi, AI phải tối ưu thời gian chạy bên trong Toa của Tàu, TUYỆT ĐỐI KHÔNG ĐƯỢC giải quyết bằng cách "xé lẻ" ra chạy song song gây xung đột IP và khóa session Telegram!
+
+---
+
 # 🔒 STRICT REPO ISOLATION RULE: REPOSITORY NÀO PHỤC VỤ PHÂN HỆ ĐÓ — TUYỆT ĐỐI CẤM TIỆN TAY COPY / ĐẨY FILE CHÉO (STRICT DEDICATED REPOSITORY & ZERO CROSS-POLLUTION POLICY)
 
 > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (REPOSITORY ISOLATION POLICY)**:
@@ -117,6 +130,23 @@
 > 4. **Kiểm Tra Tham Số Trigger Bắt Buộc (Strict Trigger Boolean Check)**: Khi một hàm GAS được gọi bởi Time-driven Trigger, GAS luôn tự động truyền vào 1 đối tượng Event `e` (`{authMode: ...}`). Do đó, nếu hàm có tham số cờ (ví dụ `forceSend`), TUYỆT ĐỐI KHÔNG DÙNG `if (!forceSend)` vì `!{}` là `false` khiến Trigger hiểu nhầm là `forceSend=true` và gửi spam liên tục! BẮT BUỘC phải kiểm tra kiểu boolean chặt chẽ: `const isForce = (forceSend === true);`.
 > 5. **Vô Hiệu Hóa Ghost Cron Khi Chuyển Sang Luồng Liên Kết (Zero Ghost Cron Policy)**: Khi một luồng gửi tin được chuyển sang kích hoạt liên kết trực tiếp (như Bot 5T sau 30s gọi Bot 2D qua Webhook), BẮT BUỘC phải tắt hoàn toàn cron tự động tương ứng trên GitHub Actions (`SHARE_ETA=false`) để tránh chạy kép lệch nhịp làm sai lệch state và ghi đè tin nhắn.
 > 6. **Xóa Tin Cũ Đa ID & Chống Timeout GAS (Multi-ID Deletion & Retry Resilience)**: Mọi logic xóa tin cũ ("tin nào xóa tin nấy") BẮT BUỘC phải hỗ trợ phân tách và xóa toàn bộ danh sách Multi-IDs (chuỗi ngăn cách `,` hoặc `;`) và có retry tối thiểu 2 lần khi gọi `get_msg_id` qua GAS API. TUYỆT ĐỐI CẤM chỉ giả định đọc 1 ID rồi ghi đè ngay làm mất dấu tin mồ côi (orphaned messages).
+---
+
+# ⚡ STRICT SERVERLESS TIMEOUT & FAST-PATH PIPELINE RULE: CẤM GỌI GAS ĐỒNG BỘ NẶNG TRƯỚC PHÂN LOẠI TIN NHẮN (STRICT SERVERLESS TIMEOUT & PRE-CLASSIFICATION NON-BLOCKING POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SERVERLESS TIMEOUT & FAST PATH POLICY)**:
+> 1. **Phân Loại & Xử Lý Báo Cáo Trước Tiên (Classify & Fast-Path First)**: Mọi webhook nhận tin Telegram chạy trên Serverless (Vercel/Cloud Functions với giới hạn timeout 10s) BẮT BUỘC phải thực hiện kiểm tra lệnh (`/`) và phân loại nội dung (`classify(text)`) ĐẦU TIÊN. Tuyệt đối KHÔNG ĐƯỢC đặt bất kỳ cuộc gọi mạng đồng bộ nào (như ghi nhận ai đọc tin, `realtime_read`, sync sheet...) ở trước bước phân loại và thu thập chính!
+> 2. **Tác Vụ Phụ Trợ Bắt Buộc Non-Blocking / Background Thread**: Bất kỳ tác vụ ghi log phụ trợ nào (như ghi nhận ai đã đọc tin/chat thông thường) BẮT BUỘC phải chạy trong non-blocking background thread (`threading.Thread(target=..., daemon=True).start()`) hoặc chỉ chạy sau khi đã hoàn thành tác vụ chính, TUYỆT ĐỐI CẤM chặn (blocking) dòng luồng chính gây timeout 504 và làm rớt mất dữ liệu báo cáo của người dùng!
+> 3. **Cấm Gọi Trùng Lặp 2 Lần Vào GAS (Zero Duplicate GAS Calls)**: Nếu downstream GAS (`collectMessage`) đã tích hợp sẵn logic cập nhật sender/đọc tin (`syncSenderToTelegramIdAndReadSheet`), TUYỆT ĐỐI CẤM gọi thêm một hàm phụ cùng chức năng từ Webhook trước khi chuyển dữ liệu vào GAS.
+
+---
+
+# 🛡️ STRICT SYSTEM AUDITOR & SYNCHRONIZED TRAIN SCHEDULE RULE: KHÓA CHẶT ĐỒNG BỘ MỐC GIỜ, PHẠM VI NGÀY & TỐI ƯU TRA CỨU RAM (STRICT AUDITOR-TRAIN SYNC & IN-MEMORY BATCH POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (AUDITOR & TRAIN SYNC POLICY)**:
+> 1. **Khóa Chặt Mốc Giờ Giữa Đoàn Tàu & Kiểm Toán (Auditor-Train 100% Schedule Parity)**: Mọi mốc giờ báo cáo được khai báo trong `SCHEDULE_RULES` của Sentinel Auditor (`system_auditor.py`) BẮT BUỘC phải đồng bộ 100% với điều kiện kích hoạt trong đoàn tàu cron (`train_5min.yml`). TUYỆT ĐỐI CẤM để cờ kích hoạt bị `false` (như Toa 8 `REFUEL_REQ=false` hoặc thiếu mốc Catch-up 07:06, 13:06), gây tình trạng script không bao giờ được chạy tự động dẫn đến báo lỗi bỏ sót ảo (`MISSED`)!
+> 2. **Kiểm Tra Trùng Lặp Bắt Buộc Đúng Ngày Hiện Tại (Strict Active-Date Dedup Scope)**: Khi thực hiện kiểm toán nhân đôi tin nhắn (Deduplication Check), BẮT BUỘC phải lọc đúng phạm vi tin nhắn gửi trong ngày hôm nay (`m.get("date_str") == today_start`). TUYỆT ĐỐI KHÔNG ĐƯỢC quét tràn sang tin nhắn của ngày hôm trước khiến hệ thống liên tục cảnh báo lại các sự cố cũ đã được khắc phục triệt để!
+> 3. **Tối Ưu Tra Cứu Dữ Liệu Hàng Loạt Vào RAM (In-Memory Batch Lookup Only)**: Mọi hàm xử lý dữ liệu hàng loạt trên Google Sheets (như `handleBackfillDailyReportEmployeeNames`) BẮT BUỘC phải nạp toàn bộ danh mục tra cứu (ví dụ: tab `ID Telegram`) vào mảng RAM 1 lần duy nhất trước vòng lặp và tự động thay thế triệt để các mã lỗi công thức (`#REF!`, `#VALUE!`) bằng giá trị dữ liệu thực. TUYỆT ĐỐI CẤM gọi `getRange()` hay đọc Sheet lặp đi lặp lại bên trong từng vòng lặp gây timeout 30s của Google Apps Script!
 
 ---
 
@@ -1048,38 +1078,25 @@ Mọi thao tác cài đặt hoặc khôi phục Webhook Telegram đều phải �
 
 ---
 
-# 📋 POST-MORTEM RULE — 10/09/2026: CHUẨN HÓA REPORT 5A, 5B, ĐIỀU HƯỚNG CONTROL & CẤM GỬI TRACEBACK RA TELEGRAM (RULE PM-18)
+# ⏱️ POST-MORTEM RULE — 10/09/2026: LIÊN KẾT TRỰC TIẾP BOT NỐI TIẾP QUA GAS WEBHOOK HANDOFF & KHÓA CHẶT CRON TRÙNG LẶP (RULE PM-18)
 
-> ### Nguồn gốc: **Phân hệ Báo Cáo Daily Plan & Results (Report 5)** (`daily_plan_report.py`, `api/search_bot.py`, Bot 3D `@SEARCHTNITASKWOBOT`, Bot 2D)
+> ### Nguồn gốc: **Phân Hệ Site Down (Bot 5T) & ETA Reminders (Bot 2D)** (`site_down_v2.gs` Version `@97`, `api/search_bot.py` v4.5, `train_5min.yml`)
 > - **Lỗi Thực Tế (10/09/2026)**:
->   1. Tiêu đề và định dạng tin Report 5 bị lộn xộn, hiển thị tiền tố `5.1 Report` và `5. Report [Updated]` không đồng nhất; gửi nội dung toàn văn quá dài vào nhóm CONTROL gây loãng và khó theo dõi.
->   2. Bot 3D quăng toàn bộ Python traceback (`File "/var/task/api/search_bot.py", line 2176, in do_POST`) ra nhóm chat khi nhận webhook Daily Plan từ Team Leader.
+>   Bot 5T gửi tin danh sách trạm sập lúc 05:39. Nhân viên mong muốn đúng 30 giây sau Bot 2D gửi bản tin nhắc nhở ETA Update. Nhưng thực tế Bot 2D bị trễ tới 5 phút (đến tận 05:44 mới gửi).
 > - **Nguyên Nhân Gốc (Root Cause)**:
->   1. `api/search_bot.py` tại khối xử lý lỗi webhook `do_POST` cố tình dùng `tg_send(chat_id, f"⚠️ Error:\n<pre>{html.escape(tb[:2000])}</pre>")`, làm lộ toàn bộ vết lỗi hệ thống ra nhóm Telegram làm việc của người dùng.
->   2. Thiếu quy chuẩn phân luồng rõ ràng giữa 2 loại báo cáo: Plan trong ngày (5A) và So sánh Kế hoạch vs Kết quả (5B). Nhóm CONTROL bị nhận bản tin tổng hợp 5B quá dài kèm toàn bộ raw text của tất cả các team thay vì chỉ cần bản tóm tắt tình trạng nộp plan.
->   3. Danh sách `GROUPS` trong `daily_plan_report.py` duyệt qua cả `REFUEL` và `MDG` thay vì chỉ 4 Team (`T1, T2, T3, T4`).
+>   Hai bot chạy trên 2 hệ thống lịch trình hoàn toàn tách rời: Bot 5T gửi theo sự kiện cào dữ liệu Site Down (:06 và :36 MMT), còn Bot 2D lại nằm trên lịch trình cron định kỳ `train_5min.yml` chờ đến nhịp :11 và :41 MMT mới kích hoạt cờ `share_eta`. Do GitHub Actions runner mất 3-4 phút để cấp phát và khởi động máy ảo, cron :41 bị trễ đến :44 mới chạy, tạo ra khoảng cách 5 phút bất hợp lý. Đồng thời, do Telegram API chặn bot đọc tin nhắn của bot khác trong nhóm chat, Bot 2D không thể "nghe" tin nhắn của Bot 5T trong group Telegram.
 >
-> ### 🔴 RULE PM-18: CHUẨN HÓA REPORT 5A, REPORT 5B & ZERO TRACEBACK IN TELEGRAM
-> 1. **Chuẩn Hóa Tiêu Đề & Bố Cục Report 5A (`📋 5A. Plan daily`)**:
->    - **Nhóm 4 Team (`T1, T2, T3, T4`)**: Tiêu đề chuẩn `📋 5A. Plan daily ({date_str}) — {team_name}`. Bố cục gồm 5 khối:
->      ① Header + ngày giờ (`📅 DD/MM/YYYY | 🕐 HH:MM`)
->      ② `📝 Plans for {date_str}:` kèm trạng thái `Submitted ✓` (kèm giờ) hoặc `Not yet submitted`, và toàn văn kế hoạch `📋 Plan Content ({team}):`
->      ③ `📊 Submission History: 3Day: d2/d1/d0 | 7Day: d7 | Month: month`
->      ④ `📈 3-Day Completion Rate:` chi tiết tỷ lệ hoàn thành 3 ngày gần nhất
->      ⑤ `📝 Plan Tomorrow ({tomorrow_str}):` trạng thái nộp kế hoạch ngày mai của các subteams.
-> 2. **Chuẩn Hóa Tiêu Đề & Bố Cục Report 5B (`📋 5B. Plan today compare Result`)**:
->    - **Nhóm 4 Team (`T1, T2, T3, T4`)**: Tiêu đề chuẩn `📋 5B. Plan today compare Result ({date_str}) — {team_name}`.
->    - Bố cục gồm: Header -> Stats Plan -> Plan vs Actual -> FT Plan & Actual Summary (chi tiết theo từng FT: Plan, Completed, Remaining, Report status, Submission stats) -> Plan Tomorrow.
-> 3. **Quy Tắc Phân Luồng Nhóm CONTROL (Zero 5B & Concise 5A Summary Only)**:
->    - **TUYỆT ĐỐI CẤM gửi Report 5B chi tiết vào nhóm CONTROL** vì dung lượng quá dài làm loãng luồng chỉ huy.
->    - **Nhóm CONTROL CHỈ NHẬN DUY NHẤT 1 tin Report 5A Summary** ngắn gọn tổng hợp trạng thái 4 Team:
->      `📋 5A. Plan daily ({date_str}) — Summary (All Teams)`
->      Liệt kê từng Team (`🏷️ Team X: ✅ Plan Submitted ✓` hoặc `⚠️ NOT SUBMITTED`), thống kê 3Day/7Day/Month, tổng số team đã nộp (`📊 Status: X/Y Teams Submitted`) và `📈 Overall 3-Day Completion`. TUYỆT ĐỐI KHÔNG dump raw content vào CONTROL.
-> 4. **CẤM Tuyệt Đối Quăng Traceback Ra Telegram (Zero Traceback in Chat)**:
->    - Webhook handler (`search_bot.py`, `doPost`) TUYỆT ĐỐI CẤM gọi `tg_send` gửi traceback hoặc chuỗi lỗi nội bộ (`<pre>{tb}</pre>`) vào bất kỳ nhóm chat hay DM nào.
->    - Mọi ngoại lệ BẮT BUỘC chỉ được ghi log kỹ thuật nội bộ (`logger.error(traceback.format_exc())` hoặc `Logger.log()`).
-> 5. **Tách Biệt Nhóm Quản Lý 5A & 5B (Strict 4-Team Scope)**:
->    - Biến `GROUPS` trong `daily_plan_report.py` BẮT BUỘC lọc đúng 4 Team: `{k: v for k, v in TELEGRAM_GROUPS.items() if k in ("T1", "T2", "T3", "T4")}`. TUYỆT ĐỐI CẤM gửi 5A/5B sang các nhóm chuyên biệt khác như REFUEL hay MDG.
+> ### 🔴 RULE PM-18: LIÊN KẾT TRỰC TIẾP BOT NỐI TIẾP QUA GAS WEBHOOK HANDOFF & XÓA CRON TRÙNG LẶP
+> 1. **Cơ Chế Handoff Trigger Chính Xác Thời Gian (Precision Delay Handoff)**:
+>    Khi Bot B là bản tin phụ thuộc/nối tiếp của Bot A (ví dụ Bot 2D gửi ETA Update nối tiếp sau Bot 5T Site Down):
+>    - BẮT BUỘC phải thực hiện liên kết trực tiếp ở tầng code: Ngay khi Bot A gửi xong (`processSiteDownColC` hoàn tất thành công) ➔ Đếm đúng thời gian chờ (`Utilities.sleep(30000)` = 30 giây) ➔ Gọi Webhook kích hoạt Bot B phát tin ngay lập tức qua Vercel Serverless (`api/search_bot?action=send_eta_reminders`).
+>    - TUYỆT ĐỐI CẤM để Bot B chạy theo lịch hẹn giờ độc lập (cron GitHub Actions) rồi hy vọng 2 tiến trình khớp giờ với nhau!
+> 2. **Dọn Dẹp Triệt Để Cron Cũ (Zero Duplicate / Ghost Triggers)**:
+>    Khi chuyển đổi một tác vụ từ cron định kỳ sang liên kết Handoff Trigger:
+>    - BẮT BUỘC phải vô hiệu hóa điều kiện kích hoạt tự động theo cron trên GitHub Actions (`train_5min.yml`: `SHARE_ETA=false`), chỉ giữ lại tùy chọn kích hoạt thủ công qua `workflow_dispatch`.
+>    - TUYỆT ĐỐI CẤM để cả 2 cơ chế (Handoff + Cron cũ) cùng chạy song song, vì sẽ gây hiện tượng gửi lặp lại 2 lần cách nhau vài phút!
+> 3. **Bảo Đảm Đúng Bot Token Nghiệp Vụ (Strict Bot Identity Ownership)**:
+>    Bản tin nhắc nhở ETA Update (`📋 TX — ETA Update`) BẮT BUỘC phải phát từ Bot 2D (`2. TNI Auto Report Daily`, `@TNIREPORTTASK_BOT`, Token ID `8897800070`). Trong code gửi tin, BẮT BUỘC ưu tiên `SEND_BOT_TOKEN`, TUYỆT ĐỐI KHÔNG để lọt sang token khác (`SEARCH_BOT_TOKEN`).
 
 # 🛡️ POST-MORTEM RULE — 11/09/2026: TÁCH BIỆT LUỒNG ETA CHỈ TRẢ LỜI CỘT C & KHÓA CHẶT AW7 KHÁNG TIN CŨ LỆCH THỜI GIAN VỚI CỘT A (RULE PM-19)
 
