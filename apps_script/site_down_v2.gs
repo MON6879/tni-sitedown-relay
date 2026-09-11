@@ -141,21 +141,15 @@ function doPost(e) {
         Logger.log("[doPost] ❌ Lỗi Luồng 1 (Cột C): " + errColC.message);
       }
 
-      // Luồng 2 (AW7 Summary): CHỈ GỬI KHI Ô AW7 CÓ MỐC GIỜ MỚI THAY ĐỔI
-      var sentAwAz = false;
-      try {
-        sentAwAz = processSummaryAwAz(sheet, false);
-        Logger.log("[doPost] Luồng 2 (AW7) gửi xong: " + sentAwAz);
-      } catch(errAwAz) {
-        Logger.log("[doPost] ❌ Lỗi Luồng 2 (AW7): " + errAwAz.message);
-      }
+      // 🛑 KHÔNG GỌI processSummaryAwAz Ở ĐÂY:
+      // Luồng cào Cột A (store_site_down) CHỈ GỬI DUY NHẤT Cột C (Tin 1) + kích hoạt Bot 2D ETA.
+      // Bảng AW7 độc lập, tuyệt đối không gửi chen vào đợt cào Cột A để tránh gửi tin cũ và lệch thời gian!
 
       return _json({ 
         ok: true, 
         lines: lines.length,
         relay_ts: relayTs,
-        sent_tin1: sentColC,
-        sent_tin2: sentAwAz
+        sent_tin1: sentColC
       });
     }
 
@@ -483,30 +477,30 @@ function triggerBot2dEta_(skipDelay) {
 // Độc lập 100% — Chỉ đọc mốc giờ ô AW7 & ghi chìa khóa TS_KEY_AW7
 // ============================================================
 function processSummaryAwAz(sheet, isDirectPush) {
-  const rawVal = sheet.getRange("AW7").getValue();
-  // 🔍 DEBUG: Log kiểu dữ liệu thực tế của ô AW7
-  Logger.log("[Luồng AW7] rawVal type=" + typeof rawVal + " | instanceof Date=" + (rawVal instanceof Date) + " | raw=" + String(rawVal).substring(0, 60));
-
-  let rawTs;
-  if (rawVal instanceof Date) {
-    // Nếu là Date object → format chuẩn hóa về dd/MM/yyyy HH:mm (không có giây)
-    rawTs = Utilities.formatDate(rawVal, "Asia/Rangoon", "dd/MM/yyyy HH:mm");
-  } else {
-    rawTs = String(rawVal).trim();
-  }
-
-  if (!rawTs) {
-    Logger.log("[Luồng AW7] Ô AW7 rỗng — Bỏ qua Luồng 2");
-    return false;
-  }
-
-  // ✅ Chuẩn hóa tsKey: CHỈ giữ lại dd/MM/yyyy HH:mm, loại bỏ giây và phần dư
-  const m = rawTs.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
-  const tsKey = m ? m[1] : rawTs.substring(0, 16).trim();
+  const tsKey = parseAW7Timestamp(sheet);
 
   if (!tsKey) {
-    Logger.log("[Luồng AW7] Không bóc tách được timestamp từ AW7 — Bỏ qua Luồng 2");
+    Logger.log("[Luồng AW7] Không bóc tách được timestamp từ AW7/AW6 — Bỏ qua Luồng 2");
     return false;
+  }
+
+  // 🛡️ CHỐT CHẶN 1: Dữ liệu AW7 không được quá 45 phút so với thời gian hiện tại
+  if (!isDirectPush && !isDataFresh_(tsKey, 45)) {
+    Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") đã quá 45 phút so với hiện tại → Dữ liệu cũ, bỏ qua không gửi Tin 2!");
+    return false;
+  }
+
+  // 🛡️ CHỐT CHẶN 2: Timestamp AW7 KHÔNG ĐƯỢC CŨ HƠN Cột A
+  // Nếu Cột A đã có mốc giờ mới hơn (ví dụ A1 là 18:00 mà AW7 vẫn là 17:16 hoặc 13:49)
+  // → Chứng tỏ bảng AW7 chưa được cập nhật theo đợt mới, TUYỆT ĐỐI KHÔNG GỬI!
+  const tsA1 = parseA1Timestamp(sheet);
+  if (tsA1) {
+    const minAw = parseTsToMinutes_(tsKey);
+    const minA1 = parseTsToMinutes_(tsA1);
+    if (minAw > 0 && minA1 > 0 && minAw < minA1) {
+      Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") CŨ HƠN Cột A (" + tsA1 + ") " + (minA1 - minAw) + " phút → Dữ liệu cũ, bỏ qua không gửi Tin 2!");
+      return false;
+    }
   }
 
   const props  = PropertiesService.getScriptProperties();
@@ -516,14 +510,13 @@ function processSummaryAwAz(sheet, isDirectPush) {
   Logger.log("[Luồng AW7] tsKey=[" + tsKey + "] lastTs=[" + lastTs + "] match=" + (tsKey === lastTs));
 
   // 🛑 DEDUP: Nếu timestamp AW7 không đổi → bỏ qua (đã gửi rồi)
-  // Logic đúng: tsKey mới ≠ lastTs → GỬI NGAY. Không cần freshness check.
   if (tsKey === lastTs && !isDirectPush) {
     Logger.log("[Luồng AW7] Timestamp AW7 không đổi (" + tsKey + ") → Bỏ qua Luồng 2");
     return false;
   }
 
-  // ✅ Timestamp mới → gửi ngay lập tức (không giới hạn thời gian)
-  Logger.log("[Luồng AW7] 🆕 Timestamp mới: " + tsKey + " (cũ: " + lastTs + ") → Gửi ngay!");
+  // ✅ Timestamp mới và hợp lệ → gửi
+  Logger.log("[Luồng AW7] 🆕 Timestamp mới: " + tsKey + " (cũ: " + lastTs + ") → Đủ điều kiện gửi Tin 2!");
 
   // ✅ Đọc trực tiếp bảng AW:AZ và gửi nguyên vẹn 100% thông tin có trong ô (thêm Icon)
   let awaz = readAwAz(sheet);
@@ -640,12 +633,42 @@ function parseA1Timestamp(sheet) {
 }
 
 function parseAW7Timestamp(sheet) {
-  const raw = sheet.getRange("AW7").getValue().toString();
-  const m1 = raw.match(/Site\s*down[^:]*:\s*(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/i);
-  if (m1) return m1[1].trim();
-  const m2 = raw.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
-  if (m2) return m2[1].trim();
+  // 1. Thử đọc AW7 (Cell down / Site down)
+  try {
+    const rawVal7 = sheet.getRange("AW7").getValue();
+    const raw7 = (rawVal7 instanceof Date)
+      ? Utilities.formatDate(rawVal7, "Asia/Rangoon", "dd/MM/yyyy HH:mm")
+      : (rawVal7 || "").toString();
+    const m1 = raw7.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
+    if (m1) return m1[1].trim();
+  } catch(e) {}
+
+  // 2. Thử đọc AW6 (Site down header nếu có)
+  try {
+    const rawVal6 = sheet.getRange("AW6").getValue();
+    const raw6 = (rawVal6 instanceof Date)
+      ? Utilities.formatDate(rawVal6, "Asia/Rangoon", "dd/MM/yyyy HH:mm")
+      : (rawVal6 || "").toString();
+    const m2 = raw6.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
+    if (m2) return m2[1].trim();
+  } catch(e) {}
+
   return null;
+}
+
+/**
+ * ⏱️ Chuyển chuỗi timestamp "dd/MM/yyyy HH:mm" thành số phút để so sánh thời gian chính xác
+ */
+function parseTsToMinutes_(tsStr) {
+  if (!tsStr) return 0;
+  const m = tsStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+  if (!m) return 0;
+  const day   = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10) - 1;
+  const year  = parseInt(m[3], 10);
+  const hour  = parseInt(m[4], 10);
+  const min   = parseInt(m[5], 10);
+  return Math.floor(Date.UTC(year, month, day, hour, min) / 60000);
 }
 
 function readAwAz(sheet) {
