@@ -39,7 +39,7 @@ TEAM_GROUPS = {
     3: TELEGRAM_GROUPS["T3"],
     4: TELEGRAM_GROUPS["T4"],
 }
-CONTROL_CHAT_ID = -1005251698940
+CONTROL_CHAT_ID = TELEGRAM_GROUPS.get("CONTROL", -5251698940)
 
 MAIN_GAS_FALLBACK = "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
 APPS_SCRIPT_URL = os.getenv("APPS_SCRIPT_URL", "").strip()
@@ -47,11 +47,20 @@ if not APPS_SCRIPT_URL or "AKfycbzGFdnE" in APPS_SCRIPT_URL or "AKfycbz-" not in
     APPS_SCRIPT_URL = MAIN_GAS_FALLBACK
 
 
+# Các giá trị lỗi công thức Google Sheets — PHẢI loại bỏ 100%
+FORMULA_ERRORS = {"#REF!", "#VALUE!", "#N/A", "#NAME?", "#DIV/0!", "#NULL!", "#ERROR!", "#NUM!"}
+
+
 def is_valid_text(val):
     if not val:
         return False
     val_s = str(val).strip()
-    return val_s not in ("", "-", "nan", "None", "NaN", "0")
+    if val_s in ("", "-", "nan", "None", "NaN", "0"):
+        return False
+    # Loại bỏ dòng chứa lỗi công thức Google Sheets
+    if any(err in val_s for err in FORMULA_ERRORS):
+        return False
+    return True
 
 
 async def send_msg(bot: Bot, cid: int, text: str, label: str = ""):
@@ -118,7 +127,7 @@ async def main():
         col_b = str(row.iloc[1]).strip() if len(row) > 1 and not pd.isna(row.iloc[1]) else ""
         col_c = str(row.iloc[2]).strip() if len(row) > 2 and not pd.isna(row.iloc[2]) else ""
 
-        if not col_b or not is_valid_text(col_c):
+        if not col_b or not is_valid_text(col_b) or not is_valid_text(col_c):
             continue
 
         prefix = col_b[:2].upper()
@@ -203,7 +212,7 @@ async def main():
                 except Exception as ex:
                     logger.warning(f"Lỗi lưu msgids Control: {ex}")
 
-        logger.info(f"🎉 Hoàn tất Report 6.1 (Đã gửi {total_sent} teams).")
+        logger.info(f"🎉 Hoàn tất Report 6.1 (Đã gửi {total_sent} teams + Control).")
 
 
 if __name__ == "__main__":
