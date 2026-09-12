@@ -75,6 +75,7 @@
 | 🔵 **GITHUB ACTIONS** | **Report 6.1 (Site Clear Today)** | `site_clear_report.py` | GitHub (`MON6879` — 07:18, 10:18, 14:18, 17:18 MMT) | Báo cáo sự cố Clear trong ngày theo Team từ tab Site down Clear Morning |
 | 🔵 **GITHUB ACTIONS** | **Refuel Reports** | `refuel_plan_report.py` (~~`cable_report.py` đã hủy~~) | GitHub (`MON6879` — theo lịch) | Kế hoạch cấp dầu máy phát |
 | 🔵 **GITHUB ACTIONS** | **Site Down Relay (Toa SD ƯU TIÊN 1)** | `train_5min.yml` / `botlookup_relay.py` | GitHub (`MON6879` — Toa SD chạy ĐẦU TIÊN mỗi nhịp :06/:36 MMT trong train) | Cào dữ liệu trạm sập NOC Pro bằng Telethon, chạy tuần tự TRƯỚC mọi report khác |
+| 🔵 **GITHUB ACTIONS** | **Toa Cable Link Down (:16 / :46)** | `cable_link_down_report.py` | GitHub (`MON6879` — :16 & :46 MMT) | Báo cáo tiến độ Link Down tuyến cáp cột C tab Link down now gửi vào SOS (-5531350787) qua Bot 15, xóa tin cũ |
 
 ---
 
@@ -201,8 +202,8 @@ grep -c 'continue-on-error: true' train_5min.yml                # Phải = tổn
 | Tên chức năng / Bot | Endpoint Webhook / Deployment | Apps Script Web App URL | Các file Python liên quan (Phải đồng bộ `MAIN_GAS_FALLBACK`) | Workflow / Docs liên quan (Phải đồng bộ) |
 |---|---|---|---|---|
 | **Main & Asset Collector Bot** (`@TNIASSETorderREQUEST_BOT`) | `https://tni-bot.vercel.app/api/collector` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@302`) | `api/collector.py`, `daily_read_report.py`, `daily_plan_report.py`, `daily_bod_assign.py`, `cron_send.py`, `backlog_send.py`, `site_clear_report.py` | `system_map.md`, `SYSTEM_DOC.md`, `AGENTS.md` |
-| **Search Bot** (`@SEARCHTNITASKWOBOT`) | `https://tni-bot.vercel.app/api/search_bot` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@302`) | `api/search_bot.py` | `system_map.md`, `SYSTEM_DOC.md`, `AGENTS.md` |
-| **Refuel Collector & Plan Bot** | Apps Script Web App | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` (Version `@71`) | `api/refuel_collector.py`, `refuel_send.py`, `refuel_plan_report.py` | `system_map.md`, `SYSTEM_DOC.md` |
+| **Search Bot** (`@SEARCHTNITASKWOBOT`) | `https://tni-bot.vercel.app/api/search_bot` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@302`) / Vercel `v4.5` | `api/search_bot.py` | `system_map.md`, `SYSTEM_DOC.md`, `AGENTS.md` |
+| **Refuel & Site Down GAS** | Apps Script Web App | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` (Version `@98`) | `api/refuel_collector.py`, `site_down_v2.gs`, `botlookup_relay.py` | `system_map.md`, `SYSTEM_DOC.md` |
 | **Site Down Bot (Relay)** (`@tni_site_down_bot`) | `https://tni-bot.vercel.app/api/site_down_relay` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` (Version `@349`) | `api/site_down_relay.py`, `botlookup_relay.py` | `system_map.md`, `SYSTEM_DOC.md` |
 | **Construction Bot** (`@8903841312`) | `https://tni-bot.vercel.app/api/construction` (Vercel Proxy) | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec` | `api/construction.py` | `system_map.md`, `SYSTEM_DOC.md` |
 
@@ -308,10 +309,10 @@ grep -c 'continue-on-error: true' train_5min.yml                # Phải = tổn
 | Script | Phiên bản Live | Deployment ID (Prefix) | Spreadsheet / Project | Fallback var trong Python |
 |---|---|---|---|---|
 | **Main GAS Collector** | `@302` | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` | `Team All Find - Sum WO` (`1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8`) | `MAIN_GAS_FALLBACK` |
-| **Refuel GAS** | `@71` | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` | `TNI_Refuel` (`1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM`) | `REFUEL_PLAN_GAS_URL` |
+| **Refuel & Site Down GAS** | `@98` | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` | `TNI_Refuel` (`1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM`) | `REFUEL_PLAN_GAS_URL` / `SD_APPS_SCRIPT_URL` |
 | **Site Down GAS** | `@latest` | `AKfycbxVi0BGDW7B_KBxcSEdw3yuHB9Rs2BemQEYeKDwsybJQdmQv-_0HqyGHjpZI6jupxll` | `TNI SITE DOWN` (standalone) | `SD_APPS_SCRIPT_URL` (secret) |
 | **Construction Keepalive GAS** | `@302` (merged into Main GAS) | `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` | `13_TNI_CONSTRUCTION.gs` | `keepalive_construction.yml` |
-| **Attendance Bot GAS** | `@41` | `AKfycbxoM2KgWFJ4pXaYYdE7bAelngrpVD335D1a9y6Ryusr7Wh7xEwTOG4rfpPTC7K_ZMaqlg` | `TNI attendance.js` | Direct deploy (Clasp) |
+| **Attendance Bot GAS** | `@72` | `AKfycbyFIDGDS5k7wy-hNp2p1PNvte0CQ6cSiNYLyBmNc00Yi1b6IueOob9bKmu4zoQ1A6Cs` | `TNI attendance.js` | Direct deploy (Clasp) |
 
 ---
 
@@ -1382,7 +1383,7 @@ KHÔNG ĐỤNG:
 | **`Ghế EXT-TC-CONSTRUCTION`**| Cổng Ngoại Giao Construction | Webhook Bot `@8903841312` (`10 TNI_SITE`) | Báo Bot câm / mất phản hồi về DM Admin |
 | **`Ghế GAS-ATTENDANCE-4`** | Quản Trị GAS Điểm Danh | Logic điểm danh trên `apps_script_attendance` | Báo lỗi Sheet điểm danh về DM Admin |
 | **`Ghế EXT-ATTENDANCE-BOT`** | Cổng Ngoại Giao Điểm Danh | Webhook Bot Điểm Danh `@8628370628` | Báo trễ nhận diện ảnh về DM Admin |
-| **`Ghế BOT-CABLE-15`** | Bot 15 TNI CABLE Thu Thập Cáp | Webhook `/api/cable_bot`, `@TNI_CABLE_BOT` (8758104446), Nhóm `8 TNI CABLE BROKEN SOS` (-5531350787) | Phản hồi sự cố cáp & lưu ảnh Drive folder theo REF |
+| **`Ghế BOT-CABLE-15`** | Bot 15 TNI CABLE Thu Thập Cáp | Webhook `/api/cable_bot`, `@TNI_CABLE_BOT` (8758104446), Nhóm `8 TNI CABLE BROKEN SOS` (-5531350787) | Phản hồi sự cố cáp kèm Note vật tư & bảo dưỡng, lưu ảnh Drive folder theo REF |
 | **`Ghế GAS-CABLE-15`** | Quản Trị GAS Cable | `apps_script_cable.gs` (@387), ghi Sheet `Detail cable`, trả link Drive Folder tải tất cả ảnh | Báo lỗi Drive / Sheet Cable về DM Admin |
 | **`Ghế GAS-VERIFY-0`** | Xác Nhận Đủ File GAS | `QLTC_GAS` = 17 files, `apps_script_sitedown` = 1 file | DỪNG NGAY nếu thiếu file, KHÔNG push! |
 | **`Ghế GAS-PUSH-1`** | Đẩy Code Lên GAS Cloud | `npx clasp push` (theo đúng thư mục chuyên biệt) | Báo lỗi push / xung đột về DM Admin |

@@ -11,12 +11,9 @@ name: "🚂 5-Min Train — Unified Keepalive + All Reports"
 # last-updated: 2026-08-13
 
 on:
+  schedule:
+    - cron: '1/5 * * * *'   # Every 5 min offset 1 (fires at :06, :11, :16, :21, :26, :31, :36, :41, :46, :51, :56, :01 MMT)
   workflow_dispatch:
-# schedule:
-#   # 🚫 VÔ HIỆU HÓA HOÀN TOÀN TRÊN REPO tni-sitedown-relay:
-#   # Toàn bộ Đoàn Tàu 5-Min Train DUY NHẤT chạy trên phonghdpxd-cmd/tni-bot (Task and WO).
-#   # TUYỆT ĐỐI CẤM kích hoạt cron trên repo này để tránh gửi tin nhắn nhân đôi và xung đột Telethon session!
-#   - cron: '1/5 * * * *'
     inputs:
       report_type:
         description: 'Select report to run manually (Auto = check_time decides)'
@@ -27,6 +24,8 @@ on:
           - 'Auto'
           - '🚨 Toa Site Down - Site Down Relay (:06 / :36)'
           - 'Site Down Relay'
+          - '🔌 Toa Cable - Cable Link Down Report (:16 / :46)'
+          - 'Cable Link Down Report'
           - 'All Reports (1, 2, 3, 4, 5, 6 - Full Pipeline)'
           - 'Reports 1, 2, 3, 4 - Daily Task & Backlog'
           - 'Report 1, 2, 3 - Daily Backlog (DG & Task)'
@@ -125,7 +124,7 @@ jobs:
           R1234=false; R4=false; BOD=false; P5A=false; P5B=false; P5C=false
           R6=false; R61=false; CABLE=false; REFUEL_REQ=false
           REFUEL_P1=false; REFUEL_P2=false; REFUEL_P21=false; REFUEL_P4=false
-          AUDITOR91=false; SHARE_ETA=false; SITE_DOWN=false
+          AUDITOR91=false; SHARE_ETA=false; SITE_DOWN=false; CABLE_LD=false
 
           # check_time <hour> <target_minute> — dung sai ±4 phút (nới rộng do GitHub Actions delay thường xuyên 3-5p)
           check_time() {
@@ -229,6 +228,17 @@ jobs:
             fi
           fi
 
+          # 🔌 TOA CABLE LINK DOWN: Khởi hành tại nhịp :16 và :46 MMT mỗi giờ (10 phút sau Site Down :06/:36)
+          DIFF_16=$(( CURR_M - 16 ))
+          [ $DIFF_16 -lt 0 ] && DIFF_16=$(( -DIFF_16 ))
+          DIFF_46=$(( CURR_M - 46 ))
+          [ $DIFF_46 -lt 0 ] && DIFF_46=$(( -DIFF_46 ))
+          if [ $DIFF_16 -le 2 ] || [ $DIFF_46 -le 2 ]; then
+            CABLE_LD=true
+            NEED_PYTHON=true
+            echo "🔌 Toa Cable: Cable Link Down Report (:16/:46 MMT)"
+          fi
+
           # 📋 Share ETA Reminder: ĐÃ ĐƯỢC LIÊN KẾT TRỰC TIẾP QUA GAS (30s sau Bot 5T)
           # Tắt kích hoạt tự động theo cron :11/:41 trên train_5min để tránh bị trễ 5 phút và trùng lặp
           # Vẫn cho phép kích hoạt thủ công qua workflow_dispatch
@@ -237,6 +247,7 @@ jobs:
           # Output all flags
           echo "need_python=$NEED_PYTHON" >> $GITHUB_OUTPUT
           echo "site_down=$SITE_DOWN" >> $GITHUB_OUTPUT
+          echo "cable_ld=$CABLE_LD" >> $GITHUB_OUTPUT
           echo "r1234=$R1234" >> $GITHUB_OUTPUT
           echo "r4=$R4" >> $GITHUB_OUTPUT
           echo "bod=$BOD" >> $GITHUB_OUTPUT
@@ -304,6 +315,26 @@ jobs:
           else
             python botlookup_relay.py || true
           fi
+
+      # ═══════════════════════════════════════════════
+      # 🔌 TOA CABLE: Cable Link Down Report (Nhịp :16 và :46 MMT)
+      # 🤖 Engine: Bot API (15 TNI CABLE)
+      # ⏰ Schedule: :16 và :46 Myanmar (10 phút sau Site Down :06/:36)
+      # ═══════════════════════════════════════════════
+      - name: "🔌 Toa Cable — Cable Link Down Report (:16 / :46 MMT)"
+        continue-on-error: true
+        if: |
+          steps.sched.outputs.cable_ld == 'true' ||
+          (github.event_name == 'workflow_dispatch' && (
+            inputs.report_type == 'Cable Link Down Report' ||
+            inputs.report_type == '🔌 Toa Cable - Cable Link Down Report (:16 / :46)' ||
+            inputs.report_type == 'All Reports (1, 2, 3, 4, 5, 6 - Full Pipeline)'
+          ))
+        env:
+          CABLE_BOT_TOKEN: ${{ secrets.CABLE_BOT_TOKEN }}
+          CABLE_CHAT_ID: ${{ secrets.CABLE_CHAT_ID }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+        run: python cable_link_down_report.py || true
 
       # ═══════════════════════════════════════════════
       # 📊 TOA 1+11: Reports 1,2,3,4 + BOD Assign

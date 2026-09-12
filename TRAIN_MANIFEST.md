@@ -49,6 +49,12 @@
 # 22:18 | Toa 11 | 📱 Refuel Plan 4          | refuel_plan_report.py --report 4
 #
 # ═══════════════════════════════════════════════════
+# 🔄 24/7 HOURLY RECURRING BLOCKS (Mỗi 30 phút, 24/7)
+# ═══════════════════════════════════════════════════
+# :06 & :36 | Toa SD     | 📱 Site Down Relay        | botlookup_relay.py
+# :16 & :46 | Toa Cable  | 🤖 Cable Link Down Report  | cable_link_down_report.py (Bot 15)
+#
+# ═══════════════════════════════════════════════════
 # 🏥 TOA 0: KEEPALIVE ENDPOINTS (MỌI CHUYẾN, 24/7)
 # ═══════════════════════════════════════════════════
 # 1. Search Bot    | Vercel /api/search_bot     | Tránh cold start 3-5s
