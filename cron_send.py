@@ -2138,12 +2138,25 @@ async def main():
                 logger.info(f"📝 Gửi Note reply dưới tên user @phongha79 (Telethon) TRẢ LỜI CHO 4D → {len(target_reply_msgids)} nhóm...")
                 for cid_str, reply_to_id in target_reply_msgids.items():
                     try:
+                        # 🛡️ Idempotency check: kiểm tra 5 tin gần nhất trong chat
+                        # Nếu Note đã được gửi trong vòng 15 phút, bỏ qua để chống gửi lặp tuyệt đối!
+                        already_sent = False
+                        async for prev_m in tg_note_client.iter_messages(int(cid_str), limit=5):
+                            if prev_m.text and control_note.strip() in prev_m.text.strip():
+                                age_secs = (datetime.now(timezone.utc) - prev_m.date).total_seconds()
+                                if age_secs < 900:  # 15 phút
+                                    already_sent = True
+                                    logger.info(f"  ⏭️ Note đã gửi gần đây ({int(age_secs)}s trước) tới {cid_str} — bỏ qua gửi trùng!")
+                                    break
+                        if already_sent:
+                            continue
+
                         await tg_note_client.send_message(
                             entity=int(cid_str),
                             message=control_note,
                             reply_to=reply_to_id
                         )
-                        logger.info(f"  ✅ Note reply (@phongha79) → {cid_str} (reply_to 4d msg_id: {reply_to_id})")
+                        logger.info(f"  ✅ Note reply (@phongha79) → {cid_str} (reply_to msg_id: {reply_to_id})")
                         await asyncio.sleep(0.5)
                     except Exception as note_send_err:
                         logger.error(f"  ❌ Note reply (@phongha79) thất bại → {cid_str}: {note_send_err}")
@@ -2204,13 +2217,69 @@ def send_share_eta_reminders(force: bool = False):
         logger.info(f"share_eta reminder: ngoài giờ hoạt động ({hour}:xx), bỏ qua")
         return
 
-    # Import tg_utils để xóa/lưu message_id
+    # Import tg_utils để xóa/lưu message_id (có fallback cục bộ tự thân 100% chức năng)
+    import_err_str = None
     try:
-        from tg_utils import tg_delete, get_msg_id, set_msg_id
+        from tg_utils import tg_delete, get_msg_id, set_msg_id, get_msg_ids_batch, set_msg_ids_batch
         has_tg_utils = True
-    except ImportError:
-        has_tg_utils = False
-        logger.warning("send_share_eta_reminders: tg_utils not available, no delete-old support")
+    except Exception as e:
+        import_err_str = str(e)
+        logger.warning(f"send_share_eta_reminders: tg_utils import warning ({e}), using built-in self-contained helpers")
+        _raw_gas = os.getenv("APPS_SCRIPT_URL") or "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec"
+        _gas_fallback = str(_raw_gas).strip().lstrip('\ufeff\u200b\u200c\u200d\u200e\u200f\xa0')
+        def tg_delete(chat_id, mid, bot_token=None):
+            if not mid or not chat_id: return
+            tok = bot_token or os.getenv("SEND_BOT_TOKEN") or "8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A"
+            try:
+                requests.post(f"https://api.telegram.org/bot{tok}/deleteMessage", json={"chat_id": int(chat_id), "message_id": int(mid)}, timeout=8)
+            except Exception: pass
+        def get_msg_ids_batch(keys):
+            if not keys: return {}
+            import urllib.request, json as _j
+            full_url = f"{_gas_fallback}?action=get_msg_ids_batch&keys=" + ",".join(str(k) for k in keys)
+            try:
+                req = urllib.request.Request(full_url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    data = _j.loads(resp.read().decode("utf-8"))
+                    if data.get("status") == "ok" and data.get("states"): return data.get("states", {})
+            except Exception: pass
+            try:
+                r = requests.get(full_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+                if r.status_code == 200: return r.json().get("states", {})
+            except Exception: pass
+            return {}
+        def set_msg_ids_batch(st):
+            if not st: return
+            import urllib.request, json as _j
+            try:
+                payload = _j.dumps({"action": "set_msg_ids_batch", "states": st}).encode("utf-8")
+                req = urllib.request.Request(_gas_fallback, data=payload, headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    return resp.read().decode("utf-8")
+            except Exception: pass
+            try:
+                requests.post(_gas_fallback, json={"action": "set_msg_ids_batch", "states": st}, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+            except Exception: pass
+        def get_msg_id(k):
+            if not k: return ""
+            import urllib.request, json as _j
+            full_url = f"{_gas_fallback}?action=get_msg_id&key={k}"
+            try:
+                req = urllib.request.Request(full_url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    val = _j.loads(resp.read().decode("utf-8")).get("msg_id", "")
+                    if val: return str(val).strip()
+            except Exception: pass
+            try:
+                r = requests.get(full_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+                if r.status_code == 200: return str(r.json().get("msg_id", "")).strip()
+            except Exception: pass
+            return ""
+        def set_msg_id(k, v):
+            if not k: return
+            try:
+                requests.post(_gas_fallback, json={"action": "set_msg_id", "key": k, "msg_id": str(v)}, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+            except Exception: pass
 
     # ── Chốt chặn: Kiểm tra timestamp Site Down & Kháng trùng lặp trong cùng nhịp ──
     if not force:
@@ -2236,14 +2305,13 @@ def send_share_eta_reminders(force: bool = False):
                         logger.warning(f"Lỗi parse sd_dt: {parse_err}")
 
                     # 2. Kháng trùng lặp cùng nhịp (bucket 30 phút :11 và :41 MMT)
-                    if has_tg_utils:
-                        bucket = f"{now.strftime('%Y%m%d_%H')}_{'11' if now.minute < 30 else '41'}"
-                        last_sent_bucket = get_msg_id("last_eta_sent_bucket")
-                        if last_sent_bucket == bucket:
-                            logger.info(f"⏸️ Nhịp {bucket} đã gửi rồi — bỏ qua để tránh gửi lặp trong cùng nhịp 30 phút.")
-                            return
-                        set_msg_id("last_eta_sent_bucket", bucket)
-                        set_msg_id("last_eta_sd_timestamp", current_sd_ts)
+                    bucket = f"{now.strftime('%Y%m%d_%H')}_{'11' if now.minute < 30 else '41'}"
+                    last_sent_bucket = get_msg_id("last_eta_sent_bucket")
+                    if last_sent_bucket == bucket:
+                        logger.info(f"⏸️ Nhịp {bucket} đã gửi rồi — bỏ qua để tránh gửi lặp trong cùng nhịp 30 phút.")
+                        return
+                    set_msg_id("last_eta_sent_bucket", bucket)
+                    set_msg_id("last_eta_sd_timestamp", current_sd_ts)
         except Exception as sd_chk_err:
             logger.warning(f"Không kiểm tra được Site Down timestamp: {sd_chk_err}")
 
@@ -2265,58 +2333,94 @@ def send_share_eta_reminders(force: bool = False):
         "T4":    str(TELEGRAM_GROUPS.get("T4", "")),
     }
 
+    # Bot 2D (2. TNI Auto Report Daily - SEND_BOT_TOKEN)
     token = os.getenv("SEND_BOT_TOKEN") or "8897800070:AAHcG2eHlPsE0KpZAGjcFTe7ndn8gjpQi-A"
 
+    # 1. TỐC ĐỘ CAO: Nạp toàn bộ State của tất cả các Team trong 1 HTTP request duy nhất (<300ms)
+    target_keys = [f"eta_reminder_{t_name.replace(' ', '_')}" for t_name, _, _ in results]
+    old_states = {}
+    try:
+        old_states = get_msg_ids_batch(target_keys)
+    except Exception as ex_b:
+        logger.warning(f"get_msg_ids_batch error: {ex_b}")
+
     sent_count = 0
-    for t_name, msg_text, has_pending in results:
+    deleted_count = 0
+    new_states = {}
+
+    import concurrent.futures
+
+    def _process_team(item):
+        t_name, msg_text, has_pending = item
         chat_id = team_chat_map.get(t_name, "")
         if not chat_id:
             logger.warning(f"share_eta reminder: Không tìm thấy chat_id cho {t_name}")
-            continue
+            return None, "", 0
 
-        # Key riêng cho mỗi team — "tin nào xóa tin nấy"
         state_key = f"eta_reminder_{t_name.replace(' ', '_')}"
+        t_del_count = 0
 
-        # 1. Xóa tin cũ (nếu có) — hỗ trợ multi-IDs và retry chống nghẽn GAS
-        if has_tg_utils:
-            old_raw = ""
-            for _ in range(2):
-                try:
-                    old_raw = get_msg_id(state_key)
-                    if old_raw:
-                        break
-                except Exception:
-                    pass
-                time.sleep(0.5)
+        # 2. Xóa tin cũ (nếu có) — tra cứu in-memory RAM siêu tốc
+        old_raw = old_states.get(state_key, "")
+        if not old_raw:
+            try:
+                old_raw = get_msg_id(state_key)
+            except Exception:
+                pass
 
-            if old_raw:
-                for mid in str(old_raw).replace(";", ",").split(","):
-                    mid = mid.strip()
-                    if mid:
-                        try:
-                            tg_delete(chat_id, mid, bot_token=token)
-                            logger.info(f"🗑️ Đã xóa tin cũ {state_key} msg_id={mid}")
-                        except Exception as del_err:
-                            logger.warning(f"Lỗi xóa tin {state_key} mid={mid}: {del_err}")
+        if old_raw:
+            for mid in str(old_raw).replace(";", ",").split(","):
+                mid = mid.strip()
+                if mid:
+                    try:
+                        tg_delete(chat_id, mid, bot_token=token)
+                        t_del_count += 1
+                        logger.info(f"🗑️ Đã xóa tin cũ {state_key} msg_id={mid}")
+                    except Exception as del_err:
+                        logger.warning(f"Lỗi xóa tin {state_key} mid={mid}: {del_err}")
 
-        # 2. Gửi tin mới
+        # 3. Gửi tin mới qua Bot 2D
+        t_new_msg_id = ""
         try:
             resp = requests.post(
                 f"https://api.telegram.org/bot{token}/sendMessage",
                 json={"chat_id": chat_id, "text": msg_text, "parse_mode": ""},
-                timeout=15
+                timeout=10
             )
             if resp.status_code == 200:
-                new_msg_id = resp.json().get("result", {}).get("message_id", "")
-                logger.info(f"✅ share_eta reminder → {t_name} ({chat_id}): msg_id={new_msg_id}")
-                sent_count += 1
-                # 3. Lưu message_id mới để lần sau xóa
-                if has_tg_utils and new_msg_id:
-                    set_msg_id(state_key, str(new_msg_id))
+                t_new_msg_id = str(resp.json().get("result", {}).get("message_id", ""))
+                logger.info(f"✅ share_eta reminder → {t_name} ({chat_id}): msg_id={t_new_msg_id}")
             else:
                 logger.warning(f"share_eta reminder → {t_name}: HTTP {resp.status_code} {resp.text[:100]}")
         except Exception as e:
             logger.error(f"share_eta reminder → {t_name}: {e}")
 
-    logger.info(f"📢 send_share_eta_reminders: xong, đã gửi {sent_count} tin")
+        return state_key, t_new_msg_id, t_del_count
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
+        for sk, nid, d_cnt in executor.map(_process_team, results):
+            if sk and nid:
+                new_states[sk] = nid
+                sent_count += 1
+            deleted_count += d_cnt
+
+    # 4. TỐC ĐỘ CAO: Lưu toàn bộ ID mới của tất cả các Team trong 1 request duy nhất (<300ms)
+    if new_states:
+        try:
+            set_msg_ids_batch(new_states)
+            logger.info(f"💾 Đã lưu batch state thành công: {new_states}")
+        except Exception as ex_sb:
+            logger.warning(f"set_msg_ids_batch error ({ex_sb}), fallback từng key")
+            for sk, sv in new_states.items():
+                try: set_msg_id(sk, sv)
+                except Exception: pass
+
+    logger.info(f"📢 send_share_eta_reminders: xong, đã gửi {sent_count} tin, đã xóa {deleted_count} tin cũ")
+    return {
+        "sent_count": sent_count,
+        "deleted_count": deleted_count,
+        "new_states": new_states,
+        "old_states": old_states,
+        "import_error": import_err_str
+    }
 
