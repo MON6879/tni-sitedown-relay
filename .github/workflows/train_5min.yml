@@ -243,10 +243,22 @@ jobs:
           # Vẫn cho phép kích hoạt thủ công qua workflow_dispatch
           SHARE_ETA=false
 
+          # 🧹 Toa Sweep ETA: Tự động chạy quét tin ETA mồ côi tại :11 và :41 MMT
+          DIFF_11=$(( CURR_M - 11 ))
+          [ $DIFF_11 -lt 0 ] && DIFF_11=$(( -DIFF_11 ))
+          DIFF_41=$(( CURR_M - 41 ))
+          [ $DIFF_41 -lt 0 ] && DIFF_41=$(( -DIFF_41 ))
+          if [ $DIFF_11 -le 2 ] || [ $DIFF_41 -le 2 ]; then
+            SWEEP_ETA=true
+            NEED_PYTHON=true
+            echo "🧹 Toa Sweep ETA: Quét tin ETA mồ côi (:11/:41 MMT)"
+          fi
+
           # Output all flags
           echo "need_python=$NEED_PYTHON" >> $GITHUB_OUTPUT
           echo "site_down=$SITE_DOWN" >> $GITHUB_OUTPUT
           echo "cable_ld=$CABLE_LD" >> $GITHUB_OUTPUT
+          echo "sweep_eta=$SWEEP_ETA" >> $GITHUB_OUTPUT
           echo "r1234=$R1234" >> $GITHUB_OUTPUT
           echo "r4=$R4" >> $GITHUB_OUTPUT
           echo "bod=$BOD" >> $GITHUB_OUTPUT
@@ -656,6 +668,28 @@ jobs:
           from cron_send import send_share_eta_reminders
           send_share_eta_reminders(force=($IS_FORCE))
           " || true
+
+      # ═══════════════════════════════════════════════
+      # 🧹 TOA SWEEP ETA: Quét và Triệt Tiêu Sạch Tin ETA Mồ Côi
+      # 📱 Engine: Telethon (Bảo vệ tuyệt đối Report 1, 2, 3, 4, 4c, 5.1)
+      # ⏰ Schedule: :11, :41 MMT (sau ETA) và bất cứ khi nào Site Down / Cable chạy
+      # ═══════════════════════════════════════════════
+      - name: "🧹 Toa Sweep ETA — Triệt Tiêu Tin ETA Mồ Côi"
+        continue-on-error: true
+        if: |
+          steps.sched.outputs.sweep_eta == 'true' ||
+          steps.sched.outputs.site_down == 'true' ||
+          steps.sched.outputs.share_eta == 'true' ||
+          (github.event_name == 'workflow_dispatch' && (
+            inputs.report_type == 'Toa ETA - Share ETA Reminder' ||
+            inputs.report_type == 'Task - All Refuel Reports'
+          ))
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+        run: python sweep_orphan_eta.py || true
 
 
 
