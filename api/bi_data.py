@@ -232,7 +232,21 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            payload = get_bi_stats()
+            from urllib.parse import urlparse, parse_qs
+            parsed = urlparse(self.path)
+            query = parse_qs(parsed.query)
+            action = query.get("action", [None])[0]
+
+            if action in ("wo_detail", "wo"):
+                cache_file = os.path.join(os.path.dirname(__file__), "wo_detail_cache.json")
+                if os.path.exists(cache_file):
+                    with open(cache_file, "r", encoding="utf-8") as f:
+                        payload = json.load(f)
+                else:
+                    payload = {"status": "ok", "message": "No cache yet"}
+            else:
+                payload = get_bi_stats()
+
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -247,3 +261,4 @@ class handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(err_body)
+
