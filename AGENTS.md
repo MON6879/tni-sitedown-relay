@@ -1304,3 +1304,25 @@ Mọi thao tác cài đặt hoặc khôi phục Webhook Telegram đều phải �
 >    - Khi chạy hàm `setupAllSheets()` hoặc đồng bộ, CHỈ ĐƯỢC PHÉP tạo thêm tab mới và đặt tiêu đề chuẩn cho các tab đích.
 >    - TUYỆT ĐỐI CẤM ghi đè hoặc xóa các dòng template mà người dùng đã soạn trong tab `Template Sale`.
 
+---
+
+# 💵 STRICT BRANCH & COMPANY FINANCE RULE: CƠ CHẾ TÀI CHÍNH CHI NHÁNH & CÔNG TY — GIÁ GỐC (83%) + LN TRẢ VỀ CTY (17%) = GIÁ BÁN THẤP NHẤT (100%), TĂNG GIÁ THỰC BÁN & LỢI NHUẬN CHI NHÁNH (RULE PM-29 & BRANCH-COMPANY MARGIN FORMULA POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (BRANCH-COMPANY MARGIN FORMULA & SUMMARY STANDARD)**:
+> 
+> ### 🔴 RULE PM-29: QUY ĐỊNH CƠ CHẾ PHÂN CHIA TÀI CHÍNH GIỮA CHI NHÁNH & CÔNG TY TRONG BÁN HÀNG
+> 1. **Cơ Chế Tài Chính 5 Cột Bắt Buộc (The 5 Core Financial Columns)**:
+>    - **Cột 1 — Giá Gốc Đầu Vào (83%)** (Cost Price $C$): Mức giá chi nhánh tự bỏ vốn mua hàng từ nhà cung cấp hoặc nhập kho.
+>    - **Cột 2 — Lợi Nhuận Trả Về Cty 17% / SP** ($\text{LN Cty 17\%} = C \times \frac{17}{83}$ hoặc $\text{Giá Sàn} \times 17\%$): Khoản lợi nhuận cam kết bắt buộc phải nộp trả về Công ty trên mỗi sản phẩm bán ra.
+>    - **Cột 3 — Mức Giá Bán Thấp Nhất (100%)** ($\text{Giá Sàn Thấp Nhất} = C + \text{LN Cty 17\%} = \frac{C}{0.83}$): Mức giá sàn tối thiểu được phép bán ra. Chi nhánh tuyệt đối KHÔNG được phép bán dưới mức giá sàn này vì sẽ không đủ bù vốn giá gốc và 17% nộp về công ty.
+>    - **Cột 4 — Giá Thực Bán** (Actual Selling Price $P_{\text{act}}$): Mức giá thực tế chi nhánh bán cho khách hàng hoặc đối tác (chi nhánh có quyền tăng giá bán cao hơn mức giá sàn thấp nhất).
+>    - **Cột 5 — Lợi Nhuận Chi Nhánh / SP** ($\text{LN Chi Nhánh} = \max(0, P_{\text{act}} - \text{Mức Giá Bán Thấp Nhất})$): Toàn bộ phần chênh lệch dôi dư khi chi nhánh bán cao hơn mức giá sàn thuộc về quyền lợi và lợi nhuận ròng của Chi nhánh (100%).
+> 2. **Cơ Chế Báo Cáo Tổng Hợp Toàn Cảnh (Master Summary Cockpit)**:
+>    - `Tổng LN Trả Về Cty` = $\text{Tổng Đã Bán} \times \text{LN Trả Về Cty 17\% / SP}$.
+>    - `Tổng LN Chi Nhánh` = $\text{Tổng Đã Bán} \times \text{LN Chi Nhánh / SP}$.
+>    - `Tổng Doanh Thu Thực Bán` = $\text{Tổng Đã Bán} \times \text{Giá Thực Bán}$.
+>    - `Tổng Giá Trị Tồn Kho Giá Gốc` = $\text{Tồn Kho Tổng} \times \text{Giá Gốc Đầu Vào (83\%)}$.
+> 3. **Bảo Đảm Tính Nhất Quán 100% Trên Toàn Hệ Thống**:
+>    - Toàn bộ các bảng tính (`NhapHang`, `Tổng Hợp`, `Consignment`), mã nguồn Apps Script (`apps_script_ups_solar`) và Giao diện Web App (`ups_manager.html`) BẮT BUỘC phải áp dụng chính xác công thức toán học và cấu trúc cột này!
+
+
