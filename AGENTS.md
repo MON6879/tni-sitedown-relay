@@ -1281,3 +1281,26 @@ Mọi thao tác cài đặt hoặc khôi phục Webhook Telegram đều phải �
 >    - ③ Kiểm tra endpoint `/api/bi_data?action=wo_detail` có trả về JSON hợp lệ với status 200 hay không.
 >    - ④ Đồng bộ đồng thời cả 3 repositories (`Task and WO`, `tni-search`, `tni-sitedown`) và root.
 
+---
+
+# 🛒 STRICT SALES & TELEGRAM COLLECTOR RULE: BẢO VỆ CẤU TRÚC CỘT TEMPLATE & TRUY VẾT ẢNH ĐỘNG (STRICT TELEGRAM SALES TEMPLATE & DYNAMIC COLUMN MAPPING POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SALES TEMPLATE & DYNAMIC PHOTO MAPPING STANDARD)**:
+> 
+> ### 🔴 RULE PM-28: QUY ĐỊNH CẤU TRÚC CỘT THU THẬP TỪ TEMPLATE TELEGRAM DẠNG PHÂN CÁCH (|) & TRUY VẾT CỘT ẢNH ĐỘNG
+> 1. **Khớp Cột 1-1 Với Template Người Dùng**:
+>    - Khi người dùng cấu hình template trong tab `Template Sale` dạng `[Keyword] : Field 1 | Field 2 | ...`:
+>    - Sheet đích (Target Tab) BẮT BUỘC phải có đầy đủ:
+>      - Cột định danh: `REF ID`
+>      - Cột thời gian: `Date` (Ngày), `Time` (Giờ)
+>      - Các cột thông tin chính tương ứng 1-1 với template: `Product Name`, `Quantity`, `Serial Number` (hoặc `Serial Numbers List`), `Buyer's Name` (hoặc `Dealer Name`), `Phone Number`, `Note`.
+>      - Cột thu thập hình ảnh: `Drive Photos` (chứa URLs ảnh lưu vào Google Drive).
+>      - Cột tải tất cả: `Download All Link` (link folder Drive chứa toàn bộ ảnh của đơn hàng).
+>      - Cột nhân viên: `Staff Name` (tên người gửi tin).
+> 2. **Tuyệt Đối Cấm Hardcode Vị Trí Cột Ảnh (Zero Hardcoded Column Index)**:
+>    - Trong các hàm cập nhật link ảnh (`updateOrderPhotoLinks`), BẮT BUỘC phải tra cứu động vị trí cột `Drive Photos` và `Download All Link` bằng cách đọc header row 1 (`toLowerCase().includes("photo")`, `toLowerCase().includes("download")`).
+>    - TUYỆT ĐỐI CẤM hardcode vị trí cột cố định (ví dụ Cột 10, Cột 11) vì khi người dùng thêm cột `Serial` hoặc `Quantity`, số thứ tự cột bị dịch chuyển sẽ gây ghi đè làm hỏng dữ liệu thông tin khách hàng!
+> 3. **Bảo Tồn 100% Nội Dung Tab Template Sale Do Người Dùng Tạo**:
+>    - Khi chạy hàm `setupAllSheets()` hoặc đồng bộ, CHỈ ĐƯỢC PHÉP tạo thêm tab mới và đặt tiêu đề chuẩn cho các tab đích.
+>    - TUYỆT ĐỐI CẤM ghi đè hoặc xóa các dòng template mà người dùng đã soạn trong tab `Template Sale`.
+

@@ -143,7 +143,10 @@ function doPost(e) {
         cleanCmd === "/t3" || cleanCmd === "t3" || cleanCmd === "/t3_main" || cleanCmd === "/t3_s1" || cleanCmd === "/t3s1" ||
         cleanCmd === "/t4" || cleanCmd === "t4" || cleanCmd === "/t4_main" ||
         cleanCmd === "/template_office" || cleanCmd === "/template_team1" || cleanCmd === "/template_team2" || cleanCmd === "/template_team3" || cleanCmd === "/template_team4" ||
-        cleanCmd.startsWith("/template") || cleanCmd.startsWith("template ") ||
+        cleanCmd === "/template_t1" || cleanCmd === "/template_t1_s1" || cleanCmd === "/template_t2" || cleanCmd === "/template_t2_s1" ||
+        cleanCmd === "/template_t3" || cleanCmd === "/template_t3_s1" || cleanCmd === "/template_t4" ||
+        cleanCmd === "/template_header" || cleanCmd === "/template_leave" || cleanCmd === "/template_leave_half" ||
+        cleanCmd.startsWith("template ") ||
         cleanCmd.startsWith("/attendance ") || cleanCmd.startsWith("attendance template") ||
         cleanCmd.startsWith("/leave ") || cleanCmd.startsWith("leave template") ||
         cleanCmd.startsWith("/diemdanh ") || cleanCmd.startsWith("diemdanh template")
@@ -185,7 +188,9 @@ function doPost(e) {
       }
 
       // 2. Thu thập báo cáo điểm danh của Team Leader / Xin nghỉ phép cá nhân
-      if (isAttendanceReportText_(rawText)) {
+      // CHỈ THU THẬP TIN CỦA NGƯỜI (không thu thập tin bot tự reply)
+      const isBotSender = telegramUser && telegramUser.is_bot === true;
+      if (!isBotSender && isAttendanceReportText_(rawText)) {
         const count = processAttendanceReportText_(ssId, rawText, senderId);
         if (count > 0) {
           const nowMM = new Date();
@@ -971,6 +976,66 @@ function isAttendanceReportText_(text) {
   return false;
 }
 
+/**
+ * Tự động dò tìm cột của từng Team trong tab Template Attendance theo Header dòng 1 (Dynamic Column Detection)
+ * Không hardcode chỉ số cột để chống lệch khi người dùng chèn/xóa/dịch chuyển cột trên Sheet.
+ */
+function getAttendanceTemplateColumns_(tplSheet) {
+  const maxCol = tplSheet.getLastColumn();
+  const headers = tplSheet.getRange(1, 1, 1, maxCol).getValues()[0];
+  const map = {
+    office: [],
+    t1_main: [],
+    t1_s1: [],
+    t2_main: [],
+    t2_s1: [],
+    t3_main: [],
+    t3_s1: [],
+    t4: []
+  };
+
+  for (let c = 0; c < headers.length; c++) {
+    const colIdx = c + 1;
+    const h = String(headers[c] || "").trim().toUpperCase();
+    if (!h) continue;
+    if (h.indexOf("REPORT") === -1 && h.indexOf("ATTENDAN") === -1) continue;
+
+    if (h.indexOf("OFFICE") !== -1 || h.indexOf("VAN PHONG") !== -1) {
+      map.office.push(colIdx);
+    } else if (/T1\s*S1|TEAM\s*0?1\s*S1/i.test(h)) {
+      map.t1_s1.push(colIdx);
+    } else if (/T1\b|TEAM\s*0?1/i.test(h)) {
+      map.t1_main.push(colIdx);
+    } else if (/T2\s*S1|TEAM\s*0?2\s*S1/i.test(h)) {
+      map.t2_s1.push(colIdx);
+    } else if (/T2\b|TEAM\s*0?2/i.test(h)) {
+      map.t2_main.push(colIdx);
+    } else if (/T3\s*S1|TEAM\s*0?3\s*S1/i.test(h)) {
+      map.t3_s1.push(colIdx);
+    } else if (/T3\b|TEAM\s*0?3/i.test(h)) {
+      map.t3_main.push(colIdx);
+    } else if (/T4\b|TEAM\s*0?4/i.test(h)) {
+      map.t4.push(colIdx);
+    }
+  }
+
+  // Fallback an toàn nếu chưa quét được
+  if (map.office.length === 0) map.office = [5];
+  if (map.t1_main.length === 0) map.t1_main = [6];
+  if (map.t1_s1.length === 0) map.t1_s1 = [7];
+  if (map.t2_main.length === 0) map.t2_main = [10];
+  if (map.t2_s1.length === 0) map.t2_s1 = [11];
+  if (map.t3_main.length === 0) map.t3_main = [12];
+  if (map.t3_s1.length === 0) map.t3_s1 = [13];
+  if (map.t4.length === 0) map.t4 = [14];
+
+  map.t1_all = map.t1_main.concat(map.t1_s1);
+  map.t2_all = map.t2_main.concat(map.t2_s1);
+  map.t3_all = map.t3_main.concat(map.t3_s1);
+
+  return map;
+}
+
 function handleAttendanceTemplateQuery_(ssId, queryText) {
   try {
     const ss = SpreadsheetApp.openById(ssId);
@@ -979,23 +1044,23 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
 
     const q = queryText.toLowerCase().trim();
 
-    // 0. Menu / Help Commands
+    // 0. Menu / Help Commands — 100% English & prefixed with /template_
     if (q === "/menu" || q === "menu" || q === "/help" || q === "help" || q === "/huongdan") {
       return "📋 *TNI ATTENDANCE BOT — TEMPLATE MENU*\n" +
              "──────────────────────────────\n" +
-             "🔹 `/office` — Mẫu khối Văn Phòng (Col E)\n" +
-             "🔹 `/t1` — Mẫu Team 1 Main (Dawei/Myeik)\n" +
-             "🔹 `/t1_s1` — Mẫu Team 1 Sub-team 1\n" +
-             "🔹 `/t2` — Mẫu Team 2 Main\n" +
-             "🔹 `/t2_s1` — Mẫu Team 2 Sub-team 1\n" +
-             "🔹 `/t3` — Mẫu Team 3 Main\n" +
-             "🔹 `/t3_s1` — Mẫu Team 3 Sub-team 1\n" +
-             "🔹 `/t4` — Mẫu Team 4 Main\n" +
-             "🔹 `/header` — Dòng tiêu đề điểm danh nhanh\n" +
-             "🔹 `/leave` — Mẫu xin nghỉ phép cả ngày (Take leave)\n" +
-             "🔹 `/leave_half` — Mẫu xin nghỉ phép nửa ngày (Half day)\n" +
+             "🔹 `/template_office` — Office attendance report template\n" +
+             "🔹 `/template_t1` — Team 1 Main attendance report template\n" +
+             "🔹 `/template_t1_s1` — Team 1 S1 attendance report template\n" +
+             "🔹 `/template_t2` — Team 2 Main attendance report template\n" +
+             "🔹 `/template_t2_s1` — Team 2 S1 attendance report template\n" +
+             "🔹 `/template_t3` — Team 3 Main attendance report template\n" +
+             "🔹 `/template_t3_s1` — Team 3 S1 attendance report template\n" +
+             "🔹 `/template_t4` — Team 4 Main attendance report template\n" +
+             "🔹 `/template_header` — Quick attendance header template\n" +
+             "🔹 `/template_leave` — Take leave full day template\n" +
+             "🔹 `/template_leave_half` — Take leave half day template\n" +
              "──────────────────────────────\n" +
-             "📸 *Điểm danh tự động:* Gửi ảnh chụp mặt kèm vị trí vào nhóm!";
+             "📸 *Automatic Attendance:* Send selfie photo with location to group!";
     }
 
     const isLeave = q.indexOf("leave") !== -1 || q.indexOf("nghi") !== -1 || q.indexOf("phep") !== -1;
@@ -1015,47 +1080,35 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
       return strFull;
     }
 
-    // 2. Team & Sub-team Attendance templates
-    // Mapping exact columns in 'Template Attendance' tab:
-    // Office: Col E (5)
-    // Team 1: Col F (6) [T1 Main], Col G (7) [T1 S1]
-    // Team 2: Col I (9) [T2 Main], Col J (10) [T2 S1]
-    // Team 3: Col K (11) [T3 Main], Col L (12) [T3 S1]
-    // Team 4: Col M (13) [T4 Main]
-    const subTeamColMap = {
-      "office": [5],
-      "t1_main": [6],
-      "t1_s1": [7],
-      "t1_all": [6, 7],
-      "t2_main": [9],
-      "t2_s1": [10],
-      "t2_all": [9, 10],
-      "t3_main": [11],
-      "t3_s1": [12],
-      "t3_all": [11, 12],
-      "t4": [13]
-    };
+    // 2. Team & Sub-team Attendance templates via Dynamic Column Detection
+    const subTeamColMap = getAttendanceTemplateColumns_(tplSheet);
 
     let targetCols = null;
     const isS1 = q.indexOf("s1") !== -1 || q.indexOf("sub") !== -1 || q.indexOf("nhom1") !== -1;
     const isAll = q.indexOf("all") !== -1 || q.indexOf("both") !== -1;
 
-    if (/office|van\s*phong|\bvp\b|template_office/i.test(q)) {
-      targetCols = subTeamColMap["office"];
-    } else if (/team\s*0?1|\bt1\b|_team1\b|team_1\b|template_t1\b/i.test(q)) {
-      if (isS1) targetCols = subTeamColMap["t1_s1"];
-      else if (isAll) targetCols = subTeamColMap["t1_all"];
-      else targetCols = subTeamColMap["t1_main"];
-    } else if (/team\s*0?2|\bt2\b|_team2\b|team_2\b|template_t2\b/i.test(q)) {
-      if (isS1) targetCols = subTeamColMap["t2_s1"];
-      else if (isAll) targetCols = subTeamColMap["t2_all"];
-      else targetCols = subTeamColMap["t2_main"];
-    } else if (/team\s*0?3|\bt3\b|_team3\b|team_3\b|template_t3\b/i.test(q)) {
-      if (isS1) targetCols = subTeamColMap["t3_s1"];
-      else if (isAll) targetCols = subTeamColMap["t3_all"];
-      else targetCols = subTeamColMap["t3_main"];
-    } else if (/team\s*0?4|\bt4\b|_team4\b|team_4\b|template_t4\b/i.test(q)) {
-      targetCols = subTeamColMap["t4"];
+    if (/office|van\s*phong|\bvp\b|template_office|template\s*office/i.test(q)) {
+      targetCols = subTeamColMap.office;
+    } else if (/t1_s1|t1s1|template_t1_s1|template\s*t1\s*s1/i.test(q)) {
+      targetCols = subTeamColMap.t1_s1;
+    } else if (/t2_s1|t2s1|template_t2_s1|template\s*t2\s*s1/i.test(q)) {
+      targetCols = subTeamColMap.t2_s1;
+    } else if (/t3_s1|t3s1|template_t3_s1|template\s*t3\s*s1/i.test(q)) {
+      targetCols = subTeamColMap.t3_s1;
+    } else if (/team\s*0?1|\bt1\b|_team1\b|team_1\b|template_t1\b|template\s*t1\b|template_team1\b/i.test(q)) {
+      if (isS1) targetCols = subTeamColMap.t1_s1;
+      else if (isAll) targetCols = subTeamColMap.t1_all;
+      else targetCols = subTeamColMap.t1_main;
+    } else if (/team\s*0?2|\bt2\b|_team2\b|team_2\b|template_t2\b|template\s*t2\b|template_team2\b/i.test(q)) {
+      if (isS1) targetCols = subTeamColMap.t2_s1;
+      else if (isAll) targetCols = subTeamColMap.t2_all;
+      else targetCols = subTeamColMap.t2_main;
+    } else if (/team\s*0?3|\bt3\b|_team3\b|team_3\b|template_t3\b|template\s*t3\b|template_team3\b/i.test(q)) {
+      if (isS1) targetCols = subTeamColMap.t3_s1;
+      else if (isAll) targetCols = subTeamColMap.t3_all;
+      else targetCols = subTeamColMap.t3_main;
+    } else if (/team\s*0?4|\bt4\b|_team4\b|team_4\b|template_t4\b|template\s*t4\b|template_team4\b/i.test(q)) {
+      targetCols = subTeamColMap.t4;
     }
 
     const maxRow = Math.min(tplSheet.getLastRow(), 35);
@@ -1075,7 +1128,7 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
       return lines;
     }
 
-    if (targetCols) {
+    if (targetCols && targetCols.length > 0) {
       const blocks = [];
       for (let c = 0; c < targetCols.length; c++) {
         const lines = getColumnLines(targetCols[c]);
@@ -1083,7 +1136,13 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
       }
       return blocks.join("\n\n");
     } else if (isHeaderOnly) {
-      const allCols = [5, 6, 7, 9, 10, 11, 12, 13];
+      const allCols = [].concat(
+        subTeamColMap.office,
+        subTeamColMap.t1_main, subTeamColMap.t1_s1,
+        subTeamColMap.t2_main, subTeamColMap.t2_s1,
+        subTeamColMap.t3_main, subTeamColMap.t3_s1,
+        subTeamColMap.t4
+      );
       const allHeaders = [];
       for (let c = 0; c < allCols.length; c++) {
         const lines = getColumnLines(allCols[c]);
@@ -1092,19 +1151,19 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
       return allHeaders.join("\n");
     } else {
       // Default: Return Menu to prompt user to choose specific team
-      return "📋 *TNI ATTENDANCE BOT — VUI LÒNG CHỌN TEAM CỦA BẠN:*\n" +
+      return "📋 *TNI ATTENDANCE BOT — PLEASE CHOOSE YOUR TEAM:*\n" +
              "──────────────────────────────\n" +
-             "🔹 `/office` — Mẫu khối Văn Phòng (Col E)\n" +
-             "🔹 `/t1` — Mẫu Team 1 Main (Dawei/Myeik)\n" +
-             "🔹 `/t1_s1` — Mẫu Team 1 Sub-team 1\n" +
-             "🔹 `/t2` — Mẫu Team 2 Main\n" +
-             "🔹 `/t2_s1` — Mẫu Team 2 Sub-team 1\n" +
-             "🔹 `/t3` — Mẫu Team 3 Main\n" +
-             "🔹 `/t3_s1` — Mẫu Team 3 Sub-team 1\n" +
-             "🔹 `/t4` — Mẫu Team 4 Main\n" +
-             "🔹 `/header` — Dòng tiêu đề điểm danh nhanh\n" +
-             "🔹 `/leave` — Mẫu xin nghỉ phép cả ngày\n" +
-             "🔹 `/leave_half` — Mẫu xin nghỉ phép nửa ngày";
+             "🔹 `/template_office` — Office attendance report template\n" +
+             "🔹 `/template_t1` — Team 1 Main attendance report template\n" +
+             "🔹 `/template_t1_s1` — Team 1 S1 attendance report template\n" +
+             "🔹 `/template_t2` — Team 2 Main attendance report template\n" +
+             "🔹 `/template_t2_s1` — Team 2 S1 attendance report template\n" +
+             "🔹 `/template_t3` — Team 3 Main attendance report template\n" +
+             "🔹 `/template_t3_s1` — Team 3 S1 attendance report template\n" +
+             "🔹 `/template_t4` — Team 4 Main attendance report template\n" +
+             "🔹 `/template_header` — Quick attendance header template\n" +
+             "🔹 `/template_leave` — Take leave full day template\n" +
+             "🔹 `/template_leave_half` — Take leave half day template";
     }
   } catch (err) {
     Logger.log("handleAttendanceTemplateQuery_ error: " + err);
@@ -1143,7 +1202,7 @@ function processAttendanceReportText_(ssId, text, defaultTgId) {
     const mTeam = lines[0].match(/(?:team\s*0?([1-4])|t([1-4])|office|van\s*phong)(?:\s*s[1-9])?.*attendan[ce]+.*report[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
 
     if (mTeam) {
-      const dateStr = mTeam[2];
+      const dateStr = mTeam[3]; // FIX: mTeam[3] = date (group 3). mTeam[1]=team# via "team\s*0?([1-4])", mTeam[2]=team# via "t([1-4])" — date is ALWAYS group 3.
       let currentRec = null;
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
@@ -1245,71 +1304,170 @@ function setupAttendanceBotCommands() {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
   const url = "https://api.telegram.org/bot" + token + "/setMyCommands";
+  const delUrl = "https://api.telegram.org/bot" + token + "/deleteMyCommands";
 
-  // ── Menu chung (Daily Attendance group + private + default) — KHÔNG có ETA ──
-  var attCmds = [
-    { command: "office",         description: "Mau diem danh Van Phong (Col E)" },
-    { command: "t1",             description: "Mau diem danh Team 1 Main" },
-    { command: "t1_s1",          description: "Mau diem danh Team 1 S1" },
-    { command: "t2",             description: "Mau diem danh Team 2 Main" },
-    { command: "t2_s1",          description: "Mau diem danh Team 2 S1" },
-    { command: "t3",             description: "Mau diem danh Team 3 Main" },
-    { command: "t3_s1",          description: "Mau diem danh Team 3 S1" },
-    { command: "t4",             description: "Mau diem danh Team 4 Main" },
-    { command: "header",         description: "Dong tieu de diem danh nhanh" },
-    { command: "leave",          description: "Mau xin nghi phep ca ngay" },
-    { command: "leave_half",     description: "Mau xin nghi phep nua ngay" }
+  // ── Chỉ giữ 2 lệnh: take_leave và half_leave (các template khác bot tự gửi lúc 6:15) ──
+  var leaveCmds = [
+    { command: "take_leave",  description: "Take leave full day — Full Name: Take leave\\nReason:" },
+    { command: "half_leave",  description: "Take leave half day — Full Name: take leave half day\\nReason:" }
   ];
 
-  // Default scope
-  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
-    payload: JSON.stringify({ commands: attCmds }) });
-  // All group chats
-  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
-    payload: JSON.stringify({ commands: attCmds, scope: { type: "all_group_chats" } }) });
-  // All private chats
-  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
-    payload: JSON.stringify({ commands: attCmds, scope: { type: "all_private_chats" } }) });
-  // All chat administrators — xóa scope cũ rồi set lại
-  var delUrl = "https://api.telegram.org/bot" + token + "/deleteMyCommands";
-  UrlFetchApp.fetch(delUrl, { method: "post", contentType: "application/json",
-    payload: JSON.stringify({ scope: { type: "all_chat_administrators" } }) });
-  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
-    payload: JSON.stringify({ commands: attCmds, scope: { type: "all_chat_administrators" } }) });
+  // ── Xóa TOÀN BỘ lệnh cũ trên tất cả scope ──
+  try { UrlFetchApp.fetch(delUrl, { method: "post" }); } catch (e) {}
+  try { UrlFetchApp.fetch(delUrl, { method: "post", contentType: "application/json", payload: JSON.stringify({ scope: { type: "all_group_chats" } }) }); } catch (e) {}
+  try { UrlFetchApp.fetch(delUrl, { method: "post", contentType: "application/json", payload: JSON.stringify({ scope: { type: "all_private_chats" } }) }); } catch (e) {}
+  try { UrlFetchApp.fetch(delUrl, { method: "post", contentType: "application/json", payload: JSON.stringify({ scope: { type: "all_chat_administrators" } }) }); } catch (e) {}
 
-  // ── Menu riêng cho 4 Group Team — CÓ ETA ──
+  // Xóa trên 4 nhóm Team riêng
+  var allGroupIds = [
+    "-1004215695747", "-1004480845549", "-1004369170658", "-1004293741999"
+  ];
+  for (var g = 0; g < allGroupIds.length; g++) {
+    try {
+      UrlFetchApp.fetch(delUrl, { method: "post", contentType: "application/json",
+        payload: JSON.stringify({ scope: { type: "chat", chat_id: allGroupIds[g] } }) });
+    } catch (e) {}
+  }
+
+  // Đặt 2 lệnh mới trên tất cả scope
+  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
+    payload: JSON.stringify({ commands: leaveCmds }) });
+  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
+    payload: JSON.stringify({ commands: leaveCmds, scope: { type: "all_group_chats" } }) });
+  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
+    payload: JSON.stringify({ commands: leaveCmds, scope: { type: "all_private_chats" } }) });
+  UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
+    payload: JSON.stringify({ commands: leaveCmds, scope: { type: "all_chat_administrators" } }) });
+
+  // ETA commands chỉ trên 4 nhóm Team
   var etaCmds = [
-    { command: "eta",            description: "ETA Site Down - Tat ca Team" },
-    { command: "eta_t1",         description: "ETA Site Down - Team 1" },
-    { command: "eta_t1_s1",      description: "ETA Site Down - Team 1 S1" },
-    { command: "eta_t2",         description: "ETA Site Down - Team 2" },
-    { command: "eta_t2_s1",      description: "ETA Site Down - Team 2 S1" },
-    { command: "eta_t3",         description: "ETA Site Down - Team 3" },
-    { command: "eta_t3_s1",      description: "ETA Site Down - Team 3 S1" },
-    { command: "eta_t4",         description: "ETA Site Down - Team 4" }
+    { command: "eta",       description: "ETA Site Down - All Teams" },
+    { command: "eta_t1",    description: "ETA Site Down - Team 1" },
+    { command: "eta_t1_s1", description: "ETA Site Down - Team 1 S1" },
+    { command: "eta_t2",    description: "ETA Site Down - Team 2" },
+    { command: "eta_t2_s1", description: "ETA Site Down - Team 2 S1" },
+    { command: "eta_t3",    description: "ETA Site Down - Team 3" },
+    { command: "eta_t3_s1", description: "ETA Site Down - Team 3 S1" },
+    { command: "eta_t4",    description: "ETA Site Down - Team 4" }
   ];
-
-  var teamGroupIds = [
-    "-1004215695747",  // TNI TEAM 1 PLAN - ALARM
-    "-1004480845549",  // TNI TEAM 2 PLAN - ALARM
-    "-1004369170658",  // TNI TEAM 3 PLAN - ALARM
-    "-1004293741999"   // TNI TEAM 4 PLAN - ALARM
-  ];
-
-  for (var g = 0; g < teamGroupIds.length; g++) {
+  var teamGroupCmds = leaveCmds.concat(etaCmds);
+  for (var tg = 0; tg < allGroupIds.length; tg++) {
     try {
       UrlFetchApp.fetch(url, { method: "post", contentType: "application/json",
-        payload: JSON.stringify({
-          commands: etaCmds,
-          scope: { type: "chat", chat_id: teamGroupIds[g] }
-        })
-      });
+        payload: JSON.stringify({ commands: teamGroupCmds, scope: { type: "chat", chat_id: allGroupIds[tg] } }) });
     } catch (e) {
-      Logger.log("setMyCommands for " + teamGroupIds[g] + " error: " + e.message);
+      Logger.log("setMyCommands for " + allGroupIds[tg] + " error: " + e.message);
     }
   }
 
-  Logger.log("✅ Attendance bot commands registered: general + ETA per team group.");
+  Logger.log("✅ Bot commands updated: only take_leave + half_leave remain. All /template_* commands removed.");
+}
+
+/**
+ * Gửi tất cả template điểm danh vào nhóm "10. TNI DAILY ADDTENDANCE" lúc 6:15 MMT
+ * Thứ tự: Office → Team 1 → Team 1 S1 → Team 2 → Team 2 S1 → Team 3 → Team 3 S1 → Team 4
+ * Tự xóa tin cũ của ngày hôm trước trước khi gửi mới.
+ */
+function sendDailyAttendanceTemplates() {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
+  const ssId  = props.getProperty("ATTENDANCE_SS_ID") || "18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54";
+
+  // ── Chat ID nhóm "10. TNI DAILY ADDTENDANCE" ──
+  const DAILY_ATT_CHAT = props.getProperty("DAILY_ATT_CHAT_ID") || "-1002479318956";
+
+  const ss = SpreadsheetApp.openById(ssId);
+  const tplSheet = ss.getSheetByName("Template Attendance");
+  if (!tplSheet || tplSheet.getLastRow() < 1) {
+    Logger.log("sendDailyAttendanceTemplates: Template Attendance sheet not found");
+    return;
+  }
+
+  const colMap = getAttendanceTemplateColumns_(tplSheet);
+  const now    = new Date();
+  const todayStr = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy (EEE)");
+
+  // ── Danh sách template theo thứ tự gửi ──
+  var TEMPLATE_ORDER = [
+    { key: "office",  label: "🏢 OFFICE / BACKOFFICE", cols: colMap.office  },
+    { key: "t1_main", label: "🟠 TEAM 1 MAIN",          cols: colMap.t1_main },
+    { key: "t1_s1",   label: "🟠 TEAM 1 S1",            cols: colMap.t1_s1  },
+    { key: "t2_main", label: "🔵 TEAM 2 MAIN",          cols: colMap.t2_main },
+    { key: "t2_s1",   label: "🔵 TEAM 2 S1",            cols: colMap.t2_s1  },
+    { key: "t3_main", label: "🟢 TEAM 3 MAIN",          cols: colMap.t3_main },
+    { key: "t3_s1",   label: "🟢 TEAM 3 S1",            cols: colMap.t3_s1  },
+    { key: "t4",      label: "🟡 TEAM 4",               cols: colMap.t4     }
+  ];
+
+  // ── Xóa tin cũ của ngày hôm trước ──
+  for (var i = 0; i < TEMPLATE_ORDER.length; i++) {
+    var oldMidKey = "daily_tpl_" + TEMPLATE_ORDER[i].key + "_mid";
+    var oldMid = props.getProperty(oldMidKey);
+    if (oldMid) {
+      deleteTgMessage_(token, DAILY_ATT_CHAT, oldMid);
+      props.deleteProperty(oldMidKey);
+    }
+    Utilities.sleep(200);
+  }
+
+  // ── Gửi từng template theo thứ tự ──
+  var maxRow = Math.min(tplSheet.getLastRow(), 35);
+
+  for (var j = 0; j < TEMPLATE_ORDER.length; j++) {
+    var tpl    = TEMPLATE_ORDER[j];
+    var cols   = tpl.cols;
+    if (!cols || cols.length === 0) continue;
+
+    // Lấy nội dung từ cột đầu tiên của nhóm
+    var colIdx  = cols[0];
+    var vals    = tplSheet.getRange(1, colIdx, maxRow, 1).getValues();
+    var lines   = [];
+    for (var r = 0; r < vals.length; r++) {
+      var v = String(vals[r][0] || "").trim();
+      if (v && v.toLowerCase().indexOf("total:") !== 0) {
+        lines.push(v);
+      }
+    }
+    if (lines.length === 0) continue;
+
+    var msgText = "📋 <b>" + tpl.label + "</b>\n" +
+                  "📅 " + todayStr + "\n" +
+                  "──────────────────────\n" +
+                  lines.join("\n");
+
+    var newMid = sendTgMsgGetId_(token, DAILY_ATT_CHAT, msgText);
+    if (newMid) {
+      props.setProperty("daily_tpl_" + tpl.key + "_mid", String(newMid));
+    }
+    Utilities.sleep(500); // tránh rate limit
+  }
+
+  Logger.log("✅ sendDailyAttendanceTemplates completed at " +
+    Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy HH:mm"));
+}
+
+/**
+ * Cài đặt trigger 6:15 MMT cho sendDailyAttendanceTemplates
+ * Gọi 1 lần từ GAS Editor để kích hoạt.
+ */
+function setupDailyTemplatesTrigger() {
+  var HANDLER = "sendDailyAttendanceTemplates";
+  // Xóa trigger cũ nếu có
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === HANDLER) {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  // Tạo trigger mới lúc 6:15 MMT (Asia/Rangoon = UTC+6:30 → 6:15 MMT ≈ 23:45 UTC hôm trước)
+  ScriptApp.newTrigger(HANDLER)
+    .timeBased()
+    .everyDays(1)
+    .atHour(6)
+    .nearMinute(15)
+    .inTimezone("Asia/Rangoon")
+    .create();
+  Logger.log("✅ Daily templates trigger set for 06:15 MMT → sendDailyAttendanceTemplates");
 }
 
 // ── BẢNG TỔNG HỢP CÔNG THEO THÁNG — TAB SUM WORK (GID: 1895020121) ──
@@ -1376,17 +1534,18 @@ function buildSumWorkTab() {
   const staffList = [];
   const staffSet = new Set();
 
-  // A. Nạp từ Template Attendance (Field Teams)
+  // A. Nạp từ Template Attendance (Field Teams) qua dynamic column map
   if (tplSheet && tplSheet.getLastRow() >= 1) {
+    const dynColMap = getAttendanceTemplateColumns_(tplSheet);
     const teamConfigs = [
-      { name: "Team 1", col: 6 },
-      { name: "Team 1 S1", col: 7 },
-      { name: "Team 2", col: 9 },
-      { name: "Team 2 S1", col: 10 },
-      { name: "Team 3", col: 11 },
-      { name: "Team 3 S1", col: 12 },
-      { name: "Team 4", col: 13 },
-      { name: "Office", col: 5 }
+      { name: "Team 1", col: (dynColMap.t1_main && dynColMap.t1_main[0]) || 6 },
+      { name: "Team 1 S1", col: (dynColMap.t1_s1 && dynColMap.t1_s1[0]) || 7 },
+      { name: "Team 2", col: (dynColMap.t2_main && dynColMap.t2_main[0]) || 10 },
+      { name: "Team 2 S1", col: (dynColMap.t2_s1 && dynColMap.t2_s1[0]) || 11 },
+      { name: "Team 3", col: (dynColMap.t3_main && dynColMap.t3_main[0]) || 12 },
+      { name: "Team 3 S1", col: (dynColMap.t3_s1 && dynColMap.t3_s1[0]) || 13 },
+      { name: "Team 4", col: (dynColMap.t4 && dynColMap.t4[0]) || 14 },
+      { name: "Office", col: (dynColMap.office && dynColMap.office[0]) || 5 }
     ];
     const maxR = Math.min(tplSheet.getLastRow(), 35);
     for (let tc = 0; tc < teamConfigs.length; tc++) {
@@ -1882,4 +2041,314 @@ function setupMorningAttendanceSummaryTrigger() {
 }
 
 
+// ═══════════════════════════════════════════════════════════════════
+// ── DAILY ATTENDANCE REPORT 09:00 MMT — DELETE OLD → SEND NEW ──
+// ═══════════════════════════════════════════════════════════════════
 
+/**
+ * Builds formatted attendance report text (4 lines per person):
+ *   ✅ Work / 🏖️ Leave / 🌓 Half Day / 📷 Photo — each as Today/Yest/Day-3/Week/Month
+ * @param {string} targetTeam - "ALL" for CONTROL, or "Team 1"/"Team 2"/etc. for team groups
+ */
+function buildDailyAttendanceText_(targetTeam) {
+  const ss  = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+  const tz  = "Asia/Rangoon";
+  const now = new Date();
+
+  const todayStr  = Utilities.formatDate(now, tz, "dd/MM/yyyy");
+  const dateShort = Utilities.formatDate(now, tz, "dd/MM/yy");
+  const yestDate  = new Date(now.getTime() - 86400000);
+  const day2Date  = new Date(now.getTime() - 2 * 86400000);
+  const yestStr   = Utilities.formatDate(yestDate, tz, "dd/MM/yyyy");
+  const day2Str   = Utilities.formatDate(day2Date, tz, "dd/MM/yyyy");
+  const curMonthStr = Utilities.formatDate(now, tz, "MM/yyyy");
+
+  // Week start = Monday of current week
+  const dow = now.getDay(); // 0=Sun
+  const daysSinceMon = dow === 0 ? 6 : dow - 1;
+  const weekStart = new Date(now.getTime() - daysSinceMon * 86400000);
+  weekStart.setHours(0, 0, 0, 0);
+
+  // ── Helper: parse date string dd/MM/yy or dd/MM/yyyy ──
+  function parseDateStr(raw) {
+    if (raw instanceof Date) return raw;
+    const s = String(raw || "").trim().split(" ")[0];
+    const p = s.split(/[\/\-\.]/);
+    if (p.length < 3) return null;
+    let day = parseInt(p[0], 10), mon = parseInt(p[1], 10), yr = parseInt(p[2], 10);
+    if (yr < 100) yr += 2000;
+    return new Date(yr, mon - 1, day);
+  }
+
+  function toDateStr(d) {
+    if (!d) return "";
+    return Utilities.formatDate(d, tz, "dd/MM/yyyy");
+  }
+
+  function toMonthStr(d) {
+    if (!d) return "";
+    return Utilities.formatDate(d, tz, "MM/yyyy");
+  }
+
+  // ── 1. Load staff from Staff attendance (col A=TgId, F=FullName, C=TgName, K=Dep, M=TeamNo) ──
+  const staffSheet = ss.getSheetByName("Staff attendance");
+  const staffList  = [];
+  const notJoined  = [];
+
+  if (staffSheet && staffSheet.getLastRow() >= 2) {
+    const vals = staffSheet.getRange(2, 1, staffSheet.getLastRow() - 1, 13).getValues();
+    for (let i = 0; i < vals.length; i++) {
+      const row   = vals[i];
+      const tgId  = String(row[0] || "").trim();
+      const name  = String(row[5] || row[2] || "").trim();   // F=FullName or C=TgName
+      const dep   = String(row[10] || "").trim();            // K=Dep
+      const teamM = String(row[12] || "").trim();            // M=TeamNo (Team 01, Team 02, HR and Finance...)
+      if (!name || name.toLowerCase().indexOf("nyi nyi") !== -1) continue;
+
+      const team = teamM || dep || "Office";
+
+      // Filter by target team
+      if (targetTeam !== "ALL") {
+        const teamLow = team.toLowerCase().replace(/\s+/g, "");
+        const tgtLow  = targetTeam.toLowerCase().replace(/\s+/g, "");
+        if (teamLow !== tgtLow && team !== targetTeam) continue;
+      }
+
+      if (!tgId) notJoined.push(name + " (" + team + ")");
+      staffList.push({ name: name, team: team, tgId: tgId });
+    }
+  }
+
+  // ── 2. Load attendance from "Sum report morning attendance" ──
+  function initAtt() {
+    return { tW: 0, tL: 0, tH: 0, yW: 0, yL: 0, yH: 0, d2W: 0, d2L: 0, d2H: 0,
+             wkW: 0, wkL: 0, wkH: 0, moW: 0, moL: 0, moH: 0 };
+  }
+  const attMap = {};
+  const sumSheet = ss.getSheetByName("Sum report morning attendance");
+  if (sumSheet && sumSheet.getLastRow() >= 2) {
+    const rVals = sumSheet.getRange(2, 1, sumSheet.getLastRow() - 1, 8).getValues();
+    for (let i = 0; i < rVals.length; i++) {
+      const r     = rVals[i];
+      const name  = String(r[2] || "").trim().toLowerCase();
+      if (!name) continue;
+      const isW   = String(r[3] || "").trim().toLowerCase() === "work";
+      const isL   = String(r[4] || "").trim().toLowerCase() === "take leave";
+      const isH   = String(r[5] || "").trim().toLowerCase().indexOf("half") !== -1;
+      const dObj  = parseDateStr(r[1]);
+      if (!dObj) continue;
+      const dStr  = toDateStr(dObj);
+      const mStr  = toMonthStr(dObj);
+
+      if (!attMap[name]) attMap[name] = initAtt();
+      const a = attMap[name];
+      if (dStr === todayStr) { if (isW) a.tW++; if (isL) a.tL++; if (isH) a.tH++; }
+      if (dStr === yestStr)  { if (isW) a.yW++; if (isL) a.yL++; if (isH) a.yH++; }
+      if (dStr === day2Str)  { if (isW) a.d2W++; if (isL) a.d2L++; if (isH) a.d2H++; }
+      if (dObj >= weekStart) { if (isW) a.wkW++; if (isL) a.wkL++; if (isH) a.wkH++; }
+      if (mStr === curMonthStr) { if (isW) a.moW++; if (isL) a.moL++; if (isH) a.moH++; }
+    }
+  }
+
+  // ── 3. Load photo counts from "List Attendance" (Col G = photo URL) ──
+  function initPh() {
+    return { tP: 0, yP: 0, d2P: 0, wkP: 0, moP: 0 };
+  }
+  const photoMap = {};
+  const listSheet = ss.getSheetByName("List Attendance");
+  if (listSheet && listSheet.getLastRow() >= 2) {
+    const lVals = listSheet.getRange(2, 1, listSheet.getLastRow() - 1, 7).getValues();
+    for (let i = 0; i < lVals.length; i++) {
+      const r        = lVals[i];
+      const tgId     = String(r[3] || "").trim();
+      const nameLow  = String(r[5] || r[4] || "").trim().toLowerCase();
+      const photoUrl = String(r[6] || "").trim();
+      if (!photoUrl) continue;
+      const key = tgId || nameLow;
+      if (!key) continue;
+      const dObj = parseDateStr(r[1]);
+      if (!dObj) continue;
+      const dStr = toDateStr(dObj);
+      const mStr = toMonthStr(dObj);
+
+      if (!photoMap[key]) photoMap[key] = initPh();
+      const p = photoMap[key];
+      if (dStr === todayStr) p.tP++;
+      if (dStr === yestStr)  p.yP++;
+      if (dStr === day2Str)  p.d2P++;
+      if (dObj >= weekStart) p.wkP++;
+      if (mStr === curMonthStr) p.moP++;
+    }
+  }
+
+  // ── 4. Build message ──
+  const isAll = targetTeam === "ALL";
+  const header = isAll
+    ? "<b>📊 Attendance Report — " + dateShort + "</b>"
+    : "<b>📊 Attendance Report — " + targetTeam + " — " + dateShort + "</b>";
+
+  const lines = [
+    header,
+    "<i>Today / Yest / Day-3 / Week / Month</i>",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  ];
+
+  // Leave summary at top (CONTROL only)
+  if (isAll) {
+    const leaveToday = [];
+    for (let s = 0; s < staffList.length; s++) {
+      const st  = staffList[s];
+      const att = attMap[st.name.toLowerCase()];
+      if (att && (att.tL > 0 || att.tH > 0)) {
+        const typ = att.tH > 0 ? "🌓 Half Day" : "🏖️ Take Leave";
+        leaveToday.push("  • " + st.name + " (" + st.team + ") — " + typ);
+      }
+    }
+    if (leaveToday.length > 0) {
+      lines.push("🏖️ <b>Leave Today:</b>");
+      leaveToday.forEach(function(l) { lines.push(l); });
+      lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    }
+  }
+
+  // Group by team
+  const teamGroups = {};
+  const teamOrder  = [];
+  for (let s = 0; s < staffList.length; s++) {
+    const t = staffList[s].team;
+    if (!teamGroups[t]) { teamGroups[t] = []; teamOrder.push(t); }
+    teamGroups[t].push(staffList[s]);
+  }
+
+  const teamIcons = {
+    "Team 1": "🟠", "Team 01": "🟠",
+    "Team 2": "🔵", "Team 02": "🔵",
+    "Team 3": "🟢", "Team 03": "🟢",
+    "Team 4": "🟡", "Team 04": "🟡",
+    "Office": "🏢", "HR and Finance": "🏢", "Infrastructure": "🏢",
+    "CM Engineer": "🏢", "PM Engineer": "🏢", "M&E Engineer": "🏢"
+  };
+
+  for (let ti = 0; ti < teamOrder.length; ti++) {
+    const tName   = teamOrder[ti];
+    const icon    = teamIcons[tName] || "🔹";
+    const members = teamGroups[tName];
+    lines.push(icon + " <b>" + tName.toUpperCase() + "</b>");
+
+    for (let m = 0; m < members.length; m++) {
+      const st      = members[m];
+      const key     = st.name.toLowerCase();
+      const att     = attMap[key]   || initAtt();
+      const phKey   = st.tgId       || key;
+      const ph      = photoMap[phKey] || initPh();
+
+      lines.push((m + 1) + ". <b>" + st.name + "</b>");
+      lines.push("   ✅ Work:      " + att.tW  + "/" + att.yW  + "/" + att.d2W  + "/" + att.wkW  + "/" + att.moW);
+      lines.push("   🏖️ Leave:    " + att.tL  + "/" + att.yL  + "/" + att.d2L  + "/" + att.wkL  + "/" + att.moL);
+      lines.push("   🌓 Half Day: " + att.tH  + "/" + att.yH  + "/" + att.d2H  + "/" + att.wkH  + "/" + att.moH);
+      lines.push("   📷 Photo:   " + ph.tP + "/" + ph.yP + "/" + ph.d2P + "/" + ph.wkP + "/" + ph.moP);
+    }
+    lines.push("");
+  }
+
+  lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+  // Not joined (CONTROL only, bottom)
+  if (isAll && notJoined.length > 0) {
+    lines.push("⚠️ <b>Not yet joined attendance group (" + notJoined.length + "):</b>");
+    for (let n = 0; n < notJoined.length; n++) {
+      lines.push("  " + (n + 1) + ". " + notJoined[n]);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/** Delete a Telegram message silently */
+function deleteTgMessage_(token, chatId, messageId) {
+  if (!messageId) return;
+  try {
+    UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/deleteMessage", {
+      method: "post", contentType: "application/json",
+      payload: JSON.stringify({ chat_id: chatId, message_id: Number(messageId) }),
+      muteHttpExceptions: true
+    });
+  } catch(e) { Logger.log("deleteTgMessage_ error: " + e.message); }
+}
+
+/** Send HTML message and return message_id */
+function sendTgMsgGetId_(token, chatId, text) {
+  try {
+    const resp = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+      method: "post", contentType: "application/json",
+      payload: JSON.stringify({ chat_id: chatId, text: text, parse_mode: "HTML", disable_web_page_preview: true }),
+      muteHttpExceptions: true
+    });
+    const data = JSON.parse(resp.getContentText());
+    if (data.ok && data.result) return data.result.message_id;
+    Logger.log("sendTgMsgGetId_ failed: " + resp.getContentText());
+  } catch(e) { Logger.log("sendTgMsgGetId_ error: " + e.message); }
+  return null;
+}
+
+/**
+ * 09:00 MMT — Delete old attendance report → send new one to CONTROL + all team groups
+ */
+function sendDailyAttendanceReport() {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
+
+  const TARGETS = [
+    { key: "att09_control", chatId: "-5251698940",    team: "ALL"     },
+    { key: "att09_team1",   chatId: "-1004215695747", team: "Team 01" },
+    { key: "att09_team2",   chatId: "-1004480845549", team: "Team 02" },
+    { key: "att09_team3",   chatId: "-1004369170658", team: "Team 03" },
+    { key: "att09_team4",   chatId: "-1004293741999", team: "Team 04" }
+  ];
+
+  for (let t = 0; t < TARGETS.length; t++) {
+    const tgt = TARGETS[t];
+    try {
+      // 1. Delete old message
+      const oldId = props.getProperty(tgt.key + "_mid");
+      if (oldId) { deleteTgMessage_(token, tgt.chatId, oldId); }
+
+      // 2. Build & send
+      const text = buildDailyAttendanceText_(tgt.team);
+      if (!text) continue;
+      const newId = sendTgMsgGetId_(token, tgt.chatId, text);
+      if (newId) {
+        props.setProperty(tgt.key + "_mid", String(newId));
+      }
+      Utilities.sleep(600); // Rate limit buffer
+    } catch(e) {
+      Logger.log("sendDailyAttendanceReport [" + tgt.chatId + "] error: " + e.message);
+    }
+  }
+  Logger.log("✅ sendDailyAttendanceReport completed at " +
+    Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy HH:mm"));
+}
+
+/**
+ * Cài đặt trigger 09:00 MMT cho sendDailyAttendanceReport
+ * Xóa trigger cũ sendMonthlyAttendanceSummaryToControl
+ */
+function setupDailyAttendanceReportTrigger() {
+  const OLD_HANDLER = "sendMonthlyAttendanceSummaryToControl";
+  const NEW_HANDLER = "sendDailyAttendanceReport";
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    const fn = triggers[i].getHandlerFunction();
+    if (fn === OLD_HANDLER || fn === NEW_HANDLER) {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger(NEW_HANDLER)
+    .timeBased()
+    .everyDays(1)
+    .atHour(9)
+    .nearMinute(0)
+    .inTimezone("Asia/Rangoon")
+    .create();
+  Logger.log("✅ Daily attendance report trigger set for 09:00 MMT → sendDailyAttendanceReport");
+}

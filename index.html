@@ -588,7 +588,7 @@
       <div class="section-head" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
         <div>
           <span><i class="fa-solid fa-layer-group"></i> Regional Teams Summary Cards (Click Card for Live Sheet Details)</span>
-          <div style="font-size:0.78rem; color:#38BDF8; font-weight:700; margin-top:0.2rem;"><i class="fa-solid fa-clock"></i> Sheet Data Export Time: <span id="sheet-export-time" style="color:#F8FAFC; font-weight:800;">13/08/2026 16:36:00</span></div>
+          <div style="font-size:0.78rem; color:#38BDF8; font-weight:700; margin-top:0.2rem;"><i class="fa-solid fa-clock"></i> Sheet Data Export Time: <span id="sheet-export-time" style="color:#F8FAFC; font-weight:800;">15/09/2026 14:39:44</span></div>
         </div>
         <button class="filter-btn active" style="background:linear-gradient(135deg, #10B981, #06B6D4); color:#fff; border:none; padding:0.5rem 1rem; font-weight:700; border-radius:10px; cursor:pointer;" onclick="openAllEngineersModal()"><i class="fa-solid fa-users-viewfinder"></i> View All 29 Engineers Roster (% High to Low)</button>
       </div>
@@ -694,7 +694,7 @@
       <script>
       (function() {
         var GAS = 'https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec';
-        var CSV_URL = 'https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/export?format=csv&gid=1840482617';
+        var CSV_URL = 'https://docs.google.com/spreadsheets/d/1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8/gviz/tq?tqx=out:csv&gid=1840482617';
         var TEAMS = ['team1','team2','team3','team4'];
         var PFX   = {team1:'t1', team2:'t2', team3:'t3', team4:'t4'};
         function $id(id)   { return document.getElementById(id); }
@@ -1035,7 +1035,8 @@
 
               for (var idx = 0; idx < 4; idx++) {
                 var tk = tKeys[idx];
-                var row = rows[52 + idx] || [];
+                var targetCode = tCodes[idx];
+                var row = rows.find(function(r) { return (r[4]||'').indexOf(targetCode) !== -1; }) || rows[46 + idx] || rows[52 + idx] || [];
                 var cdNotYet  = parseInt((row[0]||'0').replace(/[^\d]/g,''), 10) || 0;
                 var waitCD    = parseInt((row[5]||'0').replace(/[^\d]/g,''), 10) || 0;
                 var fotClose  = parseInt((row[6]||'0').replace(/[^\d]/g,''), 10) || 0;
@@ -1093,6 +1094,13 @@
               tKeys.forEach(function(k){
                 applyTeam(k, teamData[k], dateLabel, planLabel, targetPct);
               });
+
+              window.latestTeamData = teamData;
+              window.latestDates = datesObj;
+              window.latestExportTime = exportTimeStr;
+              if (typeof window.updateWoChart === 'function') {
+                window.updateWoChart();
+              }
 
               // 👑 RENDER DYNAMICALLY INTO 4 TEAM MODALS
               for (var i = 0; i < 4; i++) {
@@ -7231,11 +7239,82 @@ Team04>> 2Box</td>
     let isSpeaking = false;
     let synth = window.speechSynthesis;
 
-    const BRIEFING_SCRIPTS = {
-      'en-US': "Welcome to TNI Operations BI Executive Management Portal. Here is the full operational summary for Tanintharyi region as of August 5th, 2026. Total assigned Work Orders calculated as Column P plus Column G is 693 Work Orders system wide, with 37 Work Orders pending close in Column A. Regional Team Rankings: Rank number 1 goes to Team 4 Kawthoung led by Naing Myo Htun, achieving 54 percent completion rate with 50 FOT closed Work Orders. Rank number 2 goes to Team 3 Bokpyin led by Pyae Phyo Zaw, with 26 percent completion rate. Rank number 3 goes to Team 2 Myeik led by Nay Myo Thu, achieving 21 percent completion rate with zero pending close Work Orders. Rank number 4 goes to Team 1 Dawei led by Paing Aung Soe, with 325 total assigned Work Orders and 32 Work Orders pending close in Column A. Thank you for listening to the TNI BI Executive Audio Report.",
-      'vi-VN': "Chào mừng bạn đến với Cổng thông tin Báo cáo Vận hành TNI BI. Sau đây là bản tin tổng hợp chi tiết tình hình vận hành toàn mạng Tanintharyi tính đến ngày 05 tháng 08 năm 2026. Tổng số Work Orders được giao toàn hệ thống tính theo Cột P cộng Cột G đạt 693 Work Orders. Số Work Orders chưa đóng Cột A là 37 Work Orders. Chi tiết tình hình 4 Đội khu vực: Vị trí Dẫn đầu Rank 1 thuộc về Đội 4 Kawthoung do Naing Myo Htun làm đội trưởng, đạt tỷ lệ hoàn thành 54 phần trăm với 50 Work Orders FOT Close. Vị trí Rank 2 thuộc về Đội 3 Bokpyin do Pyae Phyo Zaw làm đội trưởng, đạt tỷ lệ hoàn thành 26 phần trăm. Vị trí Rank 3 thuộc về Đội 2 Myeik do Nay Myo Thu làm đội trưởng, đạt tỷ lệ 21 phần trăm với 0 Work Order tồn đọng chưa đóng. Vị trí Rank 4 thuộc về Đội 1 Dawei do Paing Aung Soe làm đội trưởng, hiện có 325 Work Orders được giao, trong đó có 32 Work Orders chưa đóng Cột A. Xin cảm ơn bạn đã lắng nghe bản tin điều hành BI.",
-      'my-MM': "မင်္ဂလာပါ TNI လုပ်ငန်းဆောင်ရွက်မှု အစီရင်ခံစာမှ ကြိုဆိုပါသည်။ တနင်္သာရီ တိုင်းဒေသကြီး အသင်း ၄ ခု၏ စုစုပေါင်း လုပ်ငန်းအမိန့် ၆၉၃ ခု ရှိပါသည်။ အဆင့် ၁ အသင်း ၄ ကော့သောင်း ခေါင်းဆောင် နိုင်မျိုးထွန်း ဖြစ်ပြီး ၅၄ ရာခိုင်နှုန်း ပြီးစီးပါသည်။ အဆင့် ၂ အသင်း ၃ ဘုတ်ပြင်း ခေါင်းဆောင် ပြည့်ဖြိုးဇော် ဖြစ်ပြီး ၂၆ ရာခိုင်နှုန်း ပြီးစီးပါသည်။ အဆင့် ၃ အသင်း ၂ မြိတ် ခေါင်းဆောင် နေမျိုးသူ ဖြစ်ပြီး ၂၁ ရာခိုင်နှုန်း ပြီးစီးပါသည်။ အဆင့် ၄ အသင်း ၁ ထားဝယ် ခေါင်းဆောင် ပိုင်အောင်စိုး ဖြစ်ပြီး လုပ်ငန်းအမိန့် ၃၂၅ ခု ရှိပါသည်။ ကျေးဇူးတင်ပါသည်။"
-    };
+        /* ?? AI VOICE SPEECH SYNTHESIS ENGINE (DYNAMIC LIVE DATA BRIEFING WITH SENTENCE CHUNKING QUEUE) */
+    let isSpeaking = false;
+    let synth = window.speechSynthesis;
+
+    function getDynamicBriefingScript(selectedLang) {
+      function parseNum(id, fallback) {
+        var el = document.getElementById(id);
+        if (!el) return fallback;
+        var txt = (el.textContent || '').replace(/[^0-9]/g, '');
+        return txt ? parseInt(txt, 10) : fallback;
+      }
+
+      var exportEl = document.getElementById('sheet-export-time');
+      var rawTime = (exportEl && exportEl.textContent && exportEl.textContent.trim()) || '15/09/2026 14:39:44';
+      var m = rawTime.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      var day = m ? m[1] : '15';
+      var month = m ? m[2] : '09';
+      var year = m ? m[3] : '2026';
+      var dateVi = day + " th?ng " + month + " n?m " + year;
+      var dateEn = (month.length === 1 ? '0' + month : month) + '/' + (day.length === 1 ? '0' + day : day) + '/' + year;
+
+      var td = window.latestTeamData || {};
+      var t1 = td.team1 || { name: 'Team 1 Dawei', totalAssigned: parseNum('t1-assigned', 325), fotClose: parseNum('t1-fot', 77), cdNotYet: parseNum('t1-cdnotyet', 2), pct: 23, rank: 4 };
+      var t2 = td.team2 || { name: 'Team 2 Myeik', totalAssigned: parseNum('t2-assigned', 324), fotClose: parseNum('t2-fot', 126), cdNotYet: parseNum('t2-cdnotyet', 13), pct: 39, rank: 3 };
+      var t3 = td.team3 || { name: 'Team 3 Bokpyin', totalAssigned: parseNum('t3-assigned', 99), fotClose: parseNum('t3-fot', 48), cdNotYet: parseNum('t3-cdnotyet', 4), pct: 48, rank: 2 };
+      var t4 = td.team4 || { name: 'Team 4 Kawthoung', totalAssigned: parseNum('t4-assigned', 71), fotClose: parseNum('t4-fot', 60), cdNotYet: parseNum('t4-cdnotyet', 1), pct: 83, rank: 1 };
+
+      var teams = [
+        { key: 'team1', nameVi: '??i 1 Dawei', nameEn: 'Team 1 Dawei', nameMy: '????? ? ??????', leaderVi: 'Paing Aung Soe', leaderEn: 'Paing Aung Soe', leaderMy: '??????????????', d: t1 },
+        { key: 'team2', nameVi: '??i 2 Myeik', nameEn: 'Team 2 Myeik', nameMy: '????? ? ?????', leaderVi: 'Nay Myo Thu', leaderEn: 'Nay Myo Thu', leaderMy: '?????????', d: t2 },
+        { key: 'team3', nameVi: '??i 3 Bokpyin', nameEn: 'Team 3 Bokpyin', nameMy: '????? ? ?????????', leaderVi: 'Pyae Phyo Zaw', leaderEn: 'Pyae Phyo Zaw', leaderMy: '??????????????', d: t3 },
+        { key: 'team4', nameVi: '??i 4 Kawthoung', nameEn: 'Team 4 Kawthoung', nameMy: '????? ? ??????????', leaderVi: 'Naing Myo Htun', leaderEn: 'Naing Myo Htun', leaderMy: '???????????????', d: t4 }
+      ];
+
+      // Sort according to rank (1 to 4)
+      teams.sort(function(a, b) {
+        var rA = a.d.rank || 99;
+        var rB = b.d.rank || 99;
+        if (rA !== rB) return rA - rB;
+        return (b.d.pct || 0) - (a.d.pct || 0);
+      });
+
+      var totalAssigned = (t1.totalAssigned || 0) + (t2.totalAssigned || 0) + (t3.totalAssigned || 0) + (t4.totalAssigned || 0);
+      var totalClose = (t1.fotClose || 0) + (t2.fotClose || 0) + (t3.fotClose || 0) + (t4.fotClose || 0);
+      var totalCd = (t1.cdNotYet || 0) + (t2.cdNotYet || 0) + (t3.cdNotYet || 0) + (t4.cdNotYet || 0);
+
+      if (selectedLang === 'vi-VN') {
+        return "Ch?o m?ng b?n ??n v?i C?ng th?ng tin B?o c?o V?n h?nh TNI BI. Sau ??y l? b?n tin t?ng h?p chi ti?t t?nh h?nh v?n h?nh to?n m?ng Tanintharyi t?nh ??n ng?y " + dateVi + ". " +
+               "T?ng s? Work Orders ???c giao to?n h? th?ng l? " + totalAssigned + " Work Orders. " +
+               "To?n m?ng ?? ho?n th?nh ??ng " + totalClose + " Work Orders, s? Work Orders ch? ??ng C?t A l? " + totalCd + " Work Orders. " +
+               "Chi ti?t t?nh h?nh 4 ??i khu v?c: " +
+               "V? tr? D?n ??u Rank 1 thu?c v? " + teams[0].nameVi + " do " + teams[0].leaderVi + " l?m ??i tr??ng, ??t t? l? ho?n th?nh " + teams[0].d.pct + " ph?n tr?m v?i " + teams[0].d.fotClose + " Work Orders ho?n th?nh. " +
+               "V? tr? Rank 2 thu?c v? " + teams[1].nameVi + " do " + teams[1].leaderVi + " l?m ??i tr??ng, ??t t? l? ho?n th?nh " + teams[1].d.pct + " ph?n tr?m v?i " + teams[1].d.fotClose + " Work Orders ho?n th?nh. " +
+               "V? tr? Rank 3 thu?c v? " + teams[2].nameVi + " do " + teams[2].leaderVi + " l?m ??i tr??ng, ??t t? l? " + teams[2].d.pct + " ph?n tr?m v?i " + teams[2].d.fotClose + " Work Orders ho?n th?nh. " +
+               "V? tr? Rank 4 thu?c v? " + teams[3].nameVi + " do " + teams[3].leaderVi + " l?m ??i tr??ng, hi?n c? " + teams[3].d.totalAssigned + " Work Orders ???c giao v? " + (teams[3].d.cdNotYet || 0) + " Work Orders ch? ??ng C?t A. " +
+               "Xin c?m ?n b?n ?? l?ng nghe b?n tin ?i?u h?nh BI.";
+      } else if (selectedLang === 'my-MM') {
+        return "????????? TNI ???????????????????? ???????????? ????????????? " +
+               "????????? ????????????? ????? ? ??? " + dateEn + " ??? ?????????? ?????????????? " + totalAssigned + " ?? ???????? " +
+               "?????????? " + totalClose + " ?? ????? ?????????????? " + totalCd + " ?? ????????? " +
+               "????? ? " + teams[0].nameMy + " ??????????? " + teams[0].leaderMy + " ???????? " + teams[0].d.pct + " ????????????? ????????????? " +
+               "????? ? " + teams[1].nameMy + " ??????????? " + teams[1].leaderMy + " ???????? " + teams[1].d.pct + " ????????????? ????????????? " +
+               "????? ? " + teams[2].nameMy + " ??????????? " + teams[2].leaderMy + " ???????? " + teams[2].d.pct + " ????????????? ????????????? " +
+               "????? ? " + teams[3].nameMy + " ??????????? " + teams[3].leaderMy + " ???????? ?????????????? " + teams[3].d.totalAssigned + " ?? ????????? " +
+               "????????????????";
+      } else {
+        return "Welcome to TNI Operations BI Executive Management Portal. Here is the operational summary for Tanintharyi region as of " + rawTime + ". " +
+               "Total assigned Work Orders system wide is " + totalAssigned + " Work Orders, with " + totalClose + " closed and " + totalCd + " pending close in Column A. " +
+               "Regional Team Rankings: " +
+               "Rank number 1 goes to " + teams[0].nameEn + " led by " + teams[0].leaderEn + ", achieving " + teams[0].d.pct + " percent completion rate with " + teams[0].d.fotClose + " closed Work Orders. " +
+               "Rank number 2 goes to " + teams[1].nameEn + " led by " + teams[1].leaderEn + ", with " + teams[1].d.pct + " percent completion rate. " +
+               "Rank number 3 goes to " + teams[2].nameEn + " led by " + teams[2].leaderEn + ", achieving " + teams[2].d.pct + " percent completion rate. " +
+               "Rank number 4 goes to " + teams[3].nameEn + " led by " + teams[3].leaderEn + ", with " + teams[3].d.totalAssigned + " total assigned Work Orders and " + (teams[3].d.cdNotYet || 0) + " Work Orders pending close. " +
+               "Thank you for listening to the TNI BI Executive Audio Report.";
+      }
+    }
 
     function toggleAIVoice() {
       if (!synth) return;
@@ -7253,7 +7332,7 @@ Team04>> 2Box</td>
         return;
       }
 
-      const scriptText = BRIEFING_SCRIPTS[selectedLang] || BRIEFING_SCRIPTS['en-US'];
+      const scriptText = getDynamicBriefingScript(selectedLang);
       
       // Split full text into sentence chunks to bypass Chrome/Windows 15-second cutoff bug
       const sentences = scriptText.match(/[^.!?။]+[.!?။]+/g) || [scriptText];
