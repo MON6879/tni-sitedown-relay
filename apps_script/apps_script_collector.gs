@@ -43,14 +43,8 @@ function doPostCollector_(e) {
     const ss    = SpreadsheetApp.openById(SHEET_ID);
     const sheet = getDataSheet(ss);
 
-    // Route Telegram webhook format fallback
-    if (body.message || body.channel_post) {
-      if (typeof processTelegramUpdate === "function") {
-        processTelegramUpdate(body);
-        return ContentService.createTextOutput(JSON.stringify({ ok: true, status: "processed" })).setMimeType(ContentService.MimeType.JSON);
-      }
-      return ContentService.createTextOutput(JSON.stringify({ status: "ignored" })).setMimeType(ContentService.MimeType.JSON);
-    }
+    // Route Telegram webhook format (site down bot) → doPostSiteDown
+    if (body.message || body.channel_post) return doPostSiteDown_(e);
 
     if (body.action === "add")              return handleAdd(sheet, body);
     if (body.action === "done")             return handleDone(sheet, ss, body);
@@ -72,19 +66,25 @@ function doPostCollector_(e) {
     if (body.action === "save_msgids")          return handleSaveMsgIds(body);
     if (body.action === "get_msg_id")           return handleGetMsgId(body);
     if (body.action === "set_msg_id")           return handleSetMsgId(body);
+    if (body.action === "get_msg_ids_batch")    return handleGetMsgIdsBatch(body);
+    if (body.action === "set_msg_ids_batch")    return handleSetMsgIdsBatch(body);
     if (body.action === "clean_blank_rows")      return handleCleanBlankRows(sheet);
 
     // ── Daily Report Collector ─────────────────────────────────────────────
     if (body.action === "daily_add" ||
         body.action === "daily_photo" ||
         body.action === "sync_headers" ||
+        body.action === "backfill_daily_names" ||
         body.action === "store_daily_plan" ||
         body.action === "get_daily_plans" ||
         body.action === "get_daily_reports")  return doPostDaily_(e);
 
     // ── Cable Collector ───────────────────────────────────────────────────
     if (body.action === "cable_add" ||
+        body.action === "cable_add_template" ||
+        body.action === "cable_route_broken" ||
         body.action === "cable_confirm" ||
+        body.action === "cable_done" ||
         body.action === "cable_add_photo" ||
         body.action === "cable_get_stats")   return doPostCable_(e);
 
@@ -96,11 +96,18 @@ function doPostCollector_(e) {
         body.action === "inv_add" ||
         body.action === "inv_confirm" ||
         body.action === "inv_add_photo" ||
+        body.action === "oil_add" ||
+        body.action === "oil_confirm" ||
+        body.action === "oil_add_photo" ||
         body.action === "process_photo")     return doPostMdg_(e);
 
     // ── Refuel Plan Collector ──────────────────────────────────────────────
     if (body.action === "collect_message" ||
-        body.action === "collect_photo")     return doPostRefuelPlan_(e);
+        body.action === "collect_photo" ||
+        body.action === "sync_image3_requests" ||
+        body.action === "log_read_group_refuel" ||
+        body.action === "realtime_read" ||
+        body.action === "clean_test_rows") return doPostRefuelPlan_(e);
 
     // ── Plan Dep Collector (BI Plan Week) ───────────────────────────────────
     if (body.action === "plan_dep_add" ||
@@ -110,12 +117,12 @@ function doPostCollector_(e) {
     // ── Attendance Collector (Morning Attendance & Staff Leave) ─────────────
     if (body.action === "attendance_add" ||
         body.action === "collect_attendance") return handleAttendancePost_(body);
-    // ── Admin: Set Script Property ─────────────────────────────────────────
-    if (body.action === "set_property")      return handleSetProperty_(body);
-    // ── Admin: Clean Test Read Group ───────────────────────────────────────
-    if (body.action === "clean_test_read_group") return handleCleanTestReadGroup_(ss);
-    // ── Schedule Sync (Time Rain 5 min) ─────────────────────────────────────
+
+    // ── Train Schedule Sync (auto-publish at 01:46 MMT daily) ──────────────
     if (body.action === "sync_schedule")     return handleSyncSchedule_(body);
+
+    // ── Sale Backend (Nhap/Ban/TamUng/KhaoSat/CRM...) ─────────────────────
+    if (body.action && body.action.startsWith('sale_')) return handleSalePost_(body);
 
     return json({ status: "error", message: "Unknown action: " + body.action });
   } catch (err) {
@@ -126,6 +133,65 @@ function doPostCollector_(e) {
 function doGetCollector_(e) {
   try {
     const action = (e && e.parameter && e.parameter.action) || "";
+
+    // ── Ultra-fast Keepalive / Ping & Status Endpoints (<50ms) ─────────────
+    if (action === "ping") {
+      return ContentService.createTextOutput(JSON.stringify({ status: "ok", message: "pong", timestamp: new Date().toISOString() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === "get_general") {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "ok",
+        service: "TNI Main GAS Backend",
+        version: "@438",
+        message: "TNI Collector running",
+        timestamp: new Date().toISOString()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ── Construction Sheet Initialization Endpoint ──
+    if (action === "init_input_construction") {
+      if (typeof initInputConstructionSheet === "function") {
+        return ContentService.createTextOutput(JSON.stringify(initInputConstructionSheet()))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      return ContentService.createTextOutput(JSON.stringify({ error: "initInputConstructionSheet not found" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === "setup_general_summary") {
+      if (typeof setupGeneralSummarySheet === "function") {
+        return ContentService.createTextOutput(JSON.stringify(setupGeneralSummarySheet()))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+      return ContentService.createTextOutput(JSON.stringify({ error: "setupGeneralSummarySheet not found" }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === "debug_general_summary") {
+      var ssCons = SpreadsheetApp.openById("1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8");
+      var sh = ssCons.getSheetByName("General");
+      var shInput = ssCons.getSheetByName("Input Construction");
+      var a2Formula = sh ? sh.getRange("A2").getFormula() : "";
+      var a2Val = sh ? sh.getRange("A2:D10").getValues() : [];
+      var inputRows = shInput ? shInput.getRange(1, 1, Math.max(shInput.getLastRow(), 1), 10).getValues() : [];
+      return ContentService.createTextOutput(JSON.stringify({
+        a2Formula: a2Formula,
+        a2Val: a2Val,
+        inputRows: inputRows
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === "inspect_spreadsheet_tabs") {
+      var targetId = (e && e.parameter && e.parameter.id) || "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
+      var targetSs = SpreadsheetApp.openById(targetId);
+      var tabList = targetSs.getSheets().map(function(s) {
+        return { name: s.getName(), gid: s.getSheetId(), rows: s.getLastRow(), cols: s.getLastColumn() };
+      });
+      return ContentService.createTextOutput(JSON.stringify({ status: "ok", tabs: tabList }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    if (action === "backfill_daily_names") {
+      return handleBackfillDailyReportEmployeeNames();
+    }
 
     // ── Site Down data endpoint (cho Python Telethon sender) ──
     if (action === "get_site_down_data") return getSiteDownData();
@@ -150,7 +216,16 @@ function doGetCollector_(e) {
     if (action === "get_note_b2b5")       return getNoteB2B5();
     if (action === "get_note_msgids")     return handleGetNoteMsgIds();
     if (action === "get_msgids")          return handleGetMsgIds(e.parameter || {});
+    if (action === "get_msg_id")          return handleGetMsgId(e.parameter || {});
+    if (action === "set_msg_id")          return handleSetMsgId(e.parameter || {});
+    if (action === "get_msg_ids_batch")   return handleGetMsgIdsBatch(e.parameter || {});
+    if (action === "set_msg_ids_batch")   return handleSetMsgIdsBatch(e.parameter || {});
     if (action === "get_refuel_data")     return doGetRefuelData_(e);
+    if (action === "get_read_group_today") {
+      const ss2 = SpreadsheetApp.openById(SHEET_ID);
+      const dateParam = (e && e.parameter && e.parameter.date) || "";
+      return handleGetReadGroupToday(ss2, dateParam);
+    }
     if (action === "get_bod_formulas") {
       const ss = SpreadsheetApp.openById("1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8");
       const sh = ss.getSheetByName("BOD assign");
@@ -192,9 +267,21 @@ function doGetCollector_(e) {
       runAutoCopyProcessor(true);
       return json({ status: "ok", message: "Auto copy processor executed successfully" });
     }
+    if (action === "run_partner_auto_update") {
+      const res = (typeof runPartnerAutoRefuelUpdate === "function")
+        ? runPartnerAutoRefuelUpdate(true)
+        : { status: "error", message: "runPartnerAutoRefuelUpdate not found" };
+      return json({ status: "ok", result: res });
+    }
+    if (action === "update_team1_partner_auto") {
+      const res = (typeof updateTeam1PartnerAuto === "function")
+        ? updateTeam1PartnerAuto()
+        : { status: "error", message: "updateTeam1PartnerAuto not found" };
+      return json(res);
+    }
 
     // ── Cable / MDG GET endpoints ─────────────────────────────────────────
-    if (action === "cable_get_stats" || action === "cable_check_row") return doGetCable_(e);
+    if (action.indexOf("cable_") === 0) return doGetCable_(e);
     if (action === "mdg_get_stats"   || action === "mdg_check_row")   return doGetMdg_(e);
     if (action === "get_fields")                                       return doGetDaily_(e);
 
@@ -210,6 +297,10 @@ function doGetCollector_(e) {
     if (action === "get_plan_dep")        return handleGetPlanDep_();
     if (action === "get_plan_dep_permit") return handleGetPlanDepPermit_();
     if (action === "plan_dep_archive")    return handlePlanDepArchive_();
+
+    if (action === "diagnose_site_clear") return handleDiagnoseSiteClear_();
+    if (action === "clear_site_clear_morning") return handleClearSiteClearMorning_();
+    if (action === "audit_capacity") return handleAuditCapacity_();
 
     // ── Default: status check ─────────────────────────────────
     const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -312,12 +403,6 @@ function handleGetMsgIds(params) {
     return json({ status: "error", message: e.message, msgids: [] });
   }
 }
-
-/** GET ?action=get_msg_id&key=... (alias, backward compat) */
-function handleGetMsgId(params) { return handleGetMsgIds(params); }
-
-/** POST {action:"set_msg_id", key:..., msgids:[...]} (alias) */
-function handleSetMsgId(body) { return handleSaveMsgIds(body); }
 
 
 // ============================================================
@@ -830,6 +915,7 @@ function handleLogSearch(ss, body) {
 
 // ============================================================
 // ACTION: LOG_READ_GROUP — Ghi lịch sử đọc tin nhắn vào tab "Read Group"
+// v2: UPSERT theo key date+team+name, CHỈ GHI người ĐÃ ĐỌC (status=Read)
 // ============================================================
 function handleLogReadGroup(ss, body) {
   const records = body.records || [];
@@ -848,29 +934,145 @@ function handleLogReadGroup(ss, body) {
   }
 
   const TZ = "Asia/Rangoon";
-  const rows = [];
+  const today = Utilities.formatDate(new Date(), TZ, "dd/MM/yyyy");
+
+  // Helper: ép Date object → "dd/MM/yyyy" string (GAS sheet trả Date object, không phải string)
+  function fmtDate_(val) {
+    if (!val) return "";
+    if (val instanceof Date) return Utilities.formatDate(val, TZ, "dd/MM/yyyy");
+    return val.toString().trim();
+  }
+
+  // Đọc toàn bộ dữ liệu hiện tại để build UPSERT map
+  const lastRow = sheet.getLastRow();
+  let existingData = [];
+  if (lastRow > 1) {
+    existingData = sheet.getRange(2, 1, lastRow - 1, 10).getValues();
+  }
+
+  // Build map: "date|team|name" → sheet row number (1-based)
+  const keyToSheetRow = {};
+  for (let i = 0; i < existingData.length; i++) {
+    const d = fmtDate_(existingData[i][0]);          // ✅ safe: handles Date object
+    const t = (existingData[i][2] || "").toString().trim();
+    const n = (existingData[i][3] || "").toString().trim();
+    if (d && n) keyToSheetRow[d + "|" + t + "|" + n] = i + 2; // +2: 1 header + 0-based
+  }
+
+  const insertRows = [];
+  const updateOps  = [];   // { sheetRow, rowData }
+  let updatedCount = 0;
+  const seenKeys = {};
+
   records.forEach(r => {
-    rows.push([
-      r.date || Utilities.formatDate(new Date(), TZ, "dd/MM/yyyy"),
-      r.time || Utilities.formatDate(new Date(), TZ, "HH:mm"),
-      r.team || "",
-      r.name || "",
+    // CHỈ GHI người ĐÃ ĐỌC
+    if ((r.status || "") !== "Read") return;
+
+    const dateVal = r.date || today;
+    const team    = r.team || "";
+    const name    = r.name || "";
+    const key     = dateVal + "|" + team + "|" + name;
+
+    // Bỏ qua nếu đã xử lý trong batch này
+    if (seenKeys[key]) return;
+    seenKeys[key] = true;
+
+    const rowData = [
+      dateVal,
+      "'" + (r.time || Utilities.formatDate(new Date(), TZ, "HH:mm")),  // ' prefix → prevent Sheets time auto-convert
+      team,
+      name,
       r.telegram_id || "",
-      r.status || "Unread",
-      r.trend_3day || "0/0/0",
+      "Read",
+      "'" + (r.trend_3day || "1/0/0"),
       r.count_7day != null ? r.count_7day : 0,
       r.count_month != null ? r.count_month : 0,
       r.note_msg || ""
-    ]);
+    ];
+
+    if (keyToSheetRow[key] !== undefined) {
+      // Ghi nhớ UPDATE — CHƯA ghi ngay, tránh bị lệch sau insertRowsBefore
+      updateOps.push({ sheetRow: keyToSheetRow[key], rowData: rowData });
+    } else {
+      insertRows.push(rowData);
+      keyToSheetRow[key] = -1;
+    }
   });
 
-  if (rows.length > 0) {
-    // Chèn các dòng mới lên trên cùng (dưới row 1 header) để luôn xem dữ liệu mới nhất
-    sheet.insertRowsBefore(2, rows.length);
-    sheet.getRange(2, 1, rows.length, 10).setValues(rows);
+  // ── BƯỚC 1: INSERT trước (chèn lên đầu) ──
+  // Sau INSERT, các existing rows bị đẩy xuống insertRows.length dòng
+  if (insertRows.length > 0) {
+    sheet.insertRowsBefore(2, insertRows.length);
+    sheet.getRange(2, 1, insertRows.length, 10).setValues(insertRows);
+    updatedCount = 0;
   }
 
-  return json({ status: "ok", count: rows.length });
+  // ── BƯỚC 2: UPDATE sau — cộng offset để bù lệch do insertRowsBefore ──
+  const offset = insertRows.length; // mỗi INSERT đẩy existing row xuống 1
+  for (const op of updateOps) {
+    const correctedRow = op.sheetRow + offset;
+    sheet.getRange(correctedRow, 1, 1, 10).setValues([op.rowData]);
+    updatedCount++;
+  }
+
+  Logger.log("log_read_group: inserted=" + insertRows.length + " updated=" + updatedCount);
+  return json({ status: "ok", inserted: insertRows.length, updated: updatedCount });
+}
+
+
+// ============================================================
+// ACTION: GET_READ_GROUP_TODAY — Trả danh sách người ĐÃ ĐỌC trong ngày từ sheet
+// Dùng cho daily_read_report.py đọc dữ liệu tổng hợp cả ngày thay vì Telethon trực tiếp
+// ============================================================
+function handleGetReadGroupToday(ss, dateParam) {
+  const READ_GROUP_TAB = "Read Group";
+  const sheet = ss.getSheetByName(READ_GROUP_TAB);
+  if (!sheet || sheet.getLastRow() < 2) {
+    return json({ status: "ok", records: [], count: 0 });
+  }
+
+  const TZ = "Asia/Rangoon";
+  const today = dateParam || Utilities.formatDate(new Date(), TZ, "dd/MM/yyyy");
+  const lastRow = sheet.getLastRow();
+  const data = sheet.getRange(2, 1, lastRow - 1, 10).getValues();
+
+  // Helper: ép Date object → "dd/MM/yyyy" string (GAS sheet trả Date object, không phải string)
+  function fmtDateG_(val) {
+    if (!val) return "";
+    if (val instanceof Date) return Utilities.formatDate(val, TZ, "dd/MM/yyyy");
+    return val.toString().trim();
+  }
+
+  const records = [];
+  for (const row of data) {
+    const rowDate = fmtDateG_(row[0]);                // ✅ safe: handles Date object
+    if (rowDate !== today) continue;
+    if ((row[5] || "").toString().trim() !== "Read") continue;
+    // row[1] = time — Sheets may auto-convert "16:36" → Date object (Sat Dec 30 1899...)
+    // or stored as "'16:36" (with apostrophe prefix to prevent conversion)
+    const rawTime = row[1];
+    let timeStr;
+    if (rawTime instanceof Date) {
+      timeStr = Utilities.formatDate(rawTime, TZ, "HH:mm");
+    } else {
+      timeStr = (rawTime || "").toString().trim().replace(/^'/, ""); // strip leading '
+    }
+
+    records.push({
+      date:        rowDate,
+      time:        timeStr,
+      team:        (row[2] || "").toString().trim(),
+      name:        (row[3] || "").toString().trim(),
+      telegram_id: (row[4] || "").toString().trim(),
+      trend_3day:  (row[6] || "0/0/0").toString().replace(/^'/, ""),
+      count_7day:  Number(row[7]) || 0,
+      count_month: Number(row[8]) || 0,
+      note_msg:    (row[9] || "").toString().trim()
+    });
+  }
+
+  Logger.log("get_read_group_today: date=" + today + " found=" + records.length + " rows");
+  return json({ status: "ok", records: records, date: today, count: records.length });
 }
 
 
@@ -1219,6 +1421,16 @@ function handleRefreshGeneral(ss) {
   gen.setColumnWidth(2, 160);
   SpreadsheetApp.flush();
   return json({ status: 'ok', message: 'General refreshed — ' + employees.length + ' rows' });
+}
+
+function handleGetGeneral(ss) {
+  return json({
+    status: "ok",
+    service: "TNI Main GAS Backend",
+    version: "@438",
+    message: "TNI Collector running",
+    timestamp: new Date().toISOString()
+  });
 }
 
 // ============================================================
@@ -2482,7 +2694,7 @@ function doGetRefuelData_(e) {
 }
 
 
-// ── BotState: lưu/đọc message_id để xóa tin cũ trước khi gửi mới ──────────
+// ── BotState & MsgId State Management (Dual: PropertiesService 5ms + Sheet BotState backup) ──
 
 function getBotStateSheet_() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -2496,24 +2708,45 @@ function getBotStateSheet_() {
 
 function handleGetMsgId(body) {
   try {
-    const key  = String(body.key || "").trim();
+    const key = String((body && body.key) || "").trim();
+    if (!key) return json({ status: "error", message: "key required", msg_id: "" });
+
+    // 1. Fast read from PropertiesService (5ms)
+    const propKey = "MSGID_" + key;
+    let msgId = PropertiesService.getScriptProperties().getProperty(propKey);
+    if (msgId !== null && msgId !== undefined && msgId !== "") {
+      return json({ status: "ok", key: key, msg_id: String(msgId) });
+    }
+
+    // 2. Fallback to BotState sheet
     const sh   = getBotStateSheet_();
     const data = sh.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]).trim() === key) {
-        return json({ status: "ok", key: key, msg_id: String(data[i][1]) });
+        msgId = String(data[i][1]).trim();
+        if (msgId) {
+          PropertiesService.getScriptProperties().setProperty(propKey, msgId);
+        }
+        return json({ status: "ok", key: key, msg_id: msgId });
       }
     }
     return json({ status: "ok", key: key, msg_id: "" });
   } catch (err) {
-    return json({ status: "error", message: err.message });
+    return json({ status: "error", message: err.message, msg_id: "" });
   }
 }
 
 function handleSetMsgId(body) {
   try {
-    const key   = String(body.key    || "").trim();
-    const msgId = String(body.msg_id || "").trim();
+    const key   = String((body && body.key) || "").trim();
+    const msgId = String((body && (body.msg_id !== undefined ? body.msg_id : body.msgid)) || "").trim();
+    if (!key) return json({ status: "error", message: "key required" });
+
+    // 1. Instant save to PropertiesService (5ms)
+    const propKey = "MSGID_" + key;
+    PropertiesService.getScriptProperties().setProperty(propKey, msgId);
+
+    // 2. Persistent save to BotState sheet
     const sh    = getBotStateSheet_();
     const data  = sh.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
@@ -2524,6 +2757,49 @@ function handleSetMsgId(body) {
     }
     sh.appendRow([key, msgId]);
     return json({ status: "ok", key: key, msg_id: msgId });
+  } catch (err) {
+    return json({ status: "error", message: err.message });
+  }
+}
+
+/** Batch get multiple msg_ids in 1 single HTTP call (<10ms) */
+function handleGetMsgIdsBatch(body) {
+  try {
+    let keys = (body && body.keys) || [];
+    if (typeof keys === "string") {
+      try { keys = JSON.parse(keys); } catch(e) { keys = keys.split(",").map(function(k){ return k.trim(); }); }
+    }
+    const props = PropertiesService.getScriptProperties().getProperties();
+    const result = {};
+
+    keys.forEach(function(k) {
+      const trimmed = String(k).trim();
+      const val = props["MSGID_" + trimmed];
+      result[trimmed] = (val !== undefined && val !== null) ? String(val) : "";
+    });
+
+    return json({ status: "ok", states: result });
+  } catch(err) {
+    return json({ status: "error", message: err.message, states: {} });
+  }
+}
+
+/** Batch set multiple msg_ids in 1 single HTTP call (<10ms) */
+function handleSetMsgIdsBatch(body) {
+  try {
+    let states = (body && body.states) || {};
+    if (typeof states === "string") {
+      try { states = JSON.parse(states); } catch(e) { states = {}; }
+    }
+
+    // Instant batch write to PropertiesService (5ms) — Primary SSOT for Serverless Bots
+    const propUpdates = {};
+    for (const k in states) {
+      propUpdates["MSGID_" + String(k).trim()] = String(states[k]).trim();
+    }
+    PropertiesService.getScriptProperties().setProperties(propUpdates);
+
+    return json({ status: "ok", count: Object.keys(states).length, states: states });
   } catch (err) {
     return json({ status: "error", message: err.message });
   }
@@ -2900,63 +3176,371 @@ function handleAttendancePost_(body) {
   }
 }
 
-// ── Admin: Set Script Property ───────────────────────────────────────────
-// Body: { action: "set_property", key: "GITHUB_PAT", value: "ghp_xxx" }
-function handleSetProperty_(body) {
-  try {
-    var key = body.key;
-    var value = body.value;
-    if (!key) return json({ status: "error", message: "Missing key" });
-    PropertiesService.getScriptProperties().setProperty(key, value || "");
-    var verify = PropertiesService.getScriptProperties().getProperty(key);
-    return json({ status: "ok", key: key, verified: verify ? verify.substring(0, 10) + "..." : "empty" });
-  } catch (err) {
-    return json({ status: "error", message: err.message });
-  }
-}
-
-// ── Admin: Clean Test Read Group ─────────────────────────────────────────
-function handleCleanTestReadGroup_(ss) {
-  try {
-    var sheet = ss.getSheetByName("Read Group");
-    if (!sheet) return json({ status: "ok", message: "No Read Group sheet" });
-    var val = sheet.getRange("D2").getValue();
-    if (String(val).trim() === "TEST_AGENT") {
-      sheet.deleteRow(2);
-      return json({ status: "ok", deleted: true, val: val });
-    }
-    return json({ status: "ok", deleted: false, val: val });
-  } catch (err) {
-    return json({ status: "error", message: err.message });
-  }
-}
-
-// ── Schedule Sync: Ghi bảng thời gian vào tab "Time Rain 5 min" ─────────
-// Body: { action: "sync_schedule", data: [[row1], [row2], ...] }
-// Sheet: 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow → Tab "Time Rain 5 min"
-function handleSyncSchedule_(body) {
-  try {
-    var data = body.data;
-    if (!data || !Array.isArray(data) || data.length === 0) {
-      return json({ status: "error", message: "Missing or empty data array" });
-    }
-    var ss = SpreadsheetApp.openById("1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow");
-    var sheet = ss.getSheetByName("Time Rain 5 min");
-    if (!sheet) {
-      return json({ status: "error", message: "Tab 'Time Rain 5 min' not found" });
-    }
-    // Clear toàn bộ rồi ghi mới
-    sheet.clearContents();
-    if (data.length > 0 && data[0].length > 0) {
-      sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
-    }
-    return json({ status: "ok", rows_written: data.length });
-  } catch (err) {
-    return json({ status: "error", message: err.message });
-  }
-}
-
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🚂 TRAIN SCHEDULE SYNC — Ghi lịch trình đoàn tàu vào Google Sheet
+// Tab: "Time Rain 5 min" (GID 2003037043) trên bảng Site Down
+// Trigger: 01:46 MMT hàng ngày từ train_5min.yml
+// ═══════════════════════════════════════════════════════════════
+function handleSyncSchedule_(body) {
+  try {
+    var SD_SHEET_ID = "1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow";
+    var ss = SpreadsheetApp.openById(SD_SHEET_ID);
+    var sheet = ss.getSheetByName("Time Rain 5 min");
+    if (!sheet) return json({ ok: false, msg: "Tab 'Time Rain 5 min' not found" });
+
+    var rows = body.rows; // Array of arrays: [[#, Time, Toa, Report, Engine, Notes], ...]
+    if (!rows || !rows.length) return json({ ok: false, msg: "No rows data" });
+
+    // Clear old data and write new
+    sheet.clearContents();
+    sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+
+    // Format header row
+    var headerRange = sheet.getRange(1, 1, 1, rows[0].length);
+    headerRange.setFontWeight("bold");
+    headerRange.setBackground("#4a86c8");
+    headerRange.setFontColor("#ffffff");
+
+    // Auto-resize columns
+    for (var i = 1; i <= rows[0].length; i++) {
+      sheet.autoResizeColumn(i);
+    }
+
+    // Add timestamp
+    var tsRow = rows.length + 2;
+    sheet.getRange(tsRow, 1).setValue("Last updated: " + Utilities.formatDate(new Date(), "Asia/Yangon", "dd/MM/yyyy HH:mm:ss") + " MMT (auto-sync)");
+
+    return json({ ok: true, msg: "Schedule synced: " + (rows.length - 1) + " entries", ts: new Date().toISOString() });
+  } catch (err) {
+    return json({ ok: false, msg: err.message });
+  }
+}
+
+// ============================================================
+// AUDIT CAPACITY — Ghế AUDITOR-9.2 (Capacity Sentinel)
+// Đếm số dòng trong các tab thu thập dữ liệu để cảnh báo sớm
+// GET ?action=audit_capacity
+// ============================================================
+function handleAuditCapacity_() {
+  try {
+    var results = [];
+    
+    // ── 1. Team All Find (SHEET_ID) ──
+    var ss1 = SpreadsheetApp.openById("1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8");
+    var tabs1 = [
+      {name: "Data", label: "Asset Orders"},
+      {name: "Search Log", label: "Search Log"},
+      {name: "Asset Stats Log", label: "Asset Stats Log"},
+      {name: "Read Report Log", label: "Read Report Log"},
+      {name: "General", label: "General Stats"}
+    ];
+    for (var i = 0; i < tabs1.length; i++) {
+      var sh = ss1.getSheetByName(tabs1[i].name);
+      results.push({
+        spreadsheet: "Team All Find",
+        tab: tabs1[i].name,
+        label: tabs1[i].label,
+        rows: sh ? sh.getLastRow() : 0,
+        cols: sh ? sh.getLastColumn() : 0
+      });
+    }
+    
+    // ── 2. Attendance ──
+    try {
+      var ss2 = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+      var tabs2 = [
+        {name: "List Attendance", label: "Attendance Records"},
+        {name: "Logs", label: "Attendance Logs"}
+      ];
+      for (var j = 0; j < tabs2.length; j++) {
+        var sh2 = ss2.getSheetByName(tabs2[j].name);
+        results.push({
+          spreadsheet: "Attendance",
+          tab: tabs2[j].name,
+          label: tabs2[j].label,
+          rows: sh2 ? sh2.getLastRow() : 0,
+          cols: sh2 ? sh2.getLastColumn() : 0
+        });
+      }
+    } catch(e2) {
+      results.push({spreadsheet: "Attendance", tab: "ERROR", label: e2.message, rows: -1, cols: 0});
+    }
+    
+    // ── 3. Construction ──
+    try {
+      var ss3 = SpreadsheetApp.openById("1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8");
+      var sh3 = ss3.getSheetByName("Collect Data");
+      results.push({
+        spreadsheet: "Construction",
+        tab: "Collect Data",
+        label: "Construction Reports",
+        rows: sh3 ? sh3.getLastRow() : 0,
+        cols: sh3 ? sh3.getLastColumn() : 0
+      });
+    } catch(e3) {
+      results.push({spreadsheet: "Construction", tab: "ERROR", label: e3.message, rows: -1, cols: 0});
+    }
+    
+    // ── 4. Refuel ──
+    try {
+      var ss4 = SpreadsheetApp.openById("1JxrA4pJo92Xx_SpwLnOQxphVYwE2iFhLrCOHmyVVuuM");
+      var tabs4 = [
+        {name: "Plan refuel", label: "Refuel Plans"},
+        {name: "Refueled", label: "Refueled Records"}
+      ];
+      for (var k = 0; k < tabs4.length; k++) {
+        var sh4 = ss4.getSheetByName(tabs4[k].name);
+        results.push({
+          spreadsheet: "Refuel",
+          tab: tabs4[k].name,
+          label: tabs4[k].label,
+          rows: sh4 ? sh4.getLastRow() : 0,
+          cols: sh4 ? sh4.getLastColumn() : 0
+        });
+      }
+    } catch(e4) {
+      results.push({spreadsheet: "Refuel", tab: "ERROR", label: e4.message, rows: -1, cols: 0});
+    }
+    
+    // ── 5. Drive storage info (approximate from About) ──
+    var driveInfo = {used: -1, total: -1};
+    try {
+      // DriveApp doesn't expose quota, but we note total file count as proxy
+      driveInfo.note = "Drive quota requires Drive API v2 (not available via DriveApp). Use Google Admin console to check.";
+    } catch(ed) {}
+    
+    // ── Summary ──
+    var warnings = [];
+    var criticals = [];
+    for (var r = 0; r < results.length; r++) {
+      if (results[r].rows > 40000) {
+        criticals.push(results[r].spreadsheet + "/" + results[r].tab + ": " + results[r].rows + " rows");
+      } else if (results[r].rows > 20000) {
+        warnings.push(results[r].spreadsheet + "/" + results[r].tab + ": " + results[r].rows + " rows");
+      }
+    }
+    
+    var status = criticals.length > 0 ? "CRITICAL" : (warnings.length > 0 ? "WARNING" : "OK");
+    
+    return json({
+      status: status,
+      timestamp: Utilities.formatDate(new Date(), "Asia/Yangon", "dd/MM/yyyy HH:mm"),
+      tabs: results,
+      warnings: warnings,
+      criticals: criticals,
+      drive: driveInfo
+    });
+  } catch(err) {
+    return json({status: "error", message: err.message});
+  }
+}
+
+// ============================================================
+// DIAGNOSE SITE CLEAR — Đọc formulas + values từ Site Down Clear Morning
+// GET ?action=diagnose_site_clear
+// ============================================================
+function handleDiagnoseSiteClear_() {
+  try {
+    var ss = SpreadsheetApp.openById("1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow");
+    var sheets = ss.getSheets();
+    
+    // Lấy danh sách tất cả tabs
+    var sheetNames = [];
+    for (var s = 0; s < sheets.length; s++) {
+      sheetNames.push({name: sheets[s].getName(), gid: sheets[s].getSheetId()});
+    }
+    
+    // Tìm tab theo GID hoặc theo tên chứa "Clear Morning"
+    var sheet = null;
+    for (var i = 0; i < sheets.length; i++) {
+      if (sheets[i].getSheetId() === 582589665) { sheet = sheets[i]; break; }
+    }
+    if (!sheet) {
+      for (var j = 0; j < sheets.length; j++) {
+        var n = sheets[j].getName().toLowerCase();
+        if (n.indexOf("clear morning") !== -1 || n.indexOf("clear") !== -1) { sheet = sheets[j]; break; }
+      }
+    }
+    if (!sheet) return json({status: "not_found", message: "No tab matching GID 582589665 or name 'Clear Morning'", allSheets: sheetNames});
+
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow < 1 || lastCol < 1) return json({status: "ok", message: "Sheet empty", rows: 0, sheetName: sheet.getName(), gid: sheet.getSheetId(), allSheets: sheetNames});
+
+    var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+    var formulas = sheet.getRange(1, 1, lastRow, lastCol).getFormulas();
+    
+    var result = [];
+    var refErrors = 0;
+    for (var r = 0; r < lastRow; r++) {
+      var rowData = [];
+      for (var c = 0; c < lastCol; c++) {
+        var val = String(values[r][c]);
+        var formula = formulas[r][c] || "";
+        var hasRef = val.indexOf("#REF!") !== -1 || formula.indexOf("#REF!") !== -1;
+        if (hasRef) refErrors++;
+        rowData.push({
+          cell: String.fromCharCode(65 + c) + (r + 1),
+          value: val.substring(0, 200),
+          formula: formula,
+          hasRefError: hasRef
+        });
+      }
+      result.push(rowData);
+    }
+
+    return json({
+      status: "ok",
+      sheetName: sheet.getName(),
+      gid: sheet.getSheetId(),
+      lastRow: lastRow,
+      lastCol: lastCol,
+      refErrors: refErrors,
+      allSheets: sheetNames,
+      data: result
+    });
+  } catch(err) {
+    return json({status: "error", message: err.message});
+  }
+}
+
+// ============================================================
+// CLEAR SITE DOWN CLEAR MORNING — Xóa sạch nội dung tab GID 582589665
+// Tab này KHÔNG thuộc Steel Lock Site Down v2 (đã xác nhận bởi Admin)
+// GET ?action=clear_site_clear_morning
+// ============================================================
+function handleClearSiteClearMorning_() {
+  try {
+    var ss = SpreadsheetApp.openById("1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow");
+    var sheets = ss.getSheets();
+    var sheet = null;
+    
+    // Tìm theo GID
+    for (var i = 0; i < sheets.length; i++) {
+      if (sheets[i].getSheetId() === 582589665) { sheet = sheets[i]; break; }
+    }
+    // Fallback: tìm theo tên
+    if (!sheet) {
+      for (var j = 0; j < sheets.length; j++) {
+        var n = sheets[j].getName().toLowerCase();
+        if (n.indexOf("clear morning") !== -1 || (n.indexOf("site") !== -1 && n.indexOf("clear") !== -1)) { sheet = sheets[j]; break; }
+      }
+    }
+    if (!sheet) {
+      var names = [];
+      for (var k = 0; k < sheets.length; k++) names.push(sheets[k].getName() + " (gid:" + sheets[k].getSheetId() + ")");
+      return json({status: "error", message: "Tab not found. All tabs: " + names.join(", ")});
+    }
+
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow < 2) return json({status: "ok", message: "Sheet already empty (only header)", rows: lastRow});
+
+    // Xóa toàn bộ nội dung từ row 2 trở đi (giữ row 1 header)
+    sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+
+    return json({
+      status: "ok",
+      message: "Đã xóa sạch " + (lastRow - 1) + " dòng dữ liệu (giữ header row 1)",
+      clearedRows: lastRow - 1,
+      timestamp: Utilities.formatDate(new Date(), "Asia/Yangon", "dd/MM/yyyy HH:mm")
+    });
+  } catch(err) {
+    return json({status: "error", message: err.message});
+  }
+}
+
+
+// ============================================================
+// 🧹 CLEANUP READ GROUP — Xóa dữ liệu cũ quá 45 ngày
+// Trigger: ngày 16 hàng tháng lúc ~01:00-02:00 Myanmar
+// ============================================================
+/**
+ * Dọn dẹp dữ liệu cũ quá 45 ngày trong tab "Read Group" và "Read Group Refule/Refuel".
+ * Dữ liệu được chèn mới nhất ở trên (row 2), cũ nhất ở dưới cùng.
+ * → Quét từ trên xuống, tìm dòng đầu tiên cũ hơn 45 ngày, xóa batch từ đó đến cuối.
+ */
+function cleanupReadGroupOldRows() {
+  var SS_ID = "1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8";
+  var TABS = ["Read Group", "Read Group Refule", "Read Group Refuel"];
+  var TZ = "Asia/Rangoon";
+  var MAX_AGE_DAYS = 45;
+
+  var now = new Date();
+  var cutoffMs = now.getTime() - MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+  var cutoffDate = new Date(cutoffMs);
+  var cutoffStr = Utilities.formatDate(cutoffDate, TZ, "dd/MM/yyyy");
+
+  Logger.log("🧹 Cleanup Read Group — Xóa dữ liệu cũ hơn " + MAX_AGE_DAYS + " ngày (trước " + cutoffStr + ")");
+
+  var ss = SpreadsheetApp.openById(SS_ID);
+
+  for (var t = 0; t < TABS.length; t++) {
+    var tabName = TABS[t];
+    var sheet = ss.getSheetByName(tabName);
+    if (!sheet) continue;
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      Logger.log("  📋 " + tabName + ": Chỉ có header — bỏ qua");
+      continue;
+    }
+
+    var dates = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+
+    // Quét từ trên xuống (newest → oldest), tìm dòng đầu tiên cũ hơn cutoff
+    var firstOldIdx = -1;
+    for (var i = 0; i < dates.length; i++) {
+      var cellVal = (dates[i][0] || "").toString().trim();
+      if (!cellVal) continue;
+
+      var parts = cellVal.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!parts) continue;
+
+      var rowDate = new Date(parseInt(parts[3], 10), parseInt(parts[2], 10) - 1, parseInt(parts[1], 10));
+      if (rowDate.getTime() < cutoffMs) {
+        firstOldIdx = i;
+        break;
+      }
+    }
+
+    if (firstOldIdx >= 0) {
+      var firstOldRow = firstOldIdx + 2; // +2: 0-indexed → 1-indexed + header row
+      var deleteCount = lastRow - firstOldRow + 1;
+      sheet.deleteRows(firstOldRow, deleteCount);
+      Logger.log("  📋 " + tabName + ": Đã xóa " + deleteCount + " dòng cũ (row " + firstOldRow + "→" + lastRow + ") | Còn " + sheet.getLastRow() + " dòng");
+    } else {
+      Logger.log("  📋 " + tabName + ": Không có dữ liệu cũ (tất cả trong 45 ngày)");
+    }
+  }
+
+  Logger.log("✅ Cleanup hoàn tất — " + Utilities.formatDate(now, TZ, "dd/MM/yyyy HH:mm"));
+}
+
+/**
+ * Cài đặt trigger tự động dọn dẹp Read Group vào ngày 16 hàng tháng lúc ~01:00-02:00 Myanmar.
+ * Chạy 1 lần để cài, sau đó trigger tự chạy hàng tháng.
+ */
+function setupReadGroupCleanupTrigger() {
+  // Xóa trigger cũ nếu có
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "cleanupReadGroupOldRows") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  // Tạo trigger mới: ngày 16 hàng tháng, ~01:00-02:00 Myanmar
+  ScriptApp.newTrigger("cleanupReadGroupOldRows")
+    .timeBased()
+    .onMonthDay(16)
+    .atHour(1)
+    .create();
+
+  Logger.log("✅ Đã cài trigger dọn dẹp Read Group: ngày 16 hàng tháng lúc ~01:00-02:00 Myanmar");
 }
