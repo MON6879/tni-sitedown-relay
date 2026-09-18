@@ -260,6 +260,38 @@
 
 ---
 
+# ??? STRICT DATA AUDITOR & ORANGE-DOT NEWLINE TASK RULE: GH? GI?M S?T AUDITOR-9.1 PH?C TRA S?NG T? SHEET TR??C KHI G?I & ??NH D?NG TASK D?U CH?M CAM XU?NG D?NG (RULE PM-45)
+
+> ?? **QUY T?C B?T BU?C T?I TH??NG (AUDITOR LIVE FRESH SHEET AUDIT & ORANGE-DOT TASK POLICY)**:
+> 1. **Gh? Gi?m S?t D? Li?u AUDITOR-9.1 B?t Bu?c Ph?c Tra Tr?c Ti?p T? Sheet S?ng (Mandatory Auditor Live Fresh Audit)**:
+>    - Tr??c M?I l?n g?i b?o c?o ??nh k? (bao g?m b?o c?o ti?n ?? c?ng vi?c c?c Team l?c 11:46 MMT v? 17:06 MMT t? sheet `WO Close progress` GID `930147334`), B?T BU?C ph?i th?ng qua Gh? Gi?m S?t D? Li?u AUDITOR-9.1 th?c thi `SpreadsheetApp.flush()` ?? ?p Google Sheets t?nh to?n l?i to?n b? d? li?u s?ng (c?c h?m IMPORTRANGE, FILTER, XLOOKUP), ??ng th?i ki?m ??nh t?nh to?n v?n c?a m?c th?i gian T1/D1 v? s? l??ng d?ng th?c t?.
+>    - **TUY?T ??I C?M** d?ng cache c?, c?m b? qua ki?m tra r? so?t l?i c?ng th?c (`#REF!`, `#N/A`, `#VALUE!`).
+>    - M?i tin nh?n b?o c?o g?i ra Telegram B?T BU?C c? d?u ki?m ??nh c?a Auditor: `??? Auditor: 100% Live Sheet Verified (HH:mm:ss MMT)`.
+> 2. **??nh D?ng Task T?n ??ng Ri?ng 1 D?ng K?m D?u Ch?m Cam (Orange-Dot Newline Task Backlog Formatting)**:
+>    - Khi t?ng h?p c?ng vi?c th?c hi?n theo tr?m, m?i th?ng tin nhi?m v? t?n ??ng (`/Task:`) B?T BU?C ph?i ???c t?ch xu?ng m?t d?ng ri?ng bi?t ngay d??i d?ng t?n Work Order ch?nh, c? ti?n t? d?u ch?m cam `?? /Task:` th?t l? r? r?ng ?? nh?n vi?n v? qu?n l? nh?n th?y ngay nh?ng vi?c c?n dang d? t?i tr?m.
+>    - **TUY?T ??I C?M** d?n ?p chung tr?n 1 d?ng v?i t?n WO g?y tr?n m?n h?nh v? kh? ??c tr?n giao di?n ?i?n tho?i!
+> 3. **Ph?n ??nh Nh?m G?i ??c L?p Theo T?ng Team (Dedicated Group Routing & Safe Splitting)**:
+>    - N?i dung b?o c?o B?T BU?C vi?t 100% b?ng ti?ng Anh v? g?i ch?nh x?c v?o t?ng nh?m Telegram t??ng ?ng c?a t?ng Team (Team 1: `-1004215695747`, Team 2: `-1004480845549`, Team 3: `-1004369170658`, Team 4: `-1004293741999`, Control: `-5251698940`).
+>    - T? ??ng c?t nh? tin (`splitTprMsg_`, ng??ng <= 3800 k? t?) ?? tri?t ti?u ho?n to?n r?i ro l?i v??t gi?i h?n 4096 k? t? c?a Telegram API.
+
+---
+
+
+# 🛡️ STRICT RULE: BẢO ĐẢM HIỂN THỊ EMOJI BẰNG JS UNICODE ESCAPES TRÊN APPS SCRIPT & CƠ CHẾ XÓA TIN CŨ BỌC THÉP TRƯỚC KHI GỬI (MANDATORY JS UNICODE ESCAPES FOR GAS EMOJIS & DELETION-FIRST DISPATCH - RULE PM-46)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (JS UNICODE ESCAPE & CLEANUP-FIRST POLICY)**:
+> 1. **Bảo Đảm Hiển Thị 100% Emoji Bằng JavaScript Unicode Escapes (Mandatory Unicode Escapes in GAS)**:
+>    - Khi viết code Google Apps Script (`.gs`) chứa các emoji (như `🟠` `\uD83D\uDFE0`, `📊` `\uD83D\uDCCA`, `📅` `\uD83D\uDCC5`, `🛡️` `\uD83D\uDEE1\uFE0F`, `🚩` `\uD83D\uDEA9`, `🔹` `\uD83D\uDD39`, `👤` `\uD83D\uDC64`, `🚨` `\uD83D\uDEA8`, `📑` `\uD83D\uDCD1`, `•` `\u2022`, `🏆` `\uD83C\uDFC6`), BẮT BUỘC phải dùng định dạng chuỗi escape chuẩn của JavaScript (`\uXXXX` hoặc surrogate pairs `\uD83D\uXXXX`).
+>    - **TUYỆT ĐỐI CẤM** gõ trực tiếp ký tự emoji 4-byte vào code nếu công cụ ghi file trên môi trường Windows không đảm bảo encoding UTF-8, vì sẽ biến ký tự thành dấu chấm hỏi `?` hoặc `??` làm mất thẩm mỹ và mất ký hiệu nhận diện trực quan của người dùng!
+> 2. **Kỷ Luật "Xóa Tin Cũ Trước Khi Gửi Tin Mới" ("Tin Nào Xóa Tin Nấy" - Rule PM-27)**:
+>    - Trước MỌI lần gửi báo cáo định kỳ (như Team Progress Report lúc 11:46 MMT & 17:06 MMT), script BẮT BUỘC phải đọc danh sách Message IDs đã gửi ở phiên trước từ `ScriptProperties` (key `TPR_MSG_IDS_<groupKey>`) và gọi `deleteMessage` qua Telegram Bot API để dọn dẹp sạch sẽ toàn bộ tin cũ của phiên trước TRƯỚC KHI gửi các tin mới.
+>    - Sau khi gửi xong, BẮT BUỘC phải lưu lại mảng Message IDs mới vào `ScriptProperties` để làm cơ sở dọn dẹp cho phiên tiếp theo.
+>    - Áp dụng cơ chế bọc lỗi `muteHttpExceptions: true` và discard an toàn khi Telegram từ chối xóa (quá giới hạn 48h hoặc đã bị xóa trước đó) theo đúng chuẩn Rule PM-27.
+> 3. **Kiểm Tra Định Dạng Date Object Từ Google Sheets (Mandatory Date Formatting)**:
+>    - Khi đọc giá trị từ các ô chứa ngày tháng (như ô `T1` của sheet `WO Close progress`), `getValues()` sẽ trả về JavaScript `Date` object. BẮT BUỘC phải kiểm tra `val instanceof Date` và định dạng bằng `Utilities.formatDate(val, "Asia/Rangoon", "dd/MM/yyyy")` — TUYỆT ĐỐI CẤM gọi `String(val)` trực tiếp vì sẽ làm hiển thị chuỗi dài loằng ngoằng kèm múi giờ gây rối mắt người dùng!
+
+---
+
 # 🎯 STRICT RULE: SỬA CÁI NÀO TÌM ĐÚNG CÁI ĐÓ ĐỂ SỬA — TIN NÀO XÓA TIN NẤY (STRICT SCOPE ISOLATION & ZERO-COLLATERAL-DAMAGE)
 
 

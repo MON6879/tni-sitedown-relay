@@ -63,7 +63,7 @@ DAILY_REPORT_CSV = (
 
 # ── Telegram Groups ────────────────────────────────────────────
 from tni_config import TELEGRAM_GROUPS, GROUP_NAMES
-GROUPS = {k: v for k, v in TELEGRAM_GROUPS.items() if k != "CONTROL"}
+GROUPS = {k: v for k, v in TELEGRAM_GROUPS.items() if k in ("T1", "T2", "T3", "T4")}
 CONTROL_CHAT_ID = TELEGRAM_GROUPS["CONTROL"]
 
 # Team number → group key  (dùng để map nhân viên)
@@ -106,7 +106,7 @@ def is_daily_plan_msg(text: str) -> bool:
 
     # 🛑 LOẠI BỎ CÁC BẢN TIN BÁO CÁO TỰ ĐỘNG (Report 1-4, Refuel Plan, BOD, Auto Report...)
     if any(kw in text_l for kw in (
-        "5.1 report", "5. report", "4. report", "4 report", "report 4", "refuel plan",
+        "5a. plan daily", "5a plan daily", "5b. plan today", "5b plan today", "5.1 report", "5. report", "4. report", "4 report", "report 4", "refuel plan",
         "report 1", "report 2", "report 3", "refuel plan 4", "submission history",
         "3-day completion rate", "comparison of plan for", "auto report", "plan stats:",
         "report — daily plan", "crosscheck", "plan tomorrow status", "plan vs actual",
@@ -141,6 +141,7 @@ def clean_plan_content(content: str) -> str:
         line_l = line.lower().strip()
         if any(kw in line_l for kw in (
             "submission history", "3-day completion rate", "plan saved — ref:",
+            "5a. plan", "5a plan", "5b. plan", "5b plan",
             "5.1 report", "5. report", "team leader: submitted", "plan content:",
             "overall: no data", "overall:", "submitted ✓", "submitted v", "submitted✓",
             "not yet submitted", "tni auto report", "📝 plan for", "📝 plan",
@@ -1308,7 +1309,7 @@ async def run_eod_or_update(mode: str):
     tomorrow_str = tomorrow.strftime("%d/%m/%Y")
 
     mode_label = "EOD" if mode == "eod" else "Updated"
-    delete_prefix = "PLAN_EOD" if mode == "eod" else "PLAN_UPD"
+    delete_prefix = "PLAN_5B"
 
     logger.info(f"🚀 Daily Plan Report ({mode_label}) start – {now_str}")
 
@@ -1543,18 +1544,31 @@ async def run_eod_or_update(mode: str):
             lines.append(divider)
 
             msg = "\n".join(lines)
-            delete_key = f"{delete_prefix}_{group_key}"
-            try:
-                delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, delete_key)
-            except Exception as del_err:
-                logger.warning(f"Delete old msg error {group_key}: {del_err}")
-            try:
-                # Chỉ xóa đúng tin của mode này — KHÔNG xóa chéo sang 5.1 morning hay mode khác
-                tg_delete_by_title(str(chat_id), f"📋 5. Report [{mode_label}]", bot_token=SEND_BOT_TOKEN)
-            except Exception: pass
+            # ── Dọn sạch tin cũ trước khi phát tin mới (Bot API + Telethon) ──
+            # 1. Dọn sạch qua Bot API: quét cả key thống nhất PLAN_5B và các key theo mode (PLAN_EOD, PLAN_UPD)
+            for pfx in ("PLAN_5B", "PLAN_EOD", "PLAN_UPD"):
+                del_key = f"{pfx}_{group_key}"
+                try:
+                    delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, del_key)
+                except Exception as del_err:
+                    logger.warning(f"Delete old msg error {del_key}: {del_err}")
+
+            # 2. Dọn sạch qua Telethon Title Match: Quét TẤT CẢ các biến thể tiêu đề của Report 5 Evening
+            #    "5. report" khớp cả [EOD] và [Updated] nhưng KHÔNG chạm vào "5.1 report" (morning)
+            for title_pfx in ("📋 5. Report", "📋 5B. Plan today compare Result"):
+                try:
+                    tg_delete_by_title(str(chat_id), title_pfx, bot_token=SEND_BOT_TOKEN)
+                except Exception: pass
+
+            # 3. Gửi tin mới
             ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-{mode_label}-{group_key}")
             if ok and msg_ids:
-                save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
+                # Lưu đồng thời vào key thống nhất (PLAN_5B) và key theo mode để bất kỳ lần chạy sau nào
+                # (dù là EOD hay Updated) đều tìm thấy và xóa sạch tin cũ!
+                save_msgids(APPS_SCRIPT_URL, f"PLAN_5B_{group_key}", msg_ids)
+                save_msgids(APPS_SCRIPT_URL, f"PLAN_{mode_label}_{group_key}", msg_ids)
+                other_mode = "UPD" if mode == "eod" else "EOD"
+                save_msgids(APPS_SCRIPT_URL, f"PLAN_{other_mode}_{group_key}", [])
             await asyncio.sleep(0.5)
 
         # ── 5b. Send consolidated report to CONTROL ──
@@ -1646,18 +1660,24 @@ async def run_eod_or_update(mode: str):
         ctrl_lines.append(divider)
 
         ctrl_msg = "\n".join(ctrl_lines)
-        ctrl_delete_key = f"{delete_prefix}_CONTROL"
-        try:
-            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, ctrl_delete_key)
-        except Exception as del_err:
-            logger.warning(f"Delete old msg error CONTROL: {del_err}")
-        try:
-            # Chỉ xóa đúng tin của mode này — KHÔNG xóa chéo sang 5.1 morning hay mode khác
-            tg_delete_by_title(str(CONTROL_CHAT_ID), f"📋 5. Report [{mode_label}]", bot_token=SEND_BOT_TOKEN)
-        except Exception: pass
+        for pfx in ("PLAN_5B", "PLAN_EOD", "PLAN_UPD"):
+            ctrl_del_key = f"{pfx}_CONTROL"
+            try:
+                delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, ctrl_del_key)
+            except Exception as del_err:
+                logger.warning(f"Delete old msg error CONTROL: {del_err}")
+
+        for title_pfx in ("📋 5. Report", "📋 5B. Plan today compare Result"):
+            try:
+                tg_delete_by_title(str(CONTROL_CHAT_ID), title_pfx, bot_token=SEND_BOT_TOKEN)
+            except Exception: pass
+
         ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, ctrl_msg, f"PLAN-{mode_label}-CONTROL")
         if ok and msg_ids:
-            save_msgids(APPS_SCRIPT_URL, ctrl_delete_key, msg_ids)
+            save_msgids(APPS_SCRIPT_URL, "PLAN_5B_CONTROL", msg_ids)
+            save_msgids(APPS_SCRIPT_URL, f"PLAN_{mode_label}_CONTROL", msg_ids)
+            other_mode = "UPD" if mode == "eod" else "EOD"
+            save_msgids(APPS_SCRIPT_URL, f"PLAN_{other_mode}_CONTROL", [])
 
     logger.info(f"🎉 Daily Plan Report ({mode_label}) complete – {myanmar_now().strftime('%H:%M')}")
 
@@ -1801,18 +1821,22 @@ async def run_morning():
             lines.append(divider)
 
             msg = "\n".join(lines)
-            delete_key = f"{delete_prefix}_{group_key}"
-            try:
-                delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, delete_key)
-            except Exception as del_err:
-                logger.warning(f"Delete old msg error {group_key}: {del_err}")
-            try:
-                # Chỉ xóa đúng tin morning 5.1 — KHÔNG xóa chéo EOD [EOD] hay [Updated]
-                tg_delete_by_title(str(chat_id), "📋 5.1 Report — Plan", bot_token=SEND_BOT_TOKEN)
-            except Exception: pass
+            for pfx in ("PLAN_5A", "PLAN_MRN"):
+                del_key = f"{pfx}_{group_key}"
+                try:
+                    delete_old_messages_bot(SEND_BOT_TOKEN, chat_id, APPS_SCRIPT_URL, del_key)
+                except Exception as del_err:
+                    logger.warning(f"Delete old msg error {del_key}: {del_err}")
+
+            for title_pfx in ("📋 5.1 Report — Plan", "📋 5A. Plan daily"):
+                try:
+                    tg_delete_by_title(str(chat_id), title_pfx, bot_token=SEND_BOT_TOKEN)
+                except Exception: pass
+
             ok, msg_ids = await send_msg(bot, chat_id, msg, f"PLAN-MRN-{group_key}")
             if ok and msg_ids:
-                save_msgids(APPS_SCRIPT_URL, delete_key, msg_ids)
+                save_msgids(APPS_SCRIPT_URL, f"PLAN_5A_{group_key}", msg_ids)
+                save_msgids(APPS_SCRIPT_URL, f"PLAN_MRN_{group_key}", msg_ids)
             await asyncio.sleep(0.5)
 
         # ── CONTROL consolidated morning report ──
@@ -1862,18 +1886,19 @@ async def run_morning():
         ctrl_lines.append(divider)
 
         ctrl_msg = "\n".join(ctrl_lines)
-        ctrl_delete_key = f"{delete_prefix}_CONTROL"
-        try:
-            delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, ctrl_delete_key)
-        except Exception as del_err:
-            logger.warning(f"Delete old msg error CONTROL morning: {del_err}")
-        try:
-            # Chỉ xóa đúng tin morning 5.1 — KHÔNG xóa chéo EOD [EOD] hay [Updated]
-            tg_delete_by_title(str(CONTROL_CHAT_ID), "📋 5.1 Report — Plan", bot_token=SEND_BOT_TOKEN)
-        except Exception: pass
+        for pfx in ("PLAN_5A", "PLAN_MRN"):
+            try:
+                delete_old_messages_bot(SEND_BOT_TOKEN, CONTROL_CHAT_ID, APPS_SCRIPT_URL, f"{pfx}_CONTROL")
+            except Exception as del_err:
+                logger.warning(f"Delete old msg error CONTROL morning: {del_err}")
+        for title_pfx in ("📋 5.1 Report — Plan", "📋 5A. Plan daily"):
+            try:
+                tg_delete_by_title(str(CONTROL_CHAT_ID), title_pfx, bot_token=SEND_BOT_TOKEN)
+            except Exception: pass
         ok, msg_ids = await send_msg(bot, CONTROL_CHAT_ID, ctrl_msg, "PLAN-MRN-CONTROL")
         if ok and msg_ids:
-            save_msgids(APPS_SCRIPT_URL, ctrl_delete_key, msg_ids)
+            save_msgids(APPS_SCRIPT_URL, "PLAN_5A_CONTROL", msg_ids)
+            save_msgids(APPS_SCRIPT_URL, "PLAN_MRN_CONTROL", msg_ids)
 
     logger.info(f"🎉 Daily Plan Report (Morning) complete – {myanmar_now().strftime('%H:%M')}")
 
