@@ -246,6 +246,20 @@
 
 ---
 
+# 👑 STRICT VIRTUAL ASSISTANT & AUDIO TOGGLE RULE: BỌC THÉP VIRTUAL SECRETARY & CƠ CHẾ TOGGLE NÚT LOA 2-CHIỀU (RULE PM-44)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (VIRTUAL ASSISTANT ROBUSTNESS & SPEAKER TOGGLE POLICY)**:
+> 1. **Khớp Biến DOM Bubble Tuyệt Đối (Exact Bot Bubble DOM Matching)**: Biến chứa template HTML của bot (`botHtml`) BẮT BUỘC phải khớp chính xác 100% với tham số gọi trong phương thức chèn DOM (`container.insertAdjacentHTML('beforeend', botHtml)`). TUYỆT ĐỐI CẤM dùng nhầm tên biến (`html`), gây lỗi `ReferenceError: html is not defined` làm nuốt chửng toàn bộ tin nhắn phản hồi của Bot!
+> 2. **Bọc Lưới An Toàn `try...catch` Mọi Luồng Trợ Lý (Zero Silent Exception Drop)**: Mọi phương thức điều phối và tổng hợp câu trả lời (`handleQuery`, `dispatchAndAnswer`) BẮT BUỘC phải được bọc trong khối `try...catch(err)`. Nếu có lỗi bất ngờ, hệ thống BẮT BUỘC phải gỡ bỏ typing indicator và xuất thông báo phản hồi lịch thiệp cho người dùng kèm mã lỗi, TUYỆT ĐỐI CẤM để lỗi nuốt chửng làm người dùng nhìn khung chat trống rỗng!
+> 3. **Phơi Bày Toàn Bộ Dữ Liệu Phụ Thuộc Lên `window.*` (Mandatory Global State Exposure)**: Mọi dữ liệu phân tích từ CSV/Google Sheets như `allEngineers`, `teamData`, `deptPointsMap` BẮT BUỘC phải được gán toàn cục lên `window.*` (`window.allEngineers = allEngineers;`) ngay tại thời điểm hoàn tất parse, kèm giá trị dự phòng rỗng (`[]` hoặc `{}`) và null-guards an toàn `(e.team_code || '').replace(...)`, `(e.real_name || e.nsys || 'Kỹ sư')` để loại trừ 100% rủi ro đọc thuộc tính của `undefined`.
+> 4. **Cơ Chế Bấm Lần 2 Tắt Loa Bọc Thép (2-Click Speaker Toggle & Visual Feedback)**: MỌI nút đọc báo cáo (Audio Briefing, Đọc Báo Cáo) BẮT BUỘC phải hỗ trợ chuyển đổi trạng thái 2 chiều:
+>    - **Bấm lần 1 (Kích hoạt)**: Bắt đầu đọc qua Web Speech API, chuyển nhãn nút sang `⏹️ Dừng Đọc`, đổi màu/icon sang đỏ (`#EF4444`) và gắn hiệu ứng nhấp nháy `.speaking-pulse`.
+>    - **Bấm lần 2 (Tắt loa)**: Gọi ngay `window.speechSynthesis.cancel()`, hoàn nguyên nhãn nút về `🔊 Đọc Báo Cáo` và tắt hoàn toàn tiến trình đọc.
+>    - **Khi đọc xong hoặc gặp lỗi (`utter.onend`, `utter.onerror`)**: Tự động khôi phục giao diện nút về trạng thái ban đầu (`Đọc Báo Cáo`).
+> 5. **Điều Hướng Ý Định Đa Chiều (Multi-Intent Composite Routing)**: Khi người dùng hỏi kết hợp (ví dụ: *"kiểm tra cho tôi các nhân viên nào không nên không đóng gỗ để và các nhiệm vụ T4"*), hệ thống BẮT BUỘC phải nhận diện đa ý định để trả về đồng thời: (a) Tiến độ & nhiệm vụ sâu của Đội được chỉ định (Team 4 Kawthoung + danh sách 4 kỹ sư) VÀ (b) Báo cáo đôn đốc các kỹ sư có tỷ lệ tồn đọng/quá hạn cao trên toàn mạng!
+
+---
+
 # 🎯 STRICT RULE: SỬA CÁI NÀO TÌM ĐÚNG CÁI ĐÓ ĐỂ SỬA — TIN NÀO XÓA TIN NẤY (STRICT SCOPE ISOLATION & ZERO-COLLATERAL-DAMAGE)
 
 
@@ -1614,3 +1628,49 @@ Mọi thao tác cài đặt hoặc khôi phục Webhook Telegram đều phải �
 >      - `50% downpayment after agreement: [50% Total] Kyat`
 >      - `: 40% payment after installation: [40% Total] Kyat`
 >      - `: 10% payment after testing & commissioning: [10% Total] Kyat`.
+
+# ⚡ POST-MORTEM RULE — 18/09/2026: QUY TRÌNH BÀN GIAO NGHIỆM THU HIỆN TRƯỜNG THỰC DÙNG, THỪA THU HỒI QUY TIỀN & CỔNG ĐIỀU HÀNH TEAM THỰC THI (FIELD OPS HUB & ZERO INTERNAL FINANCIAL LEAK POLICY)
+
+> ### Nguồn gốc: **Nâng Cấp Nghiệm Thu Vật Tư Thừa Quy Ra Tiền, Tinh Gọn Đo Đạc & Cổng Điều Hành Team Thực Thi (18/09/2026)**
+> - **Root Cause**:
+>   1. Khi nghiệm thu ngoài hiện trường, thợ kỹ thuật mang theo vật tư dự phòng (dây DC đen/đỏ, dây AC, đầu nối MC4...) luôn có chênh lệch giữa số lượng xuất xe mang đi và số lượng thực lắp vào nhà khách. Trước đây, hệ thống chưa có bảng đối soát vật tư thừa quy ra tiền dẫn đến nguy cơ tính cả vật tư thừa vào công trình của khách hoặc không theo dõi được vật tư thừa đã thu hồi để chuyển sang công trình khác.
+>   2. Các thông số đo kiểm kỹ thuật chuyên sâu (Điện trở tiếp địa $\Omega$, Tần số lưới Hz, Trạng thái lưới/tải) làm nặng nề biểu mẫu và mất thời gian đo đạc phức tạp ngoài hiện trường bằng thiết bị đắt tiền, trong khi chỉ cần nghiệm thu 3 chỉ số cốt lõi: Điện áp bàn giao (220V/380V), Công suất phát đỉnh (kWp), và Mức sạc pin (SOC %).
+>   3. Dữ liệu tài chính nội bộ (giá gốc vốn 83%, lợi nhuận nộp công ty 17%, lợi nhuận chi nhánh) nếu hiển thị cho nhân viên nghiệm thu hoặc in trên biên bản khách hàng sẽ gây lộ bí mật kinh doanh và mâu thuẫn nội bộ.
+>   4. Đội ngũ kỹ thuật và thị trường tại Myanmar (khảo sát hiện trường mái/nắng, bỏ hàng đại lý, ký gởi trưởng thôn/già làng, theo dõi số serial từng máy inverter/pin, lịch sử từng khách hàng theo nhân viên) bị phân mảnh nếu không có 1 Hub thực thi tập trung chia sẻ qua link URL trực tiếp.
+>
+> ### 🔴 RULE PM-44: 5 NGUYÊN TẮC BỌC THÉP CHO BÀN GIAO NGHIỆM THU & CỔNG ĐIỀU HÀNH TEAM THỰC THI
+> 1. **Bảng Đối Soát Vật Tư Thực Dùng & Thừa Thu Hồi Chuyển KH Khác**:
+>    - Biểu mẫu nghiệm thu hiện trường (`s-acceptance`) và bản in PDF/A4 BẮT BUỘC hiển thị rõ ràng 2 cột tiền: (1) Tiền vật tư thực dùng (tính vào công trình) và (2) Tiền vật tư thừa thu hồi (mang sang KH khác dùng).
+>    - TUYỆT ĐỐI CẤM tính giá trị vật tư thừa vào chi phí nghiệm thu của khách hàng hiện tại.
+> 2. **Đo Đạc Hiện Trường Tinh Gọn 3 Thông Số Cốt Lõi**:
+>    - Biểu mẫu nghiệm thu bàn giao CHỈ ĐƯỢC PHÉP giữ lại 3 thông số đo đạc thực tế: Điện áp bàn giao (220V), Công suất phát đỉnh (kWp), Mức sạc pin lưu trữ (SOC %).
+>    - TUYỆT ĐỐI CẤM đưa các trường đo kiểm phức tạp (Điện trở tiếp địa $\Omega$, Tần số lưới Hz, Trạng thái tải) vào form hiện trường gây rối rắm và chậm tiến độ.
+> 3. **Khóa Bảo Mật 100% Giá Vốn & Lợi Nhuận Nội Bộ (Zero Financial Leak)**:
+>    - Nhân viên nghiệm thu hiện trường và bản in PDF/A4 gửi khách hàng TUYỆT ĐỐI KHÔNG ĐƯỢC nhìn thấy hoặc chứa các thông số tài chính nội bộ: Tổng giá gốc vốn 83%, Tiền nộp công ty 17%, Lợi nhuận còn lại của chi nhánh.
+>    - Toàn bộ mục này BẮT BUỘC phải được đóng băng, ẩn mặc định (`display:none`) và chỉ mở khi Quản lý/Giám đốc mở khóa (`👁️ Mở Khóa Quản Lý`).
+> 4. **Cổng Điều Hành Team Thực Thi (`s-thucthi` / Field Ops Hub)**:
+>    - BẮT BUỘC cung cấp link chia sẻ trực tiếp độc lập (`?tab=thucthi&staff=TÊN_NV`) hỗ trợ 5 phân hệ thực tế:
+>      - (a) `tt-ks`: Khảo sát hiện trường (kiến trúc mái, hướng nắng đón đỉnh, phụ tải thiết bị, đề xuất Inverter/Pin/PV, ảnh & tọa độ GPS).
+>      - (b) `tt-pp`: Bỏ hàng cho đại lý, điểm bán lẻ & ký gởi trưởng thôn / già làng (tính toán thù lao hoa hồng, hạn thu hồi tiền về cty).
+>      - (c) `tt-sn`: Tồn kho chi tiết đến từng số Serial thiết bị (quản lý vòng đời Inverter, Pin, PV: Trong kho, Xe kỹ thuật đi lắp, Ký gởi trưởng thôn, Đã lắp cho KH, Bảo hành/Lỗi).
+>      - (d) `tt-nt`: Nghiệm thu hiện trường sạch, tối ưu cho mobile, chữ ký cảm ứng & 100% bảo mật giá vốn.
+>      - (e) `tt-ls`: Lịch sử hành trình khách hàng xuyên suốt của từng nhân viên (Khảo sát ➔ Báo giá ➔ Giao hàng ký gởi ➔ Nghiệm thu hoàn tất).
+> 5. **Tự Động Đồng Bộ Serial Ký Gởi Vào Sổ Kho & Router Khởi Tạo Tự Động**:
+>    - Khi nhân viên lưu phiếu ký gởi hàng cho trưởng thôn hoặc đại lý, hệ thống BẮT BUỘC tự động tách dải số Serial và cập nhật trạng thái `"Ký Gởi Trưởng Thôn / Điểm Bán"` vào bảng Tồn Kho Serial (`serial_inventory`).
+>    - Khi người dùng truy cập qua URL param `?tab=thucthi&staff=...`, hệ thống BẮT BUỘC tự động chuyển hướng vào tab Thực Thi và chọn đúng nhân viên phụ trách mà không cần thao tác bấm chuột thủ công.
+
+# ⛽ POST-MORTEM RULE — 18/09/2026: BỌC THÉP ĐỒNG BỘ CỘT V & Y TRÊN TAB REQUEST PARTNER AUTO (REFUEL) (RULE PM-45)
+
+> ### Nguồn gốc: **Khắc Phục Sự Cố Ô Màu Cam Cột V 'Request Partner Auto' (18/09/2026)**
+> - **Root Cause**:
+>   1. Khi trạm cạn dầu (`S=1`), nếu Cột Y (`Date Partner refuel`) vô tình chứa chuỗi ghi chú rác hoặc ngày cũ/tương lai (ví dụ: `14/02/2027 < + > 91` trên dòng 70 `TNI0351_1`), logic cũ trong `runPartnerAutoRefuelUpdate` (Tác vụ 1) vội vàng gọi `clearContent()` xóa Cột V và W, đồng thời đánh dấu `clearedInThisRun = true` khiến Tác vụ 2 bỏ qua dòng này.
+>   2. Hậu quả: Cột V bị xóa rỗng trong khi Cột S vẫn là `1`, khiến Conditional Formatting trong Google Sheets lập tức bôi cam ô V, tạo vòng lặp xóa - bôi cam và khiến AUDITOR-9.1 liên tục phát cảnh báo mất đồng bộ đỏ!
+>
+> ### 🔴 RULE PM-45: 3 NGUYÊN TẮC BỌC THÉP CHO BẢNG REQUEST PARTNER AUTO
+> 1. **Bảo Vệ Cột V và W Khi Trạm Đang Cạn Dầu (`S=1`)**:
+>    - TUYỆT ĐỐI KHÔNG xóa dữ liệu Cột V (Date request) và Cột W (Littel request) của bất kỳ trạm nào đang có trạng thái `S === 1` (hoặc `"1"`).
+>    - Chỉ cho phép xóa Cột V và W khi và chỉ khi: (1) Cột Y có giá trị khác `"-"` VÀ (2) Trạm đã thực sự hoàn thành chu kỳ đổ dầu (`S !== "1"`, tức lượng dầu trong bồn đã được bổ sung và cờ S tắt về 0).
+> 2. **Tự Động Làm Sạch Cột Y Khi Phát Hiện Chuỗi Rác / Lệch Trạng Thái**:
+>    - Nếu trạm đang ở trạng thái cần dầu (`S === 1`) mà Cột Y lại chứa giá trị khác `"-"` (ghi chú nhầm, ngày cũ hoặc ngày tương lai), hệ thống BẮT BUỘC phải tự động ghi đè reset Cột Y về `"-"` (`sheet.getRange(sheetRow, 25).setValue("-")`) để chuẩn hóa trạng thái chờ đối tác đổ dầu.
+> 3. **Hậu Kiểm Zero-Orange Của AUDITOR-9.1 Sau Mỗi Lượt Cập Nhật**:
+>    - Sau khi hoàn thành Tác vụ 1 và Tác vụ 2, AUDITOR-9.1 quét lại toàn bộ Cột V (row 4 đến row 300). Nếu còn bất kỳ ô nào thuộc diện màu cam (`isManual` hoặc `isCF`), hệ thống gửi cảnh báo kèm danh sách trạm vi phạm; nếu bằng 0, ghi nhận trạng thái PASS hoàn hảo.
