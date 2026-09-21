@@ -1038,7 +1038,8 @@ function isValidConstructionReport(text, templateKeys) {
   var firstLine = cleanText.split('\n')[0].trim();
 
   // 1. Check if first line matches any of the official mandatory header keys followed by a Date (DD/MM/YYYY)
-  var officialHeaderRegex = /^\s*(delivery|team\s*received\s*material|plan|upgraded|revoked\s*material|degraded|solared|cable\s*route\s*over\s*head\s*progress|cable\s*route\s*over\s*head\s*complete|cable\s*route\s*under\s*ground\s*progress|cable\s*route\s*under\s*ground\s*completed)\s*[:\-]?\s*[0-3]?[0-9][\/\.-][0-1]?[0-9][\/\.-]20[2-9][0-9]/i;
+  // NOTE: Use "completed?" to match both "complete" and "completed" variants
+  var officialHeaderRegex = /^\s*(delivery|team\s*received\s*material|plan|upgraded|revoked\s*material|degraded|solared|cable\s*route\s*over\s*head\s*progress|cable\s*route\s*over\s*head\s*completed?|cable\s*route\s*under\s*ground\s*progress|cable\s*route\s*under\s*ground\s*completed?|5g\s*installation\s*completed?)\s*[:\-]?\s*[0-3]?[0-9][\/\.-][0-1]?[0-9][\/\.-]20[2-9][0-9]/i;
 
   var isHeaderValid = officialHeaderRegex.test(firstLine);
 
