@@ -222,6 +222,8 @@ grep -c 'continue-on-error: true' train_5min.yml                # Phải = tổn
 | **Báo cáo Kế hoạch Update (Report 5B)** | **19:11 PM MMT** | Toa Report 5B Update | 19:11 MMT | `daily_plan_report.py` | Teams 1..4, CONTROL |
 | **Báo cáo Kế hoạch Sáng (Report 5C)** | **06:06, 08:28, 09:56, 15:26, 22:06 MMT** | Toa Report 5C Morning | `06:06`, `08:28`, `09:56`, `15:26`, `22:06` MMT | `daily_plan_report.py` | Teams 1..4, CONTROL |
 | **Báo cáo Lượt đọc (Report 6)** | **08:48, 14:58, 17:18, 19:41 MMT** | Toa Report 6 Read | `08:48`, `14:58`, `17:18`, `19:41` MMT | `daily_read_report.py` | Teams 1..4, CONTROL |
+| **Team Operation Progress Report (Ghế GAS-OPS-1 & AUDITOR-9.1)** | **11:46 AM & 17:21 PM MMT** | GAS Native Scheduler (Tránh tuyệt đối va chạm Toa Site Down & ETA :06/:36) | 11:46 & 17:21 MMT | `team_progress_report.gs` | Teams 1..4, CONTROL |
+| **Báo cáo: Ghế giám sát đã kiểm tra không phát hiện lỗi** | **09:00 AM MMT & On-Demand** | Toa Auditor (Ghế AUDITOR-9.1) | 09:00 MMT & On-Demand | `system_auditor.py` | Admin DM (6859790680) |
 | **Báo cáo 6.1 Site Clear Today** | **07:18, 10:18, 14:18, 17:18 MMT** | Toa 6.1 Site Clear | `07:18`, `10:18`, `14:18`, `17:18` MMT | `site_clear_report.py` | Teams 1..4, CONTROL |
 | ~~**Cable Report**~~ | ~~**05:56, 15:56 MMT**~~ | ~~Toa Cable~~ | **ĐÃ HỦY THEO YÊU CẦU NGƯỜI DÙNG** | ~~`cable_report.py`~~ | ~~CABLE Group~~ |
 | **Site Down Detail (Ghế SD-DETAIL-1)** | **Mỗi giờ (:06 & :36 MMT)** | Độc lập `botlookup_relay.yml` (cron: `3,33 * * * *` UTC) | Chạy độc lập ~:03/:33 UTC | `botlookup_relay.py` | CONTROL, T1, T2, T3, T4 |
@@ -1392,7 +1394,7 @@ KHÔNG ĐỤNG:
 | **`Ghế EXT-ATTENDANCE-BOT`** | Cổng Ngoại Giao Điểm Danh | Webhook Bot Điểm Danh `@8628370628` | Báo trễ nhận diện ảnh về DM Admin |
 | **`Ghế BOT-CABLE-15`** | Bot 15 TNI CABLE Thu Thập Cáp | Webhook `/api/cable_bot`, `@TNI_CABLE_BOT` (8758104446), Nhóm `8 TNI CABLE BROKEN SOS` (-5531350787) | Phản hồi sự cố cáp kèm Note vật tư & bảo dưỡng, lưu ảnh Drive folder theo REF |
 | **`Ghế GAS-CABLE-15`** | Quản Trị GAS Cable | `apps_script_cable.gs` (@387), ghi Sheet `Detail cable`, trả link Drive Folder tải tất cả ảnh | Báo lỗi Drive / Sheet Cable về DM Admin |
-| **`Ghế WEB-SALE-16`** | Frontend TNI Sale Web App | `tni_sale.html` (static SPA 164KB), 13 module bán hàng, báo giá Solar/UPS, CRM, Ads, song ngữ VN/EN | Cảnh báo khi localStorage rỗng hoặc sync GAS thất bại |
+| **`Ghế WEB-SALE-16`** | Frontend TNI Sale Web App | `tni_sale.html` / `sale.html` (static SPA), 20 modules bán hàng, báo giá Solar/UPS, CRM, Ads, Tài chính 17%, Sổ cái quyết toán VCM, song ngữ VN/EN + **Hệ thống Phân Quyền Vai Trò (RBAC)** bọc thép ai được xem gì (khóa mục tài chính với nhân viên) | Cảnh báo khi localStorage rỗng hoặc truy cập trái quyền |
 | **`Ghế GAS-SALE-16`** | Backend GAS Sale CRUD + Collector | **Dedicated GAS**: `apps_script_ups_solar/TNI Sale.js` (1807 dòng) Deploy `AKfycbx09J8PPi...` + **Main GAS**: `QLTC_GAS/sale_backend.gs` (180 dòng, CRUD `sale_*`) | Sheet `1s-V0owHlwub...wQBA` (12 tabs: NhapHang, Sales Record, Consignment, Warranty...) |
 | **`Ghế BOT-SALE-16`** | Telegram Sale Collector Bot | Bot Token `8647102342` (ScriptProperties `BOT_TOKEN`), thu thập đơn hàng từ Telegram Groups, xóa tin gốc sau khi lưu, lưu ảnh vào Drive Folder `11HcMa63slXPOHrveHxmqZTZerzKPfjVt` | Báo lỗi thu thập / Drive quota hết về DM Admin |
 | **`Ghế GAS-VERIFY-0`** | Xác Nhận Đủ File GAS | `QLTC_GAS` = 17 files, `apps_script_sitedown` = 1 file | DỪNG NGAY nếu thiếu file, KHÔNG push! |
