@@ -2764,7 +2764,7 @@ function buildDailyAttendanceText_(targetTeam) {
       lines.push("   ⏰ Late (8:40-9):  " + att.tLt + "/" + att.yLt + "/" + att.d2Lt);
       lines.push("   🏖️ Leave:         " + att.tL  + "/" + att.yL  + "/" + att.d2L  + "/" + att.wkL  + "/" + att.moL);
       lines.push("   🌓 Half Day:      " + att.tH  + "/" + att.yH  + "/" + att.d2H  + "/" + att.wkH  + "/" + att.moH);
-      lines.push("   ❌ Not Report:    " + att.tNR + "/" + att.yNR + "/" + att.d2NR);
+      lines.push("   ❌ Not Report(Leave): " + att.tNR + "/" + att.yNR + "/" + att.d2NR);
       lines.push("   📷 Photo:         " + ph.tP + "/" + ph.yP + "/" + ph.d2P + "/" + ph.wkP + "/" + ph.moP);
     }
     lines.push("");
