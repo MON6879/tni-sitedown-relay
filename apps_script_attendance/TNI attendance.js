@@ -2555,8 +2555,11 @@ function buildDailyAttendanceText_(targetTeam) {
 
   // ── 2. Load attendance from "Sum report morning attendance" ──
   function initAtt() {
-    return { tW: 0, tL: 0, tH: 0, yW: 0, yL: 0, yH: 0, d2W: 0, d2L: 0, d2H: 0,
+    return { tW: 0, tL: 0, tH: 0, tLt: 0, tNR: 0,
+             yW: 0, yL: 0, yH: 0, yLt: 0, yNR: 0,
+             d2W: 0, d2L: 0, d2H: 0, d2Lt: 0, d2NR: 0,
              wkW: 0, wkL: 0, wkH: 0, moW: 0, moL: 0, moH: 0 };
+    // tLt = Late (photo 08:40-09:00), tNR = Take Leave Not Report (no photo before 09:00, no leave text)
   }
   const attMap = {};
   const sumSheet = ss.getSheetByName("Sum report morning attendance");
@@ -2584,15 +2587,17 @@ function buildDailyAttendanceText_(targetTeam) {
     }
   }
 
-  // ── 3. Load photo counts + Auto-inject Work from early morning photo ──
-  // Rule PM-ATT-01: Photo gửi trước 08:40 → tự động tính là Work (✅).
-  //   - Nếu đã có text "Take Leave" / "Half Day" cho ngày đó → KHÔNG ghi đè.
-  //   - Không có photo trước 08:40 → Work = 0 (Not Report).
+  // ── 3. Load photo counts + Auto-inject Work / Late / Not Report from List Attendance ──
+  // Rule PM-ATT-01: Photo trước 08:40 sáng → Work (✅)
+  // Rule PM-ATT-02: Photo 08:40-09:00 sáng → Late (⏰ Working Late), tính là có mặt nhưng muộn
+  // Rule PM-ATT-03: Không có photo trước 09:00 VÀ không có text Take Leave → Not Report (❌ Leave Not Report)
+  //   - Nếu đã có "Take Leave" / "Half Day" text → ưu tiên Leave, KHÔNG tính Not Report
   function initPh() {
     return { tP: 0, yP: 0, d2P: 0, wkP: 0, moP: 0 };
   }
   const photoMap = {};
-  var earlyPhotoWorkDone = {};  // Track (nameLow|dateStr) already injected as Work
+  // Track first-best photo per (nameLow|dateStr): "early" (<08:40) > "late" (08:40-09:00) > "after"
+  var bestPhotoSlot = {};  // value: "early" | "late" | "after"
 
   const listSheet = ss.getSheetByName("List Attendance");
   if (listSheet && listSheet.getLastRow() >= 2) {
@@ -2610,7 +2615,7 @@ function buildDailyAttendanceText_(targetTeam) {
       const dStr = toDateStr(dObj);
       const mStr = toMonthStr(dObj);
 
-      // Photo count (all times) for Photo row display
+      // ── Photo count (all times) for 📷 Photo row ──
       if (!photoMap[phKey]) photoMap[phKey] = initPh();
       const p = photoMap[phKey];
       if (dStr === todayStr) p.tP++;
@@ -2619,29 +2624,77 @@ function buildDailyAttendanceText_(targetTeam) {
       if (dObj >= weekStart) p.wkP++;
       if (mStr === curMonthStr) p.moP++;
 
-      // Auto-inject Work from early photo (before 08:40)
-      var timeRaw   = String(r[2] || "").trim();
+      // ── Classify photo time slot ──
+      var timeRaw   = String(r[2] || "").trim();   // Col C: "HH:mm"
       var tParts    = timeRaw.match(/^(\d{1,2}):(\d{2})/);
       var photoHour = tParts ? parseInt(tParts[1], 10) : 99;
       var photoMin  = tParts ? parseInt(tParts[2], 10) : 99;
-      var isEarly   = (photoHour < 8) || (photoHour === 8 && photoMin < 40);
-      if (!isEarly) continue;
+      // Slot: "early" = before 08:40 | "late" = 08:40-08:59 | "after" = 09:00+
+      var slot = (photoHour < 8 || (photoHour === 8 && photoMin < 40)) ? "early"
+               : (photoHour === 8 && photoMin >= 40) ? "late"
+               : "after";
 
       var attKey = nameLow;
       if (!attKey) continue;
       var dayKey = attKey + "|" + dStr;
-      if (earlyPhotoWorkDone[dayKey]) continue;
-      earlyPhotoWorkDone[dayKey] = true;
+
+      // Keep best slot per person per day (early > late > after)
+      var prevSlot = bestPhotoSlot[dayKey];
+      if (prevSlot === "early") continue;  // Already have best slot, skip
+      if (prevSlot === "late" && slot !== "early") continue;
+      bestPhotoSlot[dayKey] = slot;
 
       if (!attMap[attKey]) attMap[attKey] = initAtt();
       var a = attMap[attKey];
 
-      // Inject Work only if NO Leave/Half text report for that date
-      if (dStr === todayStr && a.tL === 0 && a.tH === 0 && a.tW === 0) a.tW = 1;
-      if (dStr === yestStr  && a.yL === 0 && a.yH === 0 && a.yW === 0) a.yW = 1;
-      if (dStr === day2Str  && a.d2L === 0 && a.d2H === 0 && a.d2W === 0) a.d2W = 1;
-      if (dObj >= weekStart && a.wkL === 0 && a.wkH === 0) a.wkW++;
-      if (mStr === curMonthStr && a.moL === 0 && a.moH === 0) a.moW++;
+      if (slot === "early") {
+        // ── Work: inject only if NO Leave/Half text report ──
+        if (dStr === todayStr && a.tL === 0 && a.tH === 0 && a.tW === 0) { a.tW = 1; a.tLt = 0; }
+        if (dStr === yestStr  && a.yL === 0 && a.yH === 0 && a.yW === 0) { a.yW = 1; a.yLt = 0; }
+        if (dStr === day2Str  && a.d2L === 0 && a.d2H === 0 && a.d2W === 0) { a.d2W = 1; a.d2Lt = 0; }
+        if (dObj >= weekStart && a.wkL === 0 && a.wkH === 0) a.wkW++;
+        if (mStr === curMonthStr && a.moL === 0 && a.moH === 0) a.moW++;
+
+      } else if (slot === "late") {
+        // ── Late (Working Late 08:40-08:59): only if NO Leave/Half text, and no early Work yet ──
+        if (dStr === todayStr && a.tL === 0 && a.tH === 0 && a.tW === 0) a.tLt = 1;
+        if (dStr === yestStr  && a.yL === 0 && a.yH === 0 && a.yW === 0) a.yLt = 1;
+        if (dStr === day2Str  && a.d2L === 0 && a.d2H === 0 && a.d2W === 0) a.d2Lt = 1;
+        // Late also counts toward week/month work (present but late)
+        if (dObj >= weekStart && a.wkL === 0 && a.wkH === 0) a.wkW++;
+        if (mStr === curMonthStr && a.moL === 0 && a.moH === 0) a.moW++;
+      }
+      // slot === "after": photo after 09:00 = not counted as Work or Late
+    }
+  }
+
+  // ── 3b. Inject "Not Report" for staff with NO photo before 09:00 and NO Leave/Half text ──
+  // Loop runs AFTER photoMap + attMap are fully populated above
+  // "Not Report" = today: no early/late photo, no Leave text → tNR = 1
+  // Only applies to TODAY (todayStr) since for past days we cannot determine staff presence
+  for (var si = 0; si < staffList.length; si++) {
+    var st    = staffList[si];
+    var sKey  = st.name.toLowerCase();
+    var phKey2 = st.tgId || sKey;
+    var sAtt  = attMap[sKey];
+    var sBest = bestPhotoSlot[sKey + "|" + todayStr];
+
+    // Today Not Report: no early/late photo AND no Work/Leave/Half text
+    if (!sBest || sBest === "after") {
+      if (!sAtt) { attMap[sKey] = initAtt(); sAtt = attMap[sKey]; }
+      if (sAtt.tW === 0 && sAtt.tL === 0 && sAtt.tH === 0 && sAtt.tLt === 0) sAtt.tNR = 1;
+    }
+    // Yesterday Not Report
+    var sBestY = bestPhotoSlot[sKey + "|" + yestStr];
+    if (!sBestY || sBestY === "after") {
+      if (!sAtt) { attMap[sKey] = initAtt(); sAtt = attMap[sKey]; }
+      if (sAtt.yW === 0 && sAtt.yL === 0 && sAtt.yH === 0 && sAtt.yLt === 0) sAtt.yNR = 1;
+    }
+    // Day-3 Not Report
+    var sBestD2 = bestPhotoSlot[sKey + "|" + day2Str];
+    if (!sBestD2 || sBestD2 === "after") {
+      if (!sAtt) { attMap[sKey] = initAtt(); sAtt = attMap[sKey]; }
+      if (sAtt.d2W === 0 && sAtt.d2L === 0 && sAtt.d2H === 0 && sAtt.d2Lt === 0) sAtt.d2NR = 1;
     }
   }
 
@@ -2707,10 +2760,12 @@ function buildDailyAttendanceText_(targetTeam) {
       const ph      = photoMap[phKey] || initPh();
 
       lines.push((m + 1) + ". <b>" + st.name + "</b>");
-      lines.push("   ✅ Work:      " + att.tW  + "/" + att.yW  + "/" + att.d2W  + "/" + att.wkW  + "/" + att.moW);
-      lines.push("   🏖️ Leave:    " + att.tL  + "/" + att.yL  + "/" + att.d2L  + "/" + att.wkL  + "/" + att.moL);
-      lines.push("   🌓 Half Day: " + att.tH  + "/" + att.yH  + "/" + att.d2H  + "/" + att.wkH  + "/" + att.moH);
-      lines.push("   📷 Photo:   " + ph.tP + "/" + ph.yP + "/" + ph.d2P + "/" + ph.wkP + "/" + ph.moP);
+      lines.push("   ✅ Work:           " + att.tW  + "/" + att.yW  + "/" + att.d2W  + "/" + att.wkW  + "/" + att.moW);
+      lines.push("   ⏰ Late (8:40-9):  " + att.tLt + "/" + att.yLt + "/" + att.d2Lt);
+      lines.push("   🏖️ Leave:         " + att.tL  + "/" + att.yL  + "/" + att.d2L  + "/" + att.wkL  + "/" + att.moL);
+      lines.push("   🌓 Half Day:      " + att.tH  + "/" + att.yH  + "/" + att.d2H  + "/" + att.wkH  + "/" + att.moH);
+      lines.push("   ❌ Not Report:    " + att.tNR + "/" + att.yNR + "/" + att.d2NR);
+      lines.push("   📷 Photo:         " + ph.tP + "/" + ph.yP + "/" + ph.d2P + "/" + ph.wkP + "/" + ph.moP);
     }
     lines.push("");
   }
