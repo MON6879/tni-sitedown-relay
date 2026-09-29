@@ -7,6 +7,35 @@ function doGet(e) {
     return ContentService.createTextOutput("No parameter received");
   }
   const action = e.parameter.action;
+  // Ping siêu tốc cho Keepalive và Ghế Giám Sát Auditor (<50ms) per Rule PM-28
+  if (action === "ping") {
+    return ContentService.createTextOutput("PONG");
+  }
+  // Xóa các dòng fake do bấm lệnh /take_leave hoặc /half_leave thử nghiệm
+  if (action === "delete_fake_leave") {
+    const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+    const sumSheet = ss.getSheetByName("Sum report morning attendance");
+    if (!sumSheet) return ContentService.createTextOutput("Sheet not found");
+    let deleted = [];
+    const lastRow = sumSheet.getLastRow();
+    for (let r = Math.min(lastRow, 20); r >= 2; r--) {
+      const refVal = String(sumSheet.getRange(r, 1).getValue() || "").trim();
+      const staffVal = String(sumSheet.getRange(r, 3).getValue() || "").trim();
+      const tgIdVal = String(sumSheet.getRange(r, 8).getValue() || "").trim();
+      if ((refVal === "ATT-0036" || refVal === "ATT-0035") && (staffVal.toLowerCase() === "tni" || tgIdVal === "6859790680")) {
+        sumSheet.deleteRow(r);
+        deleted.push(refVal + " (Row " + r + ")");
+      }
+    }
+    try { buildSumWorkTab(); } catch(e) {}
+    return ContentService.createTextOutput("Deleted " + deleted.length + " fake rows: " + JSON.stringify(deleted));
+  }
+  // Cập nhật tab CheckJoint và gửi báo cáo Group 10
+  if (action === "update_checkjoint" || action === "check_joint" || action === "check_membership") {
+    const cid = e.parameter.chat_id || "";
+    const resText = sendGroup10MembershipSummary(cid);
+    return ContentService.createTextOutput(resText || "CheckJoint updated successfully");
+  }
   if (action === "init") {
     initAttendanceScriptProperties();
     return ContentService.createTextOutput("Properties initialized successfully");
@@ -57,6 +86,66 @@ function doGet(e) {
     setupAttendanceBotCommands();
     return ContentService.createTextOutput("Bot commands updated");
   }
+  // Kích hoạt trigger 08:45 MMT cho sendDailyAttendanceTemplates
+  if (action === "setup_templates_trigger") {
+    setupDailyTemplatesTrigger();
+    return ContentService.createTextOutput("Daily templates trigger set for 08:45 MMT");
+  }
+  // Xóa sạch các template hiện tại trong group 10: ?action=delete_templates_now
+  if (action === "delete_templates_now") {
+    var props = PropertiesService.getScriptProperties();
+    var token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
+    var DAILY_ATT_CHAT = props.getProperty("DAILY_ATT_CHAT_ID") || "-5465634644";
+    var keys = ["office", "t1_main", "t1_s1", "t2_main", "t2_s1", "t3_main", "t3_s1", "t4", "summary"];
+    var deleted = [];
+    for (var k = 0; k < keys.length; k++) {
+      var propKey = keys[k] === "summary" ? "daily_tpl_summary_mid" : ("daily_tpl_" + keys[k] + "_mid");
+      var mid = props.getProperty(propKey);
+      if (mid) {
+        deleteTgMessage_(token, DAILY_ATT_CHAT, mid);
+        props.deleteProperty(propKey);
+        deleted.push(mid);
+      }
+    }
+    return ContentService.createTextOutput("Deleted " + deleted.length + " template messages from Group 10: " + JSON.stringify(deleted));
+  }
+  // Kiểm tra danh sách trigger đang chạy trên GAS: ?action=list_triggers
+  if (action === "list_triggers") {
+    var triggers = ScriptApp.getProjectTriggers();
+    var tList = [];
+    for (var ti = 0; ti < triggers.length; ti++) {
+      tList.push({
+        handler: triggers[ti].getHandlerFunction(),
+        type: triggers[ti].getEventType().toString()
+      });
+    }
+    return ContentService.createTextOutput(JSON.stringify(tList, null, 2));
+  }
+  // Xóa sạch trigger báo cáo hình ảnh 4 khung giờ: ?action=delete_slot_triggers
+  if (action === "delete_slot_triggers" || action === "cleanup_slot_triggers") {
+    const deletedCount = deleteAttendanceReportTriggers();
+    return ContentService.createTextOutput("✅ Successfully deleted " + deletedCount + " slot report triggers.");
+  }
+  // Cập nhật chat ID nhóm 10 từ xa: ?action=set_att_chat_id&chat_id=-100xxxxxxxxx
+  if (action === "set_att_chat_id") {
+    const cid = e.parameter.chat_id || "";
+    if (cid) {
+      PropertiesService.getScriptProperties().setProperty("DAILY_ATT_CHAT_ID", cid);
+      return ContentService.createTextOutput("DAILY_ATT_CHAT_ID set to: " + cid);
+    }
+    return ContentService.createTextOutput("Missing chat_id parameter");
+  }
+  // Gửi thử template ngay (test): ?action=send_templates_now
+  if (action === "send_templates_now") {
+    sendDailyAttendanceTemplates();
+    return ContentService.createTextOutput("Templates sent to group now");
+  }
+  // Gửi thử tin tổng hợp thành viên group 10: ?action=send_membership_summary
+  if (action === "send_membership_summary" || action === "check_group10") {
+    const cid = e.parameter.chat_id || "";
+    const resText = sendGroup10MembershipSummary(cid);
+    return ContentService.createTextOutput(resText || "Membership summary sent");
+  }
   // Chẩn đoán: kiểm tra GEMINI_API_KEY và ảnh mẫu cột O
   if (action === "check_props") {
     const props = PropertiesService.getScriptProperties();
@@ -82,6 +171,18 @@ function doGet(e) {
       return ContentService.createTextOutput("GEMINI_API_KEY set OK. Length: " + key.length);
     }
     return ContentService.createTextOutput("ERROR: key param missing or too short");
+  }
+  if (action === "debug_staff") {
+    const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
+    const staffSheet = ss.getSheetByName("Staff attendance");
+    const cols = getStaffColumns_(staffSheet);
+    const lastRow = staffSheet.getLastRow();
+    const rows = staffSheet.getRange(2, 1, Math.min(lastRow - 1, 5), staffSheet.getLastColumn()).getValues();
+    return ContentService.createTextOutput(JSON.stringify({
+      cols: cols,
+      totalRows: lastRow - 1,
+      sampleRows: rows
+    }, null, 2));
   }
   return ContentService.createTextOutput("Unknown action: " + action);
 }
@@ -126,6 +227,8 @@ function doPost(e) {
       const textL = rawText.toLowerCase();
 
       // 1. Tra cứu Attendance & Leave Templates (Strict Anchored Commands — Max 4 words)
+      // LƯU Ý: Lệnh /take_leave và /half_leave CHỈ trả về template để nhân viên copy điền tên và lý do,
+      // TUYỆT ĐỐI KHÔNG tự động chèn dòng nghỉ phép vào Sheet khi bấm lệnh!
       const cleanCmd = textL.split("@")[0].trim();
       const isExplicitTemplateCommand = (
         cleanCmd === "/menu" || cleanCmd === "menu" ||
@@ -133,6 +236,8 @@ function doPost(e) {
         cleanCmd === "/attendance" || cleanCmd === "attendance" ||
         cleanCmd === "/att" || cleanCmd === "att" ||
         cleanCmd === "/leave" || cleanCmd === "leave" ||
+        cleanCmd === "/take_leave" || cleanCmd === "take_leave" || cleanCmd === "/takeleave" || cleanCmd === "take leave" ||
+        cleanCmd === "/half_leave" || cleanCmd === "half_leave" || cleanCmd === "/halfleave" || cleanCmd === "half leave" ||
         cleanCmd === "/leave_half" || cleanCmd === "leave half" || cleanCmd === "/leavehalf" ||
         cleanCmd === "/diemdanh" || cleanCmd === "diemdanh" ||
         cleanCmd === "/header" || cleanCmd === "header" ||
@@ -149,6 +254,8 @@ function doPost(e) {
         cleanCmd.startsWith("template ") ||
         cleanCmd.startsWith("/attendance ") || cleanCmd.startsWith("attendance template") ||
         cleanCmd.startsWith("/leave ") || cleanCmd.startsWith("leave template") ||
+        cleanCmd.startsWith("/take_leave ") || cleanCmd.startsWith("take leave template") ||
+        cleanCmd.startsWith("/half_leave ") || cleanCmd.startsWith("half leave template") ||
         cleanCmd.startsWith("/diemdanh ") || cleanCmd.startsWith("diemdanh template")
       ) && cleanCmd.split(/\s+/).length <= 4;
 
@@ -177,6 +284,11 @@ function doPost(e) {
           sendTelegramMessage_(token, chatId, sumText);
           return ContentService.createTextOutput("Monthly summary sent");
         }
+      }
+
+      if (cleanCmd === "/check_members" || cleanCmd === "/group10" || cleanCmd === "/membership" || cleanCmd === "/check_group" || cleanCmd === "/check_join" || cleanCmd === "/checkjoin" || cleanCmd === "/check_joint") {
+        sendGroup10MembershipSummary(chatId);
+        return ContentService.createTextOutput("Membership check sent");
       }
 
       if (isExplicitTemplateCommand) {
@@ -224,14 +336,14 @@ function doPost(e) {
     const staffSheet = ss.getSheetByName("Staff attendance");
     if (!staffSheet) {
       logToSheet_("Error: Sheet 'Staff attendance' not found");
-      sendTelegramMessage_(token, chatId, "Loi: Khong tim thay sheet 'Staff attendance'");
+      sendTelegramMessage_(token, chatId, "❌ Error: Staff attendance sheet not found.");
       return ContentService.createTextOutput("Staff attendance sheet not found");
     }
 
     const staffLastRow = staffSheet.getLastRow();
     if (staffLastRow < 2) {
       logToSheet_("Error: Staff attendance sheet is empty");
-      sendTelegramMessage_(token, chatId, "Loi: Danh sach nhan vien trong");
+      sendTelegramMessage_(token, chatId, "❌ Error: Staff attendance list is empty.");
       return ContentService.createTextOutput("Staff attendance sheet empty");
     }
 
@@ -244,7 +356,9 @@ function doPost(e) {
     for (let i = 0; i < staffValues.length; i++) {
       const row = staffValues[i];
       const shortName = String(row[cols.nameCol - 1] || "").trim();
-      const fullName = cols.fullNameCol ? String(row[cols.fullNameCol - 1] || "").trim() : shortName;
+      const fullName = cols.fullNameCol ? String(row[cols.fullNameCol - 1] || "").trim() : "";
+      // Ưu tiên Họ & Tên thật ở Cột F (hoặc Cột C nếu có)
+      const effectiveName = fullName || shortName;
       const tgId = String(row[cols.idCol - 1] || "").trim();
       const photoUrl = String(row[cols.photoCol - 1] || "").trim();
       const depName = cols.depCol ? String(row[cols.depCol - 1] || "").trim() : "";
@@ -254,10 +368,10 @@ function doPost(e) {
         continue;
       }
 
-      if (shortName && shortName.toLowerCase() !== "tni") {
+      if (effectiveName && effectiveName.toLowerCase() !== "tni" && effectiveName.toLowerCase() !== "vcm") {
         staffList.push({
-          name: shortName,
-          fullName: fullName,
+          name: effectiveName,
+          fullName: fullName || effectiveName,
           telegramId: tgId,
           photoUrl: photoUrl,
           department: depName,
@@ -267,7 +381,7 @@ function doPost(e) {
     }
     logToSheet_("Read " + staffList.length + " staff members from database.");
 
-    logToSheet_("Face recognition disabled — looking up staff directly by Telegram ID: " + senderId);
+    logToSheet_("Looking up staff directly by Telegram ID: " + senderId);
     const finalMatches = [];
 
     // Tra cứu trực tiếp thông tin nhân viên theo Telegram ID (senderId)
@@ -297,7 +411,7 @@ function doPost(e) {
 
     const attendanceSheet = ss.getSheetByName("List Attendance");
     if (!attendanceSheet) {
-      sendTelegramMessage_(token, chatId, "❌ Lỗi: Không tìm thấy sheet 'List Attendance'");
+      sendTelegramMessage_(token, chatId, "❌ Error: List Attendance sheet not found.");
       return ContentService.createTextOutput("List Attendance sheet not found");
     }
 
@@ -337,7 +451,7 @@ function doPost(e) {
         const finalTgId = match.telegramId; // ID Telegram người gửi
         const finalDep = match.department;
 
-        if (finalShortName && isAlreadyLoggedToday_(attendanceSheet, dateStr, timeStr, finalShortName, extractedImageName)) {
+        if (finalShortName && isAlreadyLoggedToday_(attendanceSheet, dateStr, timeStr, finalTgId, finalShortName, extractedImageName)) {
           replyMsg += `- ${finalShortName} (Already logged for this time slot)\n`;
           continue;
         }
@@ -353,7 +467,7 @@ function doPost(e) {
           driveFileUrl      // Col G: photo (Link ảnh Google Drive)
         ]]);
         
-        replyMsg += finalShortName ? (`- ${finalShortName}` + (finalDep ? ` (${finalDep})\n` : `\n`)) : `- (Chưa nhận diện được tên)\n`;
+        replyMsg += finalShortName ? (`- ${finalShortName}` + (finalDep ? ` (${finalDep})\n` : `\n`)) : `- (Name not identified)\n`;
         successCount++;
       }
     } else {
@@ -480,18 +594,18 @@ function getAttendanceSlot_(timeVal) {
 }
 
 /** Kiểm tra xem nhân viên đã điểm danh trong cùng KHUNG GIỜ hôm nay chưa */
-function isAlreadyLoggedToday_(sheet, dateStr, currentTimeStr, telegramId, siteCode) {
+function isAlreadyLoggedToday_(sheet, dateStr, currentTimeStr, telegramId, staffName, siteCode) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return false;
   
   const currentSlot = getAttendanceSlot_(currentTimeStr);
 
-  const values = sheet.getRange(2, 2, lastRow - 1, 4).getValues(); 
+  const values = sheet.getRange(2, 2, Math.min(lastRow - 1, 100), 5).getValues(); 
   for (let i = 0; i < values.length; i++) {
     const rowDate = values[i][0];
     const rowTime = values[i][1];
     const rowTgId = String(values[i][2] || "").trim();
-    const rowSite = String(values[i][3] || "").trim();
+    const rowName = String(values[i][3] || values[i][4] || "").trim().toLowerCase();
     
     let formattedRowDate = "";
     if (rowDate instanceof Date) {
@@ -500,16 +614,14 @@ function isAlreadyLoggedToday_(sheet, dateStr, currentTimeStr, telegramId, siteC
       formattedRowDate = String(rowDate || "").trim();
     }
     
-    if (formattedRowDate.split(" ")[0] === dateStr && rowTgId === telegramId) {
+    const isSameDate = formattedRowDate.split(" ")[0] === dateStr;
+    const isSamePerson = (telegramId && rowTgId && rowTgId === String(telegramId)) ||
+                         (staffName && rowName && rowName === staffName.toLowerCase());
+
+    if (isSameDate && isSamePerson) {
       const rowSlot = getAttendanceSlot_(rowTime);
       if (rowSlot === currentSlot) {
-        if (siteCode && siteCode.trim() !== "") {
-          if (rowSite.toLowerCase() === siteCode.trim().toLowerCase()) {
-            return true;
-          }
-        } else {
-          return true;
-        }
+        return true;
       }
     }
   }
@@ -682,207 +794,49 @@ function buildGeneralTab() {
 
 
 // ============================================================
-// GỬI BÁO CÁO TELEGRAM 4 KHUNG GIỜ (+15 PHÚT SAU MỖI KHUNG GIỜ)
-// 08:45 | 12:15 | 14:15 | 17:15 Myanmar Time
+// BÁO CÁO HÌNH ẢNH ĐIỂM DANH 4 KHUNG GIỜ — ĐÃ XÓA SẠCH VĨNH VIỄN THEO YÊU CẦU NGƯỜI DÙNG
 // ============================================================
 function sendAttendanceSlotReport(slotKey) {
-  const ss = SpreadsheetApp.openById("18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
-  const staffSheet = ss.getSheetByName("Staff attendance");
-  const listSheet  = ss.getSheetByName("List Attendance");
-  if (!staffSheet || !listSheet) return;
-
-  const cols = getStaffColumns_(staffSheet);
-  const staffLastRow = staffSheet.getLastRow();
-  if (staffLastRow < 2) return;
-
-  const staffVals = staffSheet.getRange(2, 1, staffLastRow - 1, staffSheet.getLastColumn()).getValues();
-
-  const listLastRow = listSheet.getLastRow();
-  const listData = listLastRow >= 2 ? listSheet.getRange(2, 1, listLastRow - 1, 7).getValues() : [];
-
-  const now = new Date();
-  const todayStr  = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy");
-  const dateShort = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yy");
-
-  const d1 = new Date(now.getTime() - 24 * 3600 * 1000);
-  const yestStr = Utilities.formatDate(d1, "Asia/Rangoon", "dd/MM/yyyy");
-
-  const d2 = new Date(now.getTime() - 2 * 24 * 3600 * 1000);
-  const day2Before = Utilities.formatDate(d2, "Asia/Rangoon", "dd/MM/yyyy");
-
-  const d7 = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
-  const currentMonth = Utilities.formatDate(now, "Asia/Rangoon", "MM/yyyy");
-
-  // Tên tiêu đề khung giờ
-  const slotTitleMap = {
-    slot_morning_1:   "Khung 1 (Sáng < 08:30)",
-    slot_morning_2:   "Khung 2 (Trưa 10:00 - 12:00)",
-    slot_afternoon_1: "Khung 3 (Chiều 13:00 - 14:00)",
-    slot_afternoon_2: "Khung 4 (Chiều 16:00 - 17:00)",
-  };
-
-  const currentSlotTitle = slotTitleMap[slotKey] || "Khung điểm danh";
-
-  // Thống kê từng nhân viên
-  const statsMap = {};
-
-  for (let i = 0; i < listData.length; i++) {
-    const row = listData[i];
-    const rowDateRaw = row[1];
-    const rowTime    = row[2];
-    const tgId       = String(row[3] || "").trim();
-
-    if (!tgId) continue;
-
-    let dateStr = "";
-    let dateObj = null;
-    if (rowDateRaw instanceof Date) {
-      dateObj = rowDateRaw;
-      dateStr = Utilities.formatDate(rowDateRaw, "Asia/Rangoon", "dd/MM/yyyy");
-    } else {
-      dateStr = String(rowDateRaw || "").trim().split(" ")[0];
-      const parts = dateStr.split("/");
-      if (parts.length === 3) dateObj = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-    }
-
-    if (!statsMap[tgId]) {
-      statsMap[tgId] = {
-        todayCount: 0, yestCount: 0, day2BeforeCount: 0, count7D: 0, countMonth: 0,
-        hasCurrentSlot: false
-      };
-    }
-
-    const rec = statsMap[tgId];
-    if (dateStr === todayStr) {
-      rec.todayCount++;
-      const slot = getAttendanceSlot_(rowTime);
-      if (slot === slotKey) rec.hasCurrentSlot = true;
-    }
-    if (dateStr === yestStr) rec.yestCount++;
-    if (dateStr === day2Before) rec.day2BeforeCount++;
-    if (dateObj && dateObj >= d7) rec.count7D++;
-    if (dateStr.indexOf(currentMonth) !== -1) rec.countMonth++;
-  }
-
-  function getDepOrder(depStr) {
-    const s = String(depStr || "").toLowerCase();
-    if (s.indexOf("team 1") !== -1 || s.indexOf("t1") !== -1) return 1;
-    if (s.indexOf("team 2") !== -1 || s.indexOf("t2") !== -1) return 2;
-    if (s.indexOf("team 3") !== -1 || s.indexOf("t3") !== -1) return 3;
-    if (s.indexOf("team 4") !== -1 || s.indexOf("t4") !== -1) return 4;
-    if (s.indexOf("team 5") !== -1 || s.indexOf("t5") !== -1) return 5;
-    return 0; // Các phòng ban / Office lên đầu
-  }
-
-  const staffProcessed = [];
-
-  for (let i = 0; i < staffVals.length; i++) {
-    const row = staffVals[i];
-    const shortName = String(row[cols.nameCol - 1] || "").trim();
-    const fullName  = cols.fullNameCol ? String(row[cols.fullNameCol - 1] || "").trim() : shortName;
-    const tgId      = String(row[cols.idCol - 1] || "").trim();
-    const dep       = cols.depCol ? String(row[cols.depCol - 1] || "").trim() : "";
-
-    const statusVal = cols.statusCol ? String(row[cols.statusCol - 1] || "").toLowerCase() : "";
-    if (statusVal.indexOf("resign") !== -1 || statusVal.indexOf("nghỉ") !== -1 || statusVal.indexOf("nghi") !== -1 || statusVal.indexOf("quit") !== -1 || statusVal.indexOf("off") !== -1) {
-      continue;
-    }
-
-    if (!shortName) continue;
-
-    const isTeamMember = /team\s*[1-5]/i.test(dep) || /t[1-5]/i.test(dep);
-
-    // Ngoài Team chỉ cần khung 9:00 (Slot 1)
-    if (!isTeamMember && slotKey !== "slot_morning_1") continue;
-
-    const rec = statsMap[tgId] || { todayCount: 0, yestCount: 0, day2BeforeCount: 0, count7D: 0, countMonth: 0, hasCurrentSlot: false };
-
-    // Format gọn: • Phyo Htet Aung (Team 1) 30/07/26: 1 / 0 / 1 , 7D: 1, 1M: 1
-    const lineText = "• " + (fullName || shortName) + " (" + (dep || "Office") + ") " + dateShort + ": " + rec.todayCount + " / " + rec.yestCount + " / " + rec.day2BeforeCount + " , 7D: " + rec.count7D + ", 1M: " + rec.countMonth;
-
-    staffProcessed.push({
-      depOrder: getDepOrder(dep),
-      depName: dep,
-      name: fullName || shortName,
-      lineText: lineText,
-      hasSlot: rec.hasCurrentSlot
-    });
-  }
-
-  // Sắp xếp: Phòng ban -> Team 1 -> Team 2 -> Team 3 -> Team 4 -> Team 5
-  staffProcessed.sort(function(a, b) {
-    if (a.depOrder !== b.depOrder) return a.depOrder - b.depOrder;
-    return a.name.localeCompare(b.name);
-  });
-
-  const reportedList = [];
-  const missingList  = [];
-
-  staffProcessed.forEach(function(item) {
-    if (item.hasSlot) {
-      reportedList.push(item.lineText);
-    } else {
-      missingList.push(item.lineText);
-    }
-  });
-
-  let msg = "📸 <b>BÁO CÁO HÌNH ẢNH ĐIỂM DANH — " + currentSlotTitle + "</b>\n";
-  msg += "📅 Ngày: <b>" + todayStr + "</b>\n";
-  msg += "─────────────────────────\n\n";
-
-  msg += "✅ <b>ĐÃ BÁO CÁO (" + reportedList.length + "):</b>\n";
-  if (reportedList.length > 0) {
-    reportedList.forEach(function(item) { msg += item + "\n"; });
-  } else {
-    msg += "<i>Chưa có ai báo cáo</i>\n";
-  }
-
-  msg += "\n❌ <b>CHƯA BÁO CÁO (" + missingList.length + "):</b>\n";
-  if (missingList.length > 0) {
-    missingList.forEach(function(item) { msg += item + "\n"; });
-  } else {
-    msg += "<i>Tất cả đã báo cáo đầy đủ</i>\n";
-  }
-
-  const props = PropertiesService.getScriptProperties();
-  const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
-  const targetChatId = props.getProperty("ATTENDANCE_CHAT_ID") || "-1004215695747"; // Default Attendance Chat ID
-
-  sendTelegramMessage_(token, targetChatId, msg);
+  Logger.log("🛑 BÁO CÁO HÌNH ẢNH ĐIỂM DANH (sendAttendanceSlotReport) đã bị xóa vĩnh viễn theo yêu cầu.");
+  deleteAttendanceReportTriggers();
+  return;
 }
 
-
-// ============================================================
-// HỆ THỐNG TRIGGER HẸN GIỜ CHO 4 KHUNG (+15 PHÚT SAU MỖI KHUNG)
-// 08:45 | 12:15 | 14:15 | 17:15 Myanmar Time
-// ============================================================
-function triggerSlotReport0845() { sendAttendanceSlotReport("slot_morning_1");   }
-function triggerSlotReport1215() { sendAttendanceSlotReport("slot_morning_2");   }
-function triggerSlotReport1415() { sendAttendanceSlotReport("slot_afternoon_1"); }
-function triggerSlotReport1715() { sendAttendanceSlotReport("slot_afternoon_2"); }
+function triggerSlotReport0845() { deleteAttendanceReportTriggers(); return; }
+function triggerSlotReport1215() { deleteAttendanceReportTriggers(); return; }
+function triggerSlotReport1415() { deleteAttendanceReportTriggers(); return; }
+function triggerSlotReport1715() { deleteAttendanceReportTriggers(); return; }
 
 function setupAttendanceReportTriggers() {
-  const handlerNames = ["triggerSlotReport0845", "triggerSlotReport1215", "triggerSlotReport1415", "triggerSlotReport1715"];
+  return deleteAttendanceReportTriggers();
+}
+
+/**
+ * Xóa sạch toàn bộ 4 triggers hẹn giờ báo cáo hình ảnh điểm danh trên Google Apps Script project
+ */
+function deleteAttendanceReportTriggers() {
+  const handlerNames = [
+    "triggerSlotReport0845",
+    "triggerSlotReport1215",
+    "triggerSlotReport1415",
+    "triggerSlotReport1715",
+    "sendAttendanceSlotReport"
+  ];
+  let deletedCount = 0;
   try {
     const triggers = ScriptApp.getProjectTriggers();
     for (let i = 0; i < triggers.length; i++) {
-      if (handlerNames.indexOf(triggers[i].getHandlerFunction()) !== -1) {
+      const fn = triggers[i].getHandlerFunction();
+      if (handlerNames.indexOf(fn) !== -1) {
         ScriptApp.deleteTrigger(triggers[i]);
+        deletedCount++;
       }
     }
+    Logger.log("✅ Đã xóa sạch " + deletedCount + " triggers báo cáo hình ảnh điểm danh 4 khung giờ.");
   } catch(e) {
-    Logger.log("⚠️ Delete existing triggers warning: " + e.message);
+    Logger.log("⚠️ Lỗi xóa triggers: " + e.message);
   }
-
-  try {
-    ScriptApp.newTrigger("triggerSlotReport0845").timeBased().atHour(8).nearMinute(45).everyDays(1).inTimezone("Asia/Rangoon").create();
-    ScriptApp.newTrigger("triggerSlotReport1215").timeBased().atHour(12).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
-    ScriptApp.newTrigger("triggerSlotReport1415").timeBased().atHour(14).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
-    ScriptApp.newTrigger("triggerSlotReport1715").timeBased().atHour(17).nearMinute(15).everyDays(1).inTimezone("Asia/Rangoon").create();
-    Logger.log("✅ Đã cài đặt thành công 4 trigger hẹn giờ báo cáo (08:45, 12:15, 14:15, 17:15).");
-  } catch(e) {
-    Logger.log("⚠️ Create triggers warning: " + e.message);
-  }
+  return deletedCount;
 }
 
 
@@ -951,6 +905,7 @@ function initAttendanceScriptProperties() {
   props.setProperty("SEND_BOT_TOKEN", "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw");
   props.setProperty("ATTENDANCE_SS_ID", "18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54");
   const fId = getAttendanceFolderId_();
+  deleteAttendanceReportTriggers();
   Logger.log("✅ Khởi tạo Script Properties với Folder '2.11 Attendance photo' ID: " + fId);
 }
 
@@ -1057,8 +1012,8 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
              "🔹 `/template_t3_s1` — Team 3 S1 attendance report template\n" +
              "🔹 `/template_t4` — Team 4 Main attendance report template\n" +
              "🔹 `/template_header` — Quick attendance header template\n" +
-             "🔹 `/template_leave` — Take leave full day template\n" +
-             "🔹 `/template_leave_half` — Take leave half day template\n" +
+             "🔹 `/take_leave` — Take leave full day template\n" +
+             "🔹 `/half_leave` — Take leave half day template\n" +
              "──────────────────────────────\n" +
              "📸 *Automatic Attendance:* Send selfie photo with location to group!";
     }
@@ -1069,15 +1024,33 @@ function handleAttendanceTemplateQuery_(ssId, queryText) {
     // 1. Leave templates (Cols A & B)
     if (isLeave) {
       const isHalf = q.indexOf("half") !== -1 || q.indexOf("nuangay") !== -1 || q.indexOf("1/2") !== -1;
-      const isFull = q.indexOf("full") !== -1 || q.indexOf("cangay") !== -1;
-      const isAll = q.indexOf("all") !== -1 || q.indexOf("both") !== -1;
+      const isFull = q.indexOf("full") !== -1 || q.indexOf("cangay") !== -1 || q.indexOf("take_leave") !== -1 || q.indexOf("takeleave") !== -1;
+      const isAll = (q.indexOf("all") !== -1 || q.indexOf("both") !== -1 || q === "/leave" || q === "leave") && !isHalf && !isFull;
       
-      const strHalf = "Full Name: take leave half day\nReason:";
-      const strFull = "Full Name: Take leave\nReason:";
+      const tplHalf = "📋 *TAKE LEAVE HALF DAY TEMPLATE:*\n" +
+                      "──────────────────────────────\n" +
+                      "`Full Name: take leave half day\nReason: `\n" +
+                      "──────────────────────────────\n" +
+                      "💡 *Instruction:* Tap text in box to copy, replace *Full Name* with your name, specify reason, and send to group.";
 
-      if (isAll) return strFull + "\n\n" + strHalf;
-      if (isHalf) return strHalf;
-      return strFull;
+      const tplFull = "📋 *TAKE LEAVE FULL DAY TEMPLATE:*\n" +
+                      "──────────────────────────────\n" +
+                      "`Full Name: Take leave\nReason: `\n" +
+                      "──────────────────────────────\n" +
+                      "💡 *Instruction:* Tap text in box to copy, replace *Full Name* with your name, specify reason, and send to group.";
+
+      if (isAll) {
+        return "📋 *TAKE LEAVE TEMPLATES:*\n" +
+               "──────────────────────────────\n" +
+               "*1. Full Day Leave:*\n" +
+               "`Full Name: Take leave\nReason: `\n\n" +
+               "*2. Half Day Leave:*\n" +
+               "`Full Name: take leave half day\nReason: `\n" +
+               "──────────────────────────────\n" +
+               "💡 *Instruction:* Tap text in box to copy, replace *Full Name* with your name, specify reason, and send to group.";
+      }
+      if (isHalf) return tplHalf;
+      return tplFull;
     }
 
     // 2. Team & Sub-team Attendance templates via Dynamic Column Detection
@@ -1306,10 +1279,10 @@ function setupAttendanceBotCommands() {
   const url = "https://api.telegram.org/bot" + token + "/setMyCommands";
   const delUrl = "https://api.telegram.org/bot" + token + "/deleteMyCommands";
 
-  // ── Chỉ giữ 2 lệnh: take_leave và half_leave (các template khác bot tự gửi lúc 6:15) ──
+  // ── Chỉ giữ 2 lệnh: take_leave và half_leave (các template khác bot tự gửi lúc 8:45) ──
   var leaveCmds = [
-    { command: "take_leave",  description: "Take leave full day — Full Name: Take leave\\nReason:" },
-    { command: "half_leave",  description: "Take leave half day — Full Name: take leave half day\\nReason:" }
+    { command: "take_leave",  description: "Get template: Take leave full day" },
+    { command: "half_leave",  description: "Get template: Take leave half day" }
   ];
 
   // ── Xóa TOÀN BỘ lệnh cũ trên tất cả scope ──
@@ -1364,30 +1337,91 @@ function setupAttendanceBotCommands() {
 }
 
 /**
- * Gửi tất cả template điểm danh vào nhóm "10. TNI DAILY ADDTENDANCE" lúc 6:15 MMT
- * Thứ tự: Office → Team 1 → Team 1 S1 → Team 2 → Team 2 S1 → Team 3 → Team 3 S1 → Team 4
- * Tự xóa tin cũ của ngày hôm trước trước khi gửi mới.
+ * Gửi live status điểm danh vào nhóm "10. TNI DAILY ADDTENDANCE" lúc 6:15 MMT
+ * Đọc từ: List Attendance (photo trước 8:40 = Working) + Sum report (leave rõ ràng)
+ * Thứ tự: Office → T1 Main → T1 S1 → T2 Main → T2 S1 → T3 Main → T3 S1 → T4
+ * Tự xóa tin cũ trước khi gửi mới.
  */
 function sendDailyAttendanceTemplates() {
   const props = PropertiesService.getScriptProperties();
   const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
   const ssId  = props.getProperty("ATTENDANCE_SS_ID") || "18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54";
+  const DAILY_ATT_CHAT = props.getProperty("DAILY_ATT_CHAT_ID") || "-5465634644";
 
-  // ── Chat ID nhóm "10. TNI DAILY ADDTENDANCE" ──
-  const DAILY_ATT_CHAT = props.getProperty("DAILY_ATT_CHAT_ID") || "-1002479318956";
+  const tz = "Asia/Rangoon";
+  const ss  = SpreadsheetApp.openById(ssId);
+  const now = new Date();
+  const todayDisp = Utilities.formatDate(now, tz, "dd/MM/yyyy (EEE)");
+  const todayStr  = Utilities.formatDate(now, tz, "dd/MM/yyyy");
+  const CUTOFF_H  = 8, CUTOFF_M = 40; // Before 08:40 MMT = Working
 
-  const ss = SpreadsheetApp.openById(ssId);
-  const tplSheet = ss.getSheetByName("Template Attendance");
-  if (!tplSheet || tplSheet.getLastRow() < 1) {
-    Logger.log("sendDailyAttendanceTemplates: Template Attendance sheet not found");
-    return;
+  // ── Helper: normalize date cell → "dd/MM/yyyy" ──
+  function parseCellDate(raw) {
+    if (raw instanceof Date) return Utilities.formatDate(raw, tz, "dd/MM/yyyy");
+    var s = String(raw || "").trim().split(" ")[0];
+    var p = s.split(/[\/\-\.]/);
+    if (p.length < 3) return "";
+    var yr = parseInt(p[2]); if (yr < 100) yr += 2000;
+    return ("0"+p[0]).slice(-2) + "/" + ("0"+p[1]).slice(-2) + "/" + yr;
   }
 
-  const colMap = getAttendanceTemplateColumns_(tplSheet);
-  const now    = new Date();
-  const todayStr = Utilities.formatDate(now, "Asia/Rangoon", "dd/MM/yyyy (EEE)");
+  // ── Helper: parse time cell → {h, m, str} or null ──
+  function parseCellTime(raw) {
+    if (raw instanceof Date) {
+      var h = raw.getHours(), m = raw.getMinutes();
+      return { h: h, m: m, str: ("0"+h).slice(-2)+":"+("0"+m).slice(-2) };
+    }
+    var tp = String(raw || "").match(/(\d{1,2}):(\d{2})/);
+    if (!tp) return null;
+    var h = parseInt(tp[1]), m = parseInt(tp[2]);
+    return { h: h, m: m, str: ("0"+h).slice(-2)+":"+("0"+m).slice(-2) };
+  }
 
-  // ── Danh sách template theo thứ tự gửi ──
+  // ── 1. statusMap from List Attendance: photo sent before 8:40 = work ──
+  // key = name.toLowerCase(), value = { status: 'work'|'late'|'leave'|'half', time }
+  var statusMap = {};
+  var listSheet = ss.getSheetByName("List Attendance");
+  if (listSheet && listSheet.getLastRow() >= 2) {
+    var lVals = listSheet.getRange(2, 1, listSheet.getLastRow() - 1, 7).getValues();
+    for (var i = 0; i < lVals.length; i++) {
+      var lr = lVals[i];
+      if (parseCellDate(lr[1]) !== todayStr) continue;      // col B = date
+      var photoUrl = String(lr[6] || "").trim();             // col G = photo URL
+      if (!photoUrl) continue;
+      var fname = String(lr[5] || lr[4] || "").trim();       // col F = FullName, col E = TgName
+      if (!fname) continue;
+      var key = fname.toLowerCase();
+      var tm  = parseCellTime(lr[2]);                        // col C = time
+      if (!tm) continue;
+      var beforeCutoff = (tm.h < CUTOFF_H) || (tm.h === CUTOFF_H && tm.m <= CUTOFF_M);
+      if (!statusMap[key] || (beforeCutoff && statusMap[key].status === 'late')) {
+        statusMap[key] = { status: beforeCutoff ? 'work' : 'late', time: tm.str };
+      }
+    }
+  }
+
+  // ── 2. Override with explicit leave from Sum report morning attendance ──
+  var sumSheet = ss.getSheetByName("Sum report morning attendance");
+  if (sumSheet && sumSheet.getLastRow() >= 2) {
+    var sVals = sumSheet.getRange(2, 1, sumSheet.getLastRow() - 1, 6).getValues();
+    for (var si = 0; si < sVals.length; si++) {
+      var sr = sVals[si];
+      if (parseCellDate(sr[1]) !== todayStr) continue;
+      var sName = String(sr[2] || "").trim().toLowerCase();
+      if (!sName) continue;
+      var isHalf  = String(sr[5] || "").toLowerCase().indexOf("half") !== -1;
+      var isLeave = String(sr[4] || "").toLowerCase() === "take leave";
+      if (isHalf)       statusMap[sName] = { status: 'half',  time: '' };
+      else if (isLeave) statusMap[sName] = { status: 'leave', time: '' };
+    }
+  }
+
+  // ── 3. Template groups (roster from Template Attendance keeps S1/Main split) ──
+  var tplSheet = ss.getSheetByName("Template Attendance");
+  if (!tplSheet) { Logger.log("Template Attendance sheet not found"); return; }
+  var colMap = getAttendanceTemplateColumns_(tplSheet);
+  var maxRow = Math.min(tplSheet.getLastRow(), 35);
+
   var TEMPLATE_ORDER = [
     { key: "office",  label: "🏢 OFFICE / BACKOFFICE", cols: colMap.office  },
     { key: "t1_main", label: "🟠 TEAM 1 MAIN",          cols: colMap.t1_main },
@@ -1399,56 +1433,446 @@ function sendDailyAttendanceTemplates() {
     { key: "t4",      label: "🟡 TEAM 4",               cols: colMap.t4     }
   ];
 
-  // ── Xóa tin cũ của ngày hôm trước ──
-  for (var i = 0; i < TEMPLATE_ORDER.length; i++) {
-    var oldMidKey = "daily_tpl_" + TEMPLATE_ORDER[i].key + "_mid";
-    var oldMid = props.getProperty(oldMidKey);
-    if (oldMid) {
-      deleteTgMessage_(token, DAILY_ATT_CHAT, oldMid);
-      props.deleteProperty(oldMidKey);
-    }
+  // ── 4. Xóa tin cũ ──
+  for (var di = 0; di < TEMPLATE_ORDER.length; di++) {
+    var oldKey = "daily_tpl_" + TEMPLATE_ORDER[di].key + "_mid";
+    var oldMid = props.getProperty(oldKey);
+    if (oldMid) { deleteTgMessage_(token, DAILY_ATT_CHAT, oldMid); props.deleteProperty(oldKey); }
     Utilities.sleep(200);
   }
 
-  // ── Gửi từng template theo thứ tự ──
-  var maxRow = Math.min(tplSheet.getLastRow(), 35);
+  // ── 5. Gửi từng nhóm với live status ──
+  for (var ti = 0; ti < TEMPLATE_ORDER.length; ti++) {
+    var tpl = TEMPLATE_ORDER[ti];
+    if (!tpl.cols || tpl.cols.length === 0) continue;
 
-  for (var j = 0; j < TEMPLATE_ORDER.length; j++) {
-    var tpl    = TEMPLATE_ORDER[j];
-    var cols   = tpl.cols;
-    if (!cols || cols.length === 0) continue;
+    // Đọc từ Row 2 để bỏ dòng tiêu đề cột (ví dụ: "T4 Attendane report: 16/09/26:")
+    var rosterVals = maxRow >= 2 ? tplSheet.getRange(2, tpl.cols[0], maxRow - 1, 1).getValues() : [];
+    var roster = [];
+    for (var ri = 0; ri < rosterVals.length; ri++) {
+      var rv = String(rosterVals[ri][0] || "").trim();
+      if (!rv) continue;
+      if (rv.toLowerCase().indexOf("total:") === 0) continue;
+      if (rv.toLowerCase().indexOf("report") !== -1 && rv.toLowerCase().indexOf("attendan") !== -1) continue;
 
-    // Lấy nội dung từ cột đầu tiên của nhóm
-    var colIdx  = cols[0];
-    var vals    = tplSheet.getRange(1, colIdx, maxRow, 1).getValues();
-    var lines   = [];
-    for (var r = 0; r < vals.length; r++) {
-      var v = String(vals[r][0] || "").trim();
-      if (v && v.toLowerCase().indexOf("total:") !== 0) {
-        lines.push(v);
-      }
+      // Chuẩn hóa tên: bỏ số thứ tự ở đầu (vd: "1. ", "2. ") và dấu 2 chấm ở cuối (vd: ":")
+      var cleanName = rv.replace(/^\d+[\.\:\-\s]+/, '').replace(/[\:\-]+$/, '').trim();
+      if (!cleanName) continue;
+      roster.push({ cleanName: cleanName, rawName: rv });
     }
-    if (lines.length === 0) continue;
+    if (roster.length === 0) continue;
+
+    var wCnt = 0, lateCnt = 0, hCnt = 0, leaveCnt = 0, noRptCnt = 0;
+    var lines = [];
+    for (var ni = 0; ni < roster.length; ni++) {
+      var item = roster[ni];
+      var pName = item.cleanName;
+      var pSt   = statusMap[pName.toLowerCase()] || statusMap[item.rawName.toLowerCase()];
+      var line  = (ni + 1) + ". " + pName + ": ";
+      if (!pSt) {
+        noRptCnt++; line += "❌ Take leave Not report";
+      } else if (pSt.status === "work") {
+        wCnt++;     line += "✅ Working" + (pSt.time ? " (" + pSt.time + ")" : "");
+      } else if (pSt.status === "late") {
+        lateCnt++;  line += "⚠️ Late" + (pSt.time ? " (" + pSt.time + ")" : "");
+      } else if (pSt.status === "half") {
+        hCnt++;     line += "🟡 Half Day";
+      } else {
+        leaveCnt++; line += "🟡 Take Leave";
+      }
+      lines.push(line);
+    }
+
+    var summary = [];
+    summary.push("✅ Working: "      + wCnt);
+    if (lateCnt  > 0) summary.push("⚠️ Late: "         + lateCnt);
+    if (hCnt     > 0) summary.push("🟡 Half Day: "     + hCnt);
+    if (leaveCnt > 0) summary.push("🟡 Take Leave: "   + leaveCnt);
+    summary.push("❌ Take leave Not report: " + noRptCnt);
 
     var msgText = "📋 <b>" + tpl.label + "</b>\n" +
-                  "📅 " + todayStr + "\n" +
+                  "📅 " + todayDisp + "\n" +
+                  "──────────────────────\n" +
+                  summary.join("\n") + "\n" +
                   "──────────────────────\n" +
                   lines.join("\n");
 
     var newMid = sendTgMsgGetId_(token, DAILY_ATT_CHAT, msgText);
-    if (newMid) {
-      props.setProperty("daily_tpl_" + tpl.key + "_mid", String(newMid));
-    }
-    Utilities.sleep(500); // tránh rate limit
+    if (newMid) props.setProperty("daily_tpl_" + tpl.key + "_mid", String(newMid));
+    Utilities.sleep(500);
   }
 
-  Logger.log("✅ sendDailyAttendanceTemplates completed at " +
-    Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy HH:mm"));
+  // ── 6. Tin tổng hợp thành viên Group 10 (Not yet joined + No ID + Should remove) ──
+  sendGroup10MembershipSummary(DAILY_ATT_CHAT);
+
+  Logger.log("✅ sendDailyAttendanceTemplates (live status) done: " +
+    Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm"));
 }
 
 /**
- * Cài đặt trigger 6:15 MMT cho sendDailyAttendanceTemplates
- * Gọi 1 lần từ GAS Editor để kích hoạt.
+ * Tin nhắn tổng hợp thành viên Group 10 (TNI DAILY ADDTENDANCE):
+ * 1. Ai có Telegram ID trong Staff attendance nhưng CHƯA tham gia Group 10
+ * 2. Ai trong Staff attendance nhưng CHƯA CÓ Telegram ID trong Sheet (cần bổ sung)
+ * 3. Ai đã gửi điểm danh hôm nay nhưng KHÔNG CÓ trong Staff attendance (cần xem xét xóa/thêm)
+ */
+function sendGroup10MembershipSummary(targetChatId) {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty("SEND_BOT_TOKEN") || "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw";
+  const ssId  = props.getProperty("ATTENDANCE_SS_ID") || "18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54";
+  const DAILY_ATT_CHAT = targetChatId || props.getProperty("DAILY_ATT_CHAT_ID") || "-5465634644";
+
+  const tz = "Asia/Rangoon";
+  const ss  = SpreadsheetApp.openById(ssId);
+  const now = new Date();
+  const todayDisp = Utilities.formatDate(now, tz, "dd/MM/yyyy (EEE)");
+  const todayStr  = Utilities.formatDate(now, tz, "dd/MM/yyyy");
+
+  function parseCellDate_(raw) {
+    if (raw instanceof Date) return Utilities.formatDate(raw, tz, "dd/MM/yyyy");
+    var s = String(raw || "").trim().split(" ")[0];
+    var p = s.split(/[\/\-\.]/);
+    if (p.length < 3) return "";
+    var yr = parseInt(p[2]); if (yr < 100) yr += 2000;
+    return ("0"+p[0]).slice(-2) + "/" + ("0"+p[1]).slice(-2) + "/" + yr;
+  }
+
+  // Xóa tin cũ nếu gửi vào group 10 mặc định
+  if (!targetChatId || targetChatId === DAILY_ATT_CHAT) {
+    var oldSumMid = props.getProperty("daily_tpl_summary_mid");
+    if (oldSumMid) { deleteTgMessage_(token, DAILY_ATT_CHAT, oldSumMid); props.deleteProperty("daily_tpl_summary_mid"); }
+  }
+
+  // Đọc toàn bộ staff từ Staff attendance (Col A=TgId, F=FullName, C=TgName, M=Team, N=Probation/Status)
+  var staffSheet2 = ss.getSheetByName("Staff attendance");
+  var staffAll = [], noIdList = [], noIdListRaw = [], staffTgMap = {};
+  if (staffSheet2 && staffSheet2.getLastRow() >= 2) {
+    var saV = staffSheet2.getRange(2, 1, staffSheet2.getLastRow() - 1, 14).getValues();
+    for (var si2 = 0; si2 < saV.length; si2++) {
+      var sr2 = saV[si2];
+      var sTgId   = String(sr2[0] || "").trim();
+      var sName   = String(sr2[5] || sr2[2] || "").trim();
+      var sTeam   = String(sr2[12] || sr2[10] || "").trim();
+      var sStatus = String(sr2[13] || "").toLowerCase();
+
+      // Bỏ qua nhân viên đã nghỉ việc
+      if (sStatus.indexOf("resign") !== -1 || sStatus.indexOf("nghỉ") !== -1 || sStatus.indexOf("quit") !== -1 || sStatus.indexOf("off") !== -1) continue;
+      if (!sName || sName.toLowerCase().indexOf("nyi nyi") !== -1 || sName.toLowerCase() === "vcm") continue;
+
+      var label = sName + (sTeam ? " (" + sTeam + ")" : "");
+      if (!sTgId) {
+        noIdList.push(label);
+        noIdListRaw.push({ name: sName, team: sTeam, label: label });
+        continue;
+      }
+      staffAll.push({ name: sName, team: sTeam, tgId: sTgId, label: label });
+      staffTgMap[sTgId] = true;
+    }
+  }
+
+  // getChatMember — ai có TG ID nhưng chưa vào group 10
+  var notYetJoined = [];
+  var inGroupCount = 0;
+  var checkJointRecords = [];
+  var apiBase = "https://api.telegram.org/bot" + token;
+  for (var ci = 0; ci < staffAll.length; ci++) {
+    var uHandle = "";
+    var isJoined = false;
+    var st = "";
+    try {
+      var cmResp = UrlFetchApp.fetch(apiBase + "/getChatMember", {
+        method: "post", contentType: "application/json",
+        payload: JSON.stringify({ chat_id: Number(DAILY_ATT_CHAT), user_id: Number(staffAll[ci].tgId) }),
+        muteHttpExceptions: true
+      });
+      var cmData = JSON.parse(cmResp.getContentText());
+      st = cmData.ok ? cmData.result.status : "";
+      if (cmData.ok && cmData.result && cmData.result.user) {
+        uHandle = cmData.result.user.username || "";
+      }
+      if (cmData.ok && (st === "creator" || st === "administrator" || st === "member" || st === "restricted")) {
+        isJoined = true;
+        inGroupCount++;
+      } else {
+        notYetJoined.push(staffAll[ci].label);
+      }
+    } catch(e2) {
+      st = "error";
+      notYetJoined.push(staffAll[ci].label + " [?]");
+    }
+
+    checkJointRecords.push({
+      team: staffAll[ci].team,
+      name: staffAll[ci].name,
+      tgId: staffAll[ci].tgId,
+      status: isJoined ? "joined" : "not_joined",
+      role: st || "not_in_group",
+      username: uHandle,
+      note: isJoined ? "" : "Not in Group 10"
+    });
+
+    Utilities.sleep(150);
+  }
+
+  // Thêm nhân viên thiếu Telegram ID vào checkJointRecords
+  for (var mi2 = 0; mi2 < noIdListRaw.length; mi2++) {
+    checkJointRecords.push({
+      team: noIdListRaw[mi2].team,
+      name: noIdListRaw[mi2].name,
+      tgId: "",
+      status: "no_id",
+      role: "missing_id",
+      username: "",
+      note: "No Telegram ID in Sheet"
+    });
+  }
+
+  // Ai gởi điểm danh hôm nay nhưng KHÔNG có trong Staff attendance → cần xem xét xóa/thêm
+  var listSheet = ss.getSheetByName("List Attendance");
+  var shouldRemove = [];
+  var unknownRecords = [];
+  var seenUnknown = {};
+  if (listSheet && listSheet.getLastRow() >= 2) {
+    var lrV2 = listSheet.getRange(2, 1, listSheet.getLastRow() - 1, 6).getValues();
+    for (var li2 = 0; li2 < lrV2.length; li2++) {
+      var lr2 = lrV2[li2];
+      if (parseCellDate_(lr2[1]) !== todayStr) continue;
+      var uid = String(lr2[3] || "").trim();
+      var uname = String(lr2[5] || lr2[4] || "").trim();
+      // Bỏ qua nếu trống, đã có trong staff list, đã duyệt, hoặc là tài khoản Owner/Admin 6859790680
+      if (!uid || staffTgMap[uid] || seenUnknown[uid] || uid === "6859790680") continue;
+      seenUnknown[uid] = true;
+
+      var displayName = uname;
+      var isOwnerOrAdmin = false;
+      var uRole = "";
+      var uHandleUnknown = "";
+      try {
+        var uResp = UrlFetchApp.fetch(apiBase + "/getChatMember", {
+          method: "post", contentType: "application/json",
+          payload: JSON.stringify({ chat_id: Number(DAILY_ATT_CHAT), user_id: Number(uid) }),
+          muteHttpExceptions: true
+        });
+        var uData = JSON.parse(uResp.getContentText());
+        if (uData.ok && uData.result) {
+          uRole = uData.result.status;
+          if (uRole === "creator" || uRole === "administrator") isOwnerOrAdmin = true;
+          if (uData.result.user) {
+            var uUser = uData.result.user;
+            if (uUser.is_bot) isOwnerOrAdmin = true;
+            uHandleUnknown = uUser.username || "";
+            if (!displayName) {
+              var uFullName = [uUser.first_name, uUser.last_name].filter(Boolean).join(" ");
+              var uHandle = uUser.username ? "@" + uUser.username : "";
+              if (uFullName && uHandle) displayName = uFullName + " (" + uHandle + ")";
+              else displayName = uFullName || uHandle || ("ID:" + uid);
+            }
+          }
+        }
+      } catch(eName) {
+        if (!displayName) displayName = "ID:" + uid;
+      }
+
+      if (isOwnerOrAdmin) continue;
+      shouldRemove.push(displayName || ("ID:" + uid));
+      unknownRecords.push({
+        tgId: uid,
+        displayName: displayName || ("ID:" + uid),
+        role: uRole || "",
+        username: uHandleUnknown
+      });
+    }
+  }
+
+  // Soạn tin tổng hợp 100% tiếng Anh chuẩn
+  var totalActive = staffAll.length + noIdList.length;
+  var sumLines = [
+    "👥 <b>Group 10 Membership Check</b>",
+    "📅 " + todayDisp,
+    "──────────────────────",
+    "📊 <b>Summary:</b> " + inGroupCount + "/" + totalActive + " active staff joined"
+  ];
+
+  if (notYetJoined.length > 0) {
+    sumLines.push("──────────────────────");
+    sumLines.push("⚠️ <b>Not yet joined group (" + notYetJoined.length + "):</b>");
+    for (var ni = 0; ni < notYetJoined.length; ni++) {
+      sumLines.push((ni + 1) + ". " + notYetJoined[ni]);
+    }
+  } else {
+    sumLines.push("✅ All registered staff are in this group");
+  }
+
+  if (noIdList.length > 0) {
+    sumLines.push("──────────────────────");
+    sumLines.push("❓ <b>No Telegram ID in sheet (" + noIdList.length + "):</b>");
+    for (var mi = 0; mi < noIdList.length; mi++) {
+      sumLines.push((mi + 1) + ". " + noIdList[mi]);
+    }
+  }
+
+  if (shouldRemove.length > 0) {
+    sumLines.push("──────────────────────");
+    sumLines.push("🚫 <b>Not in staff list — consider removing (" + shouldRemove.length + "):</b>");
+    for (var ri = 0; ri < shouldRemove.length; ri++) {
+      sumLines.push((ri + 1) + ". " + shouldRemove[ri]);
+    }
+  }
+
+  // ── Cập nhật kết quả vào tab CheckJoint trong Google Sheet ──
+  try {
+    updateCheckJointSheet_(ss, checkJointRecords, unknownRecords, {
+      joinedCount: inGroupCount,
+      totalActive: totalActive,
+      noIdCount: noIdList.length
+    });
+  } catch (errCheckJoint) {
+    Logger.log("❌ Lỗi updateCheckJointSheet_: " + errCheckJoint.message + "\n" + errCheckJoint.stack);
+  }
+
+  var fullMsg = sumLines.join("\n");
+  var newMid = sendTgMsgGetId_(token, DAILY_ATT_CHAT, fullMsg);
+  if (newMid && (!targetChatId || targetChatId === DAILY_ATT_CHAT)) {
+    props.setProperty("daily_tpl_summary_mid", String(newMid));
+  }
+
+  Logger.log("✅ sendGroup10MembershipSummary done. Mid: " + newMid);
+  return fullMsg;
+}
+
+/**
+ * Ghi kết quả kiểm tra thành viên Group 10 vào tab CheckJoint
+ * Sheet ID: 18zQB4i0Fu4QfKKkkUZUd6SKWIEbdWDiwdpgNSaL9v54
+ */
+function updateCheckJointSheet_(ss, records, unknownRecords, stats) {
+  var sheet = ss.getSheetByName("CheckJoint");
+  if (!sheet) {
+    sheet = ss.insertSheet("CheckJoint");
+  }
+
+  var tz = "Asia/Rangoon";
+  var nowStr = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm:ss");
+
+  var headers = [
+    "STT",
+    "Team / Dept",
+    "Full Name",
+    "Telegram ID",
+    "Group 10 Status",
+    "Telegram Role",
+    "Telegram Username",
+    "Last Checked (MMT)",
+    "Notes"
+  ];
+
+  var rows = [];
+  var bgColors = [];
+
+  for (var i = 0; i < records.length; i++) {
+    var r = records[i];
+    var stt = i + 1;
+    var statusText = "";
+    var statusBg = "#ffffff";
+
+    if (r.status === "joined") {
+      statusText = "✅ Joined";
+      statusBg = "#D4EDDA"; // light green
+    } else if (r.status === "not_joined") {
+      statusText = "❌ Not Joined";
+      statusBg = "#F8D7DA"; // light red
+    } else if (r.status === "no_id") {
+      statusText = "❓ Missing TG ID";
+      statusBg = "#FFF3CD"; // light yellow
+    } else {
+      statusText = r.status || "";
+    }
+
+    rows.push([
+      stt,
+      r.team || "",
+      r.name || "",
+      r.tgId ? ("'" + r.tgId) : "",
+      statusText,
+      r.role || "",
+      r.username ? ("@" + r.username) : "",
+      nowStr,
+      r.note || ""
+    ]);
+
+    var colorRow = [];
+    for (var c = 0; c < headers.length; c++) {
+      if (c === 4) colorRow.push(statusBg);
+      else colorRow.push("#ffffff");
+    }
+    bgColors.push(colorRow);
+  }
+
+  // Thêm các tài khoản không có trong Staff attendance nhưng trong group/điểm danh
+  if (unknownRecords && unknownRecords.length > 0) {
+    for (var u = 0; u < unknownRecords.length; u++) {
+      var ur = unknownRecords[u];
+      rows.push([
+        rows.length + 1,
+        "Unknown",
+        ur.displayName || ("ID:" + ur.tgId),
+        ur.tgId ? ("'" + ur.tgId) : "",
+        "🚫 Not in Staff List",
+        ur.role || "",
+        ur.username ? ("@" + ur.username) : "",
+        nowStr,
+        "Consider removing from Group 10"
+      ]);
+      var uColorRow = [];
+      for (var uc = 0; uc < headers.length; uc++) {
+        if (uc === 4) uColorRow.push("#FFE8D6"); // light orange
+        else uColorRow.push("#FFF8F0");
+      }
+      bgColors.push(uColorRow);
+    }
+  }
+
+  // Xóa toàn bộ sheet và ghi dữ liệu mới chuẩn
+  sheet.clear();
+
+  // Banner tóm tắt tại Dòng 1
+  var pct = stats.totalActive > 0 ? Math.round((stats.joinedCount / stats.totalActive) * 100) : 0;
+  var summaryText = "📊 Group 10 Membership: " + stats.joinedCount + "/" + stats.totalActive + " Joined (" + pct + "%) | Missing ID: " + stats.noIdCount + " | Unknown: " + (unknownRecords ? unknownRecords.length : 0) + " | Last Checked: " + nowStr + " MMT";
+  sheet.getRange(1, 1, 1, headers.length).merge().setValue(summaryText)
+    .setFontWeight("bold").setFontSize(11).setBackground("#1A237E").setFontColor("#ffffff")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  sheet.setRowHeight(1, 34);
+
+  // Header tại Dòng 2
+  var headerRange = sheet.getRange(2, 1, 1, headers.length);
+  headerRange.setValues([headers])
+    .setFontWeight("bold").setFontSize(10).setBackground("#283593").setFontColor("#ffffff")
+    .setHorizontalAlignment("center").setVerticalAlignment("middle");
+  sheet.setRowHeight(2, 28);
+
+  // Data từ Dòng 3
+  if (rows.length > 0) {
+    var dataRange = sheet.getRange(3, 1, rows.length, headers.length);
+    dataRange.setValues(rows).setFontSize(9).setVerticalAlignment("middle");
+    dataRange.setBackgrounds(bgColors);
+
+    // Căn giữa các cột STT, Team, ID, Status, Role, Username, Last Checked
+    sheet.getRange(3, 1, rows.length, 1).setHorizontalAlignment("center");
+    sheet.getRange(3, 2, rows.length, 1).setHorizontalAlignment("center");
+    sheet.getRange(3, 4, rows.length, 1).setHorizontalAlignment("center");
+    sheet.getRange(3, 5, rows.length, 1).setHorizontalAlignment("center").setFontWeight("bold");
+    sheet.getRange(3, 6, rows.length, 1).setHorizontalAlignment("center");
+    sheet.getRange(3, 7, rows.length, 1).setHorizontalAlignment("center");
+    sheet.getRange(3, 8, rows.length, 1).setHorizontalAlignment("center");
+  }
+
+  sheet.setFrozenRows(2);
+  sheet.autoResizeColumns(1, headers.length);
+  Logger.log("✅ CheckJoint sheet updated successfully: " + rows.length + " rows.");
+}
+
+/**
+ * Cài đặt trigger 8:45 và 9:15 MMT cho sendDailyAttendanceTemplates
+ * - 08:45 MMT: Cập nhật đợt 1 sau cutoff 8:40 (Working < 8:40, ai gửi sau 8:40 là Late ⚠️)
+ * - 09:15 MMT: Chốt đợt 2 (ai gửi từ 8:40-9:15 là Late ⚠️, ai không gửi chuyển thành Take leave Not report ❌)
  */
 function setupDailyTemplatesTrigger() {
   var HANDLER = "sendDailyAttendanceTemplates";
@@ -1459,15 +1883,25 @@ function setupDailyTemplatesTrigger() {
       ScriptApp.deleteTrigger(triggers[i]);
     }
   }
-  // Tạo trigger mới lúc 6:15 MMT (Asia/Rangoon = UTC+6:30 → 6:15 MMT ≈ 23:45 UTC hôm trước)
+  // Tạo trigger 1: lúc 08:45 MMT (Asia/Rangoon)
   ScriptApp.newTrigger(HANDLER)
     .timeBased()
     .everyDays(1)
-    .atHour(6)
+    .atHour(8)
+    .nearMinute(45)
+    .inTimezone("Asia/Rangoon")
+    .create();
+
+  // Tạo trigger 2: lúc 09:15 MMT (Asia/Rangoon)
+  ScriptApp.newTrigger(HANDLER)
+    .timeBased()
+    .everyDays(1)
+    .atHour(9)
     .nearMinute(15)
     .inTimezone("Asia/Rangoon")
     .create();
-  Logger.log("✅ Daily templates trigger set for 06:15 MMT → sendDailyAttendanceTemplates");
+
+  Logger.log("✅ Daily templates triggers set for 08:45 and 09:15 MMT → sendDailyAttendanceTemplates");
 }
 
 // ── BẢNG TỔNG HỢP CÔNG THEO THÁNG — TAB SUM WORK (GID: 1895020121) ──
@@ -1876,10 +2310,10 @@ function getMonthlyAttendanceSummaryText() {
     };
 
     const msgLines = [
-      "📊 *BÁO CÁO TỔNG HỢP CHUYÊN CẦN THÁNG " + selectedMonth + "*",
-      "🏢 *TNI OPERATIONS — TOÀN BỘ ĐƠN VỊ & NHÂN SỰ*",
+      "📊 *MONTHLY ATTENDANCE SUMMARY — " + selectedMonth + "*",
+      "🏢 *TNI OPERATIONS — ALL UNITS & STAFF*",
       "──────────────────────────────",
-      "📅 *Số ngày báo cáo đến hôm nay:* " + (daysPassed || "23") + " ngày",
+      "📅 *Reporting days up to today:* " + (daysPassed || "23") + " days",
       ""
     ];
 
@@ -1891,7 +2325,7 @@ function getMonthlyAttendanceSummaryText() {
       const members = teams[tName];
       totalStaff += members.length;
       const icon = teamIcons[tName] || "🔹";
-      msgLines.push(icon + " *" + tName.toUpperCase() + "* (" + members.length + " NS)");
+      msgLines.push(icon + " *" + tName.toUpperCase() + "* (" + members.length + " staff)");
 
       for (let m = 0; m < members.length; m++) {
         const it = members[m];
@@ -1905,7 +2339,7 @@ function getMonthlyAttendanceSummaryText() {
     }
 
     msgLines.push("──────────────────────────────");
-    msgLines.push("👥 *Tổng nhân sự:* " + totalStaff + " người | 💼 *Tổng Work:* " + totWork + " | 🏖️ *Tổng Leave:* " + totLeave);
+    msgLines.push("👥 *Total Staff:* " + totalStaff + " | 💼 *Total Work:* " + totWork + " | 🏖️ *Total Leave:* " + totLeave);
 
     return msgLines.join("\n");
   } catch (e) {
@@ -1971,7 +2405,7 @@ function getEtaSiteDownByTeam_(teamFilter) {
     }
 
     const lastRow = sdSheet.getLastRow();
-    if (lastRow < 7) return "📡 *ETA " + teamFilter + "*\n_Không có site down._";
+    if (lastRow < 7) return "📡 *ETA " + teamFilter + "*\n_No sites down._";
 
     // Đọc Cột F, G, N (cột 6,7,14) từ dòng 6
     const colFG = sdSheet.getRange(6, 6, lastRow - 5, 2).getValues();  // F,G
@@ -1997,7 +2431,7 @@ function getEtaSiteDownByTeam_(teamFilter) {
 
     var hasData = false;
     for (var t in sites) { if (sites[t].length > 0) { hasData = true; break; } }
-    if (!hasData) return updateTs + "\nKhông có site down.";
+    if (!hasData) return updateTs + "\nNo sites down.";
 
     var lines = [];
     lines.push(updateTs);
@@ -2017,7 +2451,7 @@ function getEtaSiteDownByTeam_(teamFilter) {
     return lines.join("\n");
   } catch (err) {
     Logger.log("getEtaSiteDownByTeam_ error: " + err.message);
-    return "⚠️ Lỗi: " + err.message;
+    return "⚠️ Error: " + err.message;
   }
 }
 
@@ -2150,11 +2584,16 @@ function buildDailyAttendanceText_(targetTeam) {
     }
   }
 
-  // ── 3. Load photo counts from "List Attendance" (Col G = photo URL) ──
+  // ── 3. Load photo counts + Auto-inject Work from early morning photo ──
+  // Rule PM-ATT-01: Photo gửi trước 08:40 → tự động tính là Work (✅).
+  //   - Nếu đã có text "Take Leave" / "Half Day" cho ngày đó → KHÔNG ghi đè.
+  //   - Không có photo trước 08:40 → Work = 0 (Not Report).
   function initPh() {
     return { tP: 0, yP: 0, d2P: 0, wkP: 0, moP: 0 };
   }
   const photoMap = {};
+  var earlyPhotoWorkDone = {};  // Track (nameLow|dateStr) already injected as Work
+
   const listSheet = ss.getSheetByName("List Attendance");
   if (listSheet && listSheet.getLastRow() >= 2) {
     const lVals = listSheet.getRange(2, 1, listSheet.getLastRow() - 1, 7).getValues();
@@ -2164,20 +2603,45 @@ function buildDailyAttendanceText_(targetTeam) {
       const nameLow  = String(r[5] || r[4] || "").trim().toLowerCase();
       const photoUrl = String(r[6] || "").trim();
       if (!photoUrl) continue;
-      const key = tgId || nameLow;
-      if (!key) continue;
+      const phKey = tgId || nameLow;
+      if (!phKey) continue;
       const dObj = parseDateStr(r[1]);
       if (!dObj) continue;
       const dStr = toDateStr(dObj);
       const mStr = toMonthStr(dObj);
 
-      if (!photoMap[key]) photoMap[key] = initPh();
-      const p = photoMap[key];
+      // Photo count (all times) for Photo row display
+      if (!photoMap[phKey]) photoMap[phKey] = initPh();
+      const p = photoMap[phKey];
       if (dStr === todayStr) p.tP++;
       if (dStr === yestStr)  p.yP++;
       if (dStr === day2Str)  p.d2P++;
       if (dObj >= weekStart) p.wkP++;
       if (mStr === curMonthStr) p.moP++;
+
+      // Auto-inject Work from early photo (before 08:40)
+      var timeRaw   = String(r[2] || "").trim();
+      var tParts    = timeRaw.match(/^(\d{1,2}):(\d{2})/);
+      var photoHour = tParts ? parseInt(tParts[1], 10) : 99;
+      var photoMin  = tParts ? parseInt(tParts[2], 10) : 99;
+      var isEarly   = (photoHour < 8) || (photoHour === 8 && photoMin < 40);
+      if (!isEarly) continue;
+
+      var attKey = nameLow;
+      if (!attKey) continue;
+      var dayKey = attKey + "|" + dStr;
+      if (earlyPhotoWorkDone[dayKey]) continue;
+      earlyPhotoWorkDone[dayKey] = true;
+
+      if (!attMap[attKey]) attMap[attKey] = initAtt();
+      var a = attMap[attKey];
+
+      // Inject Work only if NO Leave/Half text report for that date
+      if (dStr === todayStr && a.tL === 0 && a.tH === 0 && a.tW === 0) a.tW = 1;
+      if (dStr === yestStr  && a.yL === 0 && a.yH === 0 && a.yW === 0) a.yW = 1;
+      if (dStr === day2Str  && a.d2L === 0 && a.d2H === 0 && a.d2W === 0) a.d2W = 1;
+      if (dObj >= weekStart && a.wkL === 0 && a.wkH === 0) a.wkW++;
+      if (mStr === curMonthStr && a.moL === 0 && a.moH === 0) a.moW++;
     }
   }
 
