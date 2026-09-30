@@ -285,27 +285,31 @@ async def main():
         raw_text = "\n".join(bot_messages) if bot_messages else ""
 
         # 🛡️ LỌC CHỈ LẤY TANINTHARYI REGION — Không lấy tỉnh khác (Ayeyarwady, Sagaing, v.v.)
-        # ✅ PM-59 FIX ĐÚNG: Bot có thể trả về 3 tin split (172 dòng không vừa 1 tin).
-        # Tin 1 có header "Tanintharyi Region", Tin 2+3 là các phần tiếp theo KHÔNG có "tanintharyi".
-        # → Phải tìm VỊ TRÍ tin đầu có "tanintharyi" rồi gom TẤT CẢ tin từ đó trở đi.
-        # TUYỆT ĐỐI CẤM filter tất cả tin theo "tanintharyi" → sẽ bỏ sót tin 2, tin 3!
+        # ✅ PM-60 FIX v843: Nhận diện tin TNI data bằng 2 điều kiện OR:
+        #   (1) Tin có chứa "tanintharyi" → header bản tin đầu tiên
+        #   (2) Tin có ≥1 dòng mà left(3) = "TNI" → các phần tiếp theo (Tin 2, Tin 3)
+        # Cả 2 điều kiện đảm bảo gom đủ 172 dòng kể cả khi bot chia thành N tin split.
+        # TUYỆT ĐỐI CẤM chỉ filter "tanintharyi" — Tin 2+3 không có header, sẽ bị bỏ sót!
         if bot_messages:
-            first_tni_idx = None
-            for i, m in enumerate(bot_messages):
+            def is_tni_data_msg(m):
                 if "tanintharyi" in m.lower():
-                    first_tni_idx = i
-                    break
+                    return True  # Tin đầu: có header region
+                # Tin tiếp theo: có ít nhất 1 dòng bắt đầu bằng "TNI" (station ID)
+                return any(
+                    line.strip()[:3].upper() == "TNI"
+                    for line in m.split("\n") if line.strip()
+                )
 
-            if first_tni_idx is not None:
-                # Gom TẤT CẢ phần từ tin Tanintharyi đầu tiên trở đi
-                tni_parts = bot_messages[first_tni_idx:]
+            tni_parts = [m for m in bot_messages if is_tni_data_msg(m)]
+            if tni_parts:
                 raw_text = "\n".join(tni_parts)
-                print(f"[{myanmar_now()}] 🎯 Anchor tại tin #{first_tni_idx+1}, gom {len(tni_parts)} phần → {len(raw_text)} ký tự tổng")
+                print(f"[{myanmar_now()}] 🎯 Gom {len(tni_parts)}/{len(bot_messages)} phần TNI data → {len(raw_text)} ký tự tổng")
             else:
-                print(f"[{myanmar_now()}] ⚠️ Không tìm thấy tin Tanintharyi trong {len(bot_messages)} tin bot — bỏ qua!")
+                print(f"[{myanmar_now()}] ⚠️ Không tìm thấy tin Tanintharyi/TNI trong {len(bot_messages)} tin bot — bỏ qua!")
                 raw_text = ""
         else:
             raw_text = ""
+
 
         PRIMARY_GAS_URL = "https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec"
         gas_url = os.environ.get("SD_APPS_SCRIPT_URL") or os.environ.get("APPS_SCRIPT_URL") or PRIMARY_GAS_URL
