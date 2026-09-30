@@ -2698,7 +2698,7 @@ function buildDailyAttendanceText_(targetTeam) {
     }
   }
 
-  // ── 4. Build message — Compact summary format ──
+  // ── 4. Build message — Summary at top + Details below ──
   const isAll = targetTeam === "ALL";
   const header = isAll
     ? "<b>📋 Attendance Report — " + dateShort + "</b>"
@@ -2706,7 +2706,7 @@ function buildDailyAttendanceText_(targetTeam) {
 
   const lines = [
     header,
-    "<i>Today / Yest / Day-3</i>",
+    "<i>Today / Yest / Day-3 / Week / Month</i>",
     "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   ];
 
@@ -2734,17 +2734,16 @@ function buildDailyAttendanceText_(targetTeam) {
     const members = teamGroups[tName];
 
     // ── Classify each member by TODAY's status ──
-    const grpWork  = [];  // ✅ Work (on time)
-    const grpLate  = [];  // ⏰ Late (08:40–09:00)
-    const grpLeave = [];  // 🏖️ Take Leave
-    const grpHalf  = [];  // 🌓 Half Day
-    const grpNR    = [];  // ❌ Not Report (Leave Not Report)
+    const grpWork  = [];
+    const grpLate  = [];
+    const grpLeave = [];
+    const grpHalf  = [];
+    const grpNR    = [];
 
     for (let m = 0; m < members.length; m++) {
       const st  = members[m];
       const key = st.name.toLowerCase();
       const att = attMap[key] || initAtt();
-
       if      (att.tL  > 0) grpLeave.push(st.name);
       else if (att.tH  > 0) grpHalf.push(st.name);
       else if (att.tW  > 0) grpWork.push(st.name);
@@ -2752,41 +2751,41 @@ function buildDailyAttendanceText_(targetTeam) {
       else                   grpNR.push(st.name);
     }
 
-    const total = members.length;
-    lines.push(icon + " <b>" + tName.toUpperCase() + "</b> (" + total + " members)");
-
-    if (grpWork.length  > 0) lines.push("   ✅ Work (" + grpWork.length + "): "  + grpWork.join(", "));
-    if (grpLate.length  > 0) lines.push("   ⏰ Late (" + grpLate.length + "): "  + grpLate.join(", "));
+    // ── Team header + compact summary ──
+    lines.push(icon + " <b>" + tName.toUpperCase() + "</b> (" + members.length + " members)");
+    if (grpWork.length  > 0) lines.push("   ✅ Work (" + grpWork.length + "): " + grpWork.join(", "));
+    if (grpLate.length  > 0) lines.push("   ⏰ Late (" + grpLate.length + "): " + grpLate.join(", "));
     if (grpHalf.length  > 0) lines.push("   🌓 Half Day (" + grpHalf.length + "): " + grpHalf.join(", "));
     if (grpLeave.length > 0) lines.push("   🏖️ Take Leave (" + grpLeave.length + "): " + grpLeave.join(", "));
-    if (grpNR.length    > 0) lines.push("   ❌ Not Report (" + grpNR.length + "): " + grpNR.join(", "));
+    if (grpNR.length    > 0) lines.push("   ❌ Not Report (Leave) (" + grpNR.length + "): " + grpNR.join(", "));
+    lines.push("   ─────────────────────────");
 
-    // ── Yest / Day-3 summary per member (compact: name: W/L/NR) ──
-    const yestLines  = [];
-    const day2Lines  = [];
+    // ── Per-person detail ──
     for (let m = 0; m < members.length; m++) {
-      const st  = members[m];
-      const key = st.name.toLowerCase();
-      const att = attMap[key] || initAtt();
+      const st    = members[m];
+      const key   = st.name.toLowerCase();
+      const att   = attMap[key] || initAtt();
       const phKey = st.tgId || key;
-      const ph  = photoMap[phKey] || initPh();
+      const ph    = photoMap[phKey] || initPh();
 
-      // Yest status
-      const yStatus = att.yL > 0 ? "🏖️" : att.yH > 0 ? "🌓" : att.yW > 0 ? "✅" : att.yLt > 0 ? "⏰" : att.yNR > 0 ? "❌" : "—";
-      // Day-3 status
-      const d2Status = att.d2L > 0 ? "🏖️" : att.d2H > 0 ? "🌓" : att.d2W > 0 ? "✅" : att.d2Lt > 0 ? "⏰" : att.d2NR > 0 ? "❌" : "—";
-
-      yestLines.push(st.name + ":" + yStatus);
-      day2Lines.push(st.name + ":" + d2Status);
+      lines.push("   " + (m + 1) + ". <b>" + st.name + "</b>");
+      lines.push("      ✅ Work:              " + att.tW  + "/" + att.yW  + "/" + att.d2W  + "/" + att.wkW  + "/" + att.moW);
+      if (att.tLt + att.yLt + att.d2Lt > 0)
+        lines.push("      ⏰ Late (8:40-9):    " + att.tLt + "/" + att.yLt + "/" + att.d2Lt);
+      if (att.tL + att.yL + att.d2L + att.wkL + att.moL > 0)
+        lines.push("      🏖️ Leave:            " + att.tL  + "/" + att.yL  + "/" + att.d2L  + "/" + att.wkL  + "/" + att.moL);
+      if (att.tH + att.yH + att.d2H + att.wkH + att.moH > 0)
+        lines.push("      🌓 Half Day:         " + att.tH  + "/" + att.yH  + "/" + att.d2H  + "/" + att.wkH  + "/" + att.moH);
+      if (att.tNR + att.yNR + att.d2NR > 0)
+        lines.push("      ❌ Not Rpt (Leave):  " + att.tNR + "/" + att.yNR + "/" + att.d2NR);
+      lines.push("      📷 Photo:            " + ph.tP + "/" + ph.yP + "/" + ph.d2P + "/" + ph.wkP + "/" + ph.moP);
     }
-    lines.push("   <i>Yest: " + yestLines.join(" | ") + "</i>");
-    lines.push("   <i>Day-3: " + day2Lines.join(" | ") + "</i>");
     lines.push("");
   }
 
   lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-  // Not joined (CONTROL only, bottom)
+  // Not joined (CONTROL only)
   if (isAll && notJoined.length > 0) {
     lines.push("⚠️ <b>Not yet joined (" + notJoined.length + "):</b>");
     for (let n = 0; n < notJoined.length; n++) {
