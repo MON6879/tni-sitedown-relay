@@ -285,12 +285,20 @@ async def main():
         raw_text = "\n".join(bot_messages) if bot_messages else ""
 
         # 🛡️ LỌC CHỈ LẤY TANINTHARYI REGION — Không lấy tỉnh khác (Ayeyarwady, Sagaing, v.v.)
-        # Bot /down_tni trả về nhiều tin cho nhiều region. Chỉ giữ tin chứa "Tanintharyi Region".
+        # PM-59 FIX: Nếu bot trả về 3 tin split (1 bản tin dài bị cắt), GOM TẤT CẢ phần Tanintharyi
+        # theo thứ tự oldest-first rồi nối lại. TUYỆT ĐỐI CẤM chỉ lấy tni_messages[-1] (bỏ phần đầu).
         if bot_messages:
             tni_messages = [m for m in bot_messages if "tanintharyi" in m.lower()]
             if tni_messages:
-                raw_text = tni_messages[-1]  # ✅ Chỉ lấy ĐÚNG 1 BẢN TIN Tanintharyi MỚI NHẤT, không ghép trùng lặp
-                print(f"[{myanmar_now()}] 🎯 Lọc lấy 1 bản tin Tanintharyi mới nhất: {len(raw_text)} ký tự")
+                if len(tni_messages) == 1:
+                    # Chỉ 1 tin → lấy thẳng, không cần ghép
+                    raw_text = tni_messages[0]
+                    print(f"[{myanmar_now()}] 🎯 1 bản tin Tanintharyi: {len(raw_text)} ký tự")
+                else:
+                    # Nhiều tin → đây là 1 bản tin dài bị chatbot cắt thành nhiều phần
+                    # Gom TẤT CẢ phần theo thứ tự (bot_messages đã oldest-first)
+                    raw_text = "\n".join(tni_messages)
+                    print(f"[{myanmar_now()}] 🎯 Bot trả {len(tni_messages)} phần split → đã ghép đủ: {len(raw_text)} ký tự")
             else:
                 print(f"[{myanmar_now()}] ⚠️ Không tìm thấy tin Tanintharyi trong {len(bot_messages)} tin bot — bỏ qua!")
                 raw_text = ""
