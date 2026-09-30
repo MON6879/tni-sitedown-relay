@@ -285,20 +285,22 @@ async def main():
         raw_text = "\n".join(bot_messages) if bot_messages else ""
 
         # 🛡️ LỌC CHỈ LẤY TANINTHARYI REGION — Không lấy tỉnh khác (Ayeyarwady, Sagaing, v.v.)
-        # PM-59 FIX: Nếu bot trả về 3 tin split (1 bản tin dài bị cắt), GOM TẤT CẢ phần Tanintharyi
-        # theo thứ tự oldest-first rồi nối lại. TUYỆT ĐỐI CẤM chỉ lấy tni_messages[-1] (bỏ phần đầu).
+        # ✅ PM-59 FIX ĐÚNG: Bot có thể trả về 3 tin split (172 dòng không vừa 1 tin).
+        # Tin 1 có header "Tanintharyi Region", Tin 2+3 là các phần tiếp theo KHÔNG có "tanintharyi".
+        # → Phải tìm VỊ TRÍ tin đầu có "tanintharyi" rồi gom TẤT CẢ tin từ đó trở đi.
+        # TUYỆT ĐỐI CẤM filter tất cả tin theo "tanintharyi" → sẽ bỏ sót tin 2, tin 3!
         if bot_messages:
-            tni_messages = [m for m in bot_messages if "tanintharyi" in m.lower()]
-            if tni_messages:
-                if len(tni_messages) == 1:
-                    # Chỉ 1 tin → lấy thẳng, không cần ghép
-                    raw_text = tni_messages[0]
-                    print(f"[{myanmar_now()}] 🎯 1 bản tin Tanintharyi: {len(raw_text)} ký tự")
-                else:
-                    # Nhiều tin → đây là 1 bản tin dài bị chatbot cắt thành nhiều phần
-                    # Gom TẤT CẢ phần theo thứ tự (bot_messages đã oldest-first)
-                    raw_text = "\n".join(tni_messages)
-                    print(f"[{myanmar_now()}] 🎯 Bot trả {len(tni_messages)} phần split → đã ghép đủ: {len(raw_text)} ký tự")
+            first_tni_idx = None
+            for i, m in enumerate(bot_messages):
+                if "tanintharyi" in m.lower():
+                    first_tni_idx = i
+                    break
+
+            if first_tni_idx is not None:
+                # Gom TẤT CẢ phần từ tin Tanintharyi đầu tiên trở đi
+                tni_parts = bot_messages[first_tni_idx:]
+                raw_text = "\n".join(tni_parts)
+                print(f"[{myanmar_now()}] 🎯 Anchor tại tin #{first_tni_idx+1}, gom {len(tni_parts)} phần → {len(raw_text)} ký tự tổng")
             else:
                 print(f"[{myanmar_now()}] ⚠️ Không tìm thấy tin Tanintharyi trong {len(bot_messages)} tin bot — bỏ qua!")
                 raw_text = ""
