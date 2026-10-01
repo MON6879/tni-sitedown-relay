@@ -2037,3 +2037,53 @@ Reason: [Lý do]`
 > 3. **Logic Cho Ngày Xa (Trước Day-3 — Chỉ Ảnh Hưởng Week/Month)**: Nếu `dStr` không phải 3 ngày gần (`isFarDay = true`) → ảnh chứng minh có mặt là đủ, KHÔNG BLOCK (vì không có per-day Leave counter riêng cho ngày xa).
 > 4. **Cùng Bug Áp Dụng Cho `wkW`**: Điều kiện `a.wkL === 0 && a.wkH === 0` khi tích lũy `wkW` cũng phải sửa theo nguyên tắc tương tự — dùng `isFarDay || (thisDayL === 0 && thisDayH === 0)`.
 
+---
+
+# 🔐 PM-63: TUYỆT ĐỐI CẤM HARDCODE GIÁ TRỊ HASH — BẮT BUỘC TÍNH TOÁN TRƯỚC KHI NHÚNG (ZERO HARDCODED HASH POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (PM-63 — ZERO HARDCODED HASH)**:
+> - **Root Cause**: Khi thêm tính năng SHA-256 PIN, AI hardcode giá trị `DEFAULT_PIN_HASH` là một chuỗi hex tự bịa (`9F735E0D...`) thay vì hash thật của `'7979'`. Kết quả: PIN `7979` không bao giờ match → toàn bộ user bị khóa khỏi admin → phải sửa khẩn cấp.
+> - **Rule bắt buộc**: Khi nhúng bất kỳ hash cứng (SHA-256, MD5, HMAC...) vào code, BẮT BUỘC phải tính giá trị thật trước bằng `python -c "import hashlib; print(hashlib.sha256('VALUE'.encode()).hexdigest())"` rồi mới copy vào source. TUYỆT ĐỐI CẤM tự đặt chuỗi hex tùy tiện và comment là "SHA-256 của X" mà không verify!
+> - **Checklist bắt buộc trước khi commit hash cứng**: ① Chạy lệnh tính hash thật ② So sánh với giá trị hardcode ③ Khớp 100% mới được commit.
+
+---
+
+# 🚀 PM-64: BẮT BUỘC DEPLOY NGAY SAU MỖI LẦN SỬA — TUYỆT ĐỐI CẤM TÍCH LŨY NHIỀU FIX RỒI DEPLOY GỘP (ZERO FIX-ACCUMULATE BEFORE-DEPLOY POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (PM-64 — INSTANT DEPLOY EVERY FIX)**:
+> - **Root Cause**: AI sửa nhiều lỗi liên tiếp (hash sai → PIN không hoạt động, staff table không hiện, collector_en.py syntax error) mà deploy gộp hoặc delay → User phải chờ nhiều phút, thấy lỗi vẫn còn → bức xúc "sửa không deploy cứ loanh quanh mãi".
+> - **Rule bắt buộc**: Sau MỖI LẦN sửa code (dù 1 dòng), BẮT BUỘC phải: ① Copy sync 3 repos ② `git commit + push` ③ `npx vercel --prod --yes` NGAY LẬP TỨC — không tích lũy 2–3 fix rồi deploy 1 lần. Mỗi fix = 1 deploy độc lập.
+> - **Ngoại lệ duy nhất**: Có thể gộp tối đa 2 fix trong 1 deploy nếu cả 2 fix liên quan cùng 1 root cause và hoàn thành trong vòng 60 giây.
+
+---
+
+# 🧪 PM-65: BẮT BUỘC SYNTAX CHECK TẤT CẢ PYTHON FILES TRƯỚC KHI DEPLOY VERCEL (MANDATORY PRE-DEPLOY SYNTAX VALIDATION)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (PM-65 — PRE-DEPLOY PYTHON SYNTAX CHECK)**:
+> - **Root Cause**: File `collector_en.py` có dấu `"` thừa ở line 165 gây `SyntaxError: unterminated string literal`. File này nằm trong Vercel API functions → nếu Vercel build với file lỗi syntax sẽ fail hoàn toàn, ảnh hưởng toàn bộ hệ thống. Bug này tồn tại từ trước và chỉ phát hiện khi chạy audit.
+> - **Rule bắt buộc**: Trước mỗi lần `npx vercel --prod --yes`, BẮT BUỘC phải chạy lệnh kiểm tra syntax toàn bộ Python API files:
+>   ```powershell
+>   Get-ChildItem "Task and WO\api" -Filter "*.py" | ForEach-Object { python -c "import py_compile; py_compile.compile(r'$($_.FullName)', doraise=True)" 2>&1 | Where-Object {$_} | ForEach-Object { Write-Host "$($_.Name): ❌ $_" } }
+>   ```
+>   Nếu có bất kỳ file nào lỗi syntax → BẮT BUỘC sửa xong trước khi deploy.
+
+---
+
+> ### 🔴 RULE PM-62: AW7 ĐỘC LẬP TUYỆT ĐỐI — CẤM THÊM GUARD SO SÁNH VỚI CỘT A / FRESHNESS CHECK (STRICT AW7-INDEPENDENCE & ANTI-OVER-ENGINEERING POLICY)
+> **Root Cause (Sự Cố 01/10/2026)**:
+> Commit `da358f0` thêm CHỐT CHẶN 2 so sánh `AW7 timestamp < A1 timestamp` → block gửi mỗi khi relay cào Cột A có timestamp mới hơn AW7 → AW7 cập nhật nhưng không gửi được tin.
+>
+> **Lịch sử sửa qua sửa lại làm phức tạp thêm**:
+> - `d9f8bfd`: Logic đơn giản nhất — đọc thẳng `sheet.getRange("AW7").getValue()`, chỉ dedup `TS_KEY_AW7`. **Chạy mượt.**
+> - `57b609b → c20b4ef`: Thêm freshness 30→60 min guard → block khi AW7 cũ hơn 60 phút.
+> - `d9f8bfd`: Bỏ freshness check. **Chạy mượt lại.**
+> - `da358f0`: Thêm CHỐT CHẶN 2 (AW7 vs A1) → **Bug: không gửi tin**.
+> - `9a06b3a`: Bỏ CHỐT CHẶN 2. **Nhưng vẫn còn wrapper `parseAW7Timestamp()` phức tạp + CHỐT CHẶN 1 (45 phút)**.
+> - `64eab61`: **Restore hoàn toàn về d9f8bfd**: đọc thẳng AW7, không wrapper, không freshness, không A1 guard. ✅
+>
+> **Quy Tắc Bắt Buộc (ANTI-OVER-ENGINEERING)**:
+> 1. **`processSummaryAwAz()` CHỈ ĐƯỢC CÓ 2 ĐIỀU KIỆN**: ① AW7 rỗng → skip. ② `tsKey === lastTs` → skip (dedup). **TUYỆT ĐỐI CẤM thêm bất kỳ guard thứ 3 nào** (freshness, so sánh A1, so sánh relayTs, v.v.).
+> 2. **ĐỌC THẲNG `sheet.getRange("AW7").getValue()`** — TUYỆT ĐỐI CẤM bọc thêm `parseAW7Timestamp()` hay hàm wrapper trung gian nào khác có thể fail.
+> 3. **Khi AW7 chạy tốt mà bị báo lỗi**: Trước khi sửa, BẮT BUỘC đọc `git log -- site_down_v2.gs` tìm commit gần nhất thêm code mới vào `processSummaryAwAz`. Đó là thủ phạm — REVERT về version trước đó.
+> 4. **ANTI-OVER-ENGINEERING**: Mỗi lần "fix" thêm guard vào AW7 = tạo thêm bug. Logic đơn giản nhất là đúng nhất. Resist the urge to add "safety" guards.
+
