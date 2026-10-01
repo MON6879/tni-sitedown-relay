@@ -2087,3 +2087,45 @@ Reason: [Lý do]`
 > 3. **Khi AW7 chạy tốt mà bị báo lỗi**: Trước khi sửa, BẮT BUỘC đọc `git log -- site_down_v2.gs` tìm commit gần nhất thêm code mới vào `processSummaryAwAz`. Đó là thủ phạm — REVERT về version trước đó.
 > 4. **ANTI-OVER-ENGINEERING**: Mỗi lần "fix" thêm guard vào AW7 = tạo thêm bug. Logic đơn giản nhất là đúng nhất. Resist the urge to add "safety" guards.
 
+---
+
+# 🚨 PM-66: TUYỆT ĐỐI CẤM KẾT THÚC SESSION KHI GAS CHỈ Ở @HEAD — BẮT BUỘC CLASP DEPLOY -I NGAY SAU CLASP PUSH (ZERO HEAD-ONLY GAS STATE POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (PM-66 — ZERO HEAD-ONLY GAS)**:
+> - **Root Cause (01/10/2026)**: Fix `isFarDay` per-day Work check (v105) đã được viết vào file local + git commit trong session trước. `clasp push --force` chạy thành công lên `@HEAD`. NHƯNG quên chạy `clasp deploy -i <deploymentId>` → GAS production vẫn chạy version `@104` cũ → Work = 0/0/0/0/0 vẫn xảy ra. Session sau phải audit lại mới phát hiện.
+> - **Rule bắt buộc**: Sau MỌI lần sửa file GAS (`.gs`, `.js` trong `apps_script_*`), BẮT BUỘC hoàn tất ĐỦ 2 LỆNH trong cùng 1 session:
+>   ```
+>   ① npx clasp push --force
+>   ② npx clasp deploy -i <deploymentId> -d "<mô tả version>"
+>   ```
+>   Xác nhận terminal xuất hiện: `Deployed <deploymentId> @<version>` mới được phép báo "Đã xong".
+> - **TUYỆT ĐỐI CẤM** kết thúc session với GAS ở trạng thái `@HEAD` chưa deploy. `@HEAD` = bản nháp, KHÔNG phải production.
+> - **Deployment IDs các GAS chính**:
+>   | GAS | Deployment ID |
+>   |-----|---------------|
+>   | Attendance | `AKfycbyFIDGDS5k7wy-hNp2p1PNvte0CQ6cSiNYLyBmNc00Yi1b6IueOob9bKmu4zoQ1A6Cs` |
+>   | Site Down | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` 🔒 |
+>   | Main Hub | Xem `system_map.md` |
+>   | Sale Backend | `AKfycbx09J8PPi_IN3_n_ho8QF4RapsPh5uzLchVfS9T89iuw-4QMZWU_ynlhzDvav4wRvj4` |
+
+---
+
+> ### 🔴 RULE PM-67: WINDOWS TASK SCHEDULER PHẢI CHẠY DƯỚI ĐÚNG USER ACCOUNT — TUYỆT ĐỐI CẤM ĐỂ CHẠY DƯỚI SYSTEM ACCOUNT (STRICT TASK SCHEDULER USER ACCOUNT POLICY)
+> **Root Cause (Sự Cố 01/10/2026 — ICT Auto Fetch không chạy)**:
+> Task `ICT_Auto_Fetch` đăng ký dưới **SYSTEM account** → `LastResult: 0x80070002` ("The system cannot find the file specified"). Nguyên nhân: SYSTEM account không có quyền truy cập:
+> - **D: drive** (network/secondary drive mapped cho user `HA DUC PHONG`)
+> - **Python path** `C:\Users\HA DUC PHONG\AppData\Local\...` (user-scope installation)
+> Script chạy tay dưới user bình thường thì OK hoàn toàn — chỉ fail khi Task Scheduler gọi.
+>
+> **Fix**: Đăng ký task với `LogonType Interactive` dưới đúng user `PHONGHD\HA DUC PHONG`:
+> ```powershell
+> $Principal = New-ScheduledTaskPrincipal -UserId "PHONGHD\HA DUC PHONG" -LogonType Interactive -RunLevel Highest
+> ```
+> Sau đó chạy script đăng ký bằng `powershell -ExecutionPolicy Bypass -File "...\update_task.ps1"` từ **CMD Admin** (không phải `& "..."` vì `&` là PowerShell operator, không phải CMD).
+>
+> **Quy Tắc Bắt Buộc**:
+> 1. **Mọi Scheduled Task chạy script Python/BAT truy cập D: drive hoặc Python user-scope** BẮT BUỘC đăng ký với `LogonType Interactive` dưới đúng user account. TUYỆT ĐỐI CẤM để mặc định SYSTEM account.
+> 2. **Chẩn đoán nhanh**: Nếu Task Scheduler báo `LastResult: 0x80070002` = "file not found" nhưng chạy tay OK → 100% là lỗi user account, không phải lỗi script.
+> 3. **Chạy .ps1 từ CMD Admin**: Dùng `powershell -ExecutionPolicy Bypass -File "path\script.ps1"`. TUYỆT ĐỐI CẤM dùng `& "path\script.ps1"` từ CMD vì `&` là toán tử PowerShell, CMD sẽ báo lỗi "& was unexpected".
+> 4. **File liên quan**: `D:\6. AI\1. QLTC\ICT Fetch\update_task.ps1` — đã cập nhật LogonType Interactive. Khi cần re-register task ICT, chạy file này bằng CMD Admin.
+
