@@ -263,6 +263,30 @@ function doGet(e) {
       return _json({ ok: true, msgids: msgids });
     }
 
+    // ── Kích hoạt / Kiểm tra GAS 1-Minute Train ──────────────────────────
+    if (action === "setup_gas_train_1min") {
+      const deleted = [];
+      ScriptApp.getProjectTriggers().forEach(t => {
+        const fn = t.getHandlerFunction();
+        if (fn === "checkAndSend_1min" || fn === "checkAndSend") {
+          ScriptApp.deleteTrigger(t);
+          deleted.push(fn);
+        }
+      });
+      ScriptApp.newTrigger("checkAndSend_1min")
+        .timeBased()
+        .everyMinutes(1)
+        .create();
+      const remaining = ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction());
+      return _json({ ok: true, action: "setup_gas_train_1min", deleted: deleted, triggers: remaining, msg: "GAS 1-min train active!" });
+    }
+
+    if (action === "status_gas_train") {
+      const triggers = ScriptApp.getProjectTriggers().map(t => ({ fn: t.getHandlerFunction(), type: t.getTriggerSource().toString() }));
+      const has1min = triggers.some(t => t.fn === "checkAndSend_1min");
+      return _json({ ok: true, triggers: triggers, has_1min_train: has1min });
+    }
+
     return _json({ ok: false, msg: "Unknown GET action: " + action });
   } catch (err) {
     return _json({ ok: false, msg: err.message });
@@ -295,6 +319,22 @@ function checkAndSend(isWebhookCall) {
     props.deleteProperty(TS_KEY_A1);
     // 🛑 TUYỆT ĐỐI KHÔNG XÓA TS_KEY_AW7: AW7 độc lập 100%, chỉ cập nhật khi ô AW7 có mốc giờ mới!
     Logger.log("🌅 NGÀY MỚI (" + todayStr + ") — Đã reset chìa khóa A1!");
+    // ✅ PM-59 FIX RC-2: Sweep dọn tin cũ TẤT CẢ 5 nhóm khi ngày mới bắt đầu.
+    // Tin hôm qua >48h Bot API không xóa được → phải chủ động dọn trước khi gửi tin sáng mới.
+    try {
+      var sweepKeys = ["TIN1_T1","TIN1_T2","TIN1_T3","TIN1_T4","TIN1_CONTROL","TIN2_T1","TIN2_T2","TIN2_T3","TIN2_T4","TIN2_CONTROL"];
+      var sweepChats = { TIN1_T1: SD_GROUPS["T1"], TIN1_T2: SD_GROUPS["T2"], TIN1_T3: SD_GROUPS["T3"], TIN1_T4: SD_GROUPS["T4"], TIN1_CONTROL: SD_GROUPS["CONTROL"], TIN2_T1: SD_GROUPS["T1"], TIN2_T2: SD_GROUPS["T2"], TIN2_T3: SD_GROUPS["T3"], TIN2_T4: SD_GROUPS["T4"], TIN2_CONTROL: SD_GROUPS["CONTROL"] };
+      for (var sk = 0; sk < sweepKeys.length; sk++) {
+        var sKey = sweepKeys[sk];
+        var sChatId = sweepChats[sKey];
+        if (sChatId) {
+          deleteOldMessages_(sChatId, sKey);
+          Logger.log("🧹 Daily sweep: xóa tin cũ key=" + sKey + " chat=" + sChatId);
+        }
+      }
+    } catch(sweepErr) {
+      Logger.log("⚠️ Daily sweep lỗi (bỏ qua, tiếp tục gửi tin mới): " + sweepErr.message);
+    }
   }
 
   // ── 2. Kiểm tra khung giờ hoạt động (03:30 - 22:30 Myanmar) ────────────
@@ -490,18 +530,11 @@ function processSummaryAwAz(sheet, isDirectPush) {
     return false;
   }
 
-  // 🛡️ CHỐT CHẶN 2: Timestamp AW7 KHÔNG ĐƯỢC CŨ HƠN Cột A
-  // Nếu Cột A đã có mốc giờ mới hơn (ví dụ A1 là 18:00 mà AW7 vẫn là 17:16 hoặc 13:49)
-  // → Chứng tỏ bảng AW7 chưa được cập nhật theo đợt mới, TUYỆT ĐỐI KHÔNG GỬI!
-  const tsA1 = parseA1Timestamp(sheet);
-  if (tsA1) {
-    const minAw = parseTsToMinutes_(tsKey);
-    const minA1 = parseTsToMinutes_(tsA1);
-    if (minAw > 0 && minA1 > 0 && minAw < minA1) {
-      Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") CŨ HƠN Cột A (" + tsA1 + ") " + (minA1 - minAw) + " phút → Dữ liệu cũ, bỏ qua không gửi Tin 2!");
-      return false;
-    }
-  }
+
+  // ✅ AW7 ĐỘC LẬP 100% — KHÔNG SO SÁNH VỚI CỘT A
+  // AW7 là bảng Summary cập nhật thủ công/độc lập, không phụ thuộc thời điểm relay cào Cột A.
+  // Chỉ cần AW7 có timestamp MỚI hơn lần gửi trước (TS_KEY_AW7) là đủ điều kiện gửi.
+
 
   const props  = PropertiesService.getScriptProperties();
   const lastTs = props.getProperty(TS_KEY_AW7) || "";
@@ -913,21 +946,37 @@ function getSavedMsgIds_(msgKey) {
 
 function deleteTelegramMsgBot_(chatId, messageId) {
   if (!messageId) return false;
-  const tokens = [SD_BOT_TOKEN, "8647102342:AAGwI95-xeyFfJZusOOrIPVBER-z6taZHZI"];
-  for (let t = 0; t < tokens.length; t++) {
-    try {
-      const resp = UrlFetchApp.fetch("https://api.telegram.org/bot" + tokens[t] + "/deleteMessage", {
-        method: "post", contentType: "application/json",
-        payload: JSON.stringify({ chat_id: chatId, message_id: messageId }),
-        muteHttpExceptions: true,
-      });
-      const res = JSON.parse(resp.getContentText());
-      if (res.ok === true || (res.description && res.description.indexOf("message to delete not found") >= 0)) {
-        return true;
-      }
-    } catch(e) {}
+  // ✅ PM-59 FIX: Chỉ dùng SD_BOT_TOKEN chính thức. TUYỆT ĐỐI CẤM hardcode token backup cũ.
+  var token = SD_BOT_TOKEN;
+  if (!token) {
+    Logger.log("[deleteTelegramMsgBot_] ❌ SD_BOT_TOKEN rỗng — không thể xóa msg_id=" + messageId);
+    return false;
   }
-  return false;
+  try {
+    var resp = UrlFetchApp.fetch("https://api.telegram.org/bot" + token + "/deleteMessage", {
+      method: "post", contentType: "application/json",
+      payload: JSON.stringify({ chat_id: chatId, message_id: messageId }),
+      muteHttpExceptions: true,
+    });
+    var res = JSON.parse(resp.getContentText());
+    if (res.ok === true) {
+      Logger.log("[deleteTelegramMsgBot_] 🗑️ Xóa thành công msg_id=" + messageId + " khỏi " + chatId);
+      return true;
+    }
+    if (res.description && res.description.indexOf("message to delete not found") >= 0) {
+      Logger.log("[deleteTelegramMsgBot_] ℹ️ msg_id=" + messageId + " đã được xóa trước đó (not found)");
+      return true;
+    }
+    if (res.description && (res.description.indexOf("can't be deleted") >= 0 || res.description.indexOf("message_id_invalid") >= 0)) {
+      Logger.log("[deleteTelegramMsgBot_] ⏳ msg_id=" + messageId + " quá 48h hoặc invalid → bỏ qua: " + res.description);
+      return true; // Coi là "done" để dọn khỏi Properties, tránh loop mãi
+    }
+    Logger.log("[deleteTelegramMsgBot_] ⚠️ Xóa thất bại msg_id=" + messageId + ": " + (res.description || JSON.stringify(res)));
+    return false;
+  } catch(e) {
+    Logger.log("[deleteTelegramMsgBot_] ❌ Exception xóa msg_id=" + messageId + ": " + e.message);
+    return false;
+  }
 }
 
 function deleteOldMessages_(chatId, msgKey) {
@@ -1034,15 +1083,84 @@ function triggerBotlookupRelay() {
 
 
 // ============================================================
-// TIỆN ÍCH CHẠY THỬ & ĐẶT TRIGGER
+// GAS 1-MINUTE TRAIN — ĐẦU TÀU GAS ĐẾM THỜI GIAN (03:30–22:00)
+// Chạy hoàn toàn độc lập trên Google Servers, không liên quan GitHub Actions.
+// Phụ trách: Luồng AW7 Summary (Tin 2) — phát hiện thay đổi và gửi ngay.
 // ============================================================
-function setupSdTrigger() {
-  // Xóa bỏ tất cả trigger chạy ngầm mỗi 1 phút để tránh tự gửi lại tin cũ
-  ScriptApp.getProjectTriggers()
-    .filter(t => t.getHandlerFunction() === "checkAndSend")
-    .forEach(t => ScriptApp.deleteTrigger(t));
-  Logger.log("✅ Đã dọn sạch trigger ngầm. Tin nhắn Site Down chỉ gửi đồng bộ khi có dữ liệu dán Cột A từ Botlookup.");
+
+/**
+ * ⏱️ Wrapper 1 phút — được gọi bởi GAS time-driven trigger.
+ * Kiểm tra khung giờ 03:30–22:00 Myanmar trước khi chạy checkAndSend().
+ */
+function checkAndSend_1min() {
+  const now    = new Date();
+  const hour   = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "H"),  10);
+  const minute = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "m"),  10);
+
+  // Khung giờ hoạt động 03:30 – 22:00 Myanmar
+  const afterStart  = (hour > 3) || (hour === 3 && minute >= 30);
+  const beforeEnd   = (hour < 22) || (hour === 22 && minute === 0);
+  if (!afterStart || !beforeEnd) {
+    Logger.log("[1min-train] 🌙 Ngoài khung giờ 03:30–22:00 MMT (" + hour + ":" + (minute < 10 ? "0" : "") + minute + ") — Bỏ qua.");
+    return;
+  }
+
+  Logger.log("[1min-train] ⏱️ " + Utilities.formatDate(now, "Asia/Rangoon", "HH:mm:ss") + " MMT — Chạy checkAndSend()...");
+  try {
+    const result = checkAndSend(false);
+    Logger.log("[1min-train] ✅ Kết quả: sent_tin1=" + result.sent_tin1 + " sent_tin2=" + result.sent_tin2);
+  } catch(ex) {
+    Logger.log("[1min-train] ❌ Lỗi: " + ex.message);
+  }
 }
+
+/**
+ * 🔧 Đặt GAS 1-Minute Trigger cho checkAndSend_1min().
+ * Chạy 1 lần duy nhất để thiết lập. Tự động dọn trigger cũ trước khi tạo mới.
+ * CÁCH CHẠY: Mở GAS Editor → chọn hàm setupGasTrain1min → Run.
+ */
+function setupGasTrain1min() {
+  // 1. Xóa tất cả trigger cũ của checkAndSend_1min và checkAndSend (legacy)
+  const deleted = [];
+  ScriptApp.getProjectTriggers().forEach(t => {
+    const fn = t.getHandlerFunction();
+    if (fn === "checkAndSend_1min" || fn === "checkAndSend") {
+      ScriptApp.deleteTrigger(t);
+      deleted.push(fn);
+    }
+  });
+  Logger.log("[setupGasTrain1min] 🗑️ Đã xóa " + deleted.length + " trigger cũ: " + deleted.join(", "));
+
+  // 2. Tạo trigger mới: mỗi 1 phút
+  ScriptApp.newTrigger("checkAndSend_1min")
+    .timeBased()
+    .everyMinutes(1)
+    .create();
+
+  // 3. Xác nhận
+  const remaining = ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction());
+  Logger.log("[setupGasTrain1min] ✅ GAS 1-Minute Train đã được tạo! Triggers hiện tại: " + remaining.join(", "));
+  Logger.log("[setupGasTrain1min] ⏰ checkAndSend_1min() sẽ chạy mỗi 1 phút, 03:30–22:00 MMT, hoàn toàn độc lập GitHub Actions.");
+}
+
+/**
+ * 🔧 Dọn sạch GAS 1-Minute Trigger (khi cần tắt tạm).
+ */
+function teardownGasTrain1min() {
+  const deleted = [];
+  ScriptApp.getProjectTriggers().forEach(t => {
+    const fn = t.getHandlerFunction();
+    if (fn === "checkAndSend_1min" || fn === "checkAndSend") {
+      ScriptApp.deleteTrigger(t);
+      deleted.push(fn);
+    }
+  });
+  Logger.log("[teardownGasTrain1min] 🛑 Đã xóa " + deleted.length + " trigger: " + deleted.join(", "));
+}
+
+// ============================================================
+// TIỆN ÍCH CHẠY THỬ
+// ============================================================
 
 // 🧪 CHẠY THỬ ĐỘC LẬP 2 LUỒNG
 function testSendNow() {
@@ -1053,4 +1171,9 @@ function testSendNow() {
   if (!sheet) return;
   processSiteDownColC(sheet);
   processSummaryAwAz(sheet);
+}
+
+// 🧪 Test 1-min wrapper độc lập
+function testCheckAndSend1min() {
+  checkAndSend_1min();
 }
