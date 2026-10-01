@@ -515,26 +515,31 @@ function triggerBot2dEta_(skipDelay) {
 // ============================================================
 // LUỒNG 2 — XỬ LÝ AW7 (TIN 2 — Bảng SUMMARY)
 // Độc lập 100% — Chỉ đọc mốc giờ ô AW7 & ghi chìa khóa TS_KEY_AW7
+// ✅ Restore logic d9f8bfd: đọc thẳng AW7, không wrapper, không freshness/A1 guard
 // ============================================================
 function processSummaryAwAz(sheet, isDirectPush) {
-  const tsKey = parseAW7Timestamp(sheet);
+  const rawVal = sheet.getRange("AW7").getValue();
+  Logger.log("[Luồng AW7] rawVal type=" + typeof rawVal + " | instanceof Date=" + (rawVal instanceof Date) + " | raw=" + String(rawVal).substring(0, 60));
+
+  let rawTs;
+  if (rawVal instanceof Date) {
+    rawTs = Utilities.formatDate(rawVal, "Asia/Rangoon", "dd/MM/yyyy HH:mm");
+  } else {
+    rawTs = String(rawVal).trim();
+  }
+
+  if (!rawTs) {
+    Logger.log("[Luồng AW7] Ô AW7 rỗng — Bỏ qua Luồng 2");
+    return false;
+  }
+
+  const m = rawTs.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
+  const tsKey = m ? m[1] : rawTs.substring(0, 16).trim();
 
   if (!tsKey) {
-    Logger.log("[Luồng AW7] Không bóc tách được timestamp từ AW7/AW6 — Bỏ qua Luồng 2");
+    Logger.log("[Luồng AW7] Không bóc tách được timestamp từ AW7 — Bỏ qua Luồng 2");
     return false;
   }
-
-  // 🛡️ CHỐT CHẶN 1: Dữ liệu AW7 không được quá 45 phút so với thời gian hiện tại
-  if (!isDirectPush && !isDataFresh_(tsKey, 45)) {
-    Logger.log("[Luồng AW7] ⚠️ Timestamp AW7 (" + tsKey + ") đã quá 45 phút so với hiện tại → Dữ liệu cũ, bỏ qua không gửi Tin 2!");
-    return false;
-  }
-
-
-  // ✅ AW7 ĐỘC LẬP 100% — KHÔNG SO SÁNH VỚI CỘT A
-  // AW7 là bảng Summary cập nhật thủ công/độc lập, không phụ thuộc thời điểm relay cào Cột A.
-  // Chỉ cần AW7 có timestamp MỚI hơn lần gửi trước (TS_KEY_AW7) là đủ điều kiện gửi.
-
 
   const props  = PropertiesService.getScriptProperties();
   const lastTs = props.getProperty(TS_KEY_AW7) || "";
@@ -542,14 +547,16 @@ function processSummaryAwAz(sheet, isDirectPush) {
   // 🔍 DEBUG: Log so sánh cụ thể
   Logger.log("[Luồng AW7] tsKey=[" + tsKey + "] lastTs=[" + lastTs + "] match=" + (tsKey === lastTs));
 
-  // 🛑 DEDUP: Nếu timestamp AW7 không đổi → bỏ qua (đã gửi rồi)
+  // 🛑 DEDUP: Timestamp AW7 không đổi → bỏ qua. Timestamp mới → GỬI NGAY.
+  // Không freshness check, không so sánh A1 — AW7 độc lập 100%.
   if (tsKey === lastTs && !isDirectPush) {
     Logger.log("[Luồng AW7] Timestamp AW7 không đổi (" + tsKey + ") → Bỏ qua Luồng 2");
     return false;
   }
 
-  // ✅ Timestamp mới và hợp lệ → gửi
-  Logger.log("[Luồng AW7] 🆕 Timestamp mới: " + tsKey + " (cũ: " + lastTs + ") → Đủ điều kiện gửi Tin 2!");
+  // ✅ Timestamp mới → gửi ngay
+  Logger.log("[Luồng AW7] 🆕 Timestamp mới: " + tsKey + " (cũ: " + lastTs + ") → Gửi ngay!");
+
 
   // ✅ Đọc trực tiếp bảng AW:AZ và gửi nguyên vẹn 100% thông tin có trong ô (thêm Icon)
   let awaz = readAwAz(sheet);
