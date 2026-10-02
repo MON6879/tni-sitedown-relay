@@ -112,6 +112,10 @@ jobs:
           curl -s -f "https://tni-bot.vercel.app/api/attendance" || true
           curl -s -L "https://script.google.com/macros/s/AKfycbzSz_ISXgertxBDadw4BBQX1JdMjW650_o4He0o4Lh-uf1hV5O3YaE-ohlqI2CHyAcVFg/exec?action=get_headers" || true
 
+          echo "9️⃣ Refuel Collector Bot (@TNI_REFUEL_BOT)..."
+          curl -s -f "https://api.telegram.org/bot8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME/getWebhookInfo" || true
+          curl -s -f "https://tni-bot.vercel.app/api/refuel_collector" || true
+
           echo "✅ Keepalive done"
 
       # ═══════════════════════════════════════════════
