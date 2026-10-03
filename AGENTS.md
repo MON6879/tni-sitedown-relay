@@ -2170,3 +2170,33 @@ Reason: [Lý do]`
 > - **Root Cause 1**: Báo cáo kiểm toán `build_master_audit_report()` trước đây chỉ hiển thị danh sách các ghế giám sát khi 0 lỗi & 0 cảnh báo. Khi có cảnh báo nhỏ (như WO Hoarding), danh sách các ghế giám sát bị ẩn mất, khiến người dùng không biết các ghế khác có hoạt động hay không.
 > - **Root Cause 2**: Khi thêm `notify_desktop()` bằng replace file ở phiên trước, hàm cốt lõi `send_report_telegram()` đã bị vô tình xóa đè, gây nguy cơ NameError lúc gửi báo cáo.
 > - **Rule**: Trong báo cáo kiểm toán hàng ngày của Toa Auditor (Ghế AUDITOR-9.1), BẮT BUỘC luôn luôn hiển thị khối trạng thái toàn bộ 10+ Ghế Giám Sát hệ thống với tick xanh ✅ cho các ghế đang hoạt động bình thường. Khi thêm/sửa bất kỳ hàm tiện ích nào, BẮT BUỘC kiểm tra hàm vận hành cốt lõi `send_report_telegram()` còn nguyên vẹn và kiểm tra `hasattr` trước khi bàn giao.
+
+> **PM-71 (02/10/2026) — ES6 Temporal Dead Zone (TDZ) & Undefined Variable Crash in Portal Runtime (Zero Uncaught Runtime Exception Policy)**:
+> - **Root Cause**:
+>   1. Trong `tni_sale.html`, hàm `applyLang(currentLang)` được gọi ở dòng 8394 trong khi các hằng số `SYSTEM_MODULES`, `ROLES`, `DEFAULT_STAFF_USERS` lại khai báo bằng `const` ở dòng 8589+. `applyLang` gọi `renderRBACMatrix` -> truy cập `SYSTEM_MODULES` khi chưa được khai báo -> JS ném `ReferenceError: Cannot access 'SYSTEM_MODULES' before initialization` (TDZ). Toàn bộ luồng khởi tạo script bị đứt gãy ngay từ lúc tải trang.
+>   2. Trong hàm `renderRBACMatrix()`, biến `overrides` được sử dụng (`overrideKey in overrides`) nhưng hoàn toàn không được khai báo -> ném `ReferenceError: overrides is not defined`. Lỗi này làm ngắt hàm, khiến các hàm render sau nó (`renderStaffUsersTable` và `populateStaffUserSelect`) không bao giờ được gọi -> giao diện trắng tinh.
+>   3. Mảng rỗng `[]` trong JavaScript là Truthy, nên cú pháp `DB.g('staff_directory') || DEFAULT_STAFF_USERS` nhận `[]` chứ không fallback về `DEFAULT_STAFF_USERS`.
+> - **Rule**:
+>   1. **Khóa Thép Thứ Tự Khai Báo (Zero Top-Level TDZ)**: Mọi hằng số danh mục cấu hình hệ thống (`ROLES`, `SYSTEM_MODULES`, `DEFAULT_STAFF_USERS`) BẮT BUỘC phải được khai báo TRƯỚC mọi hàm khởi tạo giao diện gọi đến chúng. Tuyệt đối không gọi các hàm render bảng dữ liệu bên trong hàm đổi ngôn ngữ `applyLang` trừ khi tab đó đang thực sự mở (`classList.contains('on')`).
+>   2. **Khai Báo Đầy Đủ Biến & Bọc Try/Catch Độc Lập Cho Từng Component**: Mọi hàm render component con (`matrix`, `staffTable`, `userSelect`) trong các tab quản trị BẮT BUỘC phải được bọc `try/catch` riêng biệt. Sự cố của 1 component không bao giờ được phép làm sập việc hiển thị của các component khác.
+>   3. **Fallback Cho Mảng Rỗng**: Khi kiểm tra dữ liệu từ cache LocalStorage hoặc API, BẮT BUỘC dùng `(cached && cached.length > 0) ? cached : DEFAULT_VALUES`, TUYỆT ĐỐI CẤM dùng `cached || DEFAULT` vì `[]` là truthy trong JS.
+
+> **PM-72 (03/10/2026) — Ký Gởi / Bán Sỉ Bulk Import Zero Cost-Price Leakage & Smart Inventory Auto-Link Policy**:
+> - **Requirement & Context**: Phân hệ Ký Gởi (`s-kygoi`) phục vụ nhân viên kinh doanh, điểm bán và đối tác gửi hàng. Nhân viên/đối tác lập file import KHÔNG ĐƯỢC PHÉP và KHÔNG CẦN BIẾT giá vốn gốc (83%). File import CHỈ yêu cầu: `Điểm Bán`, `Người Nhận`, `SĐT`, `Tên SP`, `Model`, `Số Lượng`, `Giá Bỏ Sỉ Hoặc Ký Gởi`, `Hạn (ngày)`, `Ghi Chú`.
+> - **Rule**:
+>   1. **Tuyệt Đối Giấu Cột Giá Gốc Khỏi File Mẫu Ký Gởi / Bán Sỉ (Zero Cost In Consignment Import)**: File template và khung dán của Ký Gởi TUYỆT ĐỐI KHÔNG chứa cột giá gốc đầu vào.
+>   2. **Cơ Chế Khớp Kho Thông Minh (Smart Inventory Auto-Link)**: Hệ thống tự động đối chiếu `Model` hoặc `Tên SP` với danh mục nhập kho (`DB.g('nhap')`) để tự động gán `spId`, `spN`, và `giagoc` ngầm phục vụ tính toán tài chính (hoa hồng 17% điểm bán & lợi nhuận công ty). Nếu là sản phẩm mới chưa có trong kho, tự động tạo mã và gán cờ `⚠️ SP Mới` mà không chặn người dùng import.
+>   3. **Chuẩn UX Đồng Nhất 2 Chế Độ (Single & Bulk Mode Parity)**: Mọi phân hệ có chức năng import hàng loạt BẮT BUỘC có thanh chuyển đổi chế độ (`➕ Tạo Đơn Lẻ` vs `📥 Import Hàng Loạt`), nút tải file mẫu chuẩn UTF-8 CSV BOM, khung dán từ Excel, khối thống kê nhanh và bảng xem trước (preview) kèm badge kiểm tra tính hợp lệ trước khi xác nhận lưu.
+
+
+> **PM-R4 (03/10/2026) — Hòa Chung Kênh Bán Hàng Web và Telegram (Unified Sales SSOT Policy)**:
+> - **Root Cause**: Phân hệ Bán Hàng trước đây bị chia cắt thành 2 luồng độc lập: Web UI lưu vào tab `Ban Hang` (qua `sale_backend.gs`), trong khi Telegram Bot lại lưu vào các tab riêng `Sales Record` / `Sales to dealers` (qua `TNI Sale.js`). Hậu quả là đơn hàng chốt trên Telegram không xuất hiện trên Web UI (Lịch Sử Bán Hàng bị rỗng), còn đơn bán trên Web thì không gửi thông báo cho đội ngũ trên Telegram.
+> - **Rule**: Mọi đơn bán hàng phát sinh từ Telegram (bán lẻ, bán sỉ đại lý, ký gởi) BẮT BUỘC phải được hàm `saveOrderToSheet` tự động đồng bộ chèn dòng trực tiếp vào tab `Ban Hang` (với `source = 'telegram'`) để Web UI đọc được ngay lập tức. Ngược lại, khi Web UI xuất kho qua `saleAdd_`, BẮT BUỘC gọi `notifyTelegramNewSale_` để bắn thông báo tự động lên Telegram Group bán hàng.
+
+> **PM-73 (03/10/2026) — Cơ Chế Mở: Dynamic Template Thu Thập Bán Hàng & Khảo Sát Tự Động Theo Tab Template Sale & Xóa Tin Telegram (Dynamic Template SSOT & Auto-Clean Protocol)**:
+> - **Yêu Cầu & Bối Cảnh**: Người dùng yêu cầu cơ chế mở 100%: mọi mẫu tin nhắn khảo sát, tiếp xúc khách hàng, bán hàng, ký gởi, bảo hành được cấu hình trực tiếp trong Tab `Template Sale` trên Google Sheet. Khi người dùng thêm, bớt, xóa, sửa mẫu trên Sheet thì toàn bộ hệ thống Bot và Web phải tự động nhận diện và cập nhật mà không cần sửa code.
+> - **Quy Trình Chuẩn (3 Bước Tự Động)**:
+>   1. **Dynamic Engine (SSOT)**: GAS `getDynamicSaleTemplates_()` và `templateSaleGet_()` tự động đọc các dòng dạng `Tên Mẫu : Cột 1 | Cột 2 | Cột 3` trong tab `Template Sale`.
+>   2. **Thu Thập & Xóa Tin Telegram**: Khi nhân viên gửi tin nhắn theo Template vào nhóm Telegram, Bot tự động bóc tách dữ liệu -> chèn vào **dòng 2** của Sheet đích tương ứng -> gọi Telegram API `deleteMessage` xóa sạch tin nhắn gốc của nhân viên trên nhóm -> bắn phản hồi xác nhận 2 dòng chuẩn.
+>   3. **Đồng Bộ Web Realtime**: Web `sale.html` bổ sung tab `📋 Mẫu Gửi Telegram` trong menu CRM & Survey, tự động pull danh sách mẫu từ Sheet kèm nút bấm "Sao Chép Mẫu" một chạm. Khi nhân viên mở các tab Bán Hàng, Khảo Sát, Tiếp Xúc, Web tự động pull dữ liệu sống từ Sheet để hiển thị ngay lập tức.
+
