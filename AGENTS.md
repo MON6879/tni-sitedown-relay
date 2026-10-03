@@ -143,7 +143,12 @@ bac) BẮT BUỘC chỉ nằm trong danh sách được phép (llowedTabs) củ
 bac.
 > 4. **Tự Động Nhận Diện Vai Trò Theo Nhân Sự (Staff Auto-Role Resolution & Safe Fallback)**: Khi mở trang bằng tham số link cá nhân hóa (?staff=... hoặc ?email=...), hệ thống BẮT BUỘC tra cứu danh bạ nhân sự (staff_directory) để gán chính xác vai trò tương ứng của nhân viên đó. Nếu truy cập trang công khai không có tham số xác thực, vai trò mặc định an toàn BẮT BUỘC là sales (không tự ý gán dmin).
 
-> 5. **Đồng Bộ 2 Chiều SSOT Nhân Sự Web UI <-> Google Sheet (Strict Staff Directory Bi-Directional SSOT)**: Mọi thao tác quản lý nhân sự (Thêm mới, Cập nhật thông tin, Gán/Đổi vai trò, Xóa nhân sự, Import/Reset) trên Web UI BẮT BUỘC phải đồng bộ trực tiếp 2 chiều với Google Sheet tab staff (Sheet ID: 1s-V0owHlwub4qrCxTUvKmXp4PWZthzk5oKhi5m_wQBA) qua endpoint staff_save. TUYỆT ĐỐI CẤM chỉ lưu localStorage cục bộ hoặc rào cản token client-side khiến dữ liệu không vào Google Sheet. Ngược lại, khi người dùng nhập dữ liệu trực tiếp bằng tay trên Google Sheet (dù dùng tiêu đề cột tiếng Việt hay tiếng Anh), Backend Apps Script (staffGet_) BẮT BUỘC phải nhận diện cột thông minh và tự động map chuẩn hóa để Web UI đồng bộ sống 100%.
+> 5. **Đồng Bộ 2 Chiều SSOT Nhân Sự Web UI <-> Google Sheet & Tự Động Thêm Mới / Xóa Nghỉ Việc (Strict Staff Directory Live SSOT & Auto-Sync Policy)**:
+>    - **Nguồn Dữ Liệu Nhân Sự Sống (SSOT Source)**: Tab `input HR` (GID `255709958`, Spreadsheet `1s-V0owHlwub4qrCxTUvKmXp4PWZthzk5oKhi5m_wQBA`) là nguồn duy nhất ghi nhận danh sách nhân sự thực tế.
+>    - **Tự Động Cập Nhật Mặc Định (Auto Add New with Default Role Sales)**: Bất kỳ nhân sự mới nào được thêm vào tab `input HR`, hệ thống BẮT BUỘC tự động ghi nhận vào danh bạ và gán vai trò mặc định ban đầu là `sales` (Kinh Doanh), để Ban Giám Đốc tự do điều chỉnh sau. Riêng nhân sự có chức danh `HR and Finance` được tự động gán `finance`.
+>    - **Tự Động Triệt Tiêu Nhân Viên Nghỉ Việc (Auto Purge Resigned Staff)**: Nếu một nhân sự bị xóa khỏi bảng tính trên Google Sheet (nghỉ việc), hệ thống BẮT BUỘC tự động nhận diện và xóa hoàn toàn khỏi danh bạ Web UI, không để lại dữ liệu rác hay hàng trống.
+>    - **Bảo Lưu Phân Quyền Đã Điều Chỉnh (Preserve Custom Overrides)**: Khi đồng bộ dữ liệu mới, hệ thống BẮT BUỘC bảo lưu các vai trò mà Ban Giám Đốc đã tùy chỉnh trước đó, không được tự ý ghi đè lại về `sales`.
+>    - **Ghế Giám Sát Tự Động (SUPERVISOR-HR-SYNC)**: Cả Web UI (`sale.html`) và Backend Apps Script (`staffGet_`) cùng giám sát chặt chẽ luồng đồng bộ, bảo đảm dữ liệu luôn tươi mới 100%.
 
 ---
 
@@ -2145,6 +2150,17 @@ Reason: [Lý do]`
 > 2. **Chẩn đoán nhanh**: Nếu Task Scheduler báo `LastResult: 0x80070002` = "file not found" nhưng chạy tay OK → 100% là lỗi user account, không phải lỗi script.
 > 3. **Chạy .ps1 từ CMD Admin**: Dùng `powershell -ExecutionPolicy Bypass -File "path\script.ps1"`. TUYỆT ĐỐI CẤM dùng `& "path\script.ps1"` từ CMD vì `&` là toán tử PowerShell, CMD sẽ báo lỗi "& was unexpected".
 > 4. **File liên quan**: `D:\6. AI\1. QLTC\ICT Fetch\update_task.ps1` — đã cập nhật LogonType Interactive. Khi cần re-register task ICT, chạy file này bằng CMD Admin.
+
+> ### 🔴 RULE PM-68: ĐỒNG BỘ SLIDE CẨM NANG TỪ GOOGLE PRESENTATION & GHẾ GIÁM SÁT SENTINEL-GUIDE-SYNC (STRICT GUIDE PRESENTATION DYNAMIC SYNC & SENTINEL PURGE POLICY)
+> **Root Cause (Sự Cố 03/10/2026)**:
+> 1. Khi tài liệu trình chiếu Google Presentation (Slide Traing - Google Slides, ID 1UqHw1AzsKM-U-I5rhBTdqqSokeTuukrE_vsrL6xB2uI) được cập nhật, xóa slide cũ (giảm từ 44 slide xuống 41 slide), Web Portal (executive_dashboard.html) và thư mục tĩnh ssets/guide_slides/ vẫn lưu các file slide ảnh cũ (slide_42.jpg, slide_43.jpg, slide_44.jpg, ảnh Drive cũ tại slide 8).
+> 2. Trình duyệt client cache ảnh theo URL tĩnh, dẫn đến giao diện hiển thị hình ảnh slide đã bị xóa trên Google Slide, gây nhầm lẫn quy trình vận hành hiện trường.
+> 3. Một số slide bị tác giả kéo đồ họa tràn viền âm (off-canvas như Slide 4 cột 1) khiến render trang thông thường làm mất một phần đồ họa.
+>
+> **Biện Pháp Phòng Ngừa Kỷ Luật Thép (Bắt Buộc)**:
+> 1. **Đối Chiếu Số Lượng Slide Tuyệt Đối & Dọn Sạch File Cũ (Absolute Count Match & Stale File Purge)**: Khi đồng bộ từ Google Presentation, BẮT BUỘC phải đọc trực tiếp số lượng slide thực tế từ file export PDF mới nhất. Nếu tổng số slide giảm, BẮT BUỘC phải xóa sạch các file ảnh slide thừa cũ (slide_N.jpg với N > total) trên cả 3 thư mục ssets/guide_slides/ (root, 	ni-search, Task and WO). TUYỆT ĐỐI CẤM để lại file slide cũ gây sai lệch.
+> 2. **Khai Thác Ghế Giám Sát SENTINEL-GUIDE-SYNC & Nút Đồng Bộ Live (Supervisory Sentinel & Cache-Busting)**: BẮT BUỘC duy trì ghế giám sát SENTINEL-GUIDE-SYNC trong trung tâm điều hành supervisory-sentinel-card và tích hợp nút [Đồng Bộ Slide Mới] trên giao diện Guide For Staff. Hàm đồng bộ syncGuideSlidesLive() BẮT BUỘC đính kèm query string timestamp ?t=Date.now() vào thẻ <img> để buộc trình duyệt tải lại ảnh 2K mới nhất 100%, xóa bỏ triệt để cache cũ trên thiết bị của kỹ sư hiện trường.
+> 3. **Bảo Tồn Toàn Vẹn Đồ Họa Không Bị Cắt (Lossless Unclipped Graphic Extraction)**: Với các slide đồ họa bị kéo ra ngoài khung viền trắng (off-canvas âm như Slide 4 cột 1), BẮT BUỘC trích xuất đối tượng đồ họa gốc (raw graphic object xref) thay vì chụp trang (page pixmap) để giữ nguyên vẹn 100% cột và nội dung.
 
 
 ---
