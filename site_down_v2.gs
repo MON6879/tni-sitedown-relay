@@ -225,12 +225,12 @@ function doGet(e) {
       }
       const sdTokenNew = props.getProperty("SD_BOT_TOKEN") || "";
 
-      // Dọn dẹp tất cả trigger checkAndSend cũ (nếu có)
+      // Dọn dẹp tất cả trigger checkAndSend & checkAndSend_1min cũ (nếu có)
       const deletedTriggers = [];
       const allTriggers = ScriptApp.getProjectTriggers();
       for (let i = 0; i < allTriggers.length; i++) {
         const handlerName = allTriggers[i].getHandlerFunction();
-        if (handlerName === "checkAndSend") {
+        if (handlerName === "checkAndSend" || handlerName === "checkAndSend_1min") {
           deletedTriggers.push(handlerName);
           ScriptApp.deleteTrigger(allTriggers[i]);
         }
@@ -246,6 +246,12 @@ function doGet(e) {
         deleted_legacy_triggers: deletedTriggers,
         remaining_triggers: remainingTriggers
       });
+    }
+
+    if (action === "teardown_gas_train") {
+      teardownGasTrain1min();
+      const remaining = ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction());
+      return _json({ ok: true, action: "teardown_gas_train", remaining_triggers: remaining });
     }
 
     if (action === "get_note_b2b5") {
@@ -844,7 +850,9 @@ function sendOrEditTelegram(chatId, text, msgKey, tag) {
   const props  = PropertiesService.getScriptProperties();
   const idKey  = "SD_MSGID_" + msgKey;
   const newIds = sendTelegramCollectIds_(chatId, text, tag);
-  props.setProperty(idKey, JSON.stringify(newIds));
+  const currentUnremoved = getSavedMsgIds_(msgKey);
+  const combinedIds = Array.from(new Set([...currentUnremoved, ...newIds]));
+  props.setProperty(idKey, JSON.stringify(combinedIds));
 }
 
 function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
@@ -859,7 +867,9 @@ function sendOrEditTelegramPre(chatId, plainContent, msgKey, tag) {
   deleteOldMessages_(chatId, msgKey);
   Utilities.sleep(200);
   const newIds = sendTelegramPreCollectIds_(chatId, plainContent, tag);
-  props.setProperty(idKey, JSON.stringify(newIds));
+  const currentUnremoved = getSavedMsgIds_(msgKey);
+  const combinedIds = Array.from(new Set([...currentUnremoved, ...newIds]));
+  props.setProperty(idKey, JSON.stringify(combinedIds));
 }
 
 function editTelegramMsg_(chatId, messageId, text, parseMode, tag) {
@@ -927,7 +937,7 @@ function sendTelegramPreCollectIds_(chatId, plainContent, tag) {
         Logger.log(tag + " ⚠️ <pre> send fail: " + (res.description || "error") + " -> retry plain text");
         const resp2 = UrlFetchApp.fetch(url, {
           method: "post", contentType: "application/json",
-          payload: JSON.stringify({ chat_id: chatId, text: plainContent }),
+          payload: JSON.stringify({ chat_id: chatId, text: chunk }),
           muteHttpExceptions: true,
         });
         const res2 = JSON.parse(resp2.getContentText());
@@ -987,18 +997,29 @@ function deleteTelegramMsgBot_(chatId, messageId) {
 }
 
 function deleteOldMessages_(chatId, msgKey) {
+  const remainingIds = [];
   try {
     const oldIds = getSavedMsgIds_(msgKey);
     for (let i = 0; i < oldIds.length; i++) {
-      deleteTelegramMsgBot_(chatId, oldIds[i]);
+      const mid = oldIds[i];
+      const ok = deleteTelegramMsgBot_(chatId, mid);
+      if (!ok) {
+        remainingIds.push(mid);
+      }
     }
   } catch(e) {
-    Logger.log("[deleteOldMessages_] ⚠️ Lỗi xóa tin cũ: " + e.message);
-  } finally {
-    try {
-      PropertiesService.getScriptProperties().deleteProperty("SD_MSGID_" + msgKey);
-    } catch(e) {}
+    Logger.log("[deleteOldMessages_] ⚠️ Lỗi xóa tin cũ (" + msgKey + "): " + e.message);
   }
+
+  try {
+    const idKey = "SD_MSGID_" + msgKey;
+    if (remainingIds.length === 0) {
+      PropertiesService.getScriptProperties().deleteProperty(idKey);
+    } else {
+      PropertiesService.getScriptProperties().setProperty(idKey, JSON.stringify(remainingIds.slice(-10)));
+      Logger.log("[deleteOldMessages_] ⚠️ Còn " + remainingIds.length + " msg_id chưa xóa được, lưu lại để retry lần sau: " + JSON.stringify(remainingIds));
+    }
+  } catch(e) {}
 }
 
 function colorizeTeams(text) {

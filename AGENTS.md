@@ -18,7 +18,7 @@
 # 🚂 STRICT SINGLE-TRAIN RULE: 1 ĐOÀN TÀU THỜI GIAN TUẦN TỰ DUY NHẤT — TUYỆT ĐỐI CẤM TỰ Ý TÁCH WORKFLOW / TÁCH CRON RIÊNG (STRICT SINGLE UNIFIED SEQUENTIAL TRAIN POLICY)
 
 > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SINGLE UNIFIED SEQUENTIAL TRAIN POLICY)**:
-> 1. **1 Đoàn Tàu Thời Gian Tuần Tự Duy Nhất (Single Sequential Train Engine)**: Toàn bộ các tác vụ định kỳ của hệ thống bao gồm: **Toa Site Down Relay (:06 / :36 MMT)**, Keepalive ping, Report 1, 2, 3, 4, 5A, 5B, 5C, 6, 6.1, Refuel (Request, P1, P2, P4, Read), Auditor 9.1, Toa ETA và **Toa Sale Summary (11:30 & 17:30 MMT)** BẮT BUỘC phải nằm trong **1 WORKFLOW DUY NHẤT** (`train_5min.yml`), chạy trên **1 MÁY ẢO DUY NHẤT** tại mỗi nhịp 5 phút.
+> 1. **1 Đoàn Tàu Thời Gian Tuần Tự Duy Nhất (Single Sequential Train Engine)**: Toàn bộ các tác vụ định kỳ của hệ thống bao gồm: **Toa Site Down Relay (:06 / :36 MMT)**, Keepalive ping, Report 1, 2, 3, 4, 5A, 5B, 5C, 6, 6.1, Refuel (Request, P1, P2, P4, Read), Auditor 9.1, Toa ETA và **Toa Sale Summary (17:30 MMT)** BẮT BUỘC phải nằm trong **1 WORKFLOW DUY NHẤT** (`train_5min.yml`), chạy trên **1 MÁY ẢO DUY NHẤT** tại mỗi nhịp 5 phút.
 > 2. **Chạy Tuần Tự Từng Toa (Sequential Execution — Zero Parallel Collisions)**: Mọi Toa trong Tàu chạy theo thứ tự từ trên xuống dưới trên cùng một máy ảo runner. Khi Toa Site Down chạy thì các Toa khác chờ; Toa Site Down xong mới đến các Toa tiếp theo. **1 tài khoản Telegram duy nhất** được dùng an toàn 100%, không bao giờ có 2 tiến trình MTProto kết nối cùng lúc từ 2 IP khác nhau.
 > 3. **TUYỆT ĐỐI CẤM Tự Ý Tách Workflow / Tách Cron Riêng (Zero Independent Split Workflows)**:
 >    - AI TUYỆT ĐỐI CẤM tự ý tách bất kỳ phân hệ nào (Site Down, Refuel, Report, Sale...) ra thành một workflow `.github/workflows/*.yml` độc lập có cron schedule riêng hay tạo Google Apps Script time-driven trigger riêng (ví dụ: `setupSalesTrainTrigger`). Toàn bộ logic định kỳ của Sale BẮT BUỘC tích hợp vào hàm trung tâm `dispatchTrain5Min()` và workflow `train_5min.yml`.
@@ -177,6 +177,11 @@ bac.
 > 2. **Logger.log Nội Bộ Được Phép Tiếng Việt**: Chỉ có `Logger.log()` (log nội bộ dành cho developer kiểm tra trên Apps Script Execution Log) mới được phép dùng tiếng Việt hoặc song ngữ. Đây là log kỹ thuật KHÔNG hiển thị cho nhân viên!
 > 3. **Kiểm Tra Trước Khi Deploy**: Trước mỗi lần deploy hoặc cập nhật code, BẮT BUỘC phải rà soát 100% các chuỗi `sendSingleTelegramMessage_`, `sendTelegramMessageCollectIds_`, `UrlFetchApp.fetch(... /sendMessage ...)` để đảm bảo không còn bất kỳ ký tự tiếng Việt nào trong nội dung tin nhắn!
 > 4. **Attendance GAS — Toàn Bộ Báo Cáo & Template BẮT BUỘC Tiếng Anh (Attendance English-Only)**: Mọi nội dung Bot gửi vào group 10 (TNI DAILY ADDTENDANCE `-5465634644`) và các group T1-T4/CONTROL bao gồm: daily status template (Working/Take Leave/Not report), báo cáo 09:00, thông báo lỗi (`Error: ...` không phải `Lỗi: ...`), membership summary — BẮT BUỘC 100% tiếng Anh. **Scan bắt buộc trước deploy**: `Select-String -Path "apps_script_attendance\TNI attendance.js" -Pattern "sendTelegramMessage_|sendTgMsg" | % { $_.Line }` — kiểm tra không có ký tự UTF-8 tiếng Việt trong payload.
+> 5. **RULE PM-30 — Chống Ép Kiểu Date Object Thành Chuỗi Cụt Khi Đọc Cột Giờ / Ngày (GAS getValues Date Coercion Resilience)**: Trong Google Apps Script, khi gọi `getValues()`, các ô được định dạng Giờ (Time, ví dụ `08:32`) hoặc Ngày (Date) trong Google Sheets sẽ được chuyển thành native `Date` object (`Sat Dec 30 1899 08:32:00...`). Nếu dùng `String(r[2]).match(/^(\d{1,2}):(\d{2})/)` sẽ trả về `null` vì chuỗi bắt đầu bằng `"Sat"`, làm sai toàn bộ slot tính giờ và đưa nhân viên về slot `after` (Work = 0). BẮT BUỘC phải trích xuất giờ an toàn: `var timeRaw = (r[2] instanceof Date) ? Utilities.formatDate(r[2], tz, "HH:mm") : String(r[2] || "").trim();`.
+> 6. **RULE PM-31 — Khóa Tuần Hiện Tại Bắt Đầu Từ Ngày Đầu Tháng (Current Month Week-Clip Policy)**: Trong báo cáo điểm danh theo tuần và tháng (`Today / Yest / Day-3 / Week / Month`), khi tuần rơi vào thời điểm giao thoa giữa 2 tháng (ví dụ: thứ 2 ngày 28/09 đến thứ 7 ngày 03/10), số liệu Tuần (`Week`) BẮT BUỘC CHỈ ĐƯỢC TÍNH các ngày thuộc về tháng hiện tại (`dObj >= weekStart && weekStart = max(rawWeekStart, monthStart)`). TUYỆT ĐỐI CẤM để số liệu tuần tính lấn sang các ngày của tháng trước khiến tổng tuần lớn hơn tổng tháng (`Week > Month`, ví dụ `Week: 6 / Month: 3`) gây vô lý và hiểu lầm về dữ liệu điểm danh!
+> 7. **RULE PM-32 — Tự Động Phân Mảnh Báo Cáo Dài & Xóa Đa ID Chống Lỗi Telegram 400 Message Too Long (Telegram 4096-Char Limit & Auto-Chunking Resilience)**: Giới hạn độ dài 1 tin nhắn Telegram là 4096 ký tự. Khi báo cáo tổng hợp (như nhóm CONTROL gồm toàn bộ công ty nhiều bộ phận + danh sách chưa tham gia) vượt quá 4000 ký tự, `sendMessage` sẽ báo lỗi `Bad Request: message is too long` (HTTP 400) và làm sập việc gửi tin. BẮT BUỘC:
+>    - (a) Hàm gửi báo cáo phải tích hợp sẵn bộ cắt mảnh an toàn `splitReportChunks_(text, 3800)` cắt theo dòng, nếu $>1$ phần thì thêm tiêu đề `[Part X/Y]`.
+>    - (b) Hàm `deleteTgMessage_` BẮT BUỘC phải hỗ trợ xóa chuỗi đa ID (phân tách bởi dấu phẩy `,`) để khi cập nhật chuỗi tin nhắn nhiều phần thì toàn bộ các phần cũ đều được xóa sạch không để lại tin nhắn mồ côi.
 
 ---
 
@@ -2163,6 +2168,37 @@ Reason: [Lý do]`
 > 3. **Bảo Tồn Toàn Vẹn Đồ Họa Không Bị Cắt (Lossless Unclipped Graphic Extraction)**: Với các slide đồ họa bị kéo ra ngoài khung viền trắng (off-canvas âm như Slide 4 cột 1), BẮT BUỘC trích xuất đối tượng đồ họa gốc (raw graphic object xref) thay vì chụp trang (page pixmap) để giữ nguyên vẹn 100% cột và nội dung.
 
 
+
+> ### 🔴 RULE PM-69: BỌC THÉP ĐOÀN TÀU SALE — KHÔNG SECRET TRONG SOURCE, KHÔNG ENDPOINT GHI CÔNG KHAI, MỌI GHI SHEET PHẢI CÓ LOCK + ESCAPE + AUDIT (STRICT SALE TRAIN HARDENING POLICY)
+> **Root Cause (Sự Cố 03/10/2026 — 4 chuyên gia rà soát + phúc tra live)**:
+> 1. **Secret hardcode làm fallback**: `|| '<bot-token>'` trong `sale_backend.gs` (3 chỗ), `train_5min.yml` (3 chỗ, 2 bot), `sale_summary_report.py`. Token Sale **trùng token bot Site Down Relay** (`8647102342`) nên một lần lộ là lộ cả hai phân hệ.
+> 2. **`staff_save` / `staff_delete` / `staff_get` public, không xác thực** + `staffSavePublic_` `clearContents()` rồi ghi lại từ danh sách do client gửi → danh sách rỗng/cũ làm mất toàn bộ nhân sự.
+> 3. **TDZ**: `ss` dùng trước `const ss` trong `handleTelegramSaleCollect_` → `catch` nuốt lỗi → mọi đơn bị gán sai team `Dawei`.
+> 4. **Xác thực lỏng**: `g.email === token.split(':')[0]` — chỉ cần biết email là qua auth. `SALE_API_KEY` chưa đặt trong Script Properties nên API có token trả 500 (chưa từng chạy được trên production).
+> 5. **Không LockService**, id `Date.now()` trùng, `saleAdd_` (cột `id`) và Telegram (`_id`) lệch khóa nên `update/delete` không thấy dòng Telegram; `_ts` lẫn UTC và MMT.
+> 6. **Không escape**: `parse_mode:HTML` với dữ liệu người nhập; `sale.html` ghi `u.name` thẳng vào `innerHTML` và `onclick="deleteStaffUser('${name}')"` (XSS qua tên nhân sự).
+>
+> **Quy Tắc Bắt Buộc**:
+> 1. **CẤM literal secret** (bot token, API key, PIN) trong `.gs/.py/.yml/.html/.md`. Chỉ đọc `ScriptProperties` (GAS) hoặc `${{ secrets.X }}` (Actions). Hàm lấy token chỉ trả `''` + log khi thiếu, TUYỆT ĐỐI CẤM `|| '<literal>'`. Trước khi thêm bot mới: kiểm token đó có dùng chung với phân hệ khóa thép (Site Down) không — nếu có thì xoay token cần `UNLOCK STEEL`.
+> 2. **Endpoint ghi dữ liệu nhạy cảm (`staff_*`, `sale_*`, `telegram_sale_collect`) CẤM public thuần**: bắt buộc ≥1 lớp: token hợp lệ khớp `g.token` (CẤM khớp theo email), hoặc bằng chứng PIN phía server (`SALE_ADMIN_PIN_HASH` + khóa 5 lần/10 phút), hoặc secret webhook (`SALE_COLLECT_SECRET`, fail-closed khi chưa cấu hình).
+> 3. **Ghi đè cả tab (`clearContents`) chỉ khi**: (a) danh sách không rỗng, (b) đã chụp snapshot sang tab `*_backup`, (c) nằm trong `LockService.getScriptLock()`. CẤM ghi đè từ dữ liệu cache client mà không có 3 điều kiện này.
+> 4. **Mọi hàm ghi Sheet** dùng `withScriptLock_`, id sinh bằng `uniqueId_()` (CẤM `Date.now()` trần), `_ts` luôn `Asia/Yangon` dạng `yyyy-MM-dd HH:mm:ss`, giá trị chuỗi đi qua `sanitizeCell_` (chặn formula injection), cột hệ thống `id/_ts/_by/_id` bất biến khi update, mỗi lần sửa/xóa ghi tab `Sale Audit`.
+> 5. **Mọi chuỗi người dùng vào Telegram HTML hoặc `innerHTML`** BẮT BUỘC qua `escHtml_()` (GAS) / `escH_()` (web). Với handler inline dùng `escH_(JSON.stringify(v))`, CẤM nối `'${name}'` vào `onclick`.
+> 6. **Biến dùng trước khai báo (`const`)**: khi thêm khối `try/catch` quanh logic mới, BẮT BUỘC khai báo mọi biến dùng trong khối đó TRƯỚC khối; CẤM `catch` chỉ `Logger.log` mà không kiểm tra giá trị mặc định có làm sai dữ liệu (như gán nhầm team).
+> 7. **Cấu hình thiếu phải báo rõ** (`Server auth not configured`), CẤM trả `500 Internal error` che nguyên nhân. Sau khi deploy GAS bảo mật, BẮT BUỘC chạy kiểm tra live: không token → 401, email-only → từ chối, `staff_save` rỗng → 400, `telegram_sale_collect` không secret → 403.
+> 8. **Hai bản HTML cùng chức năng (`sale.html`, `tni_sale.html`) CẤM lệch nhau**; sửa một bản thì đồng bộ bản kia và `Task and WO`, kiểm `Get-FileHash` giống nhau.
+> 9. **Thao tác thủ công còn lại sau PM-69** (AI không làm thay được): đặt `SALE_API_KEY`, `SALE_ADMIN_PIN_HASH`, `SALE_COLLECT_SECRET`, `BOT_TOKEN` trong Script Properties; thêm GitHub Secrets `SALE_BOT_TOKEN`, `ASSET_BOT_TOKEN`; xoay token bot Sale/Site Down (cần mật khẩu khóa thép vì dùng chung).
+
+> ### 🔴 RULE PM-70: SALE — SPEC LÀ NGUỒN SỰ THẬT, VÒNG ĐỜI ĐƠN & LÔ GIỮ HÀNG DO SERVER KIỂM SOÁT
+> 1. **Mọi thay đổi nghiệp vụ Sale BẮT BUỘC sửa `SALE_SPEC.md` TRƯỚC, code SAU** (file ở root và `tni-search`). CẤM code ngoài SPEC; yêu cầu mới của chủ phải ghi vào SPEC ngay trong cùng phiên.
+> 2. **Trạng thái đơn do server đặt** (`Nháp → Đã gửi báo giá → Đã xác nhận nhận hàng → Đã thanh toán đủ`). CẤM client tự ghi `status/da_thu/con_no`; chỉ `sale_status`/`sale_payment` đổi chúng. Chủ đơn sửa/xóa khi còn `Nháp`; sau đó chỉ admin, mọi thay đổi ghi `Sale Audit`.
+> 3. **Mọi ghi mới BẮT BUỘC có `idem_key`** (gọi lại không tạo dòng trùng). Migration cột chỉ **thêm cuối, idempotent**, snapshot tab đã có dữ liệu (`bak_<tab>_v0`) trước khi đụng header; CẤM đổi thứ tự cột hay ghi đè dữ liệu thật.
+> 4. **Nghiệp vụ chủ đã chốt (03/10/2026)**: đại lý = bán đứt (trừ kho + doanh thu ngay, không nợ, không hoa hồng; chiết khấu nhập tay theo lô); ký gởi và lô giao nhân viên bắt buộc có serial, tối đa 60 ngày/lô, người giữ chỉ thấy lô của mình (lọc ở server); hàng trả và hàng hỏng do kho (`warehouse`) nhập, trả thì giảm trừ công nợ hàng của người giữ, hỏng thì theo dõi gởi bảo hành. CẤM tính hàng ký gởi vào doanh thu trước khi có đơn bán thật.
+> 5. **Báo cáo Sale gửi lên GROUP Telegram chỉ định** (tên ở `Cau Hinh.sale_report_group`, id từ tab `List Group Telegram`), CẤM DM dữ liệu lô cho từng người, CẤM đoán group khi chưa chỉ định (bỏ qua + báo DM Admin). Tin group KHÔNG chứa giá vốn/lợi nhuận/CK/hoa hồng. Tiền tệ **MMK**, CẤM hiển thị `₫`/VND. Toa Sale chạy **1 lần 17:30 MMT** (bỏ 11:30).
+> 6. **Ghế Sale tách rõ**: thực thi `WEB-SALE-16`, `GAS-SALE-16`, `BOT-SALE-16`, `TRAIN-SALE-1730`; giám sát `SENTINEL-SALE-RECON` (chạy trong Toa Auditor 9.1, chỉ báo không tự sửa) + `AUDITOR-9.1`. Mỗi thay đổi Sale phải nêu ghế bị ảnh hưởng; CẤM tạo workflow/cron/trigger riêng cho giám sát.
+> 7. **Rule sai chỗ nào sửa đúng chỗ đó**: khi SPEC đổi, dò và sửa mọi nơi còn ghi giá trị cũ (AGENTS.md, system_map.md, `train_5min.yml`, script, GAS) — danh sách ở `SALE_SPEC.md` mục 14; CẤM chỉ sửa SPEC rồi để rule/code cũ mâu thuẫn.
+> 8. **Chưa đạt nghiệm thu thì CẤM báo xong**: Phase 1a đã deploy (@474/@475) nhưng `sale_status/sale_payment/rule chủ đơn` chưa test live vì `SALE_API_KEY` chưa đặt; phải test trước khi báo hoàn thành các phase sau.
+
 ---
 
 # 📌 PM RULES — POST-MORTEM TỪ BUG THỰC TẾ (AUTO-INJECTED)
@@ -2265,5 +2301,33 @@ Reason: [Lý do]`
 >      - Đồng thời gọi endpoint `staff_delete` (hỗ trợ cả GET và POST) để xóa triệt để dòng tương ứng và dọn sạch mọi dòng rác/undefined trên Google Sheet.
 >   3. **Tự Động Đồng Bộ Khi Thêm / Sửa / Đổi Vai Trò / Import**: Mọi hành động làm thay đổi danh sách nhân sự (`saveStaffUserModal`, `updateStaffAssignedRole`, `resetStaffDirectoryToClean`, `importStaffFromFile`) đều BẮT BUỘC gọi `syncStaffDirectoryToSheet` để bảo đảm tính nhất quán hai chiều (Web UI <-> Google Sheet tab `staff`) 100% thời gian thực.
 >   4. **Khóa Thép Deploy Đồng Nhất Cho Cả 2 Deployment ID GAS**: Khi sửa backend GAS (`QLTC_GAS`), AI BẮT BUỘC phải deploy cho CẢ 2 deployment ID (`AKfycbylrX...` và `AKfycbz-NZ...`) bằng lệnh `npx clasp deploy -i <id>`, bảo đảm Web UI luôn chạy trên phiên bản backend mới nhất (@467+).
+> **PM-77 (05/10/2026) — Thu Thập Ảnh Telegram Phân Loại Theo Template Trên Google Drive & Loại Bỏ Rào Cản Phân Quyền Khi Đã Quản Trị Qua Gmail (Template-Based Photo Drive Directory & Zero-Role-Barrier Policy)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Người dùng yêu cầu thu thập hình ảnh gửi lên Telegram theo từng template vào thư mục Drive cụ thể (`12V-UaZM1cSha8LihCjBHTOU_BEAk74p-` trong thư mục `1.9.1 Photo Sale solution`) và cung cấp 1 link xem tất cả hình ảnh.
+>   2. Người dùng yêu cầu bỏ lựa chọn vai trò (role selector / PIN gate) trên giao diện Web UI vì quyền truy cập đã được quản trị và chia sẻ trực tiếp qua Google Account / Gmail.
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. *Thiếu cấu trúc lưu trữ phân theo mẫu*: Trước đây, ảnh gửi kèm đơn hàng qua Telegram được lưu phân tán hoặc đưa vào thư mục chung, chưa tự động gom nhóm theo tên từng Template bán hàng (`1.9.1 Photo Sale solution/<Template Name>`).
+>   2. *Ảnh gửi trực tiếp trong caption chưa được bóc tách tức thì*: Khi nhân viên gửi ảnh kèm caption chứa cấu trúc template bán hàng, hệ thống trước đây phải đợi đến luồng xử lý ảnh riêng hoặc lưu đơn trước rồi đợi ảnh sau, dễ dẫn đến mất liên kết ảnh với đơn hàng.
+>   3. *Rào cản phân quyền trùng lặp trên Web UI*: Giao diện web trước đây duy trì dropdown chọn vai trò (`#role-selector-box`) kèm xác thực mã PIN quản trị, làm gián đoạn trải nghiệm của nhân viên dù người dùng đã được cấp quyền truy cập qua Gmail.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (The 3-Pillar Template Photo & Zero-Barrier Protocol)**:
+>   1. **Tự Động Phân Loại Thư Mục Ảnh Drive Theo Template**:
+>      - Cấu hình thư mục gốc `PHOTO_DRIVE_FOLDER_ID = "12V-UaZM1cSha8LihCjBHTOU_BEAk74p-"`.
+>      - Hàm `getOrCreateTemplateFolder(templateName)` tự động tìm hoặc tạo thư mục con `1.9.1 Photo Sale solution` bên trong thư mục gốc, và tạo các thư mục con theo tên từng Template (ví dụ: `1.9.1 Photo Sale solution/Bán lẻ UPS Solar`, `1.9.1 Photo Sale solution/Báo giá đại lý`...).
+>      - Cả ảnh gửi kèm caption đơn hàng lẫn ảnh gửi bổ sung trong phiên 10 phút BẮT BUỘC được tải về và lưu đúng thư mục template đó.
+>   2. **1 Link Xem Toàn Bộ Ảnh (Single Drive Viewer Link)**:
+>      - Mọi tin nhắn Telegram phản hồi chốt đơn / nộp ảnh BẮT BUỘC kèm theo link thư mục Google Drive để người dùng mở xem toàn bộ ảnh chỉ với 1 chạm.
+>      - Cột 11 trong bảng tính Bán Hàng (`Download All Link`) tự động điền URL thư mục Template trên Google Drive.
+>      - Trên thanh điều hướng Web UI (`sale.html`), nút `#role-selector-box` được thay thế bằng nút nổi bật: `📁 Kho Ảnh Drive (Photos)` trỏ trực tiếp đến thư mục ảnh chung `https://drive.google.com/drive/folders/12V-UaZM1cSha8LihCjBHTOU_BEAk74p-`.
+>
+> > ### 🔴 RULE PM-71: BỌC THÉP PHÂN HỆ SITE DOWN & CƠ CHẾ QUÉT DỌN TIN MỒ CÔI THEO BATCH-WINDOW (STRICT SITE DOWN DELETION & TELETHON BATCH-WINDOW SWEEP PROTOCOL)
+> > 
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SITE DOWN DELETION & BATCH-WINDOW SWEEP POLICY)**:
+> > 1. **Triệt Tiêu Tuyệt Đối Trigger Ngầm Trên GAS (Strict Zero GAS Independent Trigger Policy)**: BẮT BUỘC xóa sạch trigger `checkAndSend_1min` và `checkAndSend` trên Apps Script qua `teardownGasTrain1min()` và endpoint `action=teardown_gas_train`. Tuyệt đối CẤM tạo time-driven trigger 1 phút chạy ngầm trên GAS gây xung đột race condition với webhook `store_site_down` làm phát 2 đợt tin trùng lặp trong vòng 1-2 giây.
+> > 2. **Bảo Toàn & Retry Message ID Trong GAS (Persistent MsgID Retention & Auto-Merge)**: Trong `deleteOldMessages_`, CHỈ ĐƯỢC PHÉP xóa ID khỏi `PropertiesService` khi API đã trả về thành công (hoặc tin không tồn tại / quá 48h). TUYỆT ĐỐI CẤM dùng `finally { deleteProperty }` vô điều kiện. Nếu xóa thất bại do lỗi mạng tạm thời hoặc rate limit 429, BẮT BUỘC giữ lại ID trong mảng lưu trữ. Khi phát tin mới trong `sendOrEditTelegramPre` / `sendOrEditTelegram`, BẮT BUỘC gộp (`Set([...unremoved, ...newIds])`) để lần gửi tiếp theo tự động dọn sạch cả tin cũ lẫn tin mới!
+> > 3. **Chunk Fallback Độc Lập (Safe Chunk-Preserving Fallback)**: Khi gửi tin `<pre>` thất bại, nhánh retry khi plain text BẮT BUỘC gửi theo từng biến `chunk` hiện tại, TUYỆT ĐỐI CẤM gửi cả khối `plainContent` thô dài tránh lỗi Telegram 400 Message Too Long (>4096 ký tự).
+> > 4. **Cơ Chế Quét Dọn Theo Batch Window 120s Trong Telethon (Batch-Window Sweep Protocol)**: Trong `sweep_orphan_eta.py`, toàn bộ tin Site Down phát trong vòng 120 giây tính từ tin mới nhất (`age_from_newest <= 120s`) được coi là 1 đợt phát hợp lệ (bảo toàn trọn vẹn cả Part 1, Part 2, và Tin 2). Chỉ các tin cũ hơn 120s mới bị coi là tin mồ côi và bị xóa sạch bằng `client.delete_messages(chat_id, chunk, revoke=True)`. Đồng thời tự động khử trùng lặp (dedup) nếu có hai chunk giống hệt nhau trong cùng một batch window.
+> > 5. **Nhận Diện Bot 5T Bọc Thép (Triple-Identifier Bot Guard)**: Nhận diện Bot 5T qua 3 tầng: `sender_id == 8647102342` (ID gốc bất biến), username (`tni_site_down_cell_alarmbot`), tiêu đề (`BOT_5T_NAMES`) và nội dung (`Total Site down`, `Dont Forget`, `HUB site TNI`, `SUMMARY — Team`). BẮT BUỘC loại trừ ID cá nhân Admin (`6859790680`) để không bao giờ xóa nhầm tin nhắn của con người.
 
-
+>   3. **Xóa Bỏ Rào Cản Phân Quyền Web UI Khi Đã Quản Trị Qua Gmail**:
+>      - Loại bỏ hoàn toàn dropdown vai trò `#app-role-select` và khóa PIN chuyển vai trò trên Web UI.
+>      - Mặc định khởi tạo `currentAppRole = 'admin'` và `isTabAllowedForRole = () => true` để toàn bộ nhân viên được chia sẻ quyền qua Gmail đều truy cập thông suốt 100% tất cả các tab chức năng.
