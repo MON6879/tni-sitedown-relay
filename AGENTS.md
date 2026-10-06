@@ -2390,4 +2390,29 @@ Reason: [Lý do]`
 >      - Tự động duy trì cơ chế Fallback về Sheet GID 0 nếu tab `1839820494` tạm thời không truy cập được.
 >   3. **Đồng Bộ Song Mã Repositories (`Task and WO` & `tni-search`)**:
 >      - Đồng bộ 100% `search_bot.py` qua cả hai kho mã nguồn và triển khai kiểm tra live trên Vercel.
-
+> **PM-80 (06/10/2026) — Giám Sát Toàn Trình 4 Ca (Full-Lifecycle Continuous Multi-Shift Monitoring) & Dung Sai Kháng Trễ Hàng Đợi (Queue-Delay-Resilient Scheduling Protocol)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Người dùng thắc mắc: *"Kiểm tra tin nhắn 6 sao không có gởi vậy sao ghế giám sát không biết? Thêm rule giám sát phải toàn trình làm đi!"*
+>   2. Phúc tra thực tế:
+>      - Report 6 ca 17:18 MMT ĐÃ GỬI THÀNH CÔNG lúc 17:20:04 - 17:20:49 MMT hôm nay (Msg ID: T1 `12001`, T2 `10925`, T3 `10286`, T4 `8663`, CONTROL `108796`). Lúc người dùng hỏi vào lúc 17:15:59 MMT thì chưa tới giờ tàu chạy (17:18 MMT).
+>      - Tuy nhiên, ca 14:58 MMT trước đó đã bị trượt không gửi được, và Ghế Giám Sát AUDITOR-9.1 hoàn toàn không cảnh báo!
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. **Ghế Giám Sát Bị "Mù Ca Chiều/Tối/Đêm"**: Ghế AUDITOR-9.1 (`system_auditor.py`) chỉ được lên lịch chạy duy nhất 1 lần vào buổi sáng lúc `09:00 MMT` (`check_time_exact 09 00`). Toàn bộ hoạt động chiều, tối và đêm (14:58, 17:18, 17:30, 19:41, 20:56) hoàn toàn không có ai giám sát!
+>   2. **Dung Sai Quá Hẹp (Narrow Window Trap)**: Trong `train_5min.yml`, hàm `check_time_exact` có dung sai `DIFF <= 2` phút. Vì các mốc giờ kết thúc bằng số 8 (như 14:58, 07:18, 08:48, 10:18, 14:18, 17:18) cách các nhịp cron 5 phút ít nhất 2 đến 3 phút, khi máy ảo GitHub Actions runner bị delay khởi động hàng đợi 2-4 phút, cả 2 nhịp cron trước và sau đều rơi vào `DIFF >= 3` phút, dẫn đến việc bỏ sót hoàn toàn chuyến tàu!
+>   3. **Lệch Regex Tiêu Đề Báo Cáo**: Trong `system_auditor.py`, `SCHEDULE_RULES` dùng regex `r"6\.\s*Daily\s*Note\s*Read"`, không khớp với tiêu đề tin nhắn thực tế gửi trong nhóm: `📋 6. Report — Daily Note Read Report — Summary`.
+>   4. **Thiếu Giám Sát Toa Sale Summary (17:30 MMT)**: Toa Sale Summary chưa được đưa vào bộ luật kiểm toán `SCHEDULE_RULES`.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (The 4-Pillar Full-Lifecycle Monitoring Protocol)**:
+>   1. **Giám Sát Toàn Trình 4 Ca Bắt Buộc (4 Daily Mandatory Audit Shifts)**:
+>      - Cấu hình Ghế AUDITOR-9.1 chạy 4 ca định kỳ mỗi ngày trên `train_5min.yml`:
+>        - 🌅 **Ca Sáng (09:00 MMT)**: Hậu kiểm Báo cáo 1, 2, 3, 4, BOD, Plan 5C, Report 6 ca 1 (08:48), Report 6.1 ca 1 & 2 (07:18 & 10:18).
+>        - ☀️ **Ca Trưa / Đầu Chiều (14:35 MMT)**: Hậu kiểm Refuel ca 1 (10:06), Site Clear ca 3 (14:18), Refuel ca 2 (14:11).
+>        - 🌆 **Ca Chiều Tối (17:40 MMT)**: Hậu kiểm Report 6 ca 2 & 3 (14:58 & 17:18), Report 6.1 ca 4 (17:18), Toa Sale Summary (17:30).
+>        - 🌙 **Ca Đêm Chốt Ngày (21:15 MMT)**: Hậu kiểm Plan 5A (18:41), Plan 5B (19:11), Report 6 ca 4 (19:41), Refuel EOD (20:56).
+>   2. **Hàm Dung Sai Kháng Trễ Hàng Đợi (Queue-Delay-Resilient `check_time_tolerance_4m`)**:
+>      - Thiết lập hàm `check_time_tolerance_4m` với dung sai `DIFF <= 4` phút cho các mốc đơn lẻ không chia hết cho 5 (07:18, 08:48, 10:18, 14:18, 14:58, 17:18, 19:41), đảm bảo không bao giờ bị bỏ rơi chuyến tàu dù runner có bị nghẽn queue.
+>   3. **Tầng Chống Gửi Trùng In-Script (In-Script Dedup Gate < 20 Minutes)**:
+>      - Bổ sung tầng khóa an toàn trong `daily_read_report.py`: kiểm tra lịch sử 5 tin nhắn gần nhất trong CONTROL; nếu Report 6 đã được gửi trong vòng 20 phút qua, script lập tức thoát êm (`return`) với thông báo `Skipping duplicate run`, triệt tiêu 100% rủi ro gửi lặp tin nhắn khi nới dung sai.
+>   4. **Chuẩn Hóa Bộ Lọc Regex & Tích Hợp Toa Bán Hàng**:
+>      - Cập nhật pattern Report 6 thành `[r"6\.\s*(?:Report\s*—\s*)?Daily\s*Note\s*Read", r"Daily\s*Note\s*Read", r"Read\s*Report"]`.
+>      - Thêm Toa Sale Summary Report (17:30 MMT) vào `SCHEDULE_RULES`.
+>      - Toa Sale Summary gửi bản tổng hợp vào nhóm `CONTROL (-5251698940)` song song với nhóm bán hàng để Ban Điều Hành và Auditor đồng bộ theo dõi.
