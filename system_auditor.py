@@ -218,8 +218,8 @@ SCHEDULE_RULES = [
         "report_name": "Report 6 (Read Status)",
         "group_key": "CONTROL",
         "target_times": ["08:48", "14:58", "17:18", "19:41"],
-        "title_patterns": [r"6\.\s*Daily\s*Note\s*Read", r"Read\s*Report"],
-        "max_delay_min": 5
+        "title_patterns": [r"6\.\s*(?:Report\s*—\s*)?Daily\s*Note\s*Read", r"Daily\s*Note\s*Read", r"Read\s*Report"],
+        "max_delay_min": 15
     },
     {
         "report_name": "Report 6.1 (Site Clear Today)",
@@ -233,6 +233,13 @@ SCHEDULE_RULES = [
         "group_key": "REFUEL",
         "target_times": ["10:06", "14:11"],
         "title_patterns": [r"\[Report\s*1\]\s*TNI\s*REQUEST\s*REFUEL", r"TNI\s*REQUEST\s*REFUEL", r"Plan.*Refuel"],
+        "max_delay_min": 15
+    },
+    {
+        "report_name": "Toa Sale Summary Report",
+        "group_key": "CONTROL",
+        "target_times": ["17:30"],
+        "title_patterns": [r"TNI\s*SALE\s*&(?:amp;)?\s*OPERATIONS\s*SUMMARY", r"SALE\s*&(?:amp;)?\s*SERVICE\s*DISPATCH", r"Sale\s*Summary"],
         "max_delay_min": 15
     }
 ]

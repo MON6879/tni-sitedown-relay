@@ -153,6 +153,17 @@ jobs:
           }
 
 
+          # check_time_tolerance_4m <hour> <target_minute> — dung sai ±4 phút kháng trễ hàng đợi runner GitHub Actions
+          check_time_tolerance_4m() {
+            local TH=$1 TM=$2
+            local CURR_MIN=$(( 10#$H * 60 + 10#$M ))
+            local TARG_MIN=$(( 10#$TH * 60 + 10#$TM ))
+            local DIFF=$(( CURR_MIN - TARG_MIN ))
+            [ $DIFF -lt 0 ] && DIFF=$(( -DIFF ))
+            [ $DIFF -le 4 ] && return 0
+            return 1
+          }
+
           # check_time_exact <hour> <target_minute> — dung sai ±2 phút cho các mốc đơn lẻ duy nhất (kháng trùng lặp nhịp 5p)
           check_time_exact() {
             local TH=$1 TM=$2
@@ -177,27 +188,27 @@ jobs:
           #  10:06 → Refuel Merged Report (📱 Telethon)
           check_time 10 06 && REFUEL_P1=true && NEED_PYTHON=true && echo "🚃 Toa 9: Refuel Merged Report (10:06 MMT)"
           #  07:18 → Report 6.1 Site Clear Today (🤖 Bot API)
-          check_time_exact 07 18 && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (07:18 MMT)"
+          check_time_tolerance_4m 07 18 && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (07:18 MMT)"
           #  08:28 → Plan 5C Morning
           check_time_exact 08 28 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Morning (08:28 MMT)"
           #  08:48 → Report 6 Read Report (Ca 1) (📱 Telethon)
-          check_time_exact 08 48 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (08:48 MMT)"
+          check_time_tolerance_4m 08 48 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (08:48 MMT)"
           #  09:00 → Ghế AUDITOR-9.1 (Master System Audit — Chạy đúng 1 lần duy nhất)
-          check_time_exact 09 00 && AUDITOR91=true && NEED_PYTHON=true && echo "🚃 Toa Auditor: Ghế AUDITOR-9.1 (09:00 MMT)"
+          (check_time_tolerance_4m 09 00 || check_time_tolerance_4m 14 35 || check_time_tolerance_4m 17 40 || check_time_tolerance_4m 21 15) && AUDITOR91=true && NEED_PYTHON=true && echo "🚃 Toa Auditor: Ghế AUDITOR-9.1 Giám Sát Toàn Trình (09:00/14:35/17:40/21:15 MMT)"
           #  09:56 → Plan 5C Morning
           check_time 09 56 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Morning (09:56 MMT)"
           #  10:16 / 10:18 → Report 6.1 Site Clear Today & Refuel Group 9 Read Report (10:16 MMT)
           check_time 10 16 && REFUEL_READ=true && NEED_PYTHON=true && echo "🚃 Toa Refuel Read: Refuel Group 9 Read Report (10:16 MMT)"
-          check_time_exact 10 18 && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (10:18 MMT)"
+          check_time_tolerance_4m 10 18 && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (10:18 MMT)"
 
           # ═══════ 🌤️ AFTERNOON BLOCK (13:00-16:30) ═══════
           #  13:06 → Refuel Request Report [ĐÃ HỦY - GỘP VÀO TOA 9 LÚC 10:06 & 14:11]
           #  14:11 → Refuel Merged Report (📱 Telethon)
           check_time 14 11 && REFUEL_P1=true && NEED_PYTHON=true && echo "🚃 Toa 9: Refuel Merged Report (14:11 MMT)"
           #  14:18 → Report 6.1 Site Clear Today (🤖 Bot API)
-          check_time_exact 14 18 && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (14:18 MMT)"
+          check_time_tolerance_4m 14 18 && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6.1: Report 6.1 Site Clear Today (14:18 MMT)"
           #  14:58 → Report 6 Read Report (Ca 2) (📱 Telethon)
-          check_time_exact 14 58 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (14:58 MMT)"
+          check_time_tolerance_4m 14 58 && R6=true && NEED_PYTHON=true && echo "🚃 Toa 6: Report 6 Read (14:58 MMT)"
           #  15:26 → Plan 5C Evening (📱 Telethon)
           check_time 15 26 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Evening (15:26 MMT)"
           #  15:46 → Reports 1,2,3 + BOD + Ghế BI-WO-SYNC (🤖 Bot API)
@@ -210,9 +221,9 @@ jobs:
 
           # ═══════ 🌙 EVENING BLOCK (17:00-22:30) ═══════
           #  17:18 → Report 6 & Report 6.1
-          check_time_exact 17 18 && R6=true && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6+6.1: Report 6 + Report 6.1 Site Clear Today (17:18 MMT)"
+          check_time_tolerance_4m 17 18 && R6=true && R61=true && NEED_PYTHON=true && echo "🚃 Toa 6+6.1: Report 6 + Report 6.1 Site Clear Today (17:18 MMT)"
           #  11:30 & 17:30 → Toa Sale Summary Report (🛒 Live stock + group summary)
-          (check_time_exact 11 30 || check_time_exact 17 30) && SALE_SUM=true && NEED_PYTHON=true && echo "🛒 Toa Sale: Sale Summary Report (11:30/17:30 MMT)"
+          (check_time_tolerance_4m 11 30 || check_time_tolerance_4m 17 30) && SALE_SUM=true && NEED_PYTHON=true && echo "🛒 Toa Sale: Sale Summary Report (11:30/17:30 MMT)"
           #  18:06 → [DISABLED] Refuel — chuyển sang 20:56
           #  18:41 → Report 5 (Daily Plan - Ca Chiều / EOD Plan vs Actual) (📱 Telethon)
           check_time 18 41 && P5A=true && NEED_PYTHON=true && echo "🚃 Toa 3: Report 5 Daily Plan EOD (18:41 MMT)"
