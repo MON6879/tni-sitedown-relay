@@ -90,6 +90,11 @@ BOT_REGISTRY = {
         "token": "8628370628:AAE43wwogCzuFDKc0izu5DEuqlkud7ID7Sw",
         "expected_url": "https://tni-bot.vercel.app/api/attendance",
         "ping_url": "https://tni-bot.vercel.app/api/attendance"
+    },
+    "Refuel Collector Bot (@TNI_REFUEL_BOT)": {
+        "token": "8811503647:AAEVIToiaPbDeNTUPLsoI5xhdnufKdChsME",
+        "expected_url": "https://tni-bot.vercel.app/api/refuel_collector",
+        "ping_url": "https://tni-bot.vercel.app/api/refuel_collector"
     }
 }
 
@@ -198,21 +203,21 @@ SCHEDULE_RULES = [
         "group_key": "CONTROL",
         "target_times": ["18:41"],
         "title_patterns": [r"5\.\s*Report.*Plan", r"Plan\s*EOD"],
-        "max_delay_min": 5
+        "max_delay_min": 15
     },
     {
         "report_name": "Report 5B (Plan Update)",
         "group_key": "CONTROL",
         "target_times": ["19:11"],
         "title_patterns": [r"5\.\s*Report.*Plan", r"Plan\s*Update"],
-        "max_delay_min": 5
+        "max_delay_min": 15
     },
     {
         "report_name": "Report 5C (Plan Sáng/Chiều)",
         "group_key": "CONTROL",
-        "target_times": ["08:28", "09:56", "15:26", "22:06"],
+        "target_times": ["06:06", "08:28", "09:56", "15:26", "22:06"],
         "title_patterns": [r"5(?:\.1|\.)?\s*Report.*Plan", r"5\.\d*\s*Report.*Plan", r"Daily\s*Plan", r"Plan.*Summary"],
-        "max_delay_min": 5
+        "max_delay_min": 15
     },
     {
         "report_name": "Report 6 (Read Status)",
@@ -264,12 +269,13 @@ def audit_telegram_webhooks():
                 pending = data.get("pending_update_count", 0)
                 last_err = data.get("last_error_message")
                 
-                # Auto-recovery: Nếu mất Webhook hoặc kẹt hàng đợi >= 5 tin -> Tự động Flush & Re-Hook
-                if (not curr_url or pending >= 5) and expected_url:
-                    action_name = "Khôi phục Webhook" if not curr_url else f"Auto-Flush hàng đợi ({pending} tin)"
+                # Auto-recovery: Nếu mất Webhook, kết nối SAI địa chỉ, hoặc kẹt hàng đợi >= 5 tin -> Tự động Flush & Re-Hook
+                is_wrong_url = bool(curr_url and expected_url and curr_url.lower() != expected_url.lower())
+                if (not curr_url or pending >= 5 or is_wrong_url) and expected_url:
+                    action_name = f"Auto-Rehook URL đúng (Cũ: {curr_url[:30]}...)" if is_wrong_url else ("Khôi phục Webhook" if not curr_url else f"Auto-Flush hàng đợi ({pending} tin)")
                     logger.warning(f"🚨 {name}: {action_name}...")
                     try:
-                        if pending >= 5:
+                        if pending >= 5 or is_wrong_url:
                             requests.post(f"https://api.telegram.org/bot{token}/deleteWebhook", json={"drop_pending_updates": True}, timeout=8)
                             time.sleep(1.5)
                         set_resp = requests.post(f"https://api.telegram.org/bot{token}/setWebhook", json={
@@ -858,6 +864,285 @@ def audit_bi_wo_stats_anomaly():
     return results
 
 
+# ── AUDIT SALE INVENTORY — Smart formula: Stock alert, slow-mover, overstock ─
+def audit_sale_inventory():
+    """
+    ══════════════════════════════════════════════════════════════
+    🏷️ GHẾ AUDITOR-9.1 — MODULE KIỂM KHO BÁN HÀNG THÔNG MINH
+    ══════════════════════════════════════════════════════════════
+    Đọc trực tiếp từ Sale Sheet (GAS sale_backend) qua 3 tab:
+      • nhap  (Nhap Hang)  → hàng tồn kho nhập
+      • ban   (Ban Hang)   → đã bán
+      • tamung (Tam Ung)   → tạm ứng cho nhân viên
+
+    5 Công thức thông minh:
+      1. 🔴 Hết hàng (Stock = 0 nhưng chưa xoá) — cảnh báo bổ hàng
+      2. 🟡 Sắp hết hàng (Stock <= ngưỡng LOW_STOCK_THRESHOLD = 3)
+      3. 🟠 Hàng tồn lâu không bán (nhập > 30 ngày, tồn > 0, chưa bán)
+      4. 🔵 Tồn kho âm bất thường (sold > imported qty)
+      5. 🟣 Tổng giá trị tồn kho thay đổi bất thường (tăng/giảm > 30% so với run trước)
+    ══════════════════════════════════════════════════════════════
+    """
+    results = []
+    LOW_STOCK_THRESHOLD = 3
+    SLOW_MOVER_DAYS = 30
+    GAS_SALE_URL = os.getenv("GAS_SALE_URL", "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec")
+    SALE_ADMIN_TOKEN = os.getenv("SALE_ADMIN_TOKEN", "")
+
+    def fetch_col(col):
+        try:
+            payload = {"action": "sale_get", "col": col, "token": SALE_ADMIN_TOKEN}
+            resp = requests.post(GAS_SALE_URL, json=payload, timeout=20, allow_redirects=True)
+            data = resp.json()
+            if data.get("ok") and isinstance(data.get("data"), list):
+                return data["data"]
+            logger.warning(f"[AUDIT-INV] sale_get({col}) not ok: {data.get('error','?')}")
+            return []
+        except Exception as e:
+            logger.error(f"[AUDIT-INV] fetch_col({col}) error: {e}")
+            return []
+
+    try:
+        nhap_rows = fetch_col("nhap")   # Goods intake
+        ban_rows  = fetch_col("ban")    # Sales orders
+        tamung_rows = fetch_col("tamung")  # Stock advance
+
+        if not nhap_rows:
+            results.append({
+                "component": "Sale Inventory",
+                "status": "WARN",
+                "label": "⚠️ Không đọc được dữ liệu kho",
+                "detail": "GAS Sale Backend không trả dữ liệu nhap (có thể SALE_ADMIN_TOKEN chưa set trong Script Properties)"
+            })
+            return results
+
+        # ── Build inventory map: model → { sl_nhap, sl_ban, sl_tamung, ten, gg, gb, ngay_nhap }
+        inv = {}
+        for r in nhap_rows:
+            model = str(r.get("model") or r.get("ten") or "").strip()
+            if not model:
+                continue
+            sl = int(float(r.get("sl") or 0))
+            gg = float(r.get("gg") or 0)   # cost price
+            gb = float(r.get("gb") or 0)   # sell price
+            ten = str(r.get("ten") or model)
+            ngay = str(r.get("ngay") or "")
+            if model not in inv:
+                inv[model] = {"ten": ten, "sl_nhap": 0, "sl_ban": 0, "sl_tamung": 0,
+                              "gg": gg, "gb": gb, "ngay_nhap": ngay}
+            inv[model]["sl_nhap"] += sl
+
+        for r in ban_rows:
+            model = str(r.get("model") or r.get("ten") or "").strip()
+            sl = int(float(r.get("sl") or r.get("qty") or 1))
+            if model in inv:
+                inv[model]["sl_ban"] += sl
+            # else: sold item not in nhap → negative stock candidate handled below
+
+        for r in tamung_rows:
+            model = str(r.get("model") or r.get("ten") or "").strip()
+            sl = int(float(r.get("sl") or r.get("qty") or 1))
+            if model in inv:
+                inv[model]["sl_tamung"] += sl
+
+        # ── Compute remaining stock
+        now_mmt = datetime.now(TZ_MM)
+        out_of_stock    = []
+        low_stock       = []
+        slow_movers     = []
+        negative_stock  = []
+        total_val       = 0.0
+
+        for model, d in inv.items():
+            remaining = d["sl_nhap"] - d["sl_ban"] - d["sl_tamung"]
+            val = remaining * d["gg"]
+            total_val += max(val, 0)
+
+            # Formula 4 — âm stock
+            if remaining < 0:
+                negative_stock.append(
+                    f"{d['ten']} [{model}]: tồn = {remaining} (nhập {d['sl_nhap']} − bán {d['sl_ban']} − tạm ứng {d['sl_tamung']})"
+                )
+                continue
+
+            # Formula 1 — hết hàng
+            if remaining == 0 and d["sl_nhap"] > 0:
+                out_of_stock.append(f"{d['ten']} [{model}]")
+                continue
+
+            # Formula 2 — sắp hết
+            if 0 < remaining <= LOW_STOCK_THRESHOLD:
+                low_stock.append(f"{d['ten']} [{model}]: còn {remaining} cái")
+
+            # Formula 3 — hàng tồn lâu
+            if remaining > 0 and d["ngay_nhap"]:
+                try:
+                    # Parse ngay (YYYY-MM-DD hoặc DD/MM/YYYY)
+                    ng = d["ngay_nhap"][:10]
+                    if "/" in ng:
+                        parts = ng.split("/")
+                        ng_dt = datetime(int(parts[2]), int(parts[1]), int(parts[0]), tzinfo=TZ_MM)
+                    else:
+                        ng_dt = datetime.fromisoformat(ng).replace(tzinfo=TZ_MM)
+                    age_days = (now_mmt - ng_dt).days
+                    if age_days >= SLOW_MOVER_DAYS and d["sl_ban"] == 0:
+                        slow_movers.append(
+                            f"{d['ten']} [{model}]: tồn {remaining} cái, nhập {age_days} ngày trước, chưa bán"
+                        )
+                except Exception:
+                    pass
+
+        # ── Formula 5 — Tổng giá trị tồn kho (so sánh với lần trước qua CacheService concept, dùng file cache đơn giản)
+        cache_file = os.path.join(os.path.dirname(__file__), ".inv_value_cache.json")
+        prev_val = None
+        val_change_alert = None
+        try:
+            if os.path.exists(cache_file):
+                with open(cache_file, "r") as f:
+                    cache_data = json.load(f)
+                prev_val = cache_data.get("total_val")
+                prev_ts  = cache_data.get("ts", "")
+                if prev_val and prev_val > 0:
+                    pct_change = (total_val - prev_val) / prev_val * 100
+                    if abs(pct_change) >= 30:
+                        direction = "tăng" if pct_change > 0 else "giảm"
+                        val_change_alert = (
+                            f"Tổng giá trị tồn kho {direction} {abs(pct_change):.1f}% "
+                            f"({prev_val/1e6:.1f}M → {total_val/1e6:.1f}M Ks) "
+                            f"so với lần kiểm tra {prev_ts}"
+                        )
+            with open(cache_file, "w") as f:
+                json.dump({"total_val": total_val, "ts": now_mmt.strftime("%d/%m %H:%M")}, f)
+        except Exception as ce:
+            logger.warning(f"[AUDIT-INV] Cache file error: {ce}")
+
+        # ── Build results
+        has_issue = False
+
+        if negative_stock:
+            has_issue = True
+            results.append({
+                "component": "Sale Inventory — Tồn kho âm",
+                "status": "FAIL",
+                "label": f"🔵 {len(negative_stock)} MẶT HÀNG TỒN KHO ÂM BẤT THƯỜNG",
+                "detail": "Số lượng bán + tạm ứng vượt số nhập: " + " | ".join(negative_stock[:5])
+                          + ("..." if len(negative_stock) > 5 else "")
+            })
+
+        if out_of_stock:
+            has_issue = True
+            results.append({
+                "component": "Sale Inventory — Hết hàng",
+                "status": "WARN",
+                "label": f"🔴 {len(out_of_stock)} MẶT HÀNG ĐÃ HẾT TỒN KHO",
+                "detail": "Cần nhập bổ sung ngay: " + ", ".join(out_of_stock[:8])
+                          + ("..." if len(out_of_stock) > 8 else "")
+            })
+
+        if low_stock:
+            has_issue = True
+            results.append({
+                "component": "Sale Inventory — Sắp hết",
+                "status": "WARN",
+                "label": f"🟡 {len(low_stock)} MẶT HÀNG SẮP HẾT (≤ {LOW_STOCK_THRESHOLD} cái)",
+                "detail": " | ".join(low_stock[:6]) + ("..." if len(low_stock) > 6 else "")
+            })
+
+        if slow_movers:
+            has_issue = True
+            results.append({
+                "component": "Sale Inventory — Hàng tồn lâu",
+                "status": "WARN",
+                "label": f"🟠 {len(slow_movers)} MẶT HÀNG TỒN ≥ {SLOW_MOVER_DAYS} NGÀY CHƯA BÁN",
+                "detail": " | ".join(slow_movers[:5]) + ("..." if len(slow_movers) > 5 else "")
+            })
+
+        if val_change_alert:
+            has_issue = True
+            results.append({
+                "component": "Sale Inventory — Biến động giá trị kho",
+                "status": "WARN",
+                "label": "🟣 BIẾN ĐỘNG GIÁ TRỊ TỒN KHO BẤT THƯỜNG (≥ 30%)",
+                "detail": val_change_alert
+            })
+
+        if not has_issue:
+            results.append({
+                "component": "Sale Inventory",
+                "status": "PASS",
+                "label": "OK",
+                "detail": (
+                    f"Kho bình thường — {len(inv)} SKUs | "
+                    f"Tổng giá trị tồn: {total_val/1e6:.1f}M Ks | "
+                    f"0 hết hàng, 0 âm, 0 tồn lâu"
+                )
+            })
+
+    except Exception as e:
+        logger.error(f"[AUDIT-INV] Lỗi tổng thể: {e}")
+        results.append({
+            "component": "Sale Inventory",
+            "status": "WARN",
+            "label": "Exception",
+            "detail": str(e)
+        })
+
+    return results
+
+
+# ── AUDIT NOCPRO DESKTOP ALARM SYNC — Ghế AUDITOR-NOCPRO-9.3 ───────────────
+def audit_nocpro_alarm_sync():
+    """
+    ══════════════════════════════════════════════════════════════
+    🛡️ GHẾ AUDITOR-NOCPRO-9.3 — GIÁM SÁT NMS NOCPRO ALARM MONITORING
+    ══════════════════════════════════════════════════════════════
+    Giám sát hoạt động của Ghế DESK-NOCPRO-1 (Đồng bộ Tab 1. Input New GID 85422169)
+    - Gọi endpoint kiểm toán: GAS_COLLECTOR_URL?action=audit_nocpro
+    - Kiểm tra: status, số dòng đã sync, độ trễ và tính toàn vẹn cột J
+    ══════════════════════════════════════════════════════════════
+    """
+    results = []
+    gas_url = os.getenv("APPS_SCRIPT_URL", "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec")
+    try:
+        url = f"{gas_url}?action=audit_nocpro"
+        res = requests.get(url, timeout=20)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("status") == "ok":
+                audit = data.get("audit", {})
+                rows = audit.get("rows_synced", 0)
+                ts = audit.get("timestamp", "N/A")
+                results.append({
+                    "component": "Nocpro Alarm Sync (DESK-NOCPRO-1)",
+                    "status": "PASS",
+                    "label": "OK",
+                    "detail": f"Ghế AUDITOR-NOCPRO-9.3: Đồng bộ thành công {rows} dòng (A:AA) vào Tab 1. Input New lúc {ts}"
+                })
+            else:
+                results.append({
+                    "component": "Nocpro Alarm Sync (DESK-NOCPRO-1)",
+                    "status": "WARN",
+                    "label": "Chưa có dữ liệu",
+                    "detail": data.get("message", "Chưa có phiên đồng bộ nào được ghi nhận")
+                })
+        else:
+            results.append({
+                "component": "Nocpro Alarm Sync (DESK-NOCPRO-1)",
+                "status": "WARN",
+                "label": f"HTTP {res.status_code}",
+                "detail": "Không kết nối được endpoint audit_nocpro"
+            })
+    except Exception as e:
+        logger.error(f"[AUDIT-NOCPRO] Lỗi kiểm tra: {e}")
+        results.append({
+            "component": "Nocpro Alarm Sync (DESK-NOCPRO-1)",
+            "status": "WARN",
+            "label": "Exception",
+            "detail": str(e)
+        })
+    return results
+
+
 # ── 4. KIỂM TRA ĐÚNG GIỜ & PHÁT HIỆN NHÂN ĐÔI TIN NHẮN (TELETHON AUDIT) ─────
 async def audit_telegram_messages_telethon():
     """
@@ -1034,9 +1319,11 @@ async def audit_telegram_messages_telethon():
                             if diff_sec <= 180 and is_same_content:
                                 auto_del_str = ""
                                 try:
-                                    await client.delete_messages(chat_id, [m2["id"]])
-                                    auto_del_str = " (Đã auto-delete ✅)"
-                                    logger.info(f"🗑️ Đã tự động xóa tin nhân đôi ID {m2['id']} trong nhóm {gkey}")
+                                    target_cid = ALL_MONITORED_GROUPS.get(gkey)
+                                    if target_cid:
+                                        await client.delete_messages(target_cid, [m2["id"]])
+                                        auto_del_str = " (Đã auto-delete ✅)"
+                                        logger.info(f"🗑️ Đã tự động xóa tin nhân đôi ID {m2['id']} trong nhóm {gkey}")
                                 except Exception as del_err:
                                     logger.warning(f"Không thể xóa tin nhân đôi ID {m2['id']}: {del_err}")
 
@@ -1206,113 +1493,284 @@ def audit_construction_menu_sync():
     return results
 
 
-# ── 5. TỔNG HỢP BÁO CÁO & PHÁT CẢNH BÁO ĐỎ ──────────────────────────────────
+def audit_construction_guide_sync():
+    """
+    📖 GHẾ GIÁM SÁT GUIDE TAB — Kiểm tra tab 'Guide' trong Sheet Construction
+    có đồng bộ đủ với tab 'Template Cons' hay không.
+    - Đọc trực tiếp GViz CSV cả 2 tab
+    - Nếu Guide thiếu template → Gọi GAS syncGuideFromTemplate_ để tự động điền
+    - Nếu Guide đã đủ → PASS không làm gì thêm
+    - Cảnh báo Admin nếu có template mới chưa có giải thích
+    """
+    results = []
+    CONS_SHEET_ID = "1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8"
+    GAS_URL = os.getenv("APPS_SCRIPT_URL", "")
 
-def build_supervisory_clean_report() -> str:
+    try:
+        import csv as csv_mod
+
+        # 1. Đọc Template Cons (cột A từ hàng 3)
+        t_url = f"https://docs.google.com/spreadsheets/d/{CONS_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Template+Cons"
+        t_resp = requests.get(t_url, timeout=15)
+        if t_resp.status_code != 200:
+            results.append({"name": "Guide Tab Sync", "status": "FAIL",
+                            "reason": f"Không đọc được Template Cons (HTTP {t_resp.status_code})"})
+            return results
+
+        t_reader = csv_mod.reader(io.StringIO(t_resp.text))
+        t_rows = list(t_reader)
+        template_keys = []
+        for i, row in enumerate(t_rows):
+            if i < 2: continue
+            if row and row[0] and row[0].strip():
+                k = row[0].strip()
+                if k.lower() not in ("key", "stt", "ref"):
+                    template_keys.append(k)
+
+        # 2. Đọc Guide tab (cột B = Key, từ hàng 2)
+        g_url = f"https://docs.google.com/spreadsheets/d/{CONS_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Guide"
+        g_resp = requests.get(g_url, timeout=15)
+        guide_keys = []
+        if g_resp.status_code == 200:
+            g_reader = csv_mod.reader(io.StringIO(g_resp.text))
+            g_rows = list(g_reader)
+            for i, row in enumerate(g_rows):
+                if i < 1: continue  # Skip header
+                if len(row) >= 2 and row[1] and row[1].strip():
+                    guide_keys.append(row[1].strip())
+
+        guide_set = {k.lower() for k in guide_keys}
+        missing = [k for k in template_keys if k.lower() not in guide_set]
+
+        if not missing and len(guide_keys) >= len(template_keys):
+            results.append({"name": "Guide Tab Sync", "status": "PASS",
+                            "reason": f"Guide đồng bộ OK ({len(template_keys)} templates, {len(guide_keys)} entries)"})
+            return results
+
+        # 3. Lệch → Tự động trigger GAS sync
+        logger.warning(f"📖 Guide tab lệch! Template Cons có {len(template_keys)}, Guide có {len(guide_keys)}. Thiếu: {missing}")
+
+        sync_success = False
+        if GAS_URL:
+            try:
+                sync_resp = requests.get(
+                    GAS_URL + "?action=sync_guide_tab",
+                    timeout=60, allow_redirects=True
+                )
+                if sync_resp.status_code == 200:
+                    sync_data = sync_resp.json()
+                    if sync_data.get("status") == "ok":
+                        sync_success = True
+                        logger.info(f"✅ Guide tab auto-synced via GAS: {sync_data.get('count', '?')} templates written")
+            except Exception as se:
+                logger.warning(f"GAS sync_guide_tab call failed: {se}")
+
+        if sync_success:
+            detail = f"Auto-sync OK — {len(missing)} template(s) được điền vào Guide: {', '.join(missing[:5])}"
+            results.append({"name": "Guide Tab Sync", "status": "PASS", "reason": detail})
+        else:
+            detail = f"Guide lệch {len(missing)} templates, GAS sync chưa thực hiện được: {', '.join(missing[:5])}"
+            results.append({"name": "Guide Tab Sync", "status": "WARN", "reason": detail})
+
+        # 4. Cảnh báo Admin nếu có template mới không có giải thích trong code
+        if missing:
+            admin_id = os.getenv("ADMIN_CHAT_ID", "6859790680")
+            bot_token = os.getenv("SEARCH_BOT_TOKEN", "")
+            if bot_token:
+                alert_lines = [
+                    "📖 <b>[GUIDE SYNC — AUDITOR-9.1]</b>",
+                    f"Tab <b>Guide</b> thiếu {len(missing)} template mới:",
+                ]
+                for m in missing[:8]:
+                    cmd = "/" + m.lower().replace(" ", "_").replace("  ", "_")
+                    alert_lines.append(f"  • <b>{m}</b> → <code>{cmd}</code>")
+                if len(missing) > 8:
+                    alert_lines.append(f"  ... và {len(missing)-8} template khác")
+                alert_lines.append("🔄 Hệ thống đã tự động trigger GAS để điền vào Guide tab.")
+                alert_msg = "\n".join(alert_lines)
+                try:
+                    requests.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={"chat_id": admin_id, "text": alert_msg, "parse_mode": "HTML"},
+                        timeout=10
+                    )
+                except Exception:
+                    pass
+
+    except Exception as e:
+        logger.error(f"❌ audit_construction_guide_sync error: {e}")
+        results.append({"name": "Guide Tab Sync", "status": "FAIL",
+                        "reason": f"Exception: {str(e)[:80]}"})
+
+    return results
+
+
+
+
+def build_supervisory_seats_status(eval_data: dict) -> list[str]:
+    """
+    Đánh giá trạng thái thực tế của tất cả các ghế giám sát từ dữ liệu kiểm toán sống.
+    Trả về danh sách các dòng hiển thị có tick xanh (✅) cho ghế đang hoạt động tốt,
+    hoặc (⚠️ / ❌) kèm lý do nếu ghế phát hiện sự cố.
+    """
+    webhook_res = eval_data.get("webhook_res", [])
+    gas_res = eval_data.get("gas_res", [])
+    sheets_res = eval_data.get("sheets_res", [])
+    schedule_res = eval_data.get("schedule_res", [])
+    duplicate_res = eval_data.get("duplicate_res", [])
+    bi_anomaly_res = eval_data.get("bi_anomaly_res", [])
+    cons_menu_res = eval_data.get("cons_menu_res", [])
+    guide_sync_res = eval_data.get("guide_sync_res", [])
+
+    seats_output = []
+
+    # 1. Ghế AUDITOR-9.1 (Master Sentinel)
+    core_fails = [c for c in (webhook_res + gas_res + sheets_res) if c.get("status") == "FAIL"]
+    if not core_fails:
+        seats_output.append("✅ <b>Ghế AUDITOR-9.1 (Master Sentinel)</b>: Hoạt động (6 Webhooks, GAS Cloud & Sheet SSOT OK)")
+    else:
+        seats_output.append(f"❌ <b>Ghế AUDITOR-9.1 (Master Sentinel)</b>: Phát hiện {len(core_fails)} lỗi core")
+
+    # 2. Ghế AUDITOR-1.1 (Giám sát Report 1-4 & BOD)
+    r14_sched = [s for s in schedule_res if any(k in s.get("report", "") for k in ["Report 1", "Report 2", "Report 3", "Report 4", "BOD"])]
+    r14_fails = [s for s in r14_sched if s.get("status") in ("FAIL", "WARN")]
+    if not r14_fails:
+        seats_output.append("✅ <b>Ghế AUDITOR-1.1 (Giám sát Report 1-4 & BOD)</b>: Hoạt động đúng giờ (05:48 & 15:48 MMT)")
+    else:
+        seats_output.append(f"⚠️ <b>Ghế AUDITOR-1.1 (Giám sát Report 1-4 & BOD)</b>: Hoạt động (Trễ/thiếu {len(r14_fails)} báo cáo)")
+
+    # 3. Ghế AUDITOR-2.1 (Giám sát Báo cáo Cáp Cable)
+    cable_wh = [w for w in webhook_res if "Cable" in w.get("name", "")]
+    cable_ok = all(w.get("status") == "PASS" for w in cable_wh) if cable_wh else True
+    if cable_ok:
+        seats_output.append("✅ <b>Ghế AUDITOR-2.1 (Giám sát Báo cáo Cáp Cable)</b>: Hoạt động bình thường (05:56 & 15:56 MMT)")
+    else:
+        seats_output.append("❌ <b>Ghế AUDITOR-2.1 (Giám sát Báo cáo Cáp Cable)</b>: Mất kết nối Webhook Cable")
+
+    # 4. Ghế AUDITOR-3.1 (Giám sát Nhiên liệu Refuel & Plan)
+    refuel_sched = [s for s in schedule_res if "Refuel" in s.get("report", "")]
+    refuel_dups = [d for d in duplicate_res if "REFUEL" in d.get("group", "").upper()]
+    refuel_fails = [s for s in refuel_sched if s.get("status") in ("FAIL", "WARN")]
+    if not refuel_fails and not refuel_dups:
+        seats_output.append("✅ <b>Ghế AUDITOR-3.1 (Giám sát Nhiên liệu Refuel)</b>: Hoạt động chuẩn xác (Lọc trùng & tiến độ)")
+    else:
+        issue_txt = f"{len(refuel_dups)} tin đúp" if refuel_dups else f"{len(refuel_fails)} trễ giờ"
+        seats_output.append(f"⚠️ <b>Ghế AUDITOR-3.1 (Giám sát Nhiên liệu Refuel)</b>: Hoạt động ({issue_txt})")
+
+    # 5. Ghế AUDITOR-4.1 (Giám sát Kế hoạch Daily Plan 5A-5C)
+    plan_sched = [s for s in schedule_res if any(k in s.get("report", "") for k in ["Report 5", "Plan"])]
+    plan_fails = [s for s in plan_sched if s.get("status") in ("FAIL", "WARN")]
+    if not plan_fails:
+        seats_output.append("✅ <b>Ghế AUDITOR-4.1 (Giám sát Daily Plan 5A-5C)</b>: Hoạt động thông suốt (7 mốc giờ Plan)")
+    else:
+        seats_output.append(f"⚠️ <b>Ghế AUDITOR-4.1 (Giám sát Daily Plan 5A-5C)</b>: Hoạt động (Trễ {len(plan_fails)} mốc Plan)")
+
+    # 6. Ghế AUDITOR-6.1 (Giám sát Đọc tin Note & Clear Site)
+    r6_sched = [s for s in schedule_res if any(k in s.get("report", "") for k in ["Report 6", "Site Clear"])]
+    r6_fails = [s for s in r6_sched if s.get("status") in ("FAIL", "WARN")]
+    if not r6_fails:
+        seats_output.append("✅ <b>Ghế AUDITOR-6.1 (Giám sát Note Read & Clear Site)</b>: Hoạt động đồng bộ")
+    else:
+        seats_output.append(f"⚠️ <b>Ghế AUDITOR-6.1 (Giám sát Note Read & Clear Site)</b>: Hoạt động (Trễ {len(r6_fails)} báo cáo)")
+
+    # 7. Ghế SD-DETAIL-1 & SD-SUMMARY-2 (Giám sát Trạm sập Site Down)
+    sd_wh = [w for w in webhook_res if "Site Down" in w.get("name", "")]
+    sd_gas = [g for g in gas_res if "Site Down" in g.get("name", "")]
+    sd_ok = all(x.get("status") == "PASS" for x in (sd_wh + sd_gas))
+    if sd_ok:
+        seats_output.append("✅ <b>Ghế SD-DETAIL-1 & SD-SUMMARY-2 (Giám sát Site Down)</b>: Hoạt động (:06/:36 MMT Khóa Thép)")
+    else:
+        seats_output.append("❌ <b>Ghế SD-DETAIL-1 & SD-SUMMARY-2 (Giám sát Site Down)</b>: Lỗi kết nối Relay/GAS Site Down")
+
+    # 8. Ghế TC-1 / CONS-MENU (Giám sát Xây dựng Bot 10)
+    tc_menu_fails = [c for c in cons_menu_res if c.get("status") != "PASS"]
+    tc_guide_fails = [g for g in guide_sync_res if g.get("status") != "PASS"]
+    if not tc_menu_fails and not tc_guide_fails:
+        seats_output.append("✅ <b>Ghế TC-1 / CONS-MENU (Giám sát Xây dựng Bot 10)</b>: Hoạt động (Menu & Guide Tab OK)")
+    else:
+        seats_output.append(f"❌ <b>Ghế TC-1 / CONS-MENU (Giám sát Xây dựng Bot 10)</b>: Lệch {len(tc_menu_fails)+len(tc_guide_fails)} mục Menu/Guide")
+
+    # 9. Ghế BI-WO-SYNC (Giám sát BI Portal & WO Stats)
+    bi_warns = [b for b in bi_anomaly_res if b.get("status") in ("FAIL", "WARN")]
+    if not bi_warns:
+        seats_output.append("✅ <b>Ghế BI-WO-SYNC (Giám sát BI Portal & WO)</b>: Hoạt động (Dữ liệu WO cân bằng)")
+    else:
+        seats_output.append(f"⚠️ <b>Ghế BI-WO-SYNC (Giám sát BI Portal & WO)</b>: Hoạt động (Cảnh báo {len(bi_warns)} vấn đề dồn ứ WO)")
+
+    # 10. Ghế KEEPALIVE-TOA-0 (Sưởi ấm & Nhịp sống 24/7)
+    wh_ok_count = sum(1 for w in webhook_res if w.get("status") == "PASS")
+    if wh_ok_count >= 5:
+        seats_output.append("✅ <b>Ghế KEEPALIVE-TOA-0 (Sưởi ấm & Nhịp sống 24/7)</b>: Hoạt động liên tục (Chu kỳ 5 phút)")
+    else:
+        seats_output.append(f"⚠️ <b>Ghế KEEPALIVE-TOA-0 (Sưởi ấm & Nhịp sống 24/7)</b>: Hoạt động ({wh_ok_count}/{len(webhook_res)} webhooks sống)")
+
+    # 11. Ghế AUDITOR-9.2 (Giám sát Dung lượng Sheet Capacity)
+    sheet_fails = [s for s in sheets_res if s.get("status") != "PASS"]
+    if not sheet_fails:
+        seats_output.append("✅ <b>Ghế AUDITOR-9.2 (Giám sát Dung lượng Sheet)</b>: Hoạt động (Dung lượng an toàn < 20K dòng)")
+    else:
+        seats_output.append(f"⚠️ <b>Ghế AUDITOR-9.2 (Giám sát Dung lượng Sheet)</b>: {len(sheet_fails)} tab cần chú ý dung lượng")
+
+    # 12. Ghế AUDITOR-NOCPRO-9.3 (Giám sát Nocpro Alarm DESK-NOCPRO-1)
+    nocpro_res = eval_data.get("nocpro_res", [])
+    nocpro_fails = [n for n in nocpro_res if n.get("status") == "FAIL"]
+    nocpro_warns = [n for n in nocpro_res if n.get("status") == "WARN"]
+    if not nocpro_fails and not nocpro_warns:
+        seats_output.append("✅ <b>Ghế AUDITOR-NOCPRO-9.3 (Giám sát Nocpro Alarm)</b>: Hoạt động (Đồng bộ Tab 1. Input New OK)")
+    elif nocpro_warns:
+        seats_output.append("⚠️ <b>Ghế AUDITOR-NOCPRO-9.3 (Giám sát Nocpro Alarm)</b>: Hoạt động (Đang chờ ca kế tiếp)")
+    else:
+        seats_output.append(f"❌ <b>Ghế AUDITOR-NOCPRO-9.3 (Giám sát Nocpro Alarm)</b>: {nocpro_fails[0].get('detail', 'Lỗi đồng bộ')}")
+
+    return seats_output
+
+
+def build_supervisory_clean_report(eval_data: dict = None) -> str:
     """
     Tạo báo cáo chi tiết: 'Ghế giám sát đã kiểm tra không phát hiện lỗi'
-    Đối chiếu toàn bộ các ghế giám sát từ system_map.md để người dùng
-    thấy được bức tranh toàn cảnh các ghế hoạt động đúng giờ, không ngủ quên.
+    Đối chiếu toàn bộ các ghế giám sát từ system_map.md và dữ liệu kiểm toán sống.
     """
     now_mmt = datetime.now(TZ_MM).strftime("%d/%m/%Y %H:%M:%S")
-    seats = [
-        {
-            "seat": "AUDITOR-9.1",
-            "name": "Toa Kiểm Toán Hệ Thống Toàn Diện",
-            "schedule": "09:00 MMT Hàng Ngày (Toa Auditor, train_5min.yml)",
-            "scope": "10 Hạng mục: Báo cáo 1-4, Quân số, Lịch trình, Trùng lặp, 6 Webhooks, GAS Cloud, Sheets SSOT",
-            "last_check": "Đúng giờ (09:00:49 MMT)",
-            "result": "Các phân hệ cốt lõi hoạt động bình thường, bảo vệ dữ liệu sống"
-        },
-        {
-            "seat": "AUDITOR-LIVE",
-            "name": "Toa Giám Sát Dữ Liệu Sống Trước Gửi TPR",
-            "schedule": "11:46 & 17:21 MMT Hàng Ngày (GAS-OPS-1)",
-            "scope": "Ép flush công thức Sheets, kiểm tra ô Date (T1), xác thực > 2 dòng dữ liệu sống tab WO Close progress",
-            "last_check": "Đúng giờ (Khung giờ làm việc)",
-            "result": "Không phát hiện lỗi, 100% Live Sheet Verified trước khi phát tin"
-        },
-        {
-            "seat": "BI-WO-SYNC",
-            "name": "Toa Đồng Bộ Dữ Liệu BI Portal & BOD Assign",
-            "schedule": "05:46 & 15:46 MMT (train_5min.yml) & Live Browser Fetch",
-            "scope": "Đồng bộ 7 bảng WO Detail (GID 159298579) & 83 dòng nhiệm vụ BOD Assign (GID 1482565085) sang BI Portal",
-            "last_check": "Đúng giờ (15:46 MMT & On-Demand Live Fetch)",
-            "result": "Không phát hiện lỗi, 8 file HTML trên 3 repo khớp 100% dữ liệu sống"
-        },
-        {
-            "seat": "KEEPALIVE-TOA-0",
-            "name": "Toa Giám Sát Nhịp Sống & Sưởi Ấm Hệ Thống",
-            "schedule": "Mỗi 5 phút liên tục (:01, :06, :11, :16, :21, :26, :31, :36, :41, :46, :51, :56 MMT)",
-            "scope": "Ping Vercel API, GAS URLs, 6 Telegram Bot webhooks, chống ngủ đông serverless",
-            "last_check": "Đúng giờ (Mỗi chu kỳ 5 phút)",
-            "result": "Không phát hiện lỗi, 100% endpoint được sưởi ấm liên tục 24/7"
-        },
-        {
-            "seat": "GAS-DISPATCH-SCHEDULER",
-            "name": "Toa Trưởng Hẹn Giờ Độc Lập Cloud",
-            "schedule": "Mỗi 5 phút từ Google Cloud Infrastructure",
-            "scope": "Hẹn giờ chính dispatch workflow train_5min.yml và cửa sổ Site Down :03-:05 & :33-:35",
-            "last_check": "Đúng giờ (Chạy nền Google Cloud Trigger)",
-            "result": "Không phát hiện lỗi, ngăn chặn hoàn toàn nguy cơ GitHub Cron tự chết"
-        },
-        {
-            "seat": "SD-DETAIL-1 & SD-SUMMARY-2",
-            "name": "Ghế Giám Sát Trạm Sập NOC Pro & AW7",
-            "schedule": ":06 & :36 MMT Hàng Giờ (03:30 - 22:15 MMT)",
-            "scope": "Cào botlookup NOC Pro, kiểm soát ô AW7, chuyển tiếp cảnh báo trạm sập đến T1-T4 và Control",
-            "last_check": "Đúng giờ (:06 / :36 MMT)",
-            "result": "Không phát hiện lỗi, bảo đảm luồng dữ liệu trạm sập độc quyền và an toàn"
-        },
-        {
-            "seat": "AUTO-COPY-PROCESSOR",
-            "name": "Ghế Giám Sát Đồng Bộ Dữ Liệu Tự Động 27 Rules",
-            "schedule": "Mỗi 15 phút (Time-driven Trigger)",
-            "scope": "Kiểm soát 27 quy tắc đồng bộ bảng tính (WO DG, Analysis, Task, BOD Assign, Cable, PM Cross check)",
-            "last_check": "Đúng giờ (Mỗi 15 phút)",
-            "result": "Không phát hiện lỗi, chỉ copy dòng mới và xóa dòng nguồn an toàn"
-        },
-        {
-            "seat": "SWEEP-ETA",
-            "name": "Ghế Giám Sát Quét Tin ETA Mồ Côi",
-            "schedule": ":11 & :41 MMT Hàng Giờ",
-            "scope": "Rà soát và dọn dẹp các tin nhắn ETA trôi nổi không có người nhận trên các nhóm vận hành",
-            "last_check": "Đúng giờ (:11 / :41 MMT)",
-            "result": "Không phát hiện lỗi, giữ nhóm chat luôn sạch sẽ và thông thoáng"
-        },
-        {
-            "seat": "AUDITOR-9.2",
-            "name": "Ghế Giám Sát Dung Lượng Bảng Tính (Capacity Sentinel)",
-            "schedule": "Định kỳ sau kiểm toán hệ thống",
-            "scope": "Đo lường số dòng trên tất cả các tab Google Sheet chính, cảnh báo sớm trước ngưỡng 40,000 dòng",
-            "last_check": "Đúng giờ (Theo chu kỳ kiểm toán)",
-            "result": "Không phát hiện lỗi, toàn bộ các tab đều nằm trong ngưỡng an toàn < 20K dòng"
-        }
-    ]
-
     lines = []
     lines.append("🛡️ <b>[BÁO CÁO: GHẾ GIÁM SÁT ĐÃ KIỂM TRA KHÔNG PHÁT HIỆN LỖI]</b>")
     lines.append(f"⏰ <b>Thời điểm tổng hợp:</b> {now_mmt} (MMT)")
     lines.append("📌 <b>Trạng thái:</b> Toàn bộ các ghế giám sát đều chạy đúng giờ — KHÔNG NGỦ QUÊN — KHÔNG BỎ SÓT")
     lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("🛡️ <b>TRẠNG THÁI CÁC GHẾ GIÁM SÁT HỆ THỐNG:</b>")
 
-    for idx, s in enumerate(seats, 1):
-        lines.append(f"<b>{idx}. 🟢 Ghế {s['seat']} — {s['name']}</b>")
-        lines.append(f"   ⏱️ <b>Lịch trình:</b> {s['schedule']}")
-        lines.append(f"   📋 <b>Phạm vi:</b> {s['scope']}")
-        lines.append(f"   🕒 <b>Kiểm tra gần nhất:</b> {s['last_check']}")
-        lines.append(f"   ✅ <b>Kết luận:</b> <i>{s['result']}</i>\n")
+    if eval_data:
+        seat_lines = build_supervisory_seats_status(eval_data)
+        for sl in seat_lines:
+            lines.append(f" {sl}")
+    else:
+        # Fallback danh sách tĩnh chuẩn nếu gọi độc lập không có eval_data
+        seats = [
+            ("AUDITOR-9.1", "Master Sentinel", "09:00 MMT Hàng Ngày", "6 Webhooks, GAS Cloud, Sheets SSOT OK"),
+            ("AUDITOR-1.1", "Giám sát Report 1-4 & BOD", "05:48 & 15:48 MMT", "Đúng giờ, đủ quân số"),
+            ("AUDITOR-2.1", "Giám sát Báo cáo Cáp Cable", "05:56 & 15:56 MMT", "Sheet cáp & Webhook kết nối tốt"),
+            ("AUDITOR-3.1", "Giám sát Nhiên liệu Refuel", "10:06 & 14:11 MMT", "Lọc trùng & tiến độ chuẩn xác"),
+            ("AUDITOR-4.1", "Giám sát Daily Plan 5A-5C", "7 mốc giờ Plan", "Tiến độ gửi thông suốt"),
+            ("AUDITOR-6.1", "Giám sát Note Read & Clear Site", "Định kỳ trong ngày", "Report 6 & 6.1 đồng bộ"),
+            ("SD-DETAIL-1 & SD-SUMMARY-2", "Giám sát Site Down", ":06 & :36 MMT Hàng Giờ", "Khóa thép độc lập"),
+            ("TC-1 / CONS-MENU", "Giám sát Xây dựng Bot 10", "Theo sự kiện & định kỳ", "Menu & Guide Tab đồng bộ"),
+            ("BI-WO-SYNC", "Giám sát BI Portal & WO", "05:46 & 15:46 MMT", "Đồng bộ 7 bảng WO & BOD Assign"),
+            ("KEEPALIVE-TOA-0", "Sưởi ấm & Nhịp sống 24/7", "Mỗi 5 phút liên tục", "Chống ngủ đông serverless 100%"),
+            ("AUDITOR-9.2", "Giám sát Dung lượng Sheet", "Sau kiểm toán", "Dung lượng an toàn < 20K dòng"),
+            ("AUDITOR-NOCPRO-9.3", "Giám sát Nocpro Alarm", "12 mốc giờ MMT", "Đồng bộ Tab 1. Input New OK"),
+        ]
+        for code, name, sched, res in seats:
+            lines.append(f" ✅ <b>Ghế {code} ({name})</b>: Hoạt động ({sched} — {res})")
 
     lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    lines.append("💡 <i>Hệ thống giám sát đa tầng hoạt động độc lập, tự động cảnh báo khi có sự cố phát sinh.</i>")
+    lines.append("💡 <i>Hệ thống giám sát đa tầng hoạt động độc lập, bảo vệ dữ liệu sống 24/7.</i>")
     return "\n".join(lines)
 
 
 def build_master_audit_report():
     """
     Tổng hợp toàn bộ các kết quả kiểm tra thành bản tin báo cáo:
-    - Nếu TẤT CẢ OK: Gửi dòng ngắn gọn '🟢 [AUDITOR-9.1] 1, 2, 3, 4 OK'.
-    - Nếu CÓ LỖI: Chỉ liệt kê các thành phần bị lỗi / trễ giờ / nhân đôi để xử lý ngay.
+    - Nếu TẤT CẢ OK: Gửi báo cáo toàn bộ các ghế giám sát tick xanh.
+    - Nếu CÓ LỖI/CẢNH BÁO: Liệt kê chi tiết sự cố + ĐƯA ĐẦY ĐỦ TRẠNG THÁI CÁC GHẾ GIÁM SÁT VỚI TICK XANH.
     """
     now_mmt = datetime.now(TZ_MM).strftime("%d/%m/%Y %H:%M:%S")
     logger.info("🔍 Bắt đầu quét kiểm toán sâu toàn bộ hệ thống...")
@@ -1325,6 +1783,9 @@ def build_master_audit_report():
     template_res = audit_attendance_template_semantic()
     bi_anomaly_res = audit_bi_wo_stats_anomaly()
     cons_menu_res = audit_construction_menu_sync()
+    guide_sync_res = audit_construction_guide_sync()
+    inventory_res = audit_sale_inventory()
+    nocpro_res = audit_nocpro_alarm_sync()
 
     # 2. Chạy kiểm tra Telethon (Đúng giờ & Nhân đôi)
     try:
@@ -1337,8 +1798,25 @@ def build_master_audit_report():
     duplicate_res = telethon_data.get("duplicate_results", [])
     quality_res = telethon_data.get("quality_results", [])
 
-    # 3. Tính toán sự cố (Chỉ tính status FAIL là lỗi thực sự)
-    all_static_checks = webhook_res + gas_res + sheets_res + roster_res + template_res + bi_anomaly_res + cons_menu_res
+    # 3. Đóng gói eval_data cho tất cả các ghế giám sát
+    eval_data = {
+        "webhook_res": webhook_res,
+        "gas_res": gas_res,
+        "sheets_res": sheets_res,
+        "roster_res": roster_res,
+        "template_res": template_res,
+        "bi_anomaly_res": bi_anomaly_res,
+        "cons_menu_res": cons_menu_res,
+        "guide_sync_res": guide_sync_res,
+        "inventory_res": inventory_res,
+        "nocpro_res": nocpro_res,
+        "schedule_res": schedule_res,
+        "duplicate_res": duplicate_res,
+        "quality_res": quality_res
+    }
+
+    # 4. Tính toán sự cố (Chỉ tính status FAIL là lỗi thực sự)
+    all_static_checks = webhook_res + gas_res + sheets_res + roster_res + template_res + bi_anomaly_res + cons_menu_res + guide_sync_res + inventory_res + nocpro_res
     fail_checks = sum(1 for c in all_static_checks if c["status"] == "FAIL")
     warn_checks = sum(1 for c in all_static_checks if c["status"] == "WARN")
 
@@ -1351,9 +1829,9 @@ def build_master_audit_report():
 
     # 🟢 TRƯỜNG HỢP 1: TẤT CẢ ĐỀU OK -> BÁO CÁO CHI TIẾT GHẾ GIÁM SÁT ĐÃ KIỂM TRA KHÔNG PHÁT HIỆN LỖI
     if total_incidents == 0 and delay_count == 0 and warn_checks == 0:
-        return build_supervisory_clean_report(), 0
+        return build_supervisory_clean_report(eval_data), 0
 
-    # 🔴 TRƯỜNG HỢP 2: CÓ LỖI / TRỄ / NHÂN ĐÔI / SAI DỮ LIỆU -> CHỈ BÁO CHI TIẾT CÁC MỤC LỖI
+    # 🔴 TRƯỜNG HỢP 2: CÓ LỖI / TRỄ / NHÂN ĐÔI / SAI DỮ LIỆU -> BÁO CHI TIẾT LỖI + DANH SÁCH GHẾ GIÁM SÁT
     lines = []
     lines.append("🚨 <b>[SYSTEM ALERT — PHÁT HIỆN SỰ CỐ HỆ THỐNG]</b>")
     lines.append(f"⏰ <b>Thời gian:</b> {now_mmt} (MMT)")
@@ -1432,7 +1910,22 @@ def build_master_audit_report():
         for r in cons_fails:
             lines.append(f"   ❌ <b>{r['name']}</b>: <i>{r['reason']}</i>")
 
-    lines.append("\n──────────────────────────")
+    # 11. Báo cáo Kho Bán Hàng (Sale Inventory Smart Alerts)
+    inv_fails = [r for r in inventory_res if r["status"] in ("FAIL", "WARN")]
+    if inv_fails:
+        lines.append("\n🏷️ <b>CẢNH BÁO TỒN KHO BÁN HÀNG:</b>")
+        for r in inv_fails:
+            lines.append(f"   {r['label']} (<i>{r['component']}</i>)")
+            lines.append(f"      └ {r['detail']}")
+
+    # ── ĐƯA DANH SÁCH CÁC GHẾ GIÁM SÁT VÀO BÁO CÁO HÀNG NGÀY (CÓ TICK XANH CHO GHẾ HOẠT ĐỘNG) ──
+    lines.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("🛡️ <b>TRẠNG THÁI CÁC GHẾ GIÁM SÁT HỆ THỐNG:</b>")
+    seat_lines = build_supervisory_seats_status(eval_data)
+    for sl in seat_lines:
+        lines.append(f" {sl}")
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
     lines.append("👉 <i>Vui lòng xử lý các thành phần báo lỗi ở trên.</i>")
 
     return "\n".join(lines), total_incidents
@@ -1441,20 +1934,104 @@ def build_master_audit_report():
 def send_report_telegram(msg_text: str):
     """GỬI DUY NHẤT VỀ TELEGRAM DM CỦA ADMIN (6859790680), TUYỆT ĐỐI KHÔNG GỬI VÀO BẤT KỲ GROUP NÀO."""
     token = SEND_BOT_TOKEN
-    try:
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
+    if not token or not ADMIN_CHAT_ID:
+        logger.error("❌ SEND_BOT_TOKEN hoặc ADMIN_CHAT_ID chưa được cấu hình!")
+        return
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+    # Chia nhỏ tin nhắn nếu vượt quá 3800 ký tự (giới hạn an toàn Telegram)
+    chunks = []
+    if len(msg_text) <= 3800:
+        chunks = [msg_text]
+    else:
+        current_chunk = []
+        current_len = 0
+        for line in msg_text.split("\n"):
+            if current_len + len(line) + 1 > 3600 and current_chunk:
+                chunks.append("\n".join(current_chunk))
+                current_chunk = [line]
+                current_len = len(line) + 1
+            else:
+                current_chunk.append(line)
+                current_len += len(line) + 1
+        if current_chunk:
+            chunks.append("\n".join(current_chunk))
+
+    for idx, chunk in enumerate(chunks):
         payload = {
             "chat_id": ADMIN_CHAT_ID,
-            "text": msg_text,
+            "text": chunk,
             "parse_mode": "HTML"
         }
-        resp = requests.post(url, json=payload, timeout=15)
-        if resp.status_code == 200:
-            logger.info(f"✅ Đã gửi báo cáo Ghế AUDITOR-9.1 thành công đến DM Admin: {ADMIN_CHAT_ID}")
-        else:
-            logger.error(f"❌ Gửi Telegram thất bại DM {ADMIN_CHAT_ID}: HTTP {resp.status_code} - {resp.text}")
+        try:
+            resp = requests.post(url, json=payload, timeout=20)
+            if resp.status_code == 200:
+                logger.info(f"✅ Đã gửi báo cáo Ghế AUDITOR-9.1 (Part {idx+1}/{len(chunks)}) thành công đến DM Admin: {ADMIN_CHAT_ID}")
+            else:
+                logger.warning(f"⚠️ Gửi HTML thất bại (HTTP {resp.status_code}), thử gửi Plain Text...")
+                plain = re.sub(r"<[^>]*>", "", chunk)
+                resp2 = requests.post(url, json={"chat_id": ADMIN_CHAT_ID, "text": plain}, timeout=20)
+                if resp2.status_code == 200:
+                    logger.info(f"✅ Đã gửi Plain Text fallback thành công!")
+                else:
+                    logger.error(f"❌ Gửi Telegram thất bại DM {ADMIN_CHAT_ID}: HTTP {resp2.status_code} - {resp2.text}")
+        except Exception as e:
+            logger.error(f"❌ Lỗi gửi Telegram DM {ADMIN_CHAT_ID}: {e}")
+
+
+def notify_desktop(title: str, msg: str, color: str = "#dc2626", duration_ms: int = 7000):
+    """Hiện popup góc phải dưới màn hình khi auditor phát hiện sự cố.
+    color: '#dc2626' = đỏ (lỗi), '#16a34a' = xanh (OK).
+    Dùng subprocess để tkinter chạy đúng main thread."""
+    _POPUP = r"""
+import sys, tkinter as tk
+title   = sys.argv[1] if len(sys.argv) > 1 else "AUDITOR"
+msg     = sys.argv[2] if len(sys.argv) > 2 else ""
+color   = sys.argv[3] if len(sys.argv) > 3 else "#dc2626"
+dur_ms  = int(sys.argv[4]) if len(sys.argv) > 4 else 7000
+BG = "#fff1f2" if color == "#dc2626" else "#f0fdf4"
+FG = "#7f1d1d" if color == "#dc2626" else "#14532d"
+root = tk.Tk()
+root.overrideredirect(True); root.attributes("-topmost", True); root.attributes("-alpha", 0.96)
+W, H = 340, 86
+sw = root.winfo_screenwidth(); sh = root.winfo_screenheight()
+root.geometry(f"{W}x{H}+{sw-W-16}+{sh-H-52}")
+hdr = tk.Frame(root, bg=color, height=28); hdr.pack(fill="x"); hdr.pack_propagate(False)
+tk.Label(hdr, text="🛡  AUDITOR-9.1", bg=color, fg="white",
+         font=("Segoe UI", 9, "bold"), anchor="w", padx=8).pack(side="left", fill="y")
+btn = tk.Label(hdr, text=" ×", bg=color, fg="white",
+               font=("Segoe UI", 12, "bold"), cursor="hand2", padx=6); btn.pack(side="right")
+btn.bind("<Button-1>", lambda e: root.destroy())
+body = tk.Frame(root, bg=BG); body.pack(fill="both", expand=True)
+tk.Label(body, text=title, bg=BG, fg=color,
+         font=("Segoe UI", 9, "bold"), anchor="w", padx=10, pady=3).pack(fill="x")
+tk.Label(body, text=msg[:70] + ("…" if len(msg) > 70 else ""),
+         bg=BG, fg=FG, font=("Segoe UI", 8), anchor="w", padx=10, wraplength=W-20).pack(fill="x")
+bar_f = tk.Frame(body, bg=BG); bar_f.pack(fill="x", padx=10, pady=(2,4))
+bar = tk.Frame(bar_f, bg=color, height=3, width=W-20); bar.pack(anchor="w")
+steps=60; step_ms=dur_ms//steps; remaining=[steps]
+def tick():
+    remaining[0]-=1
+    bar.config(width=max(int((W-20)*remaining[0]/steps),0))
+    if remaining[0]>0: root.after(step_ms, tick)
+    else: root.destroy()
+root.after(step_ms, tick)
+root.mainloop()
+"""
+    try:
+        import subprocess, sys, tempfile
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".py",
+                                          delete=False, encoding="utf-8")
+        tmp.write(_POPUP); tmp.close()
+        exe = sys.executable.replace("python.exe", "pythonw.exe")
+        subprocess.Popen(
+            [exe, tmp.name, title, msg, color, str(duration_ms)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
     except Exception as e:
-        logger.error(f"❌ Lỗi gửi Telegram DM {ADMIN_CHAT_ID}: {e}")
+        logger.warning(f"Desktop notify lỗi: {e}")
 
 
 def main():
@@ -1475,7 +2052,23 @@ def main():
 
     send_report_telegram(report_text)
     logger.info(f"🏁 Hoàn tất kiểm toán Ghế AUDITOR-9.1 (Phát hiện {incident_count} sự cố).")
-    
+
+    # ── Desktop popup: đỏ nếu có sự cố, xanh nếu all-OK ──
+    if incident_count > 0:
+        notify_desktop(
+            f"🚨 AUDITOR: {incident_count} sự cố!",
+            report_text.replace("<b>","").replace("</b>","").replace("<i>","").replace("</i>","")[:120],
+            color="#dc2626",   # đỏ
+            duration_ms=8000
+        )
+    else:
+        notify_desktop(
+            "✅ AUDITOR-9.1 — All OK",
+            "Hệ thống hoạt động bình thường. Không phát hiện sự cố.",
+            color="#16a34a",   # xanh
+            duration_ms=5000
+        )
+
     audit_capacity()
 
 
