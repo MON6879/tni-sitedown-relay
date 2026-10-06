@@ -183,6 +183,10 @@ bac.
 >    - (a) Hàm gửi báo cáo phải tích hợp sẵn bộ cắt mảnh an toàn `splitReportChunks_(text, 3800)` cắt theo dòng, nếu $>1$ phần thì thêm tiêu đề `[Part X/Y]`.
 >    - (b) Hàm `deleteTgMessage_` BẮT BUỘC phải hỗ trợ xóa chuỗi đa ID (phân tách bởi dấu phẩy `,`) để khi cập nhật chuỗi tin nhắn nhiều phần thì toàn bộ các phần cũ đều được xóa sạch không để lại tin nhắn mồ côi.
 > 8. **RULE PM-33 — Trích Xuất Message ID Số Nguyên Khi Lưu Vào ScriptProperties Chống Lỗi Object Object Làm Liệt Luồng Xóa Tin Cũ (Strict Numeric Telegram Message ID Extraction Policy)**: Khi gọi hàm gửi tin nhắn Telegram trả về object kết quả `{ ok: boolean, messageId?: number }`, BẮT BUỘC phải trích xuất thuộc tính số nguyên `res.messageId` (hoặc kiểm tra `if (res && res.ok && res.messageId)`) trước khi lưu vào `ScriptProperties` / Cache / Database. TUYỆT ĐỐI CẤM ép kiểu trực tiếp cả object thành string (`String(res)`) dẫn đến giá trị `"[object Object]"` làm tê liệt toàn bộ luồng tự động xóa tin cũ (`deleteTgMessage_`), khiến các tin nhắn của khung giờ trước không được xóa và tin nhắn mới bị gửi lặp lại đè chồng lên nhau trong nhóm làm việc. Đồng thời trong hàm `deleteTgMessage_`, BẮT BUỘC phải kiểm tra hợp lệ `if (!mid || mid === "[object Object]" || isNaN(Number(mid))) continue;` để ngăn chặn lỗi HTTP 400 Bad Request và bảo vệ tính toàn vẹn của dữ liệu tin nhắn.
+> 9. **RULE PM-34 — Dọn Dẹp Menu Lệnh Bot Khi Tác Vụ Đã Được Gửi Tự Động (Strict Bot Menu Lifecycle & Redundant Command Removal Policy)**: Khi một loại báo cáo hoặc cập nhật dữ liệu (như ETA Site Down, Daily Plan, Morning Attendance Status) đã được chuyển thành luồng tự động định kỳ theo lịch trình (Toa tàu Train hoặc Trigger tự động phát vào nhóm):
+>    - (a) BẮT BUỘC phải loại bỏ triệt để các lệnh gọi thủ công tương ứng (`/eta`, `/eta_t1`, `/eta_t2`...) ra khỏi Menu Lệnh của Bot Telegram (`setMyCommands`) trên TẤT CẢ các scope (toàn cục, `all_group_chats`, `all_private_chats` và từng nhóm chat cụ thể).
+>    - (b) TUYỆT ĐỐI CẤM để lại các lệnh gợi ý trùng lặp trong menu chat khiến người dùng phân vân bấm nhầm làm spam nhóm và chạy lặp dữ liệu không cần thiết.
+>    - (c) Khi sửa hàm `setupCommands`, BẮT BUỘC gọi ngay API `deleteMyCommands` trên từng scope và gọi `setupCommands` để kích hoạt Telegram cập nhật menu ngay lập tức.
 
 ---
 
@@ -2332,3 +2336,23 @@ Reason: [Lý do]`
 >   3. **Xóa Bỏ Rào Cản Phân Quyền Web UI Khi Đã Quản Trị Qua Gmail**:
 >      - Loại bỏ hoàn toàn dropdown vai trò `#app-role-select` và khóa PIN chuyển vai trò trên Web UI.
 >      - Mặc định khởi tạo `currentAppRole = 'admin'` và `isTabAllowedForRole = () => true` để toàn bộ nhân viên được chia sẻ quyền qua Gmail đều truy cập thông suốt 100% tất cả các tab chức năng.
+>
+> **PM-78 (06/10/2026) — Bọc Thép Phân Loại Template Báo Cáo: Bắt Buộc Neo Đầu Dòng (Anchored Start) & Khóa Chặt Điều Kiện Phản Hồi status == 'ok' Có DEF ID (Strict Anchored Template Parsing & Idempotent DEF Gate Policy)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Tại nhóm Telegram `9 TNI REQUEST REFUEL`, khi thành viên nhắn tin chat thông thường: *"Raja HO Sunil Fuel Aung Naing Refuel Team sent plan refuel we can change Plan in letter you request before 1 day at 10:00 Hein Nanda will request govement change for tomorrow not wait Site down"*, Bot tự động gửi phản hồi xác nhận sai: `⛽ Plan refuel ✅ # | 🗓️ 06/10/2026 10:35 📢 @Phongha79 Who is assigned to follow and monitor ?`.
+>   2. Người dùng yêu cầu làm rõ lý do tại sao bot lại trả lời cho tin nhắn chat tự do không bắt đầu bằng cú pháp chuẩn của Template, đồng thời yêu cầu xóa tin bot nhắn nhầm và sửa dứt điểm lỗi này ở cả bot và kịch bản GAS.
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. *Biểu thức chính quy không neo đầu dòng (Unanchored Matching)*: Cả `api/refuel_collector.py` và `apps_script_refuel_plan.gs` trước đây dùng tìm kiếm tự do trong văn bản (`re.search(r'\bplan\s*refuel\b', t)`, `.includes("plan")`, `.includes("request")`). Do đó, chỉ cần tin nhắn chat chứa cụm từ *"sent plan refuel"* hoặc *"request"* là bị nhận diện nhầm thành mẫu báo cáo.
+>   2. *Lỗi kiểm tra trạng thái lỏng lẻo trong luồng phản hồi (Status Logic Inversion)*: Khi GAS nhận diện rớt trạm (`entries.length === 0`), GAS trả về `{ status: "skip", message: "No sites parsed in Plan" }` mà không ghi dòng nào vào Google Sheets. Tuy nhiên, `refuel_collector.py` lại kiểm tra điều kiện `if result.get("status") != "error":`. Vì `"skip" != "error"` là `True`, bot Python vẫn coi là thành công và gửi phản hồi Telegram với mã DEF rỗng (`#`) và tag Leader.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (The 4-Pillar Anchored Template & DEF Gate Protocol)**:
+>   1. **Bắt Buộc Neo Đầu Dòng Chuẩn Xác (Strict Anchored Start Regex)**: Mọi regex phân loại mẫu báo cáo (`classify`) BẮT BUỘC phải bắt đầu bằng `^\s*...`:
+>      - `PLAN`: `^\s*(?:plan\s*refuel|team[\s_\-]*0*[1-4](?:\s*s\d+)?\s*plan(?:\s*refuel)?)\b` VÀ có mã trạm `\bTNI0*(\d{1,4})\b`.
+>      - `REQUEST`: `^\s*(?:request\s*refuel|team[\s_\-]*0*[1-4](?:\s*s\d+)?\s*request(?:\s*refuel)?)\b` VÀ có mã trạm `\bTNI0*(\d{1,4})\b`.
+>      - `FT_MONITOR`: `^\s*(?:name\s+of\s+ft\s+staff\s+member\s+accompanying\s+to\s+supervise|follow\s*monit[eo]r)\b` VÀ có mã trạm `\bTNI0*(\d{1,4})\b`.
+>      - `REFUELED`: `^\s*(?:dg\s*type|tni0*\d{1,4}\b.*dg\s*type)\b` VÀ có các trường kỹ thuật (`actual filled` / `csu reading` / `running hour` / `level %`) VÀ có mã trạm `\bTNI0*(\d{1,4})\b`.
+>      - `LETTER_SUBMIT`: `^\s*(?:•\s*)?(?:letter\s*submit|submit\s*letter)\s*[:\-]` hoặc kèm ngày tháng.
+>      - `LETTER_APPROVED`: `^\s*(?:•\s*)?(?:approved\s*letter|letter\s*approved|government\s+approved)\s*[:\-]`.
+>   2. **Khóa Chặt Điều Kiện Phản Hồi (Strict Reply Gate: status == "ok" AND valid def)**: Bot Python CHỈ ĐƯỢC PHÉP gửi tin nhắn phản hồi Telegram khi `result.get("status") == "ok" and result.get("def")`. Mọi trạng thái `"skip"`, `"error"` hoặc thiếu mã DEF BẮT BUỘC phải im lặng hoàn toàn, cấm gửi tin rác hoặc tag người dùng.
+>   3. **Đồng Bộ Song Mã Backend GAS (`apps_script_refuel_plan.gs`)**: Cập nhật hàm `collectMessage` trong GAS để dùng chung logic regex neo đầu dòng và nhận diện trường tường minh `"category"` từ Webhook truyền lên.
+>   4. **Triển Khai & Kiểm Chứng Live (Live Verification & Sweep)**: Dùng Telethon xóa tức thì tin bot nhắn sai trong nhóm Telegram, deploy mã nguồn Apps Script (`npx clasp push` & `npx clasp deploy -i AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA @478`), và push code Webhook Python lên Vercel.
+

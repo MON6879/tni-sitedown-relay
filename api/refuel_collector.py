@@ -35,33 +35,46 @@ TZ_MM = timezone(timedelta(hours=6, minutes=30))
 
 
 def classify(text: str) -> str | None:
-    """Phân loại tin nhắn báo cáo chính xác 100%, bắt buộc đúng từ khóa đầu tiên (Keyword)."""
+    """Phân loại tin nhắn báo cáo chính xác 100%, bắt buộc đúng cú pháp BẮT ĐẦU của Template (Anchored Start)."""
     import re
-    t = text.lower().strip()
+    t = text.strip().lower()
+    has_site = bool(re.search(r'\btni0*(\d{1,4})\b', t))
 
-    # 1. FT_MONITOR: Bắt buộc đúng cụm từ khóa chuẩn bắt đầu bằng 'Name of FT staff member accompanying to supervise'
-    if re.search(r'^\s*name\s+of\s+ft\s+staff\s+member\s+accompanying\s+to\s+supervise\b', t):
-        return "FT_MONITOR"
+    # 1. FT_MONITOR: Bắt buộc BẮT ĐẦU bằng 'Name of FT staff member...' hoặc 'follow monitor' VÀ có mã trạm TNI
+    if (re.search(r'^\s*name\s+of\s+ft\s+staff\s+member\s+accompanying\s+to\s+supervise\b', t) or
+        re.search(r'^\s*follow\s*monit[eo]r\b', t)):
+        if has_site:
+            return "FT_MONITOR"
+        return None
 
-    # 2. REFUELED (báo cáo đã đổ xăng thực tế - phải có 'dg type' hoặc 'actual filled qty')
-    if "dg type" in t or "actual filled qty" in t:
-        return "REFUELED"
+    # 2. REFUELED: Bắt buộc BẮT ĐẦU bằng 'dg type' hoặc 'TNI... DG' VÀ có thông số điền form VÀ có mã trạm TNI
+    if (re.search(r'^\s*dg\s*type\b', t) or re.search(r'^\s*tni0*\d{1,4}\b.*dg\s*type\b', t)):
+        if ('actual filled' in t or 'csu reading' in t or 'running hour' in t or 'level %' in t) and has_site:
+            return "REFUELED"
+        return None
 
-    # 3. LETTER_SUBMIT (bắt buộc đúng Template "Letter Submit:" / "Submit Letter:")
-    if re.search(r'^\s*(letter\s*submit|submit\s*letter)\s*[:\-]', t, re.M) or re.search(r'^\s*(letter\s*submit|submit\s*letter)\b.*\d{1,2}[/\-\.]\d{1,2}', t, re.M):
+    # 3. LETTER_SUBMIT: Bắt buộc BẮT ĐẦU bằng 'Letter Submit:' hoặc 'Submit Letter:'
+    if (re.search(r'^\s*(?:•\s*)?(letter\s*submit|submit\s*letter)\s*[:\-]', t) or 
+        re.search(r'^\s*(?:•\s*)?(letter\s*submit|submit\s*letter)\b.*\d{1,2}[/\-\.]\d{1,2}', t)):
         return "LETTER_SUBMIT"
 
-    # 4. LETTER_APPROVED (bắt buộc đúng Template "Approved Letter:" / "Letter Approved:")
-    if re.search(r'^\s*(approved\s*letter|letter\s*approved)\s*[:\-]', t, re.M) or re.search(r'^\s*(approved\s*letter|letter\s*approved)\b.*\d{1,2}[/\-\.]\d{1,2}', t, re.M):
+    # 4. LETTER_APPROVED: Bắt buộc BẮT ĐẦU bằng 'Approved Letter:' hoặc 'Letter Approved:' hoặc 'Government Approved:'
+    if (re.search(r'^\s*(?:•\s*)?(approved\s*letter|letter\s*approved)\s*[:\-]', t) or 
+        re.search(r'^\s*(?:•\s*)?(approved\s*letter|letter\s*approved)\b.*\d{1,2}[/\-\.]\d{1,2}', t) or
+        re.search(r'^\s*government\s+approved\s*[:\-]', t)):
         return "LETTER_APPROVED"
 
-    # 5. PLAN (bắt buộc "Team X Plan" hoặc "Plan refuel")
-    if re.search(r'^\s*team[\s_\-]*\w*\s*plan\b', t, re.M) or re.search(r'^\s*plan\s*refuel\b', t, re.M) or re.search(r'\bteam[\s_\-]*0*[1-4]\s*plan\b', t):
-        return "PLAN"
+    # 5. PLAN: Bắt buộc BẮT ĐẦU bằng 'Plan refuel' hoặc 'Team X Plan' VÀ có mã trạm TNI
+    if re.search(r'^\s*(?:plan\s*refuel|team[\s_\-]*0*[1-4](?:\s*s\d+)?\s*plan(?:\s*refuel)?)\b', t):
+        if has_site:
+            return "PLAN"
+        return None
 
-    # 6. REQUEST (bắt buộc "Team X Request" hoặc "Request refuel")
-    if re.search(r'^\s*team[\s_\-]*\w*\s*request\b', t, re.M) or re.search(r'^\s*request\s*refuel\b', t, re.M) or re.search(r'\bteam[\s_\-]*0*[1-4]\s*request\b', t):
-        return "REQUEST"
+    # 6. REQUEST: Bắt buộc BẮT ĐẦU bằng 'Request refuel' hoặc 'Team X Request' VÀ có mã trạm TNI
+    if re.search(r'^\s*(?:request\s*refuel|team[\s_\-]*0*[1-4](?:\s*s\d+)?\s*request(?:\s*refuel)?)\b', t):
+        if has_site:
+            return "REQUEST"
+        return None
 
     return None
 
@@ -238,7 +251,6 @@ def process_update(update: dict):
     if norm_chat_id != PLAN_GROUP_ID and "refuel" not in title_l and "cross check" not in title_l and "9.1" not in title_l and "9" not in title_l:
         logger.info(f"Skip norm_chat_id={norm_chat_id}")
         return
-
     # Xử lý các lệnh lấy template
     if text.startswith("/"):
         cmd = text.split()[0].split("@")[0].lower()
@@ -314,7 +326,25 @@ def process_update(update: dict):
 
     category = classify(text)
     if not category:
-        logger.info("No keyword match — skip")
+        # Tin nhắn trò chuyện thông thường (không phải báo cáo): Ghi log đọc tin ngầm (non-blocking thread)
+        if msg.get("from"):
+            f_user = msg["from"]
+            s_name = f"{f_user.get('first_name','')} {f_user.get('last_name','')}".strip()
+            s_id = str(f_user.get("id", ""))
+            if s_id:
+                import threading
+                threading.Thread(
+                    target=post_gas,
+                    args=({
+                        "action": "realtime_read",
+                        "group_id": PLAN_GROUP_ID,
+                        "sender": s_name,
+                        "sender_id": s_id,
+                        "text": text[:100],
+                    },),
+                    daemon=True
+                ).start()
+        logger.info("No keyword match (casual chat logged async) — skip")
         return
 
     # Lấy tên, ID và username của người gởi (Team Leader)
@@ -366,19 +396,19 @@ def process_update(update: dict):
         "sender":   sender,
         "sender_id": sender_id,
         "date":     now.strftime("%d/%m/%Y %H:%M"),
+        "category": category,
     })
     logger.info(f"[{category}] sender={sender} | GAS={result.get('status')} def={result.get('def','')}")
 
-    # ── GỬI REPLY XÁC NHẬN KHI GHI THÀNH CÔNG (TÁCH BIỆT 100% GHẾ RIÊNG KHÔNG BAO GIỜ NHẦM) ──
-    if result.get("status") != "error":
+    # ── GỬI REPLY XÁC NHẬN KHI GHI THÀNH CÔNG (CHỈ REPLY KHI STATUS LÀ "OK" VÀ CÓ DEF ID HỢP LỆ) ──
+    if result.get("status") == "ok" and result.get("def"):
         ts     = result.get("time", now.strftime("%d/%m/%Y %H:%M"))
-        def_id = result.get("def", "")
+        def_id = str(result.get("def", "")).strip()
 
         # 💺 GHẾ 1: DÀNH RIÊNG CHO BÁO CÁO KẾ HOẠCH DẦU (PLAN REFUEL — DUY NHẤT CÓ CÂU HỎI VÀ TAG LEADER)
         if category == "PLAN":
             reply_text = (
-                f"<b>Plan refuel</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
-                f"Done 📅 {ts}\n"
+                f"⛽ <b>Plan refuel</b> ✅ #{def_id.replace('#', '')} | 🗓️ {ts}\n"
                 f"📢 {mention_tag} Who is assigned to follow and monitor ?"
             )
             tg_reply(chat_id, reply_text)
@@ -387,8 +417,8 @@ def process_update(update: dict):
         # 💺 GHẾ 2: DÀNH RIÊNG CHO BÁO CÁO FT FOLLOW MONITOR
         if category == "FT_MONITOR":
             reply_text = (
-                f"<b>FT follow monitor</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
-                f"Done 📅 {ts}"
+                f"🔍 <b>FT follow monitor</b> ✅ #{def_id.replace('#', '')} | 🗓️ {ts}\n"
+                f"✅ Recorded successfully"
             )
             tg_reply(chat_id, reply_text)
             return
@@ -396,8 +426,8 @@ def process_update(update: dict):
         # 💺 GHẾ 3: DÀNH RIÊNG CHO BÁO CÁO ĐÃ ĐỔ XĂNG THỰC TẾ (REFUELED)
         if category == "REFUELED":
             reply_text = (
-                f"<b>Refueled</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
-                f"Done 📅 {ts}"
+                f"⛽ <b>Refueled</b> ✅ #{def_id.replace('#', '')} | 🗓️ {ts}\n"
+                f"✅ Recorded successfully"
             )
             tg_reply(chat_id, reply_text)
             return
@@ -405,8 +435,8 @@ def process_update(update: dict):
         # 💺 GHẾ 4: DÀNH RIÊNG CHO BÁO CÁO YÊU CẦU ĐỘI (TEAM REQUEST)
         if category == "REQUEST":
             reply_text = (
-                f"<b>Team request</b> ✅ Recorded — 🪪 <code>{def_id}</code>\n"
-                f"Done 📅 {ts}"
+                f"📋 <b>Team request</b> ✅ #{def_id.replace('#', '')} | 🗓️ {ts}\n"
+                f"✅ Recorded successfully"
             )
             tg_reply(chat_id, reply_text)
             return
@@ -435,6 +465,8 @@ def process_update(update: dict):
             f"Done 📅 {ts}"
         )
         tg_reply(chat_id, reply_text)
+    else:
+        logger.info(f"[{category}] GAS did not return ok with def ({result}) — skip sending tg_reply")
 
 
 class handler(BaseHTTPRequestHandler):
