@@ -28,13 +28,13 @@ def get_old_msgids(gas_url: str, key: str) -> list[int]:
     if not key:
         return []
     import time as _time
-    for attempt in range(3):
+    for attempt in range(2):
         for u in urls:
             try:
                 resp = requests.get(
                     u,
                     params={"action": "get_msgids", "key": key},
-                    timeout=45,
+                    timeout=15,
                     allow_redirects=True
                 )
                 if resp.status_code == 200:
@@ -42,13 +42,14 @@ def get_old_msgids(gas_url: str, key: str) -> list[int]:
                     raw = data.get("msgids", [])
                     if raw:
                         return [int(x) for x in raw]
-                    # GAS trả OK nhưng rỗng → tin chưa được lưu, không cần retry
+                    return []
+                else:
+                    print(f"[delete_old] ⚠️ get_msgids({key}) HTTP {resp.status_code} at {u[:45]}...")
                     return []
             except Exception as ex:
                 print(f"[delete_old] ⚠️ get_msgids({key}) attempt {attempt+1} lỗi: {ex}")
-        if attempt < 2:
-            print(f"[delete_old] 🔄 Retry get_msgids sau 8s (attempt {attempt+2}/3)...")
-            _time.sleep(8)
+        if attempt < 1:
+            _time.sleep(3)
     return []
 
 
@@ -203,6 +204,7 @@ async def delete_by_titles_batch_telethon(
 
                 # Xóa các tin Note chỉ đạo gửi từ user (Telethon revoke=True)
                 if any(k in msg.text for k in [
+                    "Note: Team leader read",
                     "Note: Above are the end-of-day work results",
                     "Note: 📋 1. Report",
                     "@Raja HO",
@@ -251,7 +253,7 @@ async def delete_by_titles_batch_telethon(
                         )
                         if resp.json().get("ok"):
                             total_deleted += 1
-                            print(f"[delete_batch] 🗑️ Bot API xóa msg_id={msg.id} ('{first_line_clean[:30]}...')")
+                            print(f"[delete_batch] 🗑️ Bot API xóa msg_id={msg.id} ('{header_clean[:30]}...')")
                         else:
                             await client.delete_messages(cid, [msg.id], revoke=True)
                             total_deleted += 1
