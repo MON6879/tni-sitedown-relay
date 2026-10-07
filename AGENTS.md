@@ -1,12 +1,12 @@
 # 🔒 STRICT STEEL-LOCK RULE: KHÓA THÉP PHÂN HỆ SITE DOWN — TUYỆT ĐỐI CẤM TỰ Ý VÀO XEM / SỬA KHI KHÔNG CÓ YÊU CẦU (STRICT SITE DOWN STEEL LOCK & ZERO-UNAUTHORIZED-ACCESS POLICY)
 
 > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SITE DOWN STEEL-LOCK POLICY)**:
-> 1. **Khóa Thép Tuyệt Đối (Absolute Steel Freeze)**: Phân hệ Site Down (`apps_script_sitedown`, Script ID `1fgIR_frjlOHBt4o3STTjGmHYaKfuiSb3zAtp7IrO__uLSIuRQGJ2Oc6X`, Version `@89`, `botlookup_relay.py`) đã hoàn thiện và được KHÓA THÉP 100%.
+> 1. **Khóa Thép Tuyệt Đối (Absolute Steel Freeze)**: Phân hệ Site Down (`apps_script_sitedown`, Script ID `1fgIR_frjlOHBt4o3STTjGmHYaKfuiSb3zAtp7IrO__uLSIuRQGJ2Oc6X`, Version `@110`, `botlookup_relay.py`) đã hoàn thiện và được KHÓA THÉP 100%.
 > 2. **🔐 MẬT KHẨU MỞ KHÓA BẮT BUỘC (PASSWORD-GATED ACCESS)**: AI **CHỈ ĐƯỢC PHÉP** mở khóa thép khi Người Dùng gõ **CHÍNH XÁC** cụm lệnh: `UNLOCK STEEL: Phucat@7979`. Nếu Người Dùng KHÔNG gõ đúng mật khẩu này, AI **TUYỆT ĐỐI CẤM** đọc, sửa, gộp, xóa, hoặc tái cấu trúc bất kỳ file nào trong phạm vi khóa thép — DÙ Người Dùng có yêu cầu bằng lời nói thông thường! Sau khi sửa xong, khóa **TỰ ĐỘNG ĐÓNG LẠI** ngay lập tức.
 > 3. **CẤM Tự Tiện Vào Xem / Sửa (Zero Arbitrary Access/Modification)**: Tuyệt đối KHÔNG ĐƯỢC tự ý mở file, đọc code, sửa đổi, gộp file, xóa bỏ hay tái cấu trúc (refactor) bất kỳ thành phần nào của phân hệ Site Down khi CHƯA CÓ MẬT KHẨU!
 > 4. **Phạm Vi Đóng Băng Bất Biến**:
 >    - File GAS: `apps_script_sitedown/site_down_v2.gs` (1 file độc lập duy nhất).
->    - Deployment ID: `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` (Version `@92`).
+>    - Deployment ID: `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` (Version `@110`).
 >    - Luồng Relay: `botlookup_relay.py` (chạy nhịp :06 và :36 MMT).
 >    - Bảng Tính: `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow` (GID 0).
 > 5. **🔧 BẮT BUỘC SỬA TRIỆT ĐỂ END-TO-END TRONG CÙNG 1 PHIÊN STEEL LOCK (Zero Incomplete Fix Policy)**:
@@ -149,6 +149,16 @@ bac.
 >    - **Tự Động Triệt Tiêu Nhân Viên Nghỉ Việc (Auto Purge Resigned Staff)**: Nếu một nhân sự bị xóa khỏi bảng tính trên Google Sheet (nghỉ việc), hệ thống BẮT BUỘC tự động nhận diện và xóa hoàn toàn khỏi danh bạ Web UI, không để lại dữ liệu rác hay hàng trống.
 >    - **Bảo Lưu Phân Quyền Đã Điều Chỉnh (Preserve Custom Overrides)**: Khi đồng bộ dữ liệu mới, hệ thống BẮT BUỘC bảo lưu các vai trò mà Ban Giám Đốc đã tùy chỉnh trước đó, không được tự ý ghi đè lại về `sales`.
 >    - **Ghế Giám Sát Tự Động (SUPERVISOR-HR-SYNC)**: Cả Web UI (`sale.html`) và Backend Apps Script (`staffGet_`) cùng giám sát chặt chẽ luồng đồng bộ, bảo đảm dữ liệu luôn tươi mới 100%.
+
+---
+
+# 📊 STRICT RULE: ĐỊNH DẠNG BẢN TIN TỔNG HỢP CHUYÊN BIỆT SITE DOWN CHO GROUP CONTROL (STRICT SITE DOWN ONLY CONTROL SUMMARY FORMAT)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SITE DOWN ONLY CONTROL SUMMARY STANDARD)**:
+> 1. **Bản Tin Chuyên Biệt Chỉ Site Down (Dedicated Site Down Only Summary)**: Sau khi gửi bản tin đầy đủ `SUMMARY — ALL TEAMS`, hệ thống BẮT BUỘC gửi tiếp 1 bản tin tổng hợp chuyên biệt CHỈ CÓ SITE DOWN (`TIN2_CONTROL_SD_ONLY`) vào Group Control (`5 TNI TECHNICA DEP CONTROL SITE`).
+> 2. **Tách Biệt Rõ Ràng Team & Sub Team**: Dữ liệu Site Down BẮT BUỘC phân chia rõ ràng theo từng Team và Sub Team theo thứ tự tuần tự: Team 1 Dawei -> Sub Team 1 -> Team 2 Myeik -> Sub Team 2 -> Team 3 Bokpyin -> Sub Team 3 -> Team 4 Kawthoung. TUYỆT ĐỐI CẤM gộp nhân sự Sub Team vào chung Team chính làm rối loạn địa bàn quản lý.
+> 3. **Định Dạng Từng Nhân Viên Xuống Hàng Chuẩn Xác**: Dưới mỗi Team/Sub Team, từng nhân viên được định dạng thành một dòng riêng biệt: `• [Tên Nhân Viên] : [Danh Sách Trạm & Thời Gian Sập]` rồi xuống hàng đến nhân viên tiếp theo.
+> 4. **Phạm Vi Gửi Duy Nhất Group Control**: Bản tin tổng hợp chuyên biệt Site Down này CHỈ GỬI VÀO DUY NHẤT GROUP CONTROL (`SD_GROUPS["CONTROL"]`), tuyệt đối không gửi vào các group Team để tránh trùng lặp thông tin.
 
 ---
 
@@ -2498,6 +2508,22 @@ Reason: [Lý do]`
 >   1. **GUI Automation trên Java Client**: Client Nocpro là ứng dụng Java chạy trên desktop. Để nhấp chuột chính xác khi chạy tự động ngầm, cần dùng `OpenInputDesktop` và `SetThreadDesktop`, đồng thời đưa cửa sổ lên Foreground với kỹ thuật `AttachThreadInput` + `SetWindowPos(HWND_TOPMOST)`. Nút `Action` tại tọa độ logical chuẩn hóa `(324, 816)`.
 >   2. **Bảo tồn ô A1 & Cột J bằng openpyxl**: Đọc toàn bộ ma trận từ hàng 1 (`ws.cell(r, c).value`), chuyển đổi đối tượng `datetime.datetime` thành chuỗi định dạng `dd/MM/yyyy HH:mm:ss`, chuẩn hóa đủ 27 cột (A:AA) và gửi qua Web App GAS Hub (`handleNocproSyncSheet_`).
 >   3. **Endpoint kiểm toán độc lập**: GAS Web App cung cấp endpoint `?action=audit_nocpro` lưu trữ trạng thái phiên đồng bộ gần nhất, phục vụ Ghế Giám Sát `AUDITOR-NOCPRO-9.3` trong `system_auditor.py`.
-
-
-
+>
+> **PM-85 (07/10/2026) — Giới Hạn Cứng Bản Tin ETA Update Dừng Tại Mục 1.4 Site Down — Triệt Tiêu Mục 1.5 Battery Temp High & Các Mục Sau (Strict ETA Reminder 1.4-Cap & Zero-1.5 Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng chỉ thị dứt khoát: *"chỉ lấy đến 1.4 là hết không gởi thêm 1,5 gì nữa"* kèm ảnh chụp màn hình bản tin `📋 TX — ETA Update`.
+>   2. Trước đây trong hàm `get_eta_share_templates()` (`search_bot.py`), hệ thống tự động sinh thêm mục `1.5 🌡️ Battery Temp High: X site` (lấy từ cột K..N tab `ALARM_GID` 1839820494).
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. Cấu trúc hàm `get_eta_share_templates()` đọc cả 5 loại cảnh báo và tự động thêm mục `1.5 🌡️ Battery Temp High` nếu team có trạm báo nhiệt độ ắc quy cao.
+>   2. Tuy nhiên, quy trình vận hành và báo cáo thực địa của các Đội Kỹ Thuật (Teams & Subteams) chỉ tập trung vào 4 nhóm sự cố vận hành cốt lõi: `1.1 Cell Down`, `1.2 DG Abnormal`, `1.3 DG Run >16H`, và `1.4 Site Down`.
+>   3. Việc gửi thêm mục 1.5 gây rối loạn thông tin, tạo áp lực giải trình không cần thiết tại các nhóm điều hành chung.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (Rule PM-85)**:
+>   1. **Khóa Cứng Bản Tin Dừng Tại 1.4 (Strict 1.4 Hard-Cap)**:
+>      - Cắt bỏ hoàn toàn khối logic sinh mục `1.5 🌡️ Battery Temp High` trong `get_eta_share_templates()`.
+>      - Bỏ parsing cột 10-13 (`bat_temp`) từ tab `ALARM_GID`.
+>      - Biến đếm `total_sites` chỉ tính tổng của 4 mục (1.1 đến 1.4).
+>      - Bản tin `📋 TX — ETA Update` (cả bản tin gửi tự động qua `cron_send.py` / `build_smart_eta_reminder` lẫn lệnh bot `/share_eta`) bắt buộc dừng chính xác sau danh sách các trạm của `1.4 📡 Site Down`. Tuyệt đối không sinh thêm bất kỳ mục 1.5 hay mục nào sau đó!
+>   2. **Đồng Bộ Tri-Repo Parity Tuyệt Đối**:
+>      - Cập nhật đồng bộ trên cả `Task and WO/api/search_bot.py` và `tni-search/api/search_bot.py`.
+>      - Chạy đối chiếu `Compare-Object` đạt 0 sai khác trước khi commit và push.
+>      - Tuyệt đối tuân thủ Khóa Thép Site Down: Không can thiệp vào `apps_script_sitedown`, `botlookup_relay.py` hay repo `tni-sitedown-relay`.
