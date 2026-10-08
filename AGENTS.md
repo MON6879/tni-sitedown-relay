@@ -2553,4 +2553,34 @@ Reason: [Lý do]`
 >   1. **Phân biệt triệt để Overwrite vs Append**: `DESK-NOCPRO-1` xóa và ghi đè tab `1. Input New` mỗi ca để theo dõi cảnh báo hiện hành; trong khi `DESK-NOCPRO-2` phục vụ lưu trữ lịch sử trạm clear theo thời gian, do đó backend GAS `handleNocproSyncClearHistory_` quét tìm `firstBlankRow` từ dưới lên và ghi nối tiếp `setValues` vào cuối bảng.
 >   2. **Chuẩn hóa form input và UI Automation Java**: Xử lý đầy đủ vòng đời: Auto-login nếu gặp cửa sổ Login (`phonghd` / `MytTNI@2026`), bung thanh công cụ đáy nếu bị gập, xóa và điền chính xác 4 ô thời gian bằng keybd_event unicode, điều hướng Option dialog tick chuẩn `Flow Loss`, và chuyển dropdown sang `Cleared alarm`.
 >   3. **Endpoint đọc tham số trực tiếp (SSOT Fresh Read)**: GAS Web App cung cấp endpoint `?action=nocpro_get_clear_params` đọc trực tiếp giá trị sống hiển thị của `AF4` và `AG4` từ Google Sheet bằng `getDisplayValue()`, kèm fallback đọc CSV công khai.
+>
+> **PM-87 (07/10/2026) — Chuỗi Tuần Tự 2 Tác Vụ Ghế DESK-NOCPRO-2: Clear Flow Loss Rồi Đến Clear Door Alarm — Tuyệt Đối Chờ Loss Xong Mới Đến Door (Strict Sequential Flow Loss -> Door Alarm Execution, Dynamic Option Search & Dual-Tab Append Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng chỉ thị mở rộng Ghế `DESK-NOCPRO-2` thành quy trình 2 phần chạy tuần tự:
+>      - **Phần 1 (Clear Flow Loss)**: Đọc tham số `AF4` & `AG4` từ tab `1.1 Input Site Clear+History` (GID `379017693`). Cấu hình Nocpro `Alarm status` = `Cleared alarm`, `Alarm group` = `Flow Loss`, `Start time from` = `AF4 AG4`, `Start time to` = `today + 1 00:00:00`. Export Excel và GHI NỐI TIẾP (APPEND) vào hàng trống tiếp theo từ hàng 6 trở đi.
+>      - **Phần 2 (Clear Door Alarm — "chờ Loss làm xong rồi mới đến door")**: Bắt buộc CHỜ Phần 1 hoàn thành 100%. Đọc tham số `AF3` & `AG3` từ tab `Door Alarm` (GID `2099413230`, Spreadsheet ID `1aAMxzyhiiYYZ1Hl8n8VYgXTfu3Cx_ivX6X-WSzXbFcI`). Cấu hình Nocpro `Alarm status` = `Cleared alarm`, reset `Alarm group`, tại `Alarm name` gõ tìm từ khóa `door` trong ô tìm kiếm của hộp thoại Option dialog, bấm `Select all` để chọn toàn bộ 5 cảnh báo cửa (`Battery Cabinet Door Alarm`, `DG Door Alarm`, `Door Alarm`, `Door open alarm`, `Door open alarm.`), `Start time from` = `AF3 AG3`, `Start time to` = `today + 1 00:00:00`. Export Excel và GHI NỐI TIẾP (APPEND) vào hàng trống tiếp theo từ hàng 8 trở đi của tab `Door Alarm`.
+>   2. Quy định thời gian: Cả 2 tác vụ chạy tuần tự trong cùng 1 phiên tại 8 mốc giờ MMT: `06:16, 07:16, 08:16, 09:16, 11:50, 15:50, 17:50, 20:36`.
+> - **Nguyên Nhân Gốc & Giải Pháp Kỹ Thuật (Root Cause & Solution)**:
+>   1. **Kỷ Luật Tuần Tự Tuyệt Đối (Single-Thread Sequential Execution)**: Client NMS Nocpro là ứng dụng giao diện đơn nhiệm chạy trên Desktop 2. Tuyệt đối KHÔNG ĐƯỢC chạy song song 2 luồng tự động hóa cùng lúc vì sẽ tranh chấp chuột, bàn phím và cửa sổ Option dialog, dẫn đến sai lệch bộ lọc cảnh báo. Bắt buộc: Task 1 (Flow Loss) chạy xong, nhận phản hồi HTTP 200 từ GAS, ngủ nghỉ 3 giây cho client NMS ổn định giao diện rồi mới bắt đầu Task 2 (Door Alarm).
+>   2. **Cơ Chế Dynamic Option Search (Gõ Tìm Kiếm + Select All)**: Cửa sổ Option dialog của Nocpro có danh sách cảnh báo biến động. Nếu dùng tọa độ dòng chuột cố định rất dễ click trượt. Giải pháp chuẩn xác: Click vào ô tìm kiếm của Option dialog `(dlg_left + 50, dlg_top + 38)`, dùng clipboard paste từ khóa `door` (hoặc `Flow Loss`), sau đó nhấp vào checkbox `Select all` `(dlg_left + 20, dlg_bottom - 45)` và bấm `OK` `(dlg_left + 110, dlg_bottom - 20)`. Cách này đảm bảo chọn trọn vẹn 100% các mục liên quan mà không phụ thuộc thứ tự danh sách.
+>   3. **Đa Hình Hóa Backend GAS (Dual-Tab Append & Audit)**: Hàm `handleNocproSyncClearHistory_` trong `apps_script_collector.gs` tự động nhận diện `target_gid` (`379017693` cho Flow Loss hoặc `2099413230` cho Door Alarm), xác định ngưỡng dòng khởi điểm (`minBlankRow = 6` cho tab 1.1, `minBlankRow = 8` cho tab Door Alarm), và ghi nhận audit riêng biệt vào `AUDIT_DESK_NOCPRO_2` và `AUDIT_DESK_NOCPRO_2_DOOR` phục vụ Ghế Giám Sát `AUDITOR-NOCPRO-9.4`.
+>   4. **Tự Động Đọc Tham Số SSOT Theo Tab**: Endpoint `?action=nocpro_get_clear_params` đọc `AF4/AG4` tab 1.1; endpoint `?action=nocpro_get_door_params` đọc `AF3/AG3` tab Door Alarm. Tuyệt đối không hardcode thời gian tìm kiếm.
+>
+> **PM-88 (08/10/2026) — Ghế DESK-NOCPRO-1: Chuẩn Hóa Tọa Độ Nút Chevron Mở Rộng Toolbar Đáy, Tự Động Đóng Excel Sau Khi Dán & Khóa Desktop Chống Xung Đột (Strict Bottom Toolbar Expansion, Auto-Closing Excel & Dedicated Desktop Coordination Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Giao diện NMS Nocpro khi mở toàn màn hình (Scale 1.75, độ phân giải vật lý 2560x1600) có thanh công cụ điều kiện lọc đáy mặc định bị thu gọn, chỉ để lộ thanh mỏng chứa nút hai mũi tên lên (`^^`).
+>   2. Người dùng chỉ thị: Bắt buộc phải bấm nút hai mũi tên lên (`^^`) ở góc trái đáy màn hình để mở rộng thanh điều kiện tìm kiếm; sau khi xuất file và dán đủ A:AA (27 cột từ Dòng 1) vào tab `1. Input New`, ứng dụng Excel tự động mở lên BẮT BUỘC phải được đóng/tắt ngay lập tức để không chiếm bộ nhớ hay khóa file.
+> - **Nguyên Nhân Gốc & Giải Pháp Kỹ Thuật (Root Cause & Solution)**:
+>   1. **Xác Định Tọa Độ Vật Lý Tuyệt Đối Của Nút Chevron (Exact Chevron Coordinates)**:
+>      - Thanh đáy thu gọn ở độ cao `y = 1546`, nút chevron hai mũi tên lên (`^^`) nằm ở tọa độ vật lý chính xác `(45, 1546)`.
+>      - Khi click chuột vào `(45, 1546)`, thanh điều kiện lọc sẽ bung lên đầy đủ hiển thị các ô lọc: `Start time from/to`, `Alarm group`, `Alarm status`, `Province`, v.v.
+>      - Các tọa độ chuẩn hóa sau khi bung: Nút `Search` tại `(160, 1398)`, Checkbox All đầu bảng (chọn tất cả cảnh báo, bên trái cột No.) tại `(16, 192)`, nút `Action` tại `(223, 868)`.
+>   2. **Tự Động Đóng Tiến Trình EXCEL Tức Thì (Zero Lingering Excel Processes)**:
+>      - Khi Nocpro hoàn tất xuất file, hệ thống sẽ tự động bật Microsoft Excel để mở file vừa xuất.
+>      - Kịch bản `auto_nocpro_desk1.py` sau khi phát hiện file mới và gửi dữ liệu thành công lên GAS Web App (tab `1. Input New`, GID `85422169`) BẮT BUỘC phải thực thi lệnh `Stop-Process -Name EXCEL -ErrorAction SilentlyContinue` để giải phóng hoàn toàn bộ nhớ RAM và đóng mọi cửa sổ Excel đang mở.
+>   3. **Bảo Toàn Trọn Vẹn Dữ Liệu Gốc Ô A1 & Cột J Datetime**:
+>      - Đọc chính xác từ Dòng 1 chứa `Exported Time: dd/MM/yyyy HH:mm:ss`, dòng 2 và dòng 3 giữ nguyên tiêu đề/header, dán đủ 27 cột (A:AA) đè lên tab `1. Input New`.
+>      - Cột J (`Start time`) luôn được format định dạng chuẩn `dd/MM/yyyy HH:mm:ss`, tuyệt đối cấm lỗi hiển thị `#####`.
+>   4. **Đồng Bộ Hoàn Trả Môi Trường Làm Việc (Clean Environment Restore)**:
+>      - Trước khi chạy: tự động chuyển sang Desktop chứa Nocpro hoặc đưa Nocpro lên foreground; sau khi hoàn tất: tự động đóng dialog phụ (nếu có bằng ESC) và hoàn trả quyền điều khiển bình thường cho người dùng.
 
