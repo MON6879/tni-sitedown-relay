@@ -141,15 +141,21 @@ function doPost(e) {
         Logger.log("[doPost] ❌ Lỗi Luồng 1 (Cột C): " + errColC.message);
       }
 
-      // 🛑 KHÔNG GỌI processSummaryAwAz Ở ĐÂY:
-      // Luồng cào Cột A (store_site_down) CHỈ GỬI DUY NHẤT Cột C (Tin 1) + kích hoạt Bot 2D ETA.
-      // Bảng AW7 độc lập, tuyệt đối không gửi chen vào đợt cào Cột A để tránh gửi tin cũ và lệch thời gian!
+      // ✅ Luồng 2 (AW7 Summary): Tự động kiểm tra và gửi cập nhật nếu bảng AW:AZ có dữ liệu mới / thay đổi trạm
+      var sentAwAz = false;
+      try {
+        sentAwAz = processSummaryAwAz(sheet, false);
+        Logger.log("[doPost] Luồng 2 (AW7 Summary) cập nhật: " + sentAwAz);
+      } catch(errAwAz) {
+        Logger.log("[doPost] ⚠️ Lỗi Luồng 2 (AW7 Summary): " + errAwAz.message);
+      }
 
       return _json({ 
         ok: true, 
         lines: lines.length,
         relay_ts: relayTs,
-        sent_tin1: sentColC
+        sent_tin1: sentColC,
+        sent_tin2: sentAwAz
       });
     }
 
@@ -547,29 +553,37 @@ function processSummaryAwAz(sheet, isDirectPush) {
     return false;
   }
 
-  const props  = PropertiesService.getScriptProperties();
-  const lastTs = props.getProperty(TS_KEY_AW7) || "";
+  // ✅ Đọc trực tiếp bảng AW:AZ và kiểm tra signature trạm
+  let awaz = readAwAz(sheet);
 
-  // 🛑 DEDUP KHÓA MỐC GIỜ THUẦN TÚY (RULE PM-83):
-  // Bản tin Site Down mới CHỈ xuất hiện khi mốc giờ ô AW7 thay đổi (tsKey !== lastTs).
-  // Tuyệt đối KHÔNG so sánh chuỗi nội dung vì công thức tự tính số giờ trạm sập (Duration)
-  // sẽ tự động nhảy số sau mỗi 6-10 phút (vd: 0.7h -> 1.6h) làm gửi lại bản tin cũ liên tục!
-  Logger.log("[Luồng AW7] tsKey=[" + tsKey + "] lastTs=[" + lastTs + "] match=" + (tsKey === lastTs));
+  // 🛑 DEDUP BẢO VỆ KÉP (RULE PM-83 + RULE PM-91):
+  // 1. Chống gửi lại liên tục do nhảy số Duration (PM-83): Tuyệt đối KHÔNG so sánh chuỗi số giờ nhảy.
+  // 2. Chống bỏ sót trạm cập nhật mới/bổ sung (PM-91): Trích xuất signature gồm:
+  //    Mốc giờ + Tổng số trạm khai báo từng Team + Danh sách mã trạm TNIxxxx.
+  const allSites = (awaz[0] || []).join(" ").match(/TNI\d{4}/g) || [];
+  const sitesSig = Array.from(new Set(allSites)).sort().join(",");
+  const counts = (awaz[0] || []).map(function(c) {
+    var cm = String(c || "").match(/=\s*\/([0-9]+)\s*=/);
+    return cm ? cm[1] : "0";
+  }).join(",");
+  const sigKey = tsKey + "__CNT:" + counts + "__SITES:" + sitesSig;
 
-  if (tsKey === lastTs && !isDirectPush) {
-    Logger.log("[Luồng AW7] Mốc giờ AW7 chưa đổi (" + tsKey + ") → Chặn 100%, bỏ qua Luồng 2");
+  const props   = PropertiesService.getScriptProperties();
+  const lastSig = props.getProperty(TS_KEY_AW7) || "";
+
+  Logger.log("[Luồng AW7] sigKey=[" + sigKey + "] lastSig=[" + lastSig + "] match=" + (sigKey === lastSig));
+
+  if (sigKey === lastSig && !isDirectPush) {
+    Logger.log("[Luồng AW7] Dữ liệu AW7 chưa đổi (Mốc giờ & Trạm không đổi) → Chặn 100%, bỏ qua Luồng 2");
     return false;
   }
 
-  // ✅ Mốc giờ mới → gửi ngay!
-  Logger.log("[Luồng AW7] 🆕 AW7 có mốc giờ mới: " + tsKey + " (cũ: " + lastTs + ") → Gửi ngay!");
+  // ✅ Có mốc giờ mới hoặc danh sách trạm thay đổi → gửi ngay!
+  Logger.log("[Luồng AW7] 🆕 AW7 có dữ liệu mới/thay đổi: " + sigKey + " (cũ: " + lastSig + ") → Gửi ngay!");
 
-  // ✅ Đọc trực tiếp bảng AW:AZ và gửi nguyên vẹn 100% thông tin có trong ô (thêm Icon)
-  let awaz = readAwAz(sheet);
-
-  // ✅ ĐỘC LẬP: Lưu ngay khóa mốc giờ AW7
-  props.setProperty(TS_KEY_AW7, tsKey);
-  Logger.log("[Luồng AW7] 🆕 Đã lưu khóa TS_KEY_AW7: " + tsKey + " → Đang xử lý Tin 2 (SUMMARY)...");
+  // ✅ ĐỘC LẬP: Lưu ngay khóa signature AW7
+  props.setProperty(TS_KEY_AW7, sigKey);
+  Logger.log("[Luồng AW7] 🆕 Đã lưu khóa TS_KEY_AW7: " + sigKey + " → Đang xử lý Tin 2 (SUMMARY)...");
 
   const teams = ["T1", "T2", "T3", "T4"];
   let sentCount = 0;
