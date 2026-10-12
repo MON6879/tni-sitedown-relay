@@ -324,7 +324,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.sched.outputs.need_python == 'true' || github.event_name == 'workflow_dispatch'
-        run: pip install python-telegram-bot requests pandas python-dotenv telethon openpyxl
+        run: pip install --upgrade python-telegram-bot requests pandas python-dotenv telethon openpyxl
 
       # ═══════════════════════════════════════════════
       # 🚨 TOA SITE DOWN: Site Down Relay (Nhịp :06 và :36 MMT)
