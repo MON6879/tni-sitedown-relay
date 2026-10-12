@@ -1,0 +1,2929 @@
+# 🔒 STRICT NOCPRO SCOPE & ZERO-DATA-LEAK RULE: CHỈ THAO TÁC ĐÚNG QUY TRÌNH XUẤT ALARM — CẤM BẤM CHỖ KHÁC & CẤM ĐỌC LỆCH / LỘ THÔNG TIN (STRICT NOCPRO ZERO-LEAK & EXACT FLOW POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (NOCPRO ZERO-LEAK & SCOPE RESTRICTION POLICY)**:
+> 1. **Chỉ Làm Theo Đúng Các Bước Yêu Cầu (Strict Flow Only)**: Trên phần mềm NMS Nocpro, AI CHỈ ĐƯỢC PHÉP thực hiện đúng chuỗi thao tác xuất báo cáo theo yêu cầu:
+>    - (a) Đăng nhập đúng tài khoản / mật khẩu và giữ nguyên ngôn ngữ English mặc định (TUYỆT ĐỐI CẤM đổi sang tiếng Việt).
+>    - (b) Đưa cửa sổ lên Desktop 2.
+>    - (c) Thao tác đúng trên thanh công cụ đáy (`Advanced`): Chọn `Export` trong dropdown `--Select--`, bấm `Search` nạp cảnh báo, tick chọn Checkbox All đầu bảng, bấm nút `Action` xuất file Excel và xác nhận hộp thoại Save.
+> 2. **Tuyệt Đối Cấm Bấm Vào Chỗ Khác (Zero Arbitrary Clicks)**: TUYỆT ĐỐI CẤM tự ý click vào thân bảng, không double click hay right click mở các popup chi tiết cảnh báo (`Detail alarm`), không bấm vào các menu thanh tiêu đề (`Monitoring`, `Report`, `Setting`, `Topo`, `Help`), không bấm các nút thêm bớt dashlet làm xáo trộn giao diện của người dùng.
+> 3. **Cấm Đọc Lệch & Cấm Lộ Thông Tin Ra Ngoài (Zero Data Leak & Strict Scope Isolation)**: Toàn bộ thông tin hạ tầng viễn thông, địa bàn, mã trạm, số điện thoại, tên nhân sự trên NMS Nocpro BẮT BUỘC phải được bảo mật tuyệt đối. AI TUYỆT ĐỐI CẤM đọc lan man, cấm xuất/ghi log các thông tin không liên quan, và TUYỆT ĐỐI CẤM gửi dữ liệu ra bất kỳ kênh bên ngoài nào ngoại trừ dán trực tiếp vào đúng tab `1. Input New` trên Google Sheet được chỉ định theo quy trình!
+> 4. **🔒 Khóa Thép Zero-Stale Guard — Cấm Lấy File Cũ Dán Đè Khi Xuất Mới Thất Bại (Zero-Stale File Guard Policy)**:
+>    - Khi thực hiện xuất báo cáo cảnh báo từ NMS Nocpro, hệ thống BẮT BUỘC phải kiểm tra nghiêm ngặt: file Excel tải về PHẢI là file mới sinh ra sau thời điểm click nút `Action` (`mtime >= t_click - 2.0` hoặc `file not in before_files`).
+>    - Nếu sau thời gian timeout (90s) không thấy file Excel mới xuất hiện, hệ thống **BẮT BUỘC PHẢI DỪNG LẠI NGAY LẬP TỨC VÀ BÁO LỖI**, TUYỆT ĐỐI CẤM fallback lấy file cũ có sẵn trong thư mục để dán đè lên Google Sheet làm sai lệch mốc giờ dữ liệu sống của người dùng!
+> 5. **🛡️ Click Có Chốt Chặn & Tọa Độ Neo Đáy — Cấm Click Mù, Cấm Chọn Nhầm `Create ticket` (Guarded-Click & Bottom-Anchored Coordinates Policy — PM 2026-10-11)**:
+>    - *Root cause*: script chọn mục dropdown bằng tọa độ co giãn theo chiều cao cửa sổ; cửa sổ Nocpro thấp hơn 84px (1516 thay vì 1600) nên click trúng `Create ticket` thay vì `Export`. Ngoài ra thanh Advanced được nhận diện sai (đếm điểm ảnh xanh trong thân bảng) nên bấm sai hộp thoại `Option`.
+>    - Khi click bất kỳ điểm nào trên Nocpro, BẮT BUỘC dùng `guard_click` (`WindowFromPoint` + `GetAncestor(GA_ROOT)` phải thuộc tập cửa sổ cho phép: Nocpro / hộp thoại cụ thể / popup dropdown vừa mở), sai thì DỪNG, TUYỆT ĐỐI CẤM click mù.
+>    - Tọa độ thanh công cụ (Advanced) BẮT BUỘC neo theo ĐÁY cửa sổ (`y = bottom - (1600 - y_ref)`), CẤM co giãn theo chiều cao. Mục trong dropdown `--Select--` BẮT BUỘC tính theo hình học của chính popup (283x378, `Export` ở y≈245), kiểm tra kích thước popup, CẤM tính theo cửa sổ chính. TUYỆT ĐỐI CẤM chọn `Create ticket`/`Confirm alarm`/`Group alarm`/các mục khác ngoài `Export`.
+>    - Trạng thái thanh Advanced (mở/thu gọn) BẮT BUỘC nhận diện bằng dải góc trái-đáy (mũi tên `^^` vs nhãn ô lọc), CẤM đếm pixel trong thân bảng dữ liệu; luôn mở rộng thanh Advanced TRƯỚC khi bấm nút Alarm group.
+> 6. **🖥️ Desktop 2, Hộp Thoại Lưu File & Đóng Excel (Desktop-Attach, Save-Dialog & Excel-Close Policy — PM 2026-10-11)**:
+>    - Gắn input desktop (`SetProcessWindowStation`/`SetThreadDesktop`, GIỮ tham chiếu handle) BẮT BUỘC làm TRƯỚC khi `import pyvda`/`win32ui`; mọi click/phím chỉ khi đã `go()` sang Desktop 2 và luôn trả về Desktop 1 trong `finally`. CẤM click khi đang ở Desktop 1.
+>    - Hộp thoại `selectSaveFile`: xử lý bằng thông điệp cửa sổ (`WM_SETTEXT` điền đường dẫn đầy đủ + `BM_CLICK` nút Save), CẤM Alt+S/Enter mù.
+>    - Đóng Excel: Excel có thể hiện `Document Recovery` (class `bosa_sdm_XL9`) → chọn `Yes` (giữ file phục hồi, KHÔNG xóa) + OK; sau đó `Don't Save` (`N`) trên hộp thoại `NUIDialog`. Chỉ gửi phím khi hộp thoại đang là foreground. CẤM `Alt+F4` mù, CẤM chọn `No, remove the files`.
+>    - Tài khoản/mật khẩu Nocpro CHỈ đọc từ `.env` (`NOCPRO_USER`/`NOCPRO_PASS`, `.env` đã gitignore); TUYỆT ĐỐI CẤM hardcode mật khẩu trong mã nguồn (đã từng lộ trong `auto_nocpro_desk1.py` → phải đổi mật khẩu). CẤM lưu ảnh chụp màn hình có dữ liệu cảnh báo.
+> 7. **🎯 Scope Guard Bộ Lọc Province & Re-assert Desktop 2 (PM 2026-10-11)**: Trước khi đẩy lên Sheet, script BẮT BUỘC kiểm tra mọi dòng thuộc Tanintharyi Region (mất bộ lọc Province sau khi người dùng thao tác tay → xuất ~23.800 dòng toàn vùng làm bẩn Sheet); có dòng lạ → DỪNG, không đẩy. Trước mỗi click phải xác nhận đang ở Desktop 2 (người dùng chuyển desktop giữa chừng làm click trúng cửa sổ khác / lớp phủ Task View) → chuyển lại + chờ, sai thì DỪNG. KHÔNG kill tiến trình đang gửi GAS giữa chừng (request đã tới GAS vẫn ghi đè Sheet).
+
+> 8. **📤 Gửi Sheet Đúng 1 Lần, Cấm Gửi Lại Chồng GAS & Cấm Tự Mở Chrome (Single-POST & Audit-Poll Policy — PM 2026-10-11)**: `handleNocproSyncSheet_` ghi cả Sheet mất ~80-150s (có thể timeout); mỗi lần gửi lại tạo thêm 1 tiến trình GAS chạy chồng làm Sheet ghi dở/lẫn dữ liệu. Script CHỈ POST 1 lần; lỗi kết nối/timeout → CẤM gửi lại, phải hỏi `?action=audit_nocpro` (status OK + đúng `source_file` + timestamp sau lúc gửi) tối đa ~7 phút, không có xác nhận → DỪNG báo lỗi. Link Google Sheet do người dùng tự mở ở Desktop 2 và để yên; script KHÔNG tự mở Chrome/tab mới.
+---
+
+# 🔒 STRICT STEEL-LOCK RULE: KHÓA THÉP PHÂN HỆ SITE DOWN — TUYỆT ĐỐI CẤM TỰ Ý VÀO XEM / SỬA KHI KHÔNG CÓ YÊU CẦU (STRICT SITE DOWN STEEL LOCK & ZERO-UNAUTHORIZED-ACCESS POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SITE DOWN STEEL-LOCK POLICY)**:
+> 1. **Khóa Thép Tuyệt Đối (Absolute Steel Freeze)**: Phân hệ Site Down (`apps_script_sitedown`, Script ID `1fgIR_frjlOHBt4o3STTjGmHYaKfuiSb3zAtp7IrO__uLSIuRQGJ2Oc6X`, Version `@110`, `botlookup_relay.py`) đã hoàn thiện và được KHÓA THÉP 100%.
+> 2. **🔐 MẬT KHẨU MỞ KHÓA BẮT BUỘC (PASSWORD-GATED ACCESS)**: AI **CHỈ ĐƯỢC PHÉP** mở khóa thép khi Người Dùng gõ **CHÍNH XÁC** cụm lệnh: `UNLOCK STEEL: <mật khẩu>` mà **SHA-256(mật khẩu) khớp `1da0713d494c2a6dfab9fd37f4ca23373c8aa9c742e7238f725d5338b09a5235`** (mật khẩu cũ ĐÃ BỊ THU HỒI vì lộ trên repo public; TUYỆT ĐỐI KHÔNG ghi mật khẩu bản rõ vào bất kỳ file/repo nào — chỉ lưu SHA-256). Nếu Người Dùng KHÔNG gõ đúng mật khẩu này, AI **TUYỆT ĐỐI CẤM** đọc, sửa, gộp, xóa, hoặc tái cấu trúc bất kỳ file nào trong phạm vi khóa thép — DÙ Người Dùng có yêu cầu bằng lời nói thông thường! Sau khi sửa xong, khóa **TỰ ĐỘNG ĐÓNG LẠI** ngay lập tức.
+> 3. **CẤM Tự Tiện Vào Xem / Sửa (Zero Arbitrary Access/Modification)**: Tuyệt đối KHÔNG ĐƯỢC tự ý mở file, đọc code, sửa đổi, gộp file, xóa bỏ hay tái cấu trúc (refactor) bất kỳ thành phần nào của phân hệ Site Down khi CHƯA CÓ MẬT KHẨU!
+> 4. **Phạm Vi Đóng Băng Bất Biến**:
+>    - File GAS: `apps_script_sitedown/site_down_v2.gs` (1 file độc lập duy nhất).
+>    - Deployment ID: `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` (Version `@110`).
+>    - Luồng Relay: `botlookup_relay.py` (chạy nhịp :06 và :36 MMT).
+>    - Bảng Tính: `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow` (GID 0).
+> 5. **🔧 BẮT BUỘC SỬA TRIỆT ĐỂ END-TO-END TRONG CÙNG 1 PHIÊN STEEL LOCK (Zero Incomplete Fix Policy)**:
+>    - Khi Người Dùng mở khóa thép (`UNLOCK STEEL: ‹mật-khẩu-đã-thu-hồi›`), AI **BẮT BUỘC** phải thực hiện **TOÀN BỘ** các bước sửa code, clasp push, clasp deploy, git commit, git push và phúc tra live **TRONG CÙNG 1 PHIÊN DUY NHẤT** trước khi khóa đóng lại.
+>    - **TUYỆT ĐỐI CẤM** chỉ ghi Rule / phân tích root cause rồi đóng khóa khi code vẫn còn lỗi chưa được sửa — đây là anti-pattern "sửa nửa chừng" buộc Người Dùng phải gõ lại mật khẩu thêm lần nữa một cách vô nghĩa.
+>    - **Thứ tự bắt buộc trong 1 phiên**: ① Đọc code hiểu đủ → ② Sửa code triệt để tất cả điểm lỗi → ③ `clasp push --force` → ④ `clasp deploy -i <id>` → ⑤ git commit + push 3 repos → ⑥ Ghi Rule PM vào AGENTS.md → ⑦ Sync AGENTS.md → ⑧ Báo "ĐÃ LƯU ĐI ✅". TUYỆT ĐỐI CẤM đảo thứ tự: ghi Rule trước → đóng khóa → để code lỗi còn đó!
+---
+
+# 🚂 STRICT SINGLE-TRAIN RULE: 1 ĐOÀN TÀU THỜI GIAN TUẦN TỰ DUY NHẤT — TUYỆT ĐỐI CẤM TỰ Ý TÁCH WORKFLOW / TÁCH CRON RIÊNG (STRICT SINGLE UNIFIED SEQUENTIAL TRAIN POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SINGLE UNIFIED SEQUENTIAL TRAIN POLICY)**:
+> 1. **1 Đoàn Tàu Thời Gian Tuần Tự Duy Nhất (Single Sequential Train Engine)**: Toàn bộ các tác vụ định kỳ của hệ thống bao gồm: **Toa Site Down Relay (:06 / :36 MMT)**, Keepalive ping, Report 1, 2, 3, 4, 5A, 5B, 5C, 6, 6.1, Refuel (Request, P1, P2, P4, Read), Auditor 9.1, Toa ETA và **Toa Sale Summary (17:30 MMT)** BẮT BUỘC phải nằm trong **1 WORKFLOW DUY NHẤT** (`train_5min.yml`), chạy trên **1 MÁY ẢO DUY NHẤT** tại mỗi nhịp 5 phút.
+> 2. **Chạy Tuần Tự Từng Toa (Sequential Execution — Zero Parallel Collisions)**: Mọi Toa trong Tàu chạy theo thứ tự từ trên xuống dưới trên cùng một máy ảo runner. Khi Toa Site Down chạy thì các Toa khác chờ; Toa Site Down xong mới đến các Toa tiếp theo. **1 tài khoản Telegram duy nhất** được dùng an toàn 100%, không bao giờ có 2 tiến trình MTProto kết nối cùng lúc từ 2 IP khác nhau.
+> 3. **TUYỆT ĐỐI CẤM Tự Ý Tách Workflow / Tách Cron Riêng (Zero Independent Split Workflows)**:
+>    - AI TUYỆT ĐỐI CẤM tự ý tách bất kỳ phân hệ nào (Site Down, Refuel, Report, Sale...) ra thành một workflow `.github/workflows/*.yml` độc lập có cron schedule riêng hay tạo Google Apps Script time-driven trigger riêng (ví dụ: `setupSalesTrainTrigger`). Toàn bộ logic định kỳ của Sale BẮT BUỘC tích hợp vào hàm trung tâm `dispatchTrain5Min()` và workflow `train_5min.yml`.
+>    - Bất kỳ workflow độc lập nào (`botlookup_relay.yml`, v.v.) BẮT BUỘC phải bị vô hiệu hóa lịch chạy tự động (`schedule: cron`).
+>    - TUYỆT ĐỐI CẤM kích hoạt đồng thời 2 cron train trên 2 repository khác nhau. Duy nhất chỉ có 1 đầu tàu active.
+> 4. **Khắc Phục Lỗi Bằng Cách Tối Ưu Tuần Tự — CẤM Rẽ Nhánh**: Nếu một tác vụ bị chậm hoặc lỗi, AI phải tối ưu thời gian chạy bên trong Toa của Tàu, TUYỆT ĐỐI KHÔNG ĐƯỢC giải quyết bằng cách "xé lẻ" ra chạy song song gây xung đột IP và khóa session Telegram!
+
+---
+
+# 🔒 STRICT REPO ISOLATION RULE: REPOSITORY NÀO PHỤC VỤ PHÂN HỆ ĐÓ — TUYỆT ĐỐI CẤM TIỆN TAY COPY / ĐẨY FILE CHÉO (STRICT DEDICATED REPOSITORY & ZERO CROSS-POLLUTION POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (REPOSITORY ISOLATION POLICY)**:
+> 1. **Repo `MON6879/tni-sitedown-relay` (`tni-sitedown`)**: CHỈ PHỤC VỤ DUY NHẤT phân hệ **Site Down** (`botlookup_relay.py`, `apps_script_sitedown`). **TUYỆT ĐỐI CẤM** copy, sync, commit hoặc push bất kỳ file nào của phân hệ khác (Refuel, Cable, MDG, Attendance, TC, v.v.) vào repository này!
+> 2. **Repo `phonghdpxd-cmd/tni-bot` (`Task and WO`)**: Chuyên phục vụ các tác vụ vận hành Train, Refuel, Cable, Daily Report, Attendance, Auditor.
+> 3. **Repo `MON6879/TNI-DONE` (`tni-search`)**: Chuyên phục vụ Web UI & Hub tìm kiếm thông tin vận hành.
+> 4. **CẤM TUYỆT ĐỐI "Tiện Tay Sync Chéo"**: Khi sửa code của phân hệ A, CHỈ ĐƯỢC PHÉP đồng bộ và push vào đúng repo quản lý phân hệ A đó. CẤM copy tràn lan sang repo khác!
+
+---
+
+# 📊 STRICT RULE: CẤM QUÉT GROUP KHI ĐÃ CÓ SHEET THU THẬP — ĐỌC TRỰC TIẾP 100% DỮ LIỆU SỐNG TỪ GOOGLE SHEET & CẤM CACHE CŨ TRÊN MÂY (STRICT SHEET SSOT & ZERO REDUNDANT GROUP SCANNING & ZERO STALE CACHE POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SHEET SSOT & LIVE READ ONLY POLICY)**:
+> 1. **Đã Có Sheet Thu Thập Là BẮT BUỘC Quét Sheet — TUYỆT ĐỐI CẤM Quét Telegram Group Lại**: Mọi phân hệ báo cáo (Report 1, 2, 3, 4, Report 5 Daily Plan, BOD Assign, Cable, Refuel, Attendance, v.v.) khi đã có Sheet thu thập dữ liệu (do Bot Webhook / Form / Collector ghi vào) BẮT BUỘC phải đọc dữ liệu trực tiếp 100% từ Google Sheet. TUYỆT ĐỐI CẤM dùng Telethon hay Bot API crawl/scan lại lịch sử Telegram Group làm việc 2 lần, gây nghẽn, timeout và sai lệch dữ liệu!
+> 2. **Đọc Trực Tiếp 100% Dữ Liệu Sống (Live Fresh Read)**: Mỗi lần script chạy, BẮT BUỘC phải gọi fetch live dữ liệu mới nhất từ Google Sheets / GAS API.
+> 3. **TUYỆT ĐỐI CẤM Lưu Tạm / Cache Cứng Trên Mây**: Tuyệt đối KHÔNG lưu cache cố định, không dùng dữ liệu snapshot lưu tạm lâu ngày trên mây rồi tái sử dụng, vì dữ liệu vận hành thực tế luôn biến đổi liên tục từng phút.
+> 4. **Phạm Vi Ngoại Lệ Duy Nhất Của Telethon**: CHỈ cho phép dùng Telethon (tài khoản cá nhân) cho các tác vụ đặc thù mà Telegram Bot API và Google Sheets KHÔNG THỂ có dữ liệu (ví dụ: Report 6 quét lượt đọc tin Note của thành viên nhóm, Site Down cào botlookup). Toàn bộ các tác vụ còn lại BẮT BUỘC chạy bằng Bot API + Google Sheets!
+
+---
+
+# ⚡ STRICT ESCALATION & ZERO-FRICTION AUTONOMY RULE: 100% TỰ QUYẾT ĐỊNH CÁC TÁC VỤ CHUẨN — CHỈ HỎI KHI CHẠM 3 RANH GIỚI SINH TỬ (RULE PM-25 & ZERO-FRICTION AUTONOMY POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SMART DECISION MATRIX & MINIMAL ONE-KEY QUESTIONING)**:
+> 1. **CẤM Hỏi Xin Phép Đối Với Quy Trình Chuẩn (Zero-Prompt Auto-Exec)**: Tuyệt đối KHÔNG được hỏi xin phép (*"Anh có đồng ý không?"*, *"Tôi bắt đầu nhé?"*, *"Anh muốn làm luôn không?"*) đối với:
+>    - Toàn bộ quy trình 6 bước "Lưu Đi" (backup context, sync repos, commit, push, deploy, clear cache).
+>    - Khảo sát mã nguồn, đọc dữ liệu thật từ Google Sheets / Telegram API / Web DOM.
+>    - Sửa bug code, sửa lỗi cú pháp, bọc lỗi `try...except`, thêm `|| true` trong GitHub Actions.
+>    - Đồng bộ logic giữa các repository theo System Map.
+>    - AI BẮT BUỘC TỰ ĐỘNG THỰC THI 100% TỪ ĐẦU ĐẾN CUỐI!
+> 2. **Thực Thi Mặc Định Trước, Thông Báo Sau (Smart Default with Opt-Out)**: Khi có nhiều phương án kỹ thuật (chọn mốc giờ cron cho Toa mới, đặt tên biến, định tuyến background Serverless): AI TỰ ĐỘNG CHỌN phương án an toàn và tối ưu nhất theo `system_map.md` để làm luôn, sau đó ghi rõ trong báo cáo: *"Đã xử lý theo phương án tối ưu A; nếu muốn đổi sang B xin báo lại."* Tuyệt đối KHÔNG dừng lại hỏi mở!
+> 3. **CHỈ 3 KỊCH BẢN SINH TỬ DUY NHẤT ĐƯỢC PHÉP HỎI (The 3 Hard Stops)**: AI CHỈ ĐƯỢC PHÉP dừng lại hỏi Người Dùng khi rơi vào đúng 3 tình huống:
+>    - (a) Lệnh yêu cầu **XÓA file mã nguồn gốc** (`.gs`, `.yml`, `.py` — phòng ngừa sự cố v599).
+>    - (b) Viết hàm Reorder/Migration thay đổi **CẤU TRÚC cột** của Google Sheet đang chứa dữ liệu sống (phòng ngừa sự cố v786).
+>    - (c) Yêu cầu đụng vào **phân hệ Khóa Thép Site Down** khi chưa có mật khẩu `UNLOCK STEEL: ‹mật-khẩu-đã-thu-hồi›`.
+> 4. **Chuẩn Mẫu Hỏi 1-Phím — CẤM Yes/No Dài Dòng (One-Key Confirmation)**: Khi bắt buộc phải hỏi (thuộc 3 kịch bản trên), TUYỆT ĐỐI CẤM hỏi Yes/No hay mở modal phức tạp. BẮT BUỘC dùng form:
+>    > ⚠️ **[CẢNH BÁO RỦI RO SINH TỬ]**: Thao tác này sẽ [Xóa file X / Đổi cấu trúc cột Sheet Y].
+>    > - **Gõ `1`** (hoặc `ok`): Để tôi thực thi ngay.
+>    > - **Gõ `0`**: Để hủy bỏ.
+> 5. **Smart Fallback Cho Lệnh Ngắn Cộc Lốc (Terse Command Fallback)**: Khi Người Dùng gửi các lệnh cực ngắn (*"tiếp"*, *"sửa đi"*, *"làm đi"*, *"1"*, hoặc chỉ gửi ảnh chụp màn hình lỗi / đoạn log sự cố):
+>    - TUYỆT ĐỐI CẤM hỏi ngây ngô: *"Anh muốn sửa gì?"* hay *"Tôi làm gì với ảnh này?"*.
+>    - BẮT BUỘC tự phân tích OCR/log ➔ trích xuất lỗi/mã trạm/nhóm ➔ truy vết lịch sử bước trước ➔ tự sửa code dứt điểm ➔ tự động Lưu Đi ➔ báo cáo kết quả: **"ĐÃ LƯU ĐI ✅"**.
+> 6. **GAS Nào Sửa GAS Nấy — Đúng Dự Án Chuyên Biệt**: Mọi thay đổi logic trên GAS bắt buộc phải xác định đúng Script ID độc lập trước khi mở file hay deploy!
+---
+
+# 🧠 STRICT MINDSET RULE: KỶ LUẬT TƯ DUY AI MẪN CÁN, TỈ MỈ & LOGIC CHẮC CHẮN (METICULOUS AI ENGINEERING POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG CHO MỌI PHIÊN AI (ZERO HASTY ASSUMPTION POLICY)**:
+> Tuyệt đối KHÔNG ĐƯỢC hành động theo phản xạ nhanh nhảu, hời hợt, sửa trước nghĩ sau. AI BẮT BUỘC phải tuân thủ nghiêm ngặt **5 Trụ Cột Tư Duy Mẫn Cán**:
+> 1. **"3 Nhìn Trước Khi Gõ 1 Dòng Code" (Triple-Forensic Scan First)**:
+>    - *Nhìn 1 — Dữ Liệu Thật*: Dùng tool đọc trực tiếp 100% dữ liệu sống từ Google Sheets, Live Telegram API, Web DOM, Database. **CẤM ĐOÁN MÒ CẤU TRÚC HAY GIẢ ĐỊNH DỮ LIỆU!**
+>    - *Nhìn 2 — Liên Kết 2 Đầu (Before & After Dependencies)*: Grep toàn bộ dự án xem: Ai đang gọi hàm này? Hàm này đang trả về dữ liệu cho ai? Sửa ở đây có làm sập downstream không?
+>    - *Nhìn 3 — Lịch Sử & Bối Cảnh*: Đọc `history/backup_context_...md` và `git log` để hiểu *vì sao dòng code đó tồn tại*, tránh tự ý xóa bỏ các tầng bảo vệ (guards/fallbacks).
+> 2. **Quy Trình 6 Bước Suy Nghĩ Logic Bắt Buộc (The 6-Step Deliberate Execution Engine)**:
+>    `Khảo Sát Thực Tế` ➔ `Lập Luận Nguyên Nhân Gốc` ➔ `Đề Xuất Sửa Tối Thiểu (Minimal Scope)` ➔ `Đánh Giá Rủi Ro Tác Dụng Phụ` ➔ `Thực Thi Chuẩn Xác (GAS nào sửa GAS nấy)` ➔ `Phúc Tra Bằng Chứng Live (HTTP 200)`.
+> 3. **Tuyệt Đối Cấm "Báo Cáo Hoàn Thành Ảo" (Zero Hallucinated Completion)**:
+>    - Cấm nói "đã sửa xong" khi chưa chạy `clasp push` & `clasp deploy`.
+>    - Cấm nói "hoàn thành 100%" khi chưa có bằng chứng log live (Status 200, `result.message_id` thật, `Compare-Object` = 0).
+> 4. **Kỷ Luật Thép "GAS Nào Sửa GAS Nấy — Không Tiện Tay Sửa Chéo" (Strict Dedicated GAS Targeting)**:
+>    - Sửa Site Down: VÀO `apps_script_sitedown` (Script ID `1fgIR_...`).
+>    - Sửa Main Hub: VÀO `QLTC_GAS` (Script ID `1rvgW...`).
+>    - Sửa Construction: VÀO `apps_script_tc` (Script ID `1QsNL...`).
+>    - Sửa Attendance: VÀO `apps_script_attendance` (Script ID `166Xa...`).
+> 5. **Kiểm Tra Không Tác Dụng Phụ (Zero Side-Effect Verification)**:
+>    - Sau khi sửa tính năng A, BẮT BUỘC phải kiểm tra nhanh các tính năng lân cận B, C để chứng minh hệ thống vẫn nguyên vẹn 100%.
+> 6. **Xóa/Sửa Phải Đầy Đủ Logic End-to-End (Full Lifecycle Cleanup)**:
+>    - Khi **XÓA** tính năng (keyboard, trigger, webhook, menu, v.v.): BẮT BUỘC phải xóa **CẢ 3 TẦNG**: (a) Code nguồn, (b) Runtime state đang chạy trên cloud (triggers, cached keyboards, registered commands, webhook endpoints), (c) Dữ liệu tạm (ScriptProperties, CacheService). **CẤM** chỉ xóa code mà để runtime state cũ vẫn chạy!
+>    - Khi **SỬA** regex/matching: BẮT BUỘC phải kiểm tra **tất cả nguồn input** có thể trigger regex đó (lệnh `/`, keyboard button text, plain text chat, edited_message). Nếu bỏ 1 nguồn input → phải đảm bảo nguồn đó không còn gửi data vào.
+>    - Khi **ĐỔI** trigger interval: BẮT BUỘC phải `deleteAllTriggers()` TRƯỚC rồi mới tạo trigger mới. Trigger cũ KHÔNG tự biến mất khi deploy code mới!
+>    - Khi **ĐỔI** bot token hoặc webhook: BẮT BUỘC phải xóa commands cũ trên bot cũ (`deleteMyCommands`) + set webhook mới + xóa webhook cũ.
+>    - **Checklist Bắt Buộc Trước Khi Báo "Đã Xong"**: ① Code đã push+deploy ② Trigger cũ đã xóa ③ Keyboard/Menu cũ đã remove ④ Cache/Properties cũ đã clear ⑤ Test live không còn side-effect.
+> 7. **Đọc Lại Rule Trước Khi Phúc Tra & Phúc Tra Toàn Diện Sau Khi Sửa Tránh Nhầm Hay Quên (Mandatory Rule Review & Full-Scope Post-Edit Verification Policy)**:
+>    - **ĐỌC LẠI RULE TRƯỚC KHI PHÚC TRA (Review Rules Before Verification)**: Trước khi tiến hành bước phúc tra hoặc kết luận bất kỳ tác vụ nào, AI BẮT BUỘC phải đọc lại toàn bộ các quy tắc liên quan trong `AGENTS.md` (Single Train, Repo Isolation, Khóa Thép Site Down, Template 2 dòng, Dedup, Rule phòng ngừa mới...) để rà soát đối chiếu xem giải pháp vừa sửa có vô tình vi phạm hoặc bỏ quên bất kỳ quy định nào không!
+>    - **PHÚC TRA TOÀN DIỆN SAU KHI SỬA TRÁNH NHẦM HAY QUÊN (Full-Scope End-to-End Cross-Verification)**: Sau MỌI lần chỉnh sửa code, cấu hình, lịch trình hoặc dữ liệu, AI BẮT BUỘC phải thực hiện đủ 5 bước phúc tra:
+>      ① **Phúc tra Cú Pháp & Logic Code**: Chạy test import (`python -c "import ..."`) và validate cú pháp file, bảo đảm 0 lỗi biên dịch/runtime cơ bản.
+>      ② **Phúc tra Đồng Bộ 3 Repositories (Tri-Repo Parity)**: Dùng công cụ so sánh đối chiếu (`fc` / `Compare-Object`) đảm bảo file đã được đồng bộ 100% qua cả 3 repos (`Task and WO`, `tni-search`, `tni-sitedown`), TUYỆT ĐỐI CẤM chỉ sửa 1 repo mà quên 2 repo còn lại!
+>      ③ **Phúc tra Hai Đầu Phụ Thuộc (Upstream & Downstream Dependencies)**: Rà soát ai gọi hàm này, hàm này trả dữ liệu cho ai, kiểm tra các tính năng lân cận để bảo đảm ZERO tác dụng phụ (Zero Side-Effects).
+>      ④ **Phúc tra Trạng Thái Git Sống**: Kiểm tra `git status` trên toàn bộ 3 repos và root, bảo đảm không sót bất kỳ file uncommitted hay untracked nào.
+>      ⑤ **Phúc tra Bằng Chứng Live Thực Tế**: Kiểm tra HTTP 200, message_id thực tế hoặc log phản hồi thực trước khi bàn giao.
+>      - **TUYỆT ĐỐI CẤM** nói "đã sửa xong", "hoàn thành" hay báo "ĐÃ LƯU ĐI" khi chưa hoàn tất đầy đủ 5 bước phúc tra trên!
+
+---
+
+# 💾 STRICT RULE: TỰ ĐỘNG "LƯU ĐI" BỌC THÉP 100% SAU MỖI LẦN SỬA — TRẢ LỜI "ĐÃ LƯU ĐI" (MANDATORY AUTO FULL-SAVE & CONFIRMATION POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG CHO MỌI PHIÊN AI (AUTO-SAVE & DEPLOY POLICY)**:
+> 1. **Tự Động Lưu Đi Ngay Khi Sửa Xong (Auto Full Save After Every Fix)**: Sau mỗi lần sửa xong bất kỳ code, cấu hình, bảng tính hay endpoint nào, AI BẮT BUỘC phải TỰ ĐỘNG thực thi trọn vẹn quy trình **6 Bước "Lưu Đi"** trong `system_map.md` (backup context, đồng bộ repos, commit & push, dọn cache, cross-sync logic, live verification), TUYỆT ĐỐI KHÔNG ĐƯỢC CHỜ Người Dùng phải nhắc "lưu đi chưa"!
+> 2. **Bắt Buộc Trả Lời Khẳng Định "ĐÃ LƯU ĐI ✅"**: Sau khi hoàn thành lưu và deploy, câu trả lời gửi cho Người Dùng BẮT BUỘC phải có thông báo rõ ràng: **"ĐÃ LƯU ĐI ✅"** kèm theo chi tiết commit, version deployment và file backup context!
+> 3. **BẮT BUỘC Báo Số Ghế và Từng Bước Chi Tiết (Mandatory Seat and Step Report)**: Sau khi lưu đi, AI BẮT BUỘC phải báo cáo dưới dạng BẢNG gồm: Tên Ghế (GAS-OPS-1, GAS-ATTENDANCE-4, GAS-SITEDOWN-2, GAS-CONSTRUCTION-3, EXT-OPS-HUB, AUDITOR-9.1...), Version mới (@71, v4.2...), Thay đổi chính, Trạng thái. Kèm danh sách Git commits (hash + message) và kết quả clasp deploy / Vercel reset. TUYỆT ĐỐI KHÔNG ĐƯỢC nói đã lưu mà thiếu số ghế và version!
+> 4. **🧬 BẮT BUỘC Phân Tích Lỗi Gốc → Đúc Thành Rule Phòng Ngừa Sau Mỗi Lần Sửa (Mandatory Post-Mortem → Rule Injection Policy)**: Sau MỖI LẦN sửa lỗi (bug fix, logic error, data corruption, side-effect), AI BẮT BUỘC phải thực hiện **3 Bước Post-Mortem** trước khi báo "Đã Lưu Đi ✅":
+>    - **Bước PM-1 — Xác Định Root Cause Chính Xác**: Trả lời câu hỏi: *"Lỗi này xảy ra do nguyên nhân kỹ thuật CỤ THỂ nào?"* (Ví dụ: hardcode data trong migration function, regex không handle blank value, trigger cũ không bị xóa...) — TUYỆT ĐỐI CẤM viết root cause chung chung như "do lỗi code"!
+>    - **Bước PM-2 — Đúc Thành Rule Phòng Ngừa**: Từ root cause, AI BẮT BUỘC phải viết ít nhất **1 rule cụ thể** dưới dạng: *"Khi làm [hành động X], BẮT BUỘC phải [biện pháp Y], TUYỆT ĐỐI CẤM [anti-pattern Z]"*, đủ rõ để AI session sau đọc là hiểu ngay và không lặp lại!
+>    - **Bước PM-3 — Ghi Rule Vào AGENTS.md Ngay Lập Tức**: Rule phòng ngừa mới BẮT BUỘC phải được chèn vào đúng section liên quan trong `AGENTS.md` (và đồng bộ sang 3 file AGENTS.md còn lại) trong cùng commit "lưu đi". TUYỆT ĐỐI KHÔNG ĐƯỢC để rule chỉ nằm trong backup context mà không vào AGENTS.md — vì AI session sau không đọc backup context, chỉ đọc AGENTS.md!
+>    - **Ví Dụ Post-Mortem Mẫu**: Lỗi "hardcode test rows vào migration function → corrupt sheet data" → Rule: *"Khi viết hàm migration/reorder cột trong GAS, TUYỆT ĐỐI KHÔNG hardcode giá trị dữ liệu cụ thể vào trong thân hàm. Hàm migration CHỈ ĐƯỢC PHÉP thay đổi format, header và cấu trúc cột — KHÔNG BAO GIỜ ghi đè dữ liệu thực của người dùng."*
+> 5. **🔒 KHÓA THÉP DEPLOY GAS: CLASP PUSH + CLASP DEPLOY -I BẮT BUỘC (Zero Draft-Only Push Policy)**:
+>    - Khi sửa đổi bất kỳ file nào trong Google Apps Script (`.gs`, `.html`, `appsscript.json`), AI BẮT BUỘC phải thực thi **ĐỦ 2 LỆNH TUẦN TỰ**:
+>      ① `npx clasp push --force` (đẩy mã nguồn lên máy chủ Apps Script).
+>      ② `npx clasp deploy -i <deploymentId> -d "<description>"` (cập nhật phiên bản chạy chính thức của Web App).
+>    - **TUYỆT ĐỐI CẤM** chỉ chạy `clasp push` rồi dừng lại báo "Đã Lưu Đi" hoặc "Đã xong"! `clasp push` CHỈ cập nhật bản nháp `@HEAD`, KHÔNG HỀ thay đổi code mà Web App live đang thực thi!
+>    - Sau khi deploy xong, BẮT BUỘC phải kiểm tra kết quả terminal xuất hiện chuỗi `Deployed <deploymentId> @<version>`, và gọi kiểm tra HTTP live để xác nhận version mới đã phản hồi thành công trước khi kết luận!
+
+---
+
+
+---
+
+# 🛡️ STRICT RULE: BẢO VỆ PHÂN QUYỀN RBAC WEB UI & BỌC THÉP MẬT MÃ 17% — TUYỆT ĐỐI CẤM LỘ GIÁ VỐN & THÔNG TIN TÀI CHÍNH (STRICT WEB RBAC PIN-GATE & ZERO-FINANCIAL-LEAK POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (WEB RBAC PIN-GATE & ZERO-FINANCIAL-LEAK POLICY)**:
+> 1. **Khóa PIN Cứng Khi Đổi Sang Vai Trò Cao Cấp (Mandatory Admin/Finance PIN Gate)**: Bất kỳ thao tác chuyển đổi vai trò sang dmin (Ban Giám Đốc) hoặc inance (Kế Toán / Tài Chính) qua dropdown topbar (#app-role-select) hoặc Quick Cards (#rqc-...) BẮT BUỘC phải xác thực mã PIN Quản Trị (erifyPin_). Nếu người dùng hủy hoặc nhập sai PIN, hệ thống BẮT BUỘC hoàn nguyên ngay lập tức về vai trò trước đó. TUYỆT ĐỐI CẤM cho phép chuyển vai trò đặc quyền tự do mà không qua xác thực!
+> 2. **Khóa Ẩn Hoàn Toàn Sidebar & Phân Mục (Strict Display None & Category Clean-up)**: Đối với các phân hệ/tab mà vai trò hiện tại không được cấp phép (!isTabAllowedForRole), BẮT BUỘC phải đặt style display: none để ẩn hoàn toàn khỏi thanh điều hướng sidebar. TUYỆT ĐỐI CẤM chỉ làm mờ (opacity: 0.52) hoặc gắn icon khóa 🔒 làm lộ sự tồn tại của tính năng mật. Đồng thời, nếu toàn bộ liên kết con trong một nhóm mục (.lbl[data-nav-lbl]) đều bị ẩn (ví dụ mục Finance), tiêu đề phân mục đó cũng BẮT BUỘC phải ẩn hoàn toàn (display: none).
+> 3. **Phân Hệ RBAC Chỉ Dành Cho Admin (RBAC Module Admin-Only)**: Phân hệ Quản Trị Phân Quyền (
+bac) BẮT BUỘC chỉ nằm trong danh sách được phép (llowedTabs) của duy nhất vai trò dmin. Toàn bộ các vai trò khác (sales, 	ech, warehouse, dealer) TUYỆT ĐỐI CẤM được truy cập module 
+bac.
+> 4. **Tự Động Nhận Diện Vai Trò Theo Nhân Sự (Staff Auto-Role Resolution & Safe Fallback)**: Khi mở trang bằng tham số link cá nhân hóa (?staff=... hoặc ?email=...), hệ thống BẮT BUỘC tra cứu danh bạ nhân sự (staff_directory) để gán chính xác vai trò tương ứng của nhân viên đó. Nếu truy cập trang công khai không có tham số xác thực, vai trò mặc định an toàn BẮT BUỘC là sales (không tự ý gán dmin).
+
+> 5. **Đồng Bộ 2 Chiều SSOT Nhân Sự Web UI <-> Google Sheet & Tự Động Thêm Mới / Xóa Nghỉ Việc (Strict Staff Directory Live SSOT & Auto-Sync Policy)**:
+>    - **Nguồn Dữ Liệu Nhân Sự Sống (SSOT Source)**: Tab `input HR` (GID `255709958`, Spreadsheet `1s-V0owHlwub4qrCxTUvKmXp4PWZthzk5oKhi5m_wQBA`) là nguồn duy nhất ghi nhận danh sách nhân sự thực tế.
+>    - **Tự Động Cập Nhật Mặc Định (Auto Add New with Default Role Sales)**: Bất kỳ nhân sự mới nào được thêm vào tab `input HR`, hệ thống BẮT BUỘC tự động ghi nhận vào danh bạ và gán vai trò mặc định ban đầu là `sales` (Kinh Doanh), để Ban Giám Đốc tự do điều chỉnh sau. Riêng nhân sự có chức danh `HR and Finance` được tự động gán `finance`.
+>    - **Tự Động Triệt Tiêu Nhân Viên Nghỉ Việc (Auto Purge Resigned Staff)**: Nếu một nhân sự bị xóa khỏi bảng tính trên Google Sheet (nghỉ việc), hệ thống BẮT BUỘC tự động nhận diện và xóa hoàn toàn khỏi danh bạ Web UI, không để lại dữ liệu rác hay hàng trống.
+>    - **Bảo Lưu Phân Quyền Đã Điều Chỉnh (Preserve Custom Overrides)**: Khi đồng bộ dữ liệu mới, hệ thống BẮT BUỘC bảo lưu các vai trò mà Ban Giám Đốc đã tùy chỉnh trước đó, không được tự ý ghi đè lại về `sales`.
+>    - **Ghế Giám Sát Tự Động (SUPERVISOR-HR-SYNC)**: Cả Web UI (`sale.html`) và Backend Apps Script (`staffGet_`) cùng giám sát chặt chẽ luồng đồng bộ, bảo đảm dữ liệu luôn tươi mới 100%.
+
+---
+
+# 📊 STRICT RULE: ĐỊNH DẠNG BẢN TIN TỔNG HỢP CHUYÊN BIỆT SITE DOWN CHO GROUP CONTROL (STRICT SITE DOWN ONLY CONTROL SUMMARY FORMAT)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SITE DOWN ONLY CONTROL SUMMARY STANDARD)**:
+> 1. **Bản Tin Chuyên Biệt Chỉ Site Down (Dedicated Site Down Only Summary)**: Sau khi gửi bản tin đầy đủ `SUMMARY — ALL TEAMS`, hệ thống BẮT BUỘC gửi tiếp 1 bản tin tổng hợp chuyên biệt CHỈ CÓ SITE DOWN (`TIN2_CONTROL_SD_ONLY`) vào Group Control (`5 TNI TECHNICA DEP CONTROL SITE`).
+> 2. **Tách Biệt Rõ Ràng Team & Sub Team**: Dữ liệu Site Down BẮT BUỘC phân chia rõ ràng theo từng Team và Sub Team theo thứ tự tuần tự: Team 1 Dawei -> Sub Team 1 -> Team 2 Myeik -> Sub Team 2 -> Team 3 Bokpyin -> Sub Team 3 -> Team 4 Kawthoung. TUYỆT ĐỐI CẤM gộp nhân sự Sub Team vào chung Team chính làm rối loạn địa bàn quản lý.
+> 3. **Định Dạng Từng Nhân Viên Xuống Hàng Chuẩn Xác**: Dưới mỗi Team/Sub Team, từng nhân viên được định dạng thành một dòng riêng biệt: `• [Tên Nhân Viên] : [Danh Sách Trạm & Thời Gian Sập]` rồi xuống hàng đến nhân viên tiếp theo.
+> 4. **Phạm Vi Gửi Duy Nhất Group Control**: Bản tin tổng hợp chuyên biệt Site Down này CHỈ GỬI VÀO DUY NHẤT GROUP CONTROL (`SD_GROUPS["CONTROL"]`), tuyệt đối không gửi vào các group Team để tránh trùng lặp thông tin.
+
+---
+
+# ⛽ STRICT RULE: NHẬN DIỆN ĐA BIỂU MẪU BÁO CÁO ĐÃ ĐỔ DẦU THỰC TẾ (RULE PM-86 & STRICT MULTI-FORMAT REFUEL REPORT DETECTION POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (MULTI-FORMAT REFUEL REPORT DETECTION STANDARD)**:
+> 1. **Bắt Buộc Hỗ Trợ Toàn Diện Các Dạng Mở Đầu Biểu Mẫu (Comprehensive Header Support)**: Khi phân loại báo cáo đã đổ dầu thực tế (`REFUELED`), hệ thống BẮT BUỘC phải hỗ trợ toàn diện các dạng mở đầu biểu mẫu gồm:
+>    - Bắt đầu bằng `DG Type` (chuẩn mẫu cũ).
+>    - Mẫu đánh số bắt đầu bằng Ngày: `(?:\d+[\.\:\-\)]\s*)?date\s*[=:]` (ví dụ: `1. Date=7/10/2026`, `1.Date =...`, `Date: ...`).
+>    - Mẫu đánh số bắt đầu bằng Mã Trạm / DG: `(?:\d+[\.\:\-\)]\s*)?(?:mytel\s*)?(?:site|dg)\s*id\b` (ví dụ: `2. Mytel site ID TNI0038`).
+>    - Bắt đầu trực tiếp bằng mã trạm `tni0*\d{1,4}\b` hoặc từ khóa `refuel(ed)`.
+> 2. **Xác Thực Đa Tầng Tránh Bắt Nhầm Hội Thoại (Multi-Tier Validation & Zero False Positives)**: Để đảm bảo không bao giờ nhận nhầm trò chuyện thông thường thành báo cáo, tin nhắn BẮT BUỘC phải thỏa mãn đồng thời:
+>    - Có mã trạm TNI hợp lệ (`\btni0*(\d{1,4})\b`).
+>    - Có ít nhất một chỉ số đo đạc thực tế (`actual filled`, `csu reading`, `running hour`, `level %`, `fuel level`, `fuel liter/cm`).
+>    - Có từ khóa nghiệp vụ đổ dầu (`dg type`, `actual filled`, `fuel filling team`, `power mode`) HOẶC có đầy đủ cả 2 khối `before` và `after`.
+> 3. **TUYỆT ĐỐI CẤM Neo Cứng `^\s*dg\s*type\b` Đầu Câu**: Cấm triệt để việc chỉ kiểm tra `dg type` ở đầu dòng số 0 làm bỏ sót các báo cáo thực tế được nhân viên kỹ thuật gửi theo mẫu đánh số `1. Date=...`.
+> 4. **Trích Xuất Chỉ Số cm Linh Hoạt**: Đối với dòng `Fuel Liter/cm`, phải hỗ trợ linh hoạt cả dạng có số trong ngoặc `-(10)44L` lẫn dạng dấu gạch ngang sau ngoặc `Fuel Liter/cm -(-)30 L` hoặc `-(30) L` để không bị rỗng giá trị `beforeCm`/`afterCm`.
+
+---
+
+# 🔒 STRICT SEARCH & MENU RULE: KHÓA CỨNG ANCHOR BẮT ĐẦU — TUYỆT ĐỐI KHÔNG TÌM Ở GIỮA CÂU (STRICT START-KEY ANCHORING & ZERO MID-SENTENCE MATCHING POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (ANTI-FALSE-POSITIVE COMMAND LOCK)**: 
+> 1. **Khóa Cứng Điểm Bắt Đầu (Strict Start Anchoring)**: Mọi cú pháp tra cứu (Search), lấy mẫu (Template), thực đơn (Menu) hoặc lệnh điều khiển của toàn bộ hệ thống Bot BẮT BUỘC phải bắt đầu bằng dấu gạch chéo `/` (ví dụ: `/attendance`, `/leave`, `/plan`, `/info`, `/cons`, `/clear`, `/help`, `/menu`, `/t1..4`) HOẶC là cụm từ khóa lệnh chuẩn đứng độc lập ngay đầu câu (`^...$`), độ dài tối đa $\le 3-4$ từ.
+> 2. **CẤM TUYỆT ĐỐI Quét Từ Khóa Ở Giữa Câu Chat**: Tuyệt đối KHÔNG ĐƯỢC dùng `indexOf !== -1` hoặc regex tìm kiếm từ khóa nằm lơ lửng ở giữa câu nói chuyện, thảo luận công việc thông thường của nhân viên (ví dụ: *"Aye Min Soe sent photo attendance in telegram also"*, *"Please leave the key at the office"*, *"Check daily plan status"*). Mọi câu trò chuyện tự nhiên có từ khóa ở giữa PHẢI BỎ QUA 100% (IGNORE)!
+
+---
+
+# 💬 STRICT RULE: TEMPLATE PHẢN HỒI THU THẬP CHUẨN GỌN TỐI ĐA 2 DÒNG & ĐỊNH TUYẾN EMOJI BỌC THÉP (MAX 2-LINE BOT ACKNOWLEDGMENT & EMOJI-ROUTING POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (2-LINE TEMPLATE & EMOJI-ROUTING STANDARD)**: 
+> 1. **Chuẩn Mẫu 2 Dòng Ngắn Gọn (Max 2 Lines)**: MỌI TIN NHẮN PHẢN HỒI THU THẬP TỰ ĐỘNG CỦA BOT (INVENTORY, MDG, CABLE, ASSET, V.V.) BẮT BUỘC PHẢI NGẮN GỌN TỐI ĐA ĐÚNG 2 DÒNG, TUYỆT ĐỐI KHÔNG CHÈN TÊN/SỐ GHẾ, KHÔNG RƯỜM RÀ:
+>    - **Dòng 1**: [Icon] REF:[Mã REF] | [Mã Trạm / Thiết Bị] | [DD/MM/YYYY HH:MM]
+>    - **Dòng 2**: ✅ Reply Confirm to close | sent photo MDG after sent text report (hoặc hướng dẫn tương ứng)
+> 2. **Định Tuyến Hành Động Downstream Bắt Buộc Dùng Icon (Emoji-First Action Routing)**: Khi phân loại tin nhắn reply/callback dựa trên nội dung tin nhắn bot đã gửi trước đó (như reply ảnh hoặc gõ `Confirm`), BẮT BUỘC phải kiểm tra Icon định danh duy nhất ở đầu câu (`⛽` cho Inventory, `🛢️` cho Change Oil, `⚡` cho MDG Run) TRƯỚC TIÊN. TUYỆT ĐỐI CẤM dùng từ khóa chung (như "MDG", "Report", "Confirm") nằm trong dòng hướng dẫn thao tác (instruction line) để phân loại, vì dòng hướng dẫn có thể xuất hiện ở mọi loại báo cáo gây xung đột và định tuyến sai hành động downstream!
+
+---
+
+# 🌐 STRICT RULE: BOT PHẢN HỒI 100% TIẾNG ANH — TUYỆT ĐỐI CẤM GỬI TIẾNG VIỆT RA TELEGRAM (STRICT ENGLISH-ONLY BOT RESPONSE POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (ENGLISH-ONLY BOT OUTPUT POLICY)**:
+> 1. **Mọi Tin Nhắn Bot Gửi Ra Telegram BẮT BUỘC 100% Tiếng Anh (All Bot Replies in English)**: Toàn bộ nội dung mà Bot gửi ra các nhóm Telegram (xác nhận thu thập, menu keyboard, template danh sách, phản hồi lệnh `/refresh`, `/menu`, v.v.) BẮT BUỘC phải viết hoàn toàn bằng **tiếng Anh (English)**. TUYỆT ĐỐI CẤM để lọt bất kỳ câu, từ, cụm từ tiếng Việt nào trong tin nhắn Bot gửi cho người dùng Telegram!
+> 2. **Logger.log Nội Bộ Được Phép Tiếng Việt**: Chỉ có `Logger.log()` (log nội bộ dành cho developer kiểm tra trên Apps Script Execution Log) mới được phép dùng tiếng Việt hoặc song ngữ. Đây là log kỹ thuật KHÔNG hiển thị cho nhân viên!
+> 3. **Kiểm Tra Trước Khi Deploy**: Trước mỗi lần deploy hoặc cập nhật code, BẮT BUỘC phải rà soát 100% các chuỗi `sendSingleTelegramMessage_`, `sendTelegramMessageCollectIds_`, `UrlFetchApp.fetch(... /sendMessage ...)` để đảm bảo không còn bất kỳ ký tự tiếng Việt nào trong nội dung tin nhắn!
+> 4. **Attendance GAS — Toàn Bộ Báo Cáo & Template BẮT BUỘC Tiếng Anh (Attendance English-Only)**: Mọi nội dung Bot gửi vào group 10 (TNI DAILY ADDTENDANCE `-5465634644`) và các group T1-T4/CONTROL bao gồm: daily status template (Working/Take Leave/Not report), báo cáo 09:00, thông báo lỗi (`Error: ...` không phải `Lỗi: ...`), membership summary — BẮT BUỘC 100% tiếng Anh. **Scan bắt buộc trước deploy**: `Select-String -Path "apps_script_attendance\TNI attendance.js" -Pattern "sendTelegramMessage_|sendTgMsg" | % { $_.Line }` — kiểm tra không có ký tự UTF-8 tiếng Việt trong payload.
+> 5. **RULE PM-30 — Chống Ép Kiểu Date Object Thành Chuỗi Cụt Khi Đọc Cột Giờ / Ngày (GAS getValues Date Coercion Resilience)**: Trong Google Apps Script, khi gọi `getValues()`, các ô được định dạng Giờ (Time, ví dụ `08:32`) hoặc Ngày (Date) trong Google Sheets sẽ được chuyển thành native `Date` object (`Sat Dec 30 1899 08:32:00...`). Nếu dùng `String(r[2]).match(/^(\d{1,2}):(\d{2})/)` sẽ trả về `null` vì chuỗi bắt đầu bằng `"Sat"`, làm sai toàn bộ slot tính giờ và đưa nhân viên về slot `after` (Work = 0). BẮT BUỘC phải trích xuất giờ an toàn: `var timeRaw = (r[2] instanceof Date) ? Utilities.formatDate(r[2], tz, "HH:mm") : String(r[2] || "").trim();`.
+> 6. **RULE PM-31 — Khóa Tuần Hiện Tại Bắt Đầu Từ Ngày Đầu Tháng (Current Month Week-Clip Policy)**: Trong báo cáo điểm danh theo tuần và tháng (`Today / Yest / Day-3 / Week / Month`), khi tuần rơi vào thời điểm giao thoa giữa 2 tháng (ví dụ: thứ 2 ngày 28/09 đến thứ 7 ngày 03/10), số liệu Tuần (`Week`) BẮT BUỘC CHỈ ĐƯỢC TÍNH các ngày thuộc về tháng hiện tại (`dObj >= weekStart && weekStart = max(rawWeekStart, monthStart)`). TUYỆT ĐỐI CẤM để số liệu tuần tính lấn sang các ngày của tháng trước khiến tổng tuần lớn hơn tổng tháng (`Week > Month`, ví dụ `Week: 6 / Month: 3`) gây vô lý và hiểu lầm về dữ liệu điểm danh!
+> 7. **RULE PM-32 — Tự Động Phân Mảnh Báo Cáo Dài & Xóa Đa ID Chống Lỗi Telegram 400 Message Too Long (Telegram 4096-Char Limit & Auto-Chunking Resilience)**: Giới hạn độ dài 1 tin nhắn Telegram là 4096 ký tự. Khi báo cáo tổng hợp (như nhóm CONTROL gồm toàn bộ công ty nhiều bộ phận + danh sách chưa tham gia) vượt quá 4000 ký tự, `sendMessage` sẽ báo lỗi `Bad Request: message is too long` (HTTP 400) và làm sập việc gửi tin. BẮT BUỘC:
+>    - (a) Hàm gửi báo cáo phải tích hợp sẵn bộ cắt mảnh an toàn `splitReportChunks_(text, 3800)` cắt theo dòng, nếu $>1$ phần thì thêm tiêu đề `[Part X/Y]`.
+>    - (b) Hàm `deleteTgMessage_` BẮT BUỘC phải hỗ trợ xóa chuỗi đa ID (phân tách bởi dấu phẩy `,`) để khi cập nhật chuỗi tin nhắn nhiều phần thì toàn bộ các phần cũ đều được xóa sạch không để lại tin nhắn mồ côi.
+> 8. **RULE PM-33 — Trích Xuất Message ID Số Nguyên Khi Lưu Vào ScriptProperties Chống Lỗi Object Object Làm Liệt Luồng Xóa Tin Cũ (Strict Numeric Telegram Message ID Extraction Policy)**: Khi gọi hàm gửi tin nhắn Telegram trả về object kết quả `{ ok: boolean, messageId?: number }`, BẮT BUỘC phải trích xuất thuộc tính số nguyên `res.messageId` (hoặc kiểm tra `if (res && res.ok && res.messageId)`) trước khi lưu vào `ScriptProperties` / Cache / Database. TUYỆT ĐỐI CẤM ép kiểu trực tiếp cả object thành string (`String(res)`) dẫn đến giá trị `"[object Object]"` làm tê liệt toàn bộ luồng tự động xóa tin cũ (`deleteTgMessage_`), khiến các tin nhắn của khung giờ trước không được xóa và tin nhắn mới bị gửi lặp lại đè chồng lên nhau trong nhóm làm việc. Đồng thời trong hàm `deleteTgMessage_`, BẮT BUỘC phải kiểm tra hợp lệ `if (!mid || mid === "[object Object]" || isNaN(Number(mid))) continue;` để ngăn chặn lỗi HTTP 400 Bad Request và bảo vệ tính toàn vẹn của dữ liệu tin nhắn.
+> 9. **RULE PM-34 — Dọn Dẹp Menu Lệnh Bot Khi Tác Vụ Đã Được Gửi Tự Động (Strict Bot Menu Lifecycle & Redundant Command Removal Policy)**: Khi một loại báo cáo hoặc cập nhật dữ liệu (như ETA Site Down, Daily Plan, Morning Attendance Status) đã được chuyển thành luồng tự động định kỳ theo lịch trình (Toa tàu Train hoặc Trigger tự động phát vào nhóm):
+>    - (a) BẮT BUỘC phải loại bỏ triệt để các lệnh gọi thủ công tương ứng (`/eta`, `/eta_t1`, `/eta_t2`...) ra khỏi Menu Lệnh của Bot Telegram (`setMyCommands`) trên TẤT CẢ các scope (toàn cục, `all_group_chats`, `all_private_chats` và từng nhóm chat cụ thể).
+>    - (b) TUYỆT ĐỐI CẤM để lại các lệnh gợi ý trùng lặp trong menu chat khiến người dùng phân vân bấm nhầm làm spam nhóm và chạy lặp dữ liệu không cần thiết.
+>    - (c) Khi sửa hàm `setupCommands`, BẮT BUỘC gọi ngay API `deleteMyCommands` trên từng scope và gọi `setupCommands` để kích hoạt Telegram cập nhật menu ngay lập tức.
+> 10. **RULE PM-35 — Lệnh Nghỉ Phép (/take_leave, /half_leave) Chỉ Đăng Ký Vào Duy Nhất Nhóm 10 (Strict Attendance Command Scope Isolation to Group 10 Only)**:
+>    - (a) Các lệnh xin nghỉ phép (`/take_leave`, `/half_leave`) của `@TNI_DAILY_ADDTENDANCE_BOT` BẮT BUỘC **CHỈ ĐƯỢC HIỂN THỊ TRONG DUY NHẤT NHÓM 10** (`10. TNI DAILY ADDTENDANCE`, Chat ID `-5465634644`).
+>    - (b) **TUYỆT ĐỐI CẤM** đăng ký các lệnh này vào scope mặc định (`default`), nhóm chung (`all_group_chats`), chat riêng (`all_private_chats`) hoặc trên 4 nhóm Team vận hành (`TNI TEAM 1-4`, ví dụ `-1004215695747`, `-1004480845549`, `-1004369170658`, `-1004293741999`).
+>    - (c) Khi cấu hình `setupAttendanceBotCommands()`, BẮT BUỘC phải gọi `deleteMyCommands` trên tất cả các scope chung và từng nhóm Team, và CHỈ gọi `setMyCommands` với scope `{ type: "chat", chat_id: DAILY_ATT_CHAT }`. Khi bấm `/` trong 4 nhóm Team, bot menu BẮT BUỘC phải trống hoàn toàn (0 commands)!
+> 11. **RULE PM-36 — Quản Lý Serial & Ngày Ký Gởi Bắt Buộc Đồng Bộ Song Ngữ Trên Giao Diện Và Mẫu File (Strict Consignment Serial & Date Synchronization Policy)**:
+>    - (a) **Phân Hệ Ký Gởi / Bỏ Sỉ (Consignment)**: BẮT BUỘC phải hỗ trợ trường `Serial Number` (mã serial thiết bị) và trường `Ngày Ký Gởi` (`ngay_kg` / `Consignment Date`) trên cả 3 luồng: ① Form tạo phiếu đơn lẻ (`#kg-serial`, `#kg-ngay`), ② Bảng hiển thị danh sách ký gởi (`#t-kygoi`), ③ Khung import hàng loạt (`#kg-bulk-paste-area`) và Bảng xem trước (`#kg-bulk-preview-table`).
+>    - (b) **File Mẫu CSV Ký Gởi (`Mau_Ky_Goi_Ban_Si_TNI_*.csv`)**: BẮT BUỘC phải có đầy đủ 2 cột: `Serial Number / Mã Serial` và `Ngày Ký Gởi / Consignment Date (YYYY-MM-DD)` kèm dữ liệu mẫu thực tế.
+>    - (c) **Tương Thích Ngược Thông Minh (Dual-Format Backward Compatibility)**: Hàm phân tích import `parseKGBulkInput()` BẮT BUỘC phải hỗ trợ cả dữ liệu format mới (11 cột có Serial & Ngày Ký Gởi) lẫn dữ liệu cũ (9 cột), tự động nhận diện vị trí cột ngày và fallback serial an toàn từ kho hàng (`nhapList`) nếu dòng import để trống!
+> 12. **RULE PM-37 — Chuyển Trực Tuyến 100% Lên Web BI, Xác Thực Google Mail Whitelist, Quản Lý Đối Tác Gmail Đầu Bảng & Bắt Buộc Ảnh/Link Drive Hồ Sơ (Strict Web BI Shift, Google Mail Whitelist, Partner Gmail Top, Serial Autocomplete & Mandatory Media Audit Policy)**:
+>    - (a) **Bãi Bỏ Thu Thập Bán Hàng Từ Telegram (Abolish Telegram Order Collection)**: Toàn bộ quy trình bán hàng, xuất kho, ký gởi, nghiệm thu, thu nợ và quản lý tồn kho BẮT BUỘC thực hiện 100% trên Web BI Portal. Telegram chỉ dùng để liên lạc, trao đổi và nhận thông báo định kỳ. Hàm backend `telegram_sale_collect` bị bãi bỏ (trả HTTP 410) và các hướng dẫn cú pháp bán hàng trên Telegram bị loại bỏ hoàn toàn.
+>    - (b) **Bảo Mật Google Mail Cá Nhân Qua Whitelist SSOT (Google Mail Whitelist SSOT)**: Xác thực đăng nhập hệ thống bằng Google Mail cá nhân. Chỉ những email có trong danh sách tab `staff` hoặc tab `input HR` (GID 255709958) với trạng thái hoạt động mới được cấp quyền truy cập. Nhân viên nghỉ việc tự động bị tước quyền truy cập.
+>    - (c) **Quản Lý Đối Tác Gmail Đầu Bảng (Partner Gmail Top Row Policy)**: Chức năng thêm đối tác (`staff_partner_add`) đưa đối tác lên vị trí Hàng 2 (Top list `staff`), mặc định vai trò `sales` (Kinh Doanh / Ký Gởi) để đối tác và nhân viên dễ dàng tự theo dõi tồn kho, hàng ký gởi và lịch sử bán hàng.
+>    - (d) **Tự Động Điền Gợi Ý Serial Theo Các Số Cuối (Serial Autocomplete by Trailing Digits)**: Khi nhập mã Serial cho đơn bán hàng hoặc phiếu ký gởi, chỉ cần gõ 2-4 ký tự cuối, hệ thống tự động lọc và gợi ý danh sách Serial khả dụng còn tồn trong kho, ngăn ngừa nhầm lẫn và sai sót thủ công.
+>    - (e) **Bắt Buộc Ảnh Xác Thực & Link Google Drive Folder Lưu Trữ (Mandatory Proof Photos & Drive Folder Link)**: Mọi đơn bán hàng (`#s-banhang`), phiếu ký gởi (`#s-kygoi`) và biên bản nghiệm thu bàn giao (`#s-acceptance`) BẮT BUỘC phải tải lên ít nhất 1 ảnh hiện trường/serial hoặc nhập Link thư mục Google Drive lưu trữ hồ sơ. Hệ thống chặn lưu nếu không có ảnh hoặc link Drive.
+>    - (f) **Mở Rộng Thêm Bớt Chức Danh Linh Hoạt (Dynamic Role Management with '+' Button)**: Thanh công cụ RBAC và modal nhân sự có nút '+' để quản trị viên dễ dàng thêm mới các chức danh, vị trí công tác tùy chỉnh mà không cần can thiệp vào mã nguồn gốc.
+
+---
+
+# 🚦 STRICT RULE: XẾP HÀNG CHỐNG TRÙNG LẶP — LOCKSERVICE + DEDUP UPDATE_ID BẮT BUỘC (STRICT QUEUE & DEDUP POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (ANTI-DUPLICATE & QUEUE POLICY)**:
+> 1. **LockService Bắt Buộc (Mandatory Queue Lock)**: Mọi hàm `doPost()` (webhook) và hàm gửi tin tự động (trigger) BẮT BUỘC phải dùng `LockService.getScriptLock().tryLock()` để đảm bảo **chỉ 1 tiến trình xử lý cùng lúc**. Nếu không lấy được lock → bỏ qua (không gửi trùng).
+> 2. **Dedup Update ID Bắt Buộc (Mandatory Webhook Dedup)**: Mọi hàm `doPost()` nhận webhook từ Telegram BẮT BUỘC phải lưu `update_id` vào `CacheService` (5 phút). Nếu `update_id` đã tồn tại trong cache → trả `"OK"` ngay lập tức, KHÔNG xử lý lại. Mục đích: Telegram retry webhook 2-3 lần khi GAS phản hồi chậm, gây trùng lặp tin nhắn.
+> 3. **Giải Phóng Lock Trong Finally (Always Release in Finally)**: Mọi `tryLock()` BẮT BUỘC phải có `finally { lock.releaseLock(); }` để tránh deadlock.
+> 4. **Kiểm Tra Tham Số Trigger Bắt Buộc (Strict Trigger Boolean Check)**: Khi một hàm GAS được gọi bởi Time-driven Trigger, GAS luôn tự động truyền vào 1 đối tượng Event `e` (`{authMode: ...}`). Do đó, nếu hàm có tham số cờ (ví dụ `forceSend`), TUYỆT ĐỐI KHÔNG DÙNG `if (!forceSend)` vì `!{}` là `false` khiến Trigger hiểu nhầm là `forceSend=true` và gửi spam liên tục! BẮT BUỘC phải kiểm tra kiểu boolean chặt chẽ: `const isForce = (forceSend === true);`.
+> 5. **Vô Hiệu Hóa Ghost Cron Khi Chuyển Sang Luồng Liên Kết (Zero Ghost Cron Policy)**: Khi một luồng gửi tin được chuyển sang kích hoạt liên kết trực tiếp (như Bot 5T sau 30s gọi Bot 2D qua Webhook), BẮT BUỘC phải tắt hoàn toàn cron tự động tương ứng trên GitHub Actions (`SHARE_ETA=false`) để tránh chạy kép lệch nhịp làm sai lệch state và ghi đè tin nhắn.
+> 6. **Xóa Tin Cũ Đa ID & Chống Timeout GAS (Multi-ID Deletion & Retry Resilience)**: Mọi logic xóa tin cũ ("tin nào xóa tin nấy") BẮT BUỘC phải hỗ trợ phân tách và xóa toàn bộ danh sách Multi-IDs (chuỗi ngăn cách `,` hoặc `;`) và có retry tối thiểu 2 lần khi gọi `get_msg_id` qua GAS API. TUYỆT ĐỐI CẤM chỉ giả định đọc 1 ID rồi ghi đè ngay làm mất dấu tin mồ côi (orphaned messages).
+> 6a. **RULE PM-27 — Gạch Bỏ ID Tức Thì Khi Telegram Từ Chối Xóa Sau 48h (Mandatory Stale-ID Discard on 48h Telegram Limit)**: Telegram Bot API chỉ cho phép Bot xóa tin nhắn trong vòng **48 giờ** kể từ khi gửi. Khi `deleteMessage` trả về `"Bad Request: message can't be deleted for everyone"` hoặc `"message_id_invalid"`, hàm `delete_telegram_msg()` trong `delete_old_helper.py` BẮT BUỘC phải coi đó là **True (xử lý xong)** — TUYỆT ĐỐI CẤM đẩy ID đó vào `remaining_ids` rồi lưu lại GAS, vì sẽ tạo vòng lặp vô hạn làm tin cũ "stuck" vĩnh viễn trong nhóm. Hành vi đúng: **discard (gạch bỏ) ID >48h → gửi tin mới bình thường theo nhịp cũ**. Áp dụng cho mọi phân hệ dùng cơ chế "tin nào xóa tin nấy" (Cable `:16`/`:46`, ETA, Daily Plan, Read Report, v.v.).
+> 7. **RULE PM-23 — Cơ Chế Kép Quản Lý State Tin Nhắn & Bắt Buộc Batch Pipeline Trên Serverless & Cấm Nuốt Lỗi Import (Strict Dual-Storage State Engine & Mandatory Batch Pipeline & Zero Silent Import-Drop Policy)**:
+>    - **Tuyệt Đối Cấm Nuốt Lỗi Import Tiện Ích Xóa Tin (Zero Silent Import-Drop)**: Trong các hàm gửi tin định kỳ (`cron_send.py`), TUYỆT ĐỐI CẤM dùng `except ImportError: has_tg_utils = False` rồi tắt luôn tính năng xóa tin cũ! BẮT BUỘC phải có built-in fallback xóa tin trực tiếp (`requests.post https://api.telegram.org/bot<token>/deleteMessage`) ngay trong thân hàm để đảm bảo dù import có lỗi thì lệnh xóa tin cũ vẫn 100% được thực thi. Đồng thời trong `tg_utils.py` phải bọc `import dotenv` trong `try...except ImportError` để không bị sập trên môi trường Vercel.
+>    - **Cơ Chế Kép Lưu Trữ State Siêu Tốc (Dual Storage Engine: 5ms PropertiesService + BotState Sheet)**: Trên GAS (`apps_script_collector.gs`), các hàm `handleGetMsgId` / `handleSetMsgId` BẮT BUỘC phải lưu và đọc đồng thời trên `PropertiesService` (truy xuất RAM 5ms) và đồng bộ nền vào Google Sheet tab `BotState` (GID `45472350`). Tuyệt đối không để mỗi lần đọc/ghi state đều phải mở bảng tính 36 tab gây nghẽn I/O.
+>    - **Bắt Buộc Gom Batch Pipeline Trên Serverless (Mandatory Serverless Batch Pipeline)**: Khi một endpoint Serverless (Vercel timeout 10s) cần gửi tin và dọn dẹp tin nhắn cho nhiều nhóm/nhiều team (ví dụ 7 teams trong `send_share_eta_reminders`): TUYỆT ĐỐI CẤM gọi tuần tự 14-21 HTTP requests đến GAS. BẮT BUỘC phải dùng `get_msg_ids_batch` lấy toàn bộ ID tin cũ trong 1 request (<300ms) trước vòng lặp, xóa tin và gửi mới trong RAM, sau đó gom toàn bộ ID tin mới gửi 1 request `set_msg_ids_batch` (<300ms) sau vòng lặp. Tổng thời gian toàn bộ tác vụ BẮT BUỘC phải dưới 3 giây.
+>    - **Kháng Suy Giảm Method Chuyển Tiếp (302 Redirect Method Downgrade Resilience)**: Toàn bộ các router state (`get_msg_id`, `set_msg_id`, `get_msg_ids_batch`, `set_msg_ids_batch`) trên GAS BẮT BUỘC phải hỗ trợ CẢ HAI phương thức `doGetCollector_` và `doPostCollector_` để chống mất body JSON khi bị chuyển tiếp 302.
+> 8. **RULE PM-24 — Khóa Đơn Nhất Đoàn Tàu (Single Train Concurrency) & Chuẩn Khớp Giờ check_time_exact & Kháng Lỗi Tính Toán Tạm Thời Trên Google Sheet (Single Train Concurrency & Precision Scheduling & Sheet Recalculation Resilience Policy)**:
+>    - **Khóa Concurrency train-5min-singleton Bắt Buộc (Mandatory Singleton Concurrency Lock)**: Trong mọi file workflow `.github/workflows/train_5min.yml`, khối `concurrency` BẮT BUỘC phải dùng khóa tĩnh duy nhất: `group: train-5min-singleton` và `cancel-in-progress: false`. TUYỆT ĐỐI CẤM chia nhóm theo event_name (`train-manual` vs `train-auto`), vì khi GAS dispatch bằng `workflow_dispatch` và GitHub cron `schedule` vô tình nổ cùng lúc, hai nhóm khác nhau sẽ chạy song song gây nhân đôi tin nhắn (duplicate reports) và xung đột IP. Đồng thời BẮT BUỘC comment out `schedule: cron` khi GAS `dispatchTrain5Min` đang là đầu tàu điều phối.
+>    - **Khóa Giờ Đơn Khớp check_time_exact (Strict Single-Tick Precision Lock)**: Mọi báo cáo định kỳ chạy 1 lần duy nhất trong ngày (Report 5C, Report 6, Report 6.1, Auditor 9.1) BẮT BUỘC phải dùng hàm `check_time_exact <HH> <MM>` (dung sai $\le 2$ phút). TUYỆT ĐỐI CẤM dùng logic OR nối 2 mốc giờ `(check_time XX YY || check_time XX ZZ)` với hàm `check_time` có dung sai $\pm 5$ phút, vì dung sai nới rộng này tạo ra cửa sổ 12 phút bao trùm 2-3 nhịp 5 phút liên tiếp, làm bot gửi lặp lại ở nhịp sau và bị tính là tin trễ (DELAYED).
+>    - **Chuẩn Hóa Lịch Refuel Về Bản Tin Gộp (Refuel Schedule SSOT)**: Khi báo cáo đã được gộp (như `refuel_send.py` gộp vào `refuel_plan_report.py --report 1`), BẮT BUỘC phải dọn sạch các cờ kích hoạt cũ trong `train_5min.yml` (`REFUEL_REQ=false`, vô hiệu hóa Toa 8) và cập nhật mốc giờ trong `system_auditor.py` về đúng giờ thực tế (`10:06`, `14:11`), TUYỆT ĐỐI KHÔNG để script kiểm toán kiểm tra mốc giờ ma của file đã ngừng hoạt động gây báo động giả (MISSED alert).
+>    - **Bộ Đệm Kháng Lỗi Sheet Đang Tính Toán (Sheet Recalculation Retry Guard)**: Trong `system_auditor.py`, hàm `audit_sheets_connectors()` BẮT BUỘC phải có cơ chế retry chờ 4 giây ở attempt 0 nếu phát hiện lỗi công thức (`#DIV/0!`, `#VALUE!`, `#REF!`) hoặc rỗng dòng (0 rows), nhằm loại trừ các trạng thái tính toán trung gian khi Google Sheets đang nạp lại công thức `IMPORTRANGE`/`QUERY`.
+> 9. **RULE PM-26 — Khóa Bộ Nhớ Trạng Thái Bot State Thuần PropertiesService & I/O Song Song Trên Serverless & Toa Quét Dọn Telethon Dự Phòng Kép (Zero-Spreadsheet Serverless Bot State & Parallel Telegram I/O & Dual-Engine Telethon Sweep Policy)**:
+>    - **Khóa Bộ Nhớ State Thuần PropertiesService (<10ms)**: Trong Google Apps Script (`apps_script_collector.gs`), các hàm đọc/ghi trạng thái tin nhắn hàng loạt (`handleGetMsgIdsBatch` / `handleSetMsgIdsBatch`) BẮT BUỘC phải đọc và ghi **100% thuần túy** vào `PropertiesService.getScriptProperties()`. TUYỆT ĐỐI CẤM gọi `SpreadsheetApp.openById()` hoặc đọc/ghi bảng tính Google Sheets trong luồng synchronous API này, vì mở bảng tính 30+ tab tốn 20-55 giây gây timeout 8-10s trên Vercel Serverless và Python client, làm rỗng state `old_states = {}` và tích tụ tin nhắn mồ côi (orphaned ETA messages)!
+>    - **Xử Lý I/O Telegram Song Song Trên Serverless (<3s)**: Trong `cron_send.py` (`send_share_eta_reminders`), mọi tác vụ xóa tin cũ và gửi tin mới cho nhiều nhóm (7 teams) BẮT BUỘC phải chạy song song bằng `concurrent.futures.ThreadPoolExecutor(max_workers=7)`. TUYỆT ĐỐI CẤM gọi tuần tự 14 HTTP requests nối đuôi nhau tốn 27 giây gây sập Vercel timeout!
+>    - **Toa Quét Dọn Telethon Dự Phòng Kép (Dual-Engine Telethon Sweep Safety Net)**: Hệ thống đoàn tàu (`train_5min.yml`) BẮT BUỘC phải duy trì `Toa Sweep ETA` (`sweep_orphan_eta.py`) chạy bằng Telethon tại các nhịp :11/:41 MMT (và mỗi khi Site Down / Cable khởi hành). Script tự động duyệt lịch sử chat của cả 4 nhóm, phát hiện mọi tin nhắn ETA của Bot 2D, giữ lại DUY NHẤT 1 tin mới nhất và thu hồi (`revoke=True`) sạch toàn bộ tin mồ côi nếu có bất kỳ sự cố mạng nào xảy ra trước đó!
+---
+
+# ⚡ STRICT SERVERLESS TIMEOUT & FAST-PATH PIPELINE RULE: CẤM GỌI GAS ĐỒNG BỘ NẶNG TRƯỚC PHÂN LOẠI TIN NHẮN (STRICT SERVERLESS TIMEOUT & PRE-CLASSIFICATION NON-BLOCKING POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SERVERLESS TIMEOUT & FAST PATH POLICY)**:
+> 1. **Phân Loại & Xử Lý Báo Cáo Trước Tiên (Classify & Fast-Path First)**: Mọi webhook nhận tin Telegram chạy trên Serverless (Vercel/Cloud Functions với giới hạn timeout 10s) BẮT BUỘC phải thực hiện kiểm tra lệnh (`/`) và phân loại nội dung (`classify(text)`) ĐẦU TIÊN. Tuyệt đối KHÔNG ĐƯỢC đặt bất kỳ cuộc gọi mạng đồng bộ nào (như ghi nhận ai đọc tin, `realtime_read`, sync sheet...) ở trước bước phân loại và thu thập chính!
+> 2. **Tác Vụ Phụ Trợ Bắt Buộc Non-Blocking / Background Thread**: Bất kỳ tác vụ ghi log phụ trợ nào (như ghi nhận ai đã đọc tin/chat thông thường) BẮT BUỘC phải chạy trong non-blocking background thread (`threading.Thread(target=..., daemon=True).start()`) hoặc chỉ chạy sau khi đã hoàn thành tác vụ chính, TUYỆT ĐỐI CẤM chặn (blocking) dòng luồng chính gây timeout 504 và làm rớt mất dữ liệu báo cáo của người dùng!
+> 3. **Cấm Gọi Trùng Lặp 2 Lần Vào GAS (Zero Duplicate GAS Calls)**: Nếu downstream GAS (`collectMessage`) đã tích hợp sẵn logic cập nhật sender/đọc tin (`syncSenderToTelegramIdAndReadSheet`), TUYỆT ĐỐI CẤM gọi thêm một hàm phụ cùng chức năng từ Webhook trước khi chuyển dữ liệu vào GAS.
+
+---
+
+# 🛡️ STRICT SYSTEM AUDITOR & SYNCHRONIZED TRAIN SCHEDULE RULE: KHÓA CHẶT ĐỒNG BỘ MỐC GIỜ, PHẠM VI NGÀY & TỐI ƯU TRA CỨU RAM (STRICT AUDITOR-TRAIN SYNC & IN-MEMORY BATCH POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (AUDITOR & TRAIN SYNC POLICY)**:
+> 1. **Khóa Chặt Mốc Giờ Giữa Đoàn Tàu & Kiểm Toán (Auditor-Train 100% Schedule Parity)**: Mọi mốc giờ báo cáo được khai báo trong `SCHEDULE_RULES` của Sentinel Auditor (`system_auditor.py`) BẮT BUỘC phải đồng bộ 100% với điều kiện kích hoạt trong đoàn tàu cron (`train_5min.yml`). TUYỆT ĐỐI CẤM để cờ kích hoạt bị `false` (như Toa 8 `REFUEL_REQ=false` hoặc thiếu mốc Catch-up 07:06, 13:06), gây tình trạng script không bao giờ được chạy tự động dẫn đến báo lỗi bỏ sót ảo (`MISSED`)!
+> 2. **Kiểm Tra Trùng Lặp Bắt Buộc Đúng Ngày Hiện Tại (Strict Active-Date Dedup Scope)**: Khi thực hiện kiểm toán nhân đôi tin nhắn (Deduplication Check), BẮT BUỘC phải lọc đúng phạm vi tin nhắn gửi trong ngày hôm nay (`m.get("date_str") == today_start`). TUYỆT ĐỐI KHÔNG ĐƯỢC quét tràn sang tin nhắn của ngày hôm trước khiến hệ thống liên tục cảnh báo lại các sự cố cũ đã được khắc phục triệt để!
+> 3. **Tối Ưu Tra Cứu Dữ Liệu Hàng Loạt Vào RAM (In-Memory Batch Lookup Only)**: Mọi hàm xử lý dữ liệu hàng loạt trên Google Sheets (như `handleBackfillDailyReportEmployeeNames`) BẮT BUỘC phải nạp toàn bộ danh mục tra cứu (ví dụ: tab `ID Telegram`) vào mảng RAM 1 lần duy nhất trước vòng lặp và tự động thay thế triệt để các mã lỗi công thức (`#REF!`, `#VALUE!`) bằng giá trị dữ liệu thực. TUYỆT ĐỐI CẤM gọi `getRange()` hay đọc Sheet lặp đi lặp lại bên trong từng vòng lặp gây timeout 30s của Google Apps Script!
+> 4. **RULE PM-28 — Bộ Đệm Kháng Lỗi Timeout Khởi Động Nguội GAS & Điểm Cuối Keepalive Siêu Tốc (GAS Cold-Start Resilience & Ultra-Fast Ping Keepalive Policy)**:
+>    - **Điểm Cuối Keepalive & Status Siêu Tốc Trên GAS (<100ms)**: Trong Google Apps Script Hub (`apps_script_collector.gs` / Ghế `GAS-OPS-1`), tại đầu hàm `doGetCollector_` BẮT BUỘC phải xử lý trực tiếp `action === "ping"` và `action === "get_general"` bằng chuỗi JSON nhẹ trả về ngay lập tức (<50ms). TUYỆT ĐỐI CẤM để `action=ping` hoặc `action=get_general` rơi vào nhánh mặc định mở toàn bộ bảng tính Google Sheets khổng lồ (`SpreadsheetApp.openById`), gây tiêu tốn quota, nghẽn hàng đợi thực thi và làm sập timeout các kết nối khác!
+>    - **Bộ Đệm Kháng Lỗi Timeout Khởi Động Nguội Trong Auditor (20s Timeout + 2-Attempt Retry Buffer)**: Trong `system_auditor.py` (Ghế `AUDITOR-9.1`), hàm `audit_gas_backends()` BẮT BUỘC phải đặt `timeout=20` giây (thay vì 12s) và triển khai cơ chế thử lại 2 lần (`for attempt in range(2)`) kèm độ trễ nghỉ 2 giây nếu lần đầu gặp lỗi/timeout. Cơ chế này đảm bảo khi máy chủ Google Apps Script đang ở trạng thái ngủ sâu (cold start container loading ~8-15s), lượt thử đầu tiên sẽ đánh thức container và lượt thử thứ hai sẽ thành công 100%, chấm dứt hoàn toàn hiện tượng báo động giả (False System Alert: `Timeout / Ngủ: HTTPSConnectionPool`). Đồng thời phải có giãn cách `time.sleep(0.8)` giữa các cuộc gọi kiểm tra GAS liên tiếp để tránh bị Google API rate limit.
+> 5. **RULE PM-29 — Triệt Tiêu Double Dispatch Trên GAS, Keepalive Toa 0 Cho Attendance & Tự Động Xóa Lỗi Webhook Tồn Dư (Zero Double-Dispatch, Full Attendance Keepalive & Auto Stale Webhook Clear Policy)**:
+>    - **Triệt Tiêu Tuyệt Đối Double Dispatch Từ GAS Hub**: Trong bộ điều phối GitHub Actions trên GAS (`14_GITHUB_DISPATCH.gs`), hàm `dispatchTrain5Min()` BẮT BUỘC CHỈ GỌI DUY NHẤT `train_5min.yml`. TUYỆT ĐỐI CẤM dispatch thêm workflow con độc lập (`botlookup_relay.yml`, v.v.) bên trong cùng một nhịp chạy. Mọi tác vụ Toa (bao gồm Toa Site Down Relay :06/:36 MMT) đã được tích hợp tuần tự trong `train_5min.yml` theo `STRICT SINGLE-TRAIN RULE`. Việc gọi 2 workflow song song trong cùng một phút sẽ kích hoạt 2 instance cào dữ liệu cùng lúc, dẫn đến gửi tin nhắn trùng lặp (duplicate messages) 0-1s ra các nhóm Telegram T1-T4!
+>    - **Keepalive Toa 0 Cho Toàn Bộ Webhooks & Vercel Containers (Bao gồm Attendance Bot)**: Trong `train_5min.yml` (Toa 0 — Keepalive), BẮT BUỘC phải ping đều đặn cả URL Vercel Proxy và Telegram `getWebhookInfo` cho Attendance Bot (`@TNI_DAILY_ADDTENDANCE_BOT`), cùng với lời gọi `action=get_headers` tới Deployment mới nhất (`@98`). Việc bỏ sót Attendance Bot khỏi Toa 0 sẽ dẫn đến cold-start container trên Vercel vào giờ cao điểm điểm danh (08:00-09:00 MMT), khiến Telegram gặp lỗi `Read timeout expired`.
+>    - **Tự Động Xóa Sạch Lỗi Webhook Tồn Dư Lịch Sử Trong Auditor (`deleteWebhook` + `setWebhook`)**: Trong `system_auditor.py`, Telegram Bot API có đặc tính kỹ thuật là KHÔNG BAO GIỜ tự động xóa trường `last_error_message` kể cả khi toàn bộ các tin nhắn sau đó đã được chuyển giao thành công 100% (`pending_update_count == 0`). Do đó, hàm `audit_telegram_webhooks()` BẮT BUỘC phải tự động phát hiện khi `last_err` tồn tại nhưng `pending == 0` và `curr_url == expected_url`, thực hiện chuỗi lệnh `deleteWebhook(drop_pending_updates=False)` ➔ `setWebhook(...)` để xóa sạch chuỗi lỗi cũ, chuyển trạng thái về `PASS 100%`, triệt tiêu hoàn toàn báo động giả `Lỗi Webhook: Read timeout expired`!
+>    - **Tự Động Thu Dọn Tin Nhắn Nhân Đôi Trên Nhóm Chat (In-Audit Duplicate Auto-Purge)**: Trong `audit_telegram_messages()`, khi phát hiện 2 tin nhắn cùng nội dung gửi cách nhau $\le 180$s trong cùng một nhóm, hệ thống BẮT BUỘC gọi ngay `client.delete_messages(chat_id, [m2["id"]])` để lập tức xóa bỏ tin nhắn thừa thứ 2, giữ cho các nhóm chat vận hành luôn sạch sẽ và nguyên vẹn.
+
+---
+
+# 🚫 STRICT MULTI-REPO GHOST CRON & TELEGRAM NOTE IDEMPOTENCY RULE: KHÓA CHẶT 1 REPO CHẠY CRON DUY NHẤT & CHỐNG GỬI TRÙNG LẶP NOTE QUA IDEMPOTENCY GUARD (STRICT ZERO-GHOST-CRON & NOTE IDEMPOTENCY POLICY) (RULE PM-22)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (ZERO-GHOST-CRON & NOTE IDEMPOTENCY POLICY)**:
+> 1. **Duy Nhất 1 Repository Chạy Cron Schedule (Sole Active Cron Engine)**: Toàn bộ hệ thống GitHub Actions chỉ được phép duy trì `schedule: cron: ...` trên **DUY NHẤT 1 REPOSITORY** là `phonghdpxd-cmd/tni-bot` (`Task and WO`). Mọi repository phụ khác (`MON6879/TNI-DONE`, `MON6879/tni-sitedown-relay`, v.v.) BẮT BUỘC phải bị vô hiệu hóa 100% phần `schedule: cron` trong tất cả workflow `.github/workflows/*.yml` (chỉ để `workflow_dispatch`). TUYỆT ĐỐI CẤM để lọt bất kỳ cron job nào trên repo phụ khiến 2-3 máy ảo cùng khởi hành và gửi nhân đôi/nhân ba tin nhắn!
+> 2. **Chốt Chặn Idempotency Guard Cho Tin Nhắn Note (Mandatory 15-Min Note Idempotency Guard)**: Khi gửi tin Note chỉ đạo (`control_note`) hoặc bất kỳ tin phản hồi tự động nào qua Telethon/Bot API, script BẮT BUỘC phải kiểm tra tối thiểu 5 tin nhắn gần nhất trong chat. Nếu tin Note có cùng nội dung đã được gửi trong vòng 15 phút (`age_secs < 900`), BẮT BUỘC phải **BỎ QUA (SKIP)** ngay lập tức, tuyệt đối không gửi lại!
+> 3. **Kiểm Tra & Thanh Lọc Lịch Sử Khi Phát Hiện Nhân Đôi (Auto Forensics & Clean Purge)**: Khi phát hiện sự cố nhân đôi tin nhắn, AI BẮT BUỘC phải dùng Telethon kiểm tra thực tế lịch sử tin nhắn trong các nhóm, xác định nguyên nhân gốc (so sánh timestamp, message ID, runner IP) và tự động xóa sạch các bản tin gửi trùng bằng `client.delete_messages(..., revoke=True)` trước khi báo hoàn thành!
+
+# 📷 STRICT PHOTO COLLECTION & CHAT PRIVACY RULE: THU THẬP HÌNH ẢNH CỬA SỔ 10 PHÚT, GOOGLE DRIVE FOLDER & BẢO MẬT GROUP VS CHAT CÁ NHÂN (PHOTO COLLECTION & CHAT PRIVACY POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (PHOTO COLLECTION & CHAT PRIVACY STANDARD)**:
+> 1. **Cửa Sổ Thu Thập Hình Ảnh 10 Phút (10-Minute Photo Collection Window)**:
+>    - Sau khi nhân viên gửi một tin nhắn text báo cáo (theo bất kỳ Template nào), hệ thống BẮT BUỘC mở một cửa sổ thu thập hình ảnh đính kèm kéo dài **10 phút** (`PHOTO_WINDOW_MINUTES = 10`).
+>    - Toàn bộ ảnh mà nhân viên đó gửi trong vòng 10 phút BẮT BUỘC phải được tự động tải về và gắn vào đúng đơn hàng/báo cáo text đó.
+>    - **Điều Kiện Dừng Thu Thập**: Cửa sổ thu thập ảnh sẽ DỪNG NGAY LẬP TỨC khi:
+>      (a) Đã hết 10 phút kể từ tin nhắn text trước đó.
+>      (b) HOẶC nhân viên đó gửi tiếp một tin nhắn text báo cáo MỚI ➔ Hệ thống chốt đơn cũ và chuyển cửa sổ thu thập sang đơn mới!
+> 2. **Lưu Trữ Hình Ảnh Theo Thư Mục Template Trên Google Drive**:
+>    - Toàn bộ hình ảnh thu thập BẮT BUỘC phải được tải về Google Drive Folder gốc: `11HcMa63slXPOHrveHxmqZTZerzKPfjVt`.
+>    - Tự động phân loại và lưu vào các thư mục con mang tên của từng Template tương ứng (ví dụ: `Đã bán`, `Báo giá Solar`, `Tư vấn KH`...).
+>    - Tạo link "Download All" (link thư mục Drive) và danh sách link ảnh đính kèm cập nhật vào các cột tương ứng trên Google Sheet.
+> 3. **Bảo Mật Group Công Cộng vs Chat Cá Nhân (Group Auto-Delete vs Private Chat Retention)**:
+>    - Khi nhân viên gửi tin nhắn trong **Group / Supergroup**: Bot BẮT BUỘC **xóa ngay lập tức tin nhắn gốc** (`deleteMessage`) để bảo vệ thông tin cá nhân khách hàng (Số điện thoại, Tên, Địa chỉ, Chứng từ) không bị lộ cho thành viên khác trong nhóm.
+>    - Khi nhân viên gửi tin nhắn trong **Chat Cá Nhân Với Bot (`chat.type === "private"`)**: Bot **TUYỆT ĐỐI KHÔNG ĐƯỢC XÓA** tin nhắn gốc! Phải giữ nguyên tin nhắn trong chat riêng để nhân viên tiện tra cứu, đối chiếu lịch sử giao dịch cá nhân.
+> 4. **Khử Trùng Lặp Cột A (Deduplication on Column A Guard)**:
+>    - Mọi bảng thu thập dữ liệu BẮT BUỘC phải có cơ chế kiểm tra Cột A (Dedup Guard). Nếu phát hiện nội dung Cột A bị trùng lặp, BẮT BUỘC phải xóa dòng trùng phía dưới, giữ nguyên dòng mới nhất ở trên (Zero Duplicate Records).
+
+---
+
+
+# 👑 STRICT MULTI-AGENT ISOLATION & ZERO-EGRESS VIRTUAL SECRETARY RULE: HỆ THỐNG ĐA TÁC TỬ PHÂN CẤP BỌC THÉP, KHÓA CHẶT READ-ONLY & HỘP ĐEN AUDIT LOG (RULE PM-43)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (VIRTUAL EXECUTIVE SECRETARY & MULTI-AGENT ISOLATION POLICY)**:
+> 1. **Kiến Trúc Phân Cấp Hub-and-Spoke (Hierarchical Multi-Agent Architecture)**: Toàn bộ hệ thống Trợ lý Ảo trên BI Portal (`index.html`) BẮT BUỘC phải tổ chức theo mô hình: **1 Thư Ký Trưởng (`AI-CHIEF-EXEC`)** tiếp nhận chỉ đạo từ Giám đốc, phân tích ý định (Intent Routing), điều phối lệnh song song xuống **6 Trợ lý Chuyên Mảng Phân Ghế Độc Lập**:
+>    - `AI-AGENT-WO`: Quản lý 29 Kỹ sư & 4 Đội khu vực (Cột G, Cột N Overdue, Cột P, Cột A Wait CD).
+>    - `AI-AGENT-DEP`: Quản lý 9 Phòng ban Backoffice & Plan Dep (`BI_GAS`).
+>    - `AI-AGENT-INCIDENT`: Giám sát Sự cố Trạm (Site Down NOC Pro) & Cáp quang (Link Down).
+>    - `AI-AGENT-LOGISTICS`: Theo dõi Cấp dầu (Refuel) & Giờ chạy máy phát (MDG).
+>    - `AI-AGENT-HR`: Quân số trực chiến & Điểm danh CheckJoint.
+>    - `AI-AGENT-CONSTRUCT`: Tiến độ thi công & Hồ sơ nghiệm thu QLTC.
+> 2. **Chế Độ 100% Read-Only (Zero Data Corruption Guard)**: Các Trợ lý ảo CHỈ CÓ QUYỀN ĐỌC (Read-Only) dữ liệu sống từ Sheet SSOT và GAS Endpoint. TUYỆT ĐỐI CẤM cấp quyền ghi đè, sửa đổi hay xóa dữ liệu Sheet cho Trợ lý ảo để loại trừ 100% nguy cơ ngộ độc câu lệnh (Prompt Injection Data Tampering).
+> 3. **Bọc Thép Zero-Egress & Chặn Đứng Tuồng Tin (Content Security Policy Egress Lock)**: Tường lửa CSP và mã lệnh trên Web chỉ cho phép giao tiếp với máy chủ nội bộ (`tni-bot.vercel.app`, `script.google.com`). TUYỆT ĐỐI CẤM truyền tin hoặc mở kết nối sang bất kỳ server lạ nào bên ngoài.
+> 4. **Hộp Đen Giám Sát Thời Gian Thực (Mandatory Audit Logging)**: Toàn bộ câu hỏi và tương tác với Trợ lý ảo BẮT BUỘC phải được ghi lại vào nhật ký Hộp đen (`tni_secretary_audit_log`) gồm: Thời gian, Email người dùng, Nội dung câu hỏi, Mức độ rủi ro (Normal/High Risk). Nếu phát hiện câu hỏi độc hại nhằm khai thác token/mật khẩu, hệ thống BẮT BUỘC chặn đứng ngay sau 0.1 giây!
+> 5. **Sổ Tay Chỉ Đạo Giám Đốc (Executive Directives Memory)**: Tiêu chuẩn và ngoại lệ do Giám đốc thiết lập được lưu trữ cô lập (`tni_executive_memory`) và được ưu tiên cao hơn mọi prompt mặc định trong các phân tích hiệu suất nhân sự.
+
+---
+
+# 👑 STRICT VIRTUAL ASSISTANT & AUDIO TOGGLE RULE: BỌC THÉP VIRTUAL SECRETARY & CƠ CHẾ TOGGLE NÚT LOA 2-CHIỀU (RULE PM-44)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (VIRTUAL ASSISTANT ROBUSTNESS & SPEAKER TOGGLE POLICY)**:
+> 1. **Khớp Biến DOM Bubble Tuyệt Đối (Exact Bot Bubble DOM Matching)**: Biến chứa template HTML của bot (`botHtml`) BẮT BUỘC phải khớp chính xác 100% với tham số gọi trong phương thức chèn DOM (`container.insertAdjacentHTML('beforeend', botHtml)`). TUYỆT ĐỐI CẤM dùng nhầm tên biến (`html`), gây lỗi `ReferenceError: html is not defined` làm nuốt chửng toàn bộ tin nhắn phản hồi của Bot!
+> 2. **Bọc Lưới An Toàn `try...catch` Mọi Luồng Trợ Lý (Zero Silent Exception Drop)**: Mọi phương thức điều phối và tổng hợp câu trả lời (`handleQuery`, `dispatchAndAnswer`) BẮT BUỘC phải được bọc trong khối `try...catch(err)`. Nếu có lỗi bất ngờ, hệ thống BẮT BUỘC phải gỡ bỏ typing indicator và xuất thông báo phản hồi lịch thiệp cho người dùng kèm mã lỗi, TUYỆT ĐỐI CẤM để lỗi nuốt chửng làm người dùng nhìn khung chat trống rỗng!
+> 3. **Phơi Bày Toàn Bộ Dữ Liệu Phụ Thuộc Lên `window.*` (Mandatory Global State Exposure)**: Mọi dữ liệu phân tích từ CSV/Google Sheets như `allEngineers`, `teamData`, `deptPointsMap` BẮT BUỘC phải được gán toàn cục lên `window.*` (`window.allEngineers = allEngineers;`) ngay tại thời điểm hoàn tất parse, kèm giá trị dự phòng rỗng (`[]` hoặc `{}`) và null-guards an toàn `(e.team_code || '').replace(...)`, `(e.real_name || e.nsys || 'Kỹ sư')` để loại trừ 100% rủi ro đọc thuộc tính của `undefined`.
+> 4. **Cơ Chế Bấm Lần 2 Tắt Loa Bọc Thép (2-Click Speaker Toggle & Visual Feedback)**: MỌI nút đọc báo cáo (Audio Briefing, Đọc Báo Cáo) BẮT BUỘC phải hỗ trợ chuyển đổi trạng thái 2 chiều:
+>    - **Bấm lần 1 (Kích hoạt)**: Bắt đầu đọc qua Web Speech API, chuyển nhãn nút sang `⏹️ Dừng Đọc`, đổi màu/icon sang đỏ (`#EF4444`) và gắn hiệu ứng nhấp nháy `.speaking-pulse`.
+>    - **Bấm lần 2 (Tắt loa)**: Gọi ngay `window.speechSynthesis.cancel()`, hoàn nguyên nhãn nút về `🔊 Đọc Báo Cáo` và tắt hoàn toàn tiến trình đọc.
+>    - **Khi đọc xong hoặc gặp lỗi (`utter.onend`, `utter.onerror`)**: Tự động khôi phục giao diện nút về trạng thái ban đầu (`Đọc Báo Cáo`).
+> 5. **Điều Hướng Ý Định Đa Chiều (Multi-Intent Composite Routing)**: Khi người dùng hỏi kết hợp (ví dụ: *"kiểm tra cho tôi các nhân viên nào không nên không đóng gỗ để và các nhiệm vụ T4"*), hệ thống BẮT BUỘC phải nhận diện đa ý định để trả về đồng thời: (a) Tiến độ & nhiệm vụ sâu của Đội được chỉ định (Team 4 Kawthoung + danh sách 4 kỹ sư) VÀ (b) Báo cáo đôn đốc các kỹ sư có tỷ lệ tồn đọng/quá hạn cao trên toàn mạng!
+
+---
+
+# ??? STRICT DATA AUDITOR & ORANGE-DOT NEWLINE TASK RULE: GH? GI?M S?T AUDITOR-9.1 PH?C TRA S?NG T? SHEET TR??C KHI G?I & ??NH D?NG TASK D?U CH?M CAM XU?NG D?NG (RULE PM-45)
+
+> ?? **QUY T?C B?T BU?C T?I TH??NG (AUDITOR LIVE FRESH SHEET AUDIT & ORANGE-DOT TASK POLICY)**:
+> 1. **Gh? Gi?m S?t D? Li?u AUDITOR-9.1 B?t Bu?c Ph?c Tra Tr?c Ti?p T? Sheet S?ng (Mandatory Auditor Live Fresh Audit)**:
+>    - Tr??c M?I l?n g?i b?o c?o ??nh k? (bao g?m b?o c?o ti?n ?? c?ng vi?c c?c Team l?c 11:46 MMT v? 17:06 MMT t? sheet `WO Close progress` GID `930147334`), B?T BU?C ph?i th?ng qua Gh? Gi?m S?t D? Li?u AUDITOR-9.1 th?c thi `SpreadsheetApp.flush()` ?? ?p Google Sheets t?nh to?n l?i to?n b? d? li?u s?ng (c?c h?m IMPORTRANGE, FILTER, XLOOKUP), ??ng th?i ki?m ??nh t?nh to?n v?n c?a m?c th?i gian T1/D1 v? s? l??ng d?ng th?c t?.
+>    - **TUY?T ??I C?M** d?ng cache c?, c?m b? qua ki?m tra r? so?t l?i c?ng th?c (`#REF!`, `#N/A`, `#VALUE!`).
+>    - M?i tin nh?n b?o c?o g?i ra Telegram B?T BU?C c? d?u ki?m ??nh c?a Auditor: `??? Auditor: 100% Live Sheet Verified (HH:mm:ss MMT)`.
+> 2. **??nh D?ng Task T?n ??ng Ri?ng 1 D?ng K?m D?u Ch?m Cam (Orange-Dot Newline Task Backlog Formatting)**:
+>    - Khi t?ng h?p c?ng vi?c th?c hi?n theo tr?m, m?i th?ng tin nhi?m v? t?n ??ng (`/Task:`) B?T BU?C ph?i ???c t?ch xu?ng m?t d?ng ri?ng bi?t ngay d??i d?ng t?n Work Order ch?nh, c? ti?n t? d?u ch?m cam `?? /Task:` th?t l? r? r?ng ?? nh?n vi?n v? qu?n l? nh?n th?y ngay nh?ng vi?c c?n dang d? t?i tr?m.
+>    - **TUY?T ??I C?M** d?n ?p chung tr?n 1 d?ng v?i t?n WO g?y tr?n m?n h?nh v? kh? ??c tr?n giao di?n ?i?n tho?i!
+> 3. **Ph?n ??nh Nh?m G?i ??c L?p Theo T?ng Team (Dedicated Group Routing & Safe Splitting)**:
+>    - N?i dung b?o c?o B?T BU?C vi?t 100% b?ng ti?ng Anh v? g?i ch?nh x?c v?o t?ng nh?m Telegram t??ng ?ng c?a t?ng Team (Team 1: `-1004215695747`, Team 2: `-1004480845549`, Team 3: `-1004369170658`, Team 4: `-1004293741999`, Control: `-5251698940`).
+>    - T? ??ng c?t nh? tin (`splitTprMsg_`, ng??ng <= 3800 k? t?) ?? tri?t ti?u ho?n to?n r?i ro l?i v??t gi?i h?n 4096 k? t? c?a Telegram API.
+
+---
+
+
+# 🛡️ STRICT RULE: BẢO ĐẢM HIỂN THỊ EMOJI BẰNG JS UNICODE ESCAPES TRÊN APPS SCRIPT & CƠ CHẾ XÓA TIN CŨ BỌC THÉP TRƯỚC KHI GỬI (MANDATORY JS UNICODE ESCAPES FOR GAS EMOJIS & DELETION-FIRST DISPATCH - RULE PM-46)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (JS UNICODE ESCAPE & CLEANUP-FIRST POLICY)**:
+> 1. **Bảo Đảm Hiển Thị 100% Emoji Bằng JavaScript Unicode Escapes (Mandatory Unicode Escapes in GAS)**:
+>    - Khi viết code Google Apps Script (`.gs`) chứa các emoji (như `🟠` `\uD83D\uDFE0`, `📊` `\uD83D\uDCCA`, `📅` `\uD83D\uDCC5`, `🛡️` `\uD83D\uDEE1\uFE0F`, `🚩` `\uD83D\uDEA9`, `🔹` `\uD83D\uDD39`, `👤` `\uD83D\uDC64`, `🚨` `\uD83D\uDEA8`, `📑` `\uD83D\uDCD1`, `•` `\u2022`, `🏆` `\uD83C\uDFC6`), BẮT BUỘC phải dùng định dạng chuỗi escape chuẩn của JavaScript (`\uXXXX` hoặc surrogate pairs `\uD83D\uXXXX`).
+>    - **TUYỆT ĐỐI CẤM** gõ trực tiếp ký tự emoji 4-byte vào code nếu công cụ ghi file trên môi trường Windows không đảm bảo encoding UTF-8, vì sẽ biến ký tự thành dấu chấm hỏi `?` hoặc `??` làm mất thẩm mỹ và mất ký hiệu nhận diện trực quan của người dùng!
+> 2. **Kỷ Luật "Xóa Tin Cũ Trước Khi Gửi Tin Mới" ("Tin Nào Xóa Tin Nấy" - Rule PM-27)**:
+>    - Trước MỌI lần gửi báo cáo định kỳ (như Team Progress Report lúc 11:46 MMT & 17:06 MMT), script BẮT BUỘC phải đọc danh sách Message IDs đã gửi ở phiên trước từ `ScriptProperties` (key `TPR_MSG_IDS_<groupKey>`) và gọi `deleteMessage` qua Telegram Bot API để dọn dẹp sạch sẽ toàn bộ tin cũ của phiên trước TRƯỚC KHI gửi các tin mới.
+>    - Sau khi gửi xong, BẮT BUỘC phải lưu lại mảng Message IDs mới vào `ScriptProperties` để làm cơ sở dọn dẹp cho phiên tiếp theo.
+>    - Áp dụng cơ chế bọc lỗi `muteHttpExceptions: true` và discard an toàn khi Telegram từ chối xóa (quá giới hạn 48h hoặc đã bị xóa trước đó) theo đúng chuẩn Rule PM-27.
+> 3. **Kiểm Tra Định Dạng Date Object Từ Google Sheets (Mandatory Date Formatting)**:
+>    - Khi đọc giá trị từ các ô chứa ngày tháng (như ô `T1` của sheet `WO Close progress`), `getValues()` sẽ trả về JavaScript `Date` object. BẮT BUỘC phải kiểm tra `val instanceof Date` và định dạng bằng `Utilities.formatDate(val, "Asia/Rangoon", "dd/MM/yyyy")` — TUYỆT ĐỐI CẤM gọi `String(val)` trực tiếp vì sẽ làm hiển thị chuỗi dài loằng ngoằng kèm múi giờ gây rối mắt người dùng!
+
+---
+
+# 🎯 STRICT RULE: SỬA CÁI NÀO TÌM ĐÚNG CÁI ĐÓ ĐỂ SỬA — TIN NÀO XÓA TIN NẤY (STRICT SCOPE ISOLATION & ZERO-COLLATERAL-DAMAGE)
+
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (TARGETED SCOPE & ISOLATED CLEANUP POLICY)**:
+> 1. **Sửa Cái Nào Tìm Đúng Cái Đó Để Sửa (Strict Targeted Execution)**: Khi Người Dùng yêu cầu sửa lỗi hay tính năng ở thành phần nào, BẮT BUỘC chỉ tìm đúng file, đúng hàm, đúng dòng liên quan trực tiếp đến thành phần đó để xử lý. TUYỆT ĐỐI KHÔNG sửa lan man sang file hoặc logic khác.
+> 2. **Tin Nào Xóa Tin Nấy (Strict Isolated Message Cleanup)**: Mỗi script/luồng báo cáo CHỈ ĐƯỢC PHÉP xóa tin nhắn cũ của chính nó (theo đúng tiền tố/key định danh riêng). CẤM TUYỆT ĐỐI việc quét danh sách diện rộng hoặc xóa chéo sang tin của các script khác!
+> 3. **Tuyệt Đối Không Tiện Tay Sửa Tầm Bậy (Zero Collateral Modification)**: CẤM TUYỆT ĐỐI việc tiện tay sửa, đổi tên, tái cấu trúc (refactor) hoặc can thiệp vào bất kỳ file, hàm, biến hay component nào khác ngoài phạm vi được yêu cầu!
+> 4. **Nhìn Thấy Hết ID & Bản Đồ Trước Khi Sửa (Verify Exact ID First)**: BẮT BUỘC phải tra cứu đối chiếu đúng Script ID, Spreadsheet ID, Bot Token và Webhook URL trong system_map.md và AGENTS.md. TUYỆT ĐỐI KHÔNG ĐƯỢC đoán mò hay gán nhầm endpoint của dự án này sang dự án khác!
+> 5. **Kiểm Tra Không Ảnh Hưởng Chéo (Zero Side-Effect Verification)**: Sau khi sửa, BẮT BUỘC phải chạy kiểm thử live output để chứng minh thành phần được sửa đã hoạt động chính xác 100% VÀ toàn bộ các thành phần khác trong hệ thống vẫn hoạt động nguyên vẹn, không phát sinh bất kỳ lỗi mới nào!
+
+---
+
+# 💎 STRICT RULE: LÀM TRIỆT ĐỂ 100% — KHÔNG BỎ CUỘC KHI GIÁN ĐOẠN, NHÌN THẤY HẾT DỮ LIỆU MỚI ĐƯA PHƯƠNG ÁN (100% PERSISTENT & EXHAUSTIVE EXECUTION POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (ZERO-SHORTCUT & PERSISTENCE POLICY)**: 
+> 1. **Làm Triệt Để 100% (Exhaustive Full Scope)**: Tuyệt đối KHÔNG làm tiện tay, không sửa nửa vời, không để lại bất kỳ dữ liệu tĩnh cũ, ngày tháng sai lệch hay layout lỗi trên bất kỳ component nào.
+> 2. **Không Bỏ Cuộc Khi Gián Đoạn (Persistent Continuation)**: Khi gặp lỗi gián đoạn (timeout, disconnected, network error, browser cache, API error...), BẮT BUỘC phải tự động kiên trì tiếp tục thực hiện từng bước, retry liên tục cho đến khi hoàn tất trọn vẹn 100% mục tiêu, KHÔNG được dừng lại giữa chừng rồi báo cáo hoàn thành ảo!
+> 3. **Nhìn Thấy Hết Dữ Liệu Thực Tế Mới Đưa Phương Án (Look at All Real Data First)**: Trước khi đề xuất phương án hoặc viết code, BẮT BUỘC phải dùng script/query quét và đọc trực tiếp 100% dữ liệu nguồn thực tế (Google Sheets, Live Web DOM, Telegram API, GAS), nhìn thấy toàn bộ các dòng, cột, modal, table rồi mới đưa ra giải pháp xử lý triệt để, KHÔNG được giả định hay đoán mò!
+> 4. **Kiểm Tra Thực Tế & Đầy Đủ Bằng Chứng (Live Output Verification)**: Sau khi thực hiện, phải kiểm tra live (HTTP 200, grep so khớp, live log), chứng minh đã chạy thông suốt rồi mới bàn giao cho Người Dùng.
+
+---
+
+# 🛡️ STRICT BI PORTAL ENCAPSULATION & DATA ISOLATION RULE: ĐÓNG GÓI CHẶT THẺ DOM & GHẾ NÀO GIÁM SÁT BẢNG NẤY — TUYỆT ĐỐI CẤM TRÀN THẺ & CẤM RÂU ÔNG NỌ CẮM CẰM BÀ KIA (ZERO-LEAKING DOM & DEDICATED SUB-SEAT POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (BI DOM ENCAPSULATION & SUB-SEAT ISOLATION POLICY)**:
+> 1. **Khóa Chặt Thẻ DOM Vào Đúng Tab Panel (Strict DOM Encapsulation)**: Mọi bảng biểu, thẻ card, danh sách, modal và form trên BI Portal (`index.html`, `executive_dashboard.html`) BẮT BUỘC phải nằm trọn vẹn 100% bên trong đúng thẻ chứa `<div id="[ten-panel]-panel" class="tab-panel">...</div>`. TUYỆT ĐỐI CẤM để bất kỳ thẻ `card`, `table`, `section` nào nằm trôi nổi bên ngoài các tab panel khiến nó hiển thị tràn sang các tab khác!
+> 2. **Kiểm Tra DOM BeautifulSoup Bắt Buộc Trước Khi Bàn Giao (Mandatory DOM Leakage Audit)**: Trước khi báo "Đã Xong" hoặc deploy BI Portal, AI BẮT BUỘC phải chạy script phân tích cây DOM (`BeautifulSoup`) để kiểm tra `Cards outside tab-panel == 0`. CẤM chỉ kiểm tra HTTP 200 hay grep từ khóa chuỗi mà bỏ qua cây cấu trúc DOM!
+> 3. **Ghế Nào Giám Sát Bảng Nấy — Đúng Sheet Nguồn, Cấm Lấy Nhầm Bảng (Dedicated Sub-Seat per Table)**: Mỗi bảng dữ liệu trên BI Portal phải được quản lý bởi một Ghế Giám Sát chuyên biệt (Sub-Seat) đọc đúng 100% dữ liệu từ đúng Sheet ID / Tab GID quy định, TUYỆT ĐỐI CẤM tiện tay lấy chéo dữ liệu, gộp chung hoặc làm sai lệch nghiệp vụ ("tránh râu ông nọ cắm cằm bà kia"):
+>    - **Tab 1: Executive Summary** ➔ Nguồn Sheet `Team All Find` (Tab `Sum all WO Team`, GID `1840482617`).
+>    - **Tab 2: Department Assign** ➔ Nguồn Sheet `Team All Find` (Tab `Progress Team Task and WO+Oil`, GID `159298579`, Cột K-P).
+>    - **Tab 3: WO Detail (7 Bảng Raw)** ➔ Nguồn Sheet `Team All Find` (Tab `Progress Team Task and WO+Oil`, GID `159298579`, Cột A-CJ).
+>    - **Tab 4: BOD Assign** ➔ Nguồn Sheet `Team All Find` (Tab `BOD assign`, GID `1482565085`).
+>    - **Tab 5: Plan - Result Dep** ➔ Nguồn GAS Dự Án 5 `TNI BI Portal Backend` (Script ID `1G790B-ZHinJUQKHr-u0F2NDiaxNDjfYYSo84QysD2c3b9VGZCeevUKCU`).
+>    - **Tab 6: System Guide** ➔ Bản đồ hướng dẫn toàn hệ thống Bot & Lịch báo cáo Burmese Time.
+>    - **Tab 7: Gmail Access List** ➔ Phân quyền truy cập đa tài khoản theo vai trò (Role-Based Access Control).
+> 4. **Đồng Bộ Song Song Cả 2 HTML & Cả 2 Repositories (Dual HTML & Dual Repo Parity)**: Mọi thay đổi trên BI Portal BẮT BUỘC phải đồng bộ 100% giữa `index.html` và `executive_dashboard.html`, và commit đẩy lên cả 2 repo `phonghdpxd-cmd/tni-bot` (`Task and WO`) và `MON6879/TNI-DONE` (`tni-search`).
+
+---
+
+# 🔬 STRICT RULE: HÀM MIGRATION / REORDER CỘT GAS — TUYỆT ĐỐI CẤM HARDCODE DỮ LIỆU NGƯỜI DÙNG (GAS MIGRATION FUNCTION DATA PROTECTION POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC — Đúc từ Post-Mortem v786 (hardcode rows → corrupt sheet data)**:
+> 1. **Hàm Migration CHỈ ĐƯỢC Đụng Vào Cấu Trúc, KHÔNG BAO GIỜ Đụng Vào Dữ Liệu (Structure-Only Migration)**: Mọi hàm `reorder`, `migrate`, `restructure` cột trong GAS BẮT BUỘC phải **CHỈ** thực hiện: (a) `setNumberFormat()` — định dạng ô, (b) `setValues([headers])` trên dòng 1 header, (c) di chuyển/sắp xếp lại cột theo mapping. TUYỆT ĐỐI CẤM gọi `setValues([hardcoded_data])` trên bất kỳ dòng dữ liệu nào (row ≥ 2)!
+> 2. **Cấm Nhúng Test Data Vào Hàm Production (Zero Test Contamination)**: Khi test migration, BẮT BUỘC phải viết function riêng `test_reorderXxx_()` hoặc dùng sheet test riêng biệt. TUYỆT ĐỐI KHÔNG hardcode giá trị test (`r2 = [2, "07/09/2026", ...]`) vào trong hàm production — vì hàm production có thể được gọi lại nhiều lần và sẽ ghi đè dữ liệu thật!
+> 3. **Nguyên Tắc Idempotent Migration (Safe-to-Replay)**: Mọi hàm migration BẮT BUỘC phải an toàn khi gọi nhiều lần (idempotent) — gọi lần 2 không được làm hỏng kết quả lần 1. Nếu hàm không đảm bảo idempotent, BẮT BUỘC phải thêm guard check và comment rõ: `// CALL ONCE ONLY`.
+
+---
+
+# ⚡ STRICT PRIORITY RULE: GAS DIRECT SENDING FIRST, GITHUB ACTIONS FALLBACK SECOND
+
+> ⚠️ **QUY TẮC BẮT BUỘC**: MỌI BẢN TIN / THÔNG BÁO / BÁO CÁO CÓ THỂ GỬI ĐƯỢC BẰNG GOOGLE APPS SCRIPT (GAS) QUA `UrlFetchApp.fetch()` BẮT BUỘC PHẢI ƯU TIÊN GỬI TRỰC TIẾP TỪ GAS TRÊN GOOGLE CLOUD; CHỈ KHI GAS KHÔNG THỂ XỬ LÝ ĐƯỢC (TÁC VỤ CẦN TÀI KHOẢN NICK CÁ NHÂN USER ACCOUNT TELETHON SEED HOẶC THAO TÁC CÀO DỮ LIỆU ĐẶC THÙ) MỚI DÙNG GITHUB ACTIONS DỰ PHÒNG!
+
+---
+
+# 🚨 STRICT RULE: TUYỆT ĐỐI KHÔNG ĐƯỢC XÓA / GHI ĐÈ FILE GAS KHI CHƯA CÓ SỰ ĐỒNG Ý CỦA NGƯỜI DÙNG
+
+> ⚠️ **QUY TẮC BẮT BUỘC (GAS FILE PROTECTION POLICY)**: TUYỆT ĐỐI KHÔNG ĐƯỢC THỰC HIỆN BẤT KỲ THAO TÁC NÀO SAU ĐÂY MÀ CHƯA CÓ SỰ ĐỒNG Ý RÕ RÀNG BẰNG VĂN BẢN CỦA NGƯỜI DÙNG:
+> 1. **KHÔNG XÓA** bất kỳ file `.gs` nào khỏi thư mục clasp (`QLTC_GAS`, `Task and WO/apps_script`), kể cả file "thừa" hay "không dùng".
+> 2. **KHÔNG `clasp push`** khi thư mục local thiếu file so với GAS cloud. PHẢI kiểm tra đủ 18 file trước khi push.
+> 3. **KHÔNG REWRITE/VIẾT LẠI TOÀN BỘ** bất kỳ file `.gs` nào. Chỉ được sửa đúng dòng cần thiết (dùng replace, KHÔNG overwrite toàn bộ).
+> 4. **PHẢI HỎI NGƯỜI DÙNG** trước khi thêm/xóa/đổi tên bất kỳ file `.gs` nào: _"Tôi muốn [thao tác]. Anh có đồng ý không?"_
+> 5. **Bài học v599**: Một phiên AI trước đã tự ý xóa 13/18 file GAS rồi `clasp push` → mất toàn bộ hệ thống. KHÔNG BAO GIỜ ĐƯỢC LẶP LẠI!
+
+---
+
+# 🔒 STRICT SSOT RULE: BẢNG KHÓA CỐ ĐỊNH GAS DEPLOYMENT ENDPOINTS & CẤM TRỎ LỆCH / FALLBACK TẦM BẬY (ZERO-DRIFT SSOT ENDPOINT POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SSOT DEPLOYMENT LOCK)**: MỌI FILE PYTHON, JAVASCRIPT, WORKFLOW GITHUB ACTIONS VÀ WEB DOM KHI GỌI GOOGLE APPS SCRIPT BẮT BUỘC PHẢI DÙNG DUY NHẤT 1 ĐỊA CHỈ DEPLOYMENT CHUẨN ĐƯỢC QUY ĐỊNH BẤT BIẾN DƯỚI ĐÂY. CẤM TUYỆT ĐỐI VIỆC DÙNG ID CŨ, HARDCODE URL LỆCH HOẶC ĐOÁN MÒ:
+>
+> 🗺️ BẢNG KHÓA CÁC DỰ ÁN GAS ĐỘC LẬP & PHÂN GHẾ KẾT NỐI BẤT BIẾN:
+> 1. **Dự Án GAS 1 — TNI Operations Backend (`QLTC_GAS`)**:
+>    - **Script ID**: `1rvgWwrAMDbqtmqwOfqzguXB7m9snA5UZeOs9iGu64VJbejlNAkH2m6uR` (Tên trên Cloud: `TNI`)
+>    - **Deployment ID Duy Nhất**: `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA`
+>    - **Web App URL**: `https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec`
+>    - **Ghế Nội Bộ**: **`Ghế GAS-OPS-1`** (Quản trị 17 files .gs vận hành)
+>    - **Ghế Kết Nối Bên Ngoài**: **`Ghế EXT-OPS-HUB`** (Webhook `@SEARCHTNITASKWOBOT`, `@TNIASSETorderREQUEST_BOT`, BI Plan Dep)
+>    - **Ghế Giám Sát**: **`Ghế AUDITOR-9.1`** (Admin DM `6859790680`)
+>    - **Phạm vi phục vụ**: Cable, MDG, Refuel Request & Plan, BI Portal (Plan Dep), BOD assign, Daily Report 1..4, Cross Check WO.
+>    - **Lệnh Clasp Deploy Chuẩn**: `npx clasp deploy -i AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA -d "[Mô tả]"`
+>
+> 2. **Dự Án GAS 2 — TNI Site Down Relay Bot (`apps_script_sitedown`)**:
+>    - **Script ID**: `1fgIR_frjlOHBt4o3STTjGmHYaKfuiSb3zAtp7IrO__uLSIuRQGJ2Oc6X` (Tên trên Cloud: `TNI Site Down Bot`)
+>    - **Deployment ID Duy Nhất**: `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-`
+>    - **Web App URL**: `https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec`
+>    - **Ghế Nội Bộ**: **`Ghế GAS-SITEDOWN-2`** (Quản trị 1 file `site_down_v2.gs` độc lập 100%)
+>    - **Ghế Kết Nối Bên Ngoài**: **`Ghế EXT-SITEDOWN-RELAY`** (Webhook Bot `@tni_site_down_bot`, tiếp nhận Cột A từ `botlookup_relay.py`)
+>    - **Ghế Giám Sát**: **`Ghế AUDITOR-9.1`** (Admin DM `6859790680`)
+>    - **Phạm vi phục vụ**: Tiếp nhận Cột A, bóc tách Cột C, gửi chi tiết trạm sập 4 Team & CONTROL, bảng Incident Matrix AW:AZ.
+>    - **Lệnh Clasp Deploy Chuẩn**: `npx clasp deploy -i AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF- -d "[Mô tả]"`
+>
+> 3. **Dự Án GAS 3 — TNI Construction Bot (`apps_script_tc`)**:
+>    - **Script ID**: `1QsNLLXKtxo3wK0tmhz0pJ1CHAw7ekReFk9dl_asHLgpcMAzAE0Wz6RvN` (Tên trên Cloud: `TC`)
+>    - **Ghế Nội Bộ**: **`Ghế GAS-CONSTRUCTION-3`** (Quản trị logic tiến độ xây dựng)
+>    - **Ghế Kết Nối Bên Ngoài**: **`Ghế EXT-TC-CONSTRUCTION`** (Webhook Bot `@8903841312` — `10 TNI_SITE`)
+>    - **Ghế Giám Sát**: **`Ghế AUDITOR-9.1`** (Admin DM `6859790680`)
+>    - **Phạm vi phục vụ**: Bot `@8903841312` (`10 TNI_SITE`) quản lý tiến độ xây dựng hạ tầng, nhận vật tư, upload ảnh Drive.
+>
+> 4. **Dự Án GAS 4 — TNI Attendance Bot (`apps_script_attendance`)**:
+>    - **Script ID**: `166XawHNCvkXmo7NGjydYJPTpaQMr1FTk_cqFSjFm8yiSxLEjsyr73XtW` (Tên trên Cloud: `TNI Attendance Bot`)
+>    - **Ghế Nội Bộ**: **`Ghế GAS-ATTENDANCE-4`** (Quản trị logic điểm danh nhân sự)
+>    - **Ghế Kết Nối Bên Ngoài**: **`Ghế EXT-ATTENDANCE-BOT`** (Webhook Bot `@8628370628`, ảnh ca sáng/chiều)
+>    - **Ghế Giám Sát**: **`Ghế AUDITOR-9.1`** (Admin DM `6859790680`)
+>    - **Phạm vi phục vụ**: Bot Điểm Danh `@8628370628`, xử lý ảnh điểm danh, bảng `Sum report morning attendance`, `List Attendance`.
+>
+> 5. **Dự Án GAS 5 — TNI BI Portal Backend (`BI_GAS`)**:
+>    - **Script ID**: `1G790B-ZHinJUQKHr-u0F2NDiaxNDjfYYSo84QysD2c3b9VGZCeevUKCU`
+>    - **Ghế Nội Bộ**: **`Ghế GAS-BI-5`**
+>    - **Ghế Giám Sát**: **`Ghế AUDITOR-9.1`** (Admin DM `6859790680`)
+>
+> 6. **Dự Án GAS 6 — TNI Site Down Clear & Solution Bot (`apps_script_solution_clear`)**:
+>    - **Script ID**: `1waUIPvMeRYU0kscIbLX5AfAU8xf8NTX9dTFcOpLYutzZlFeiu8miQZwW`
+>    - **Deployment ID Duy Nhất**: `AKfycbw-QYNefq1xX-kWS9zUzJCWUkiPh1fNbE2ANmw4p-LEx9QYbom5NHgLzr-Rk0BgZZMg4A`
+>    - **Web App URL**: `https://script.google.com/macros/s/AKfycbw-QYNefq1xX-kWS9zUzJCWUkiPh1fNbE2ANmw4p-LEx9QYbom5NHgLzr-Rk0BgZZMg4A/exec`
+>    - **Spreadsheet ID**: `1d9D719TmLsrcCxozEgZ0CUm7NXi_lVZaPtBX9WF5b8M` ("Site Soution - Taget")
+>    - **Bot Token**: `8992199719:AAFVEOjFP39mcZXa8btqLK0TyqU79NJMcvM` (Bot `11 Site down Clear` — `@TNICLEARSITEBOT`)
+>    - **Ghế Nội Bộ**: **`Ghế GAS-SOLUTION-CLEAR-6`** (Gửi danh sách sự cố Cột I rỗng & thu thập solution)
+>    - **Ghế Kết Nối Bên Ngoài**: **`Ghế EXT-SOLUTION-CLEAR`** (Webhook Bot `@TNICLEARSITEBOT` tiếp nhận solution & template menu)
+>    - **Ghế Giám Sát**: **`Ghế AUDITOR-9.1`** (Admin DM `6859790680`)
+>    - **Phạm vi phục vụ**: Báo cáo sự cố cần xử lý 4 Team & Control, thu thập solution Cột H/I, menu `Solution [Staff Name]`.
+>
+> ### 🛡️ 3 TẦNG BẢO VỆ CHỐNG NHẦM LẪN (ANTI-CONFUSION SAFEGUARDS):
+> - **Tầng 1 (Hardcoded Fallback in Code)**: Mọi script Python khi lấy biến môi trường `SD_APPS_SCRIPT_URL` hoặc `APPS_SCRIPT_URL` nếu rỗng hoặc không chứa Deployment ID chuẩn tương ứng PHẢI tự động gán đè bằng `PRIMARY_GAS_URL` chuẩn của phân hệ đó.
+> - **Tầng 2 (Sentinel Auditor Scan)**: `system_auditor.py` (Ghế AUDITOR-9.1) tự động quét toàn bộ URLs và kiểm tra độ tươi mới của từng Sheet mỗi nhịp, nếu phát hiện lệch endpoint sẽ bắn Alert đỏ 🚨 về Admin DM `6859790680`.
+> - **Tầng 3 (Zero-Drift Clasp Deploy)**: Mọi thao tác deploy GAS bắt buộc phải truyền cờ `-i [DEPLOYMENT_ID_CHUẨN]` của đúng dự án đó, CẤM tạo deployment mới bừa bãi sinh ra ID lạ!
+>
+> ---
+>
+> # 🪑 STRICT RULE: QUY ĐỊNH BẮT BUỘC ĐỊNH DANH 3 GHẾ & CHIẾN LƯỢC TỐI THIỂU HÓA DEPLOY CHO MỌI PHÂN HỆ GAS (MANDATORY 3-SEAT TAXONOMY & MINIMAL-DEPLOY POLICY)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG CHO MỌI DỰ ÁN GAS MỚI / SỬA ĐỔI**:
+> > 1. **Định Danh Bộ 3 Ghế Bắt Buộc (Mandatory 3-Seat Declaration)**: Khi tạo mới hoặc nâng cấp bất kỳ phân hệ GAS nào, BẮT BUỘC phải quy định rõ ràng:
+> >    - **Ghế Nội Bộ (Internal Execution Seat)**: Tên định danh chuyên biệt (ví dụ `GAS-OPS-1`, `GAS-SITEDOWN-2`, `GAS-CONSTRUCTION-3`, `GAS-ATTENDANCE-4`, `GAS-BI-5`, `GAS-SOLUTION-CLEAR-6`).
+> >    - **Ghế Kết Nối Ngoại Giao (External Gateway Seat)**: Tên cổng giao tiếp với Telegram Bot / Webhook / Dispatch (ví dụ `EXT-OPS-HUB`, `EXT-SOLUTION-CLEAR`).
+> >    - **Ghế Giám Sát & Kiểm Toán (Sentinel Supervisor Seat)**: Ghế **`AUDITOR-9.1`**, mọi cảnh báo lỗi kỹ thuật/bảng tính chỉ báo riêng về **DM Admin `6859790680`**, CẤM gửi lỗi vào group làm việc!
+> > 2. **Chiến Lược Tối Thiểu Hóa Số Lần Deploy (Minimal Deploy Engineering Policy)**:
+> >    - **Cấu hình động qua Properties / Sheet Config**: Tuyệt đối không hardcode tham số dễ biến động (Token, GID, Chat ID, Ngưỡng thời gian) vào code gây phải deploy lại nhiều lần. Lưu toàn bộ vào `ScriptProperties` hoặc tab Config trên Sheet để cập nhật runtime dynamically.
+> >    - **Kiểm thử mô phỏng 100% trước khi deploy**: Viết script test/simulation chạy thử nghiệm trên dữ liệu thật, kiểm tra cú pháp và logic xong xuôi mới thực hiện deploy 1 lần duy nhất.
+> >    - **Khóa 1 Deployment ID duy nhất**: Luôn deploy ghi đè lên Deployment ID cố định bằng cờ `-i [DEPLOYMENT_ID]`, không tạo deployment mới vô tội vạ.
+> >    - **Ghép nối qua Vercel Proxy**: Webhook Telegram trỏ qua Vercel Proxy để chuyển tiếp đến GAS, giúp thay đổi hoặc cập nhật GAS mà không làm gián đoạn hay phải đổi Webhook của Telegram Bot.
+>
+> ---
+>
+> # 🏷️ STRICT RULE: QUY TẮC ĐẶT TÊN DỰ ÁN & FILE GAS — TUYỆT ĐỐI CẤM TÊN 'Code.gs' HAY TÊN VÍ DỤ / PLACEHOLDER (MEANINGFUL GAS NAMING & ZERO-PLACEHOLDER POLICY)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (MEANINGFUL GAS NAMING POLICY)**:
+> > 1. **Bắt Buộc Tên Dự Án & File Rõ Ràng (Strict Domain-Specific Naming)**: Mọi dự án Google Apps Script (GAS) khi tạo mới hoặc cập nhật BẮT BUỘC phải đặt Tên Dự Án (Project Name trên Google Cloud) và Tên File (`.gs`) chuẩn xác theo đúng chức năng và phân hệ nghiệp vụ (Ví dụ: `TNI Site Down Clear & Solution Bot` / `site_down_clear_solution.gs`).
+> > 2. **TUYỆT ĐỐI CẤM Tên Mặc Định 'Code.gs' / 'Untitled'**: CẤM TUYỆT ĐỐI việc để file tên mặc định `Code.gs`, `Code.js`, `Untitled`, `MyProject` hoặc bất kỳ tên ví dụ / placeholder nào như `test`, `sample`, `example`, `demo`...
+> > 3. **Phản Ánh Đúng Trách Nhiệm Chức Năng**: Mỗi file `.gs` phải mang tên gợi nhớ chức năng chuyên biệt (VD: `daily_report_collector.gs`, `apps_script_cable.gs`, `site_down_v2.gs`, `site_down_clear_solution.gs`).
+>
+> ---
+>
+> # 📥 STRICT TOP-INSERT RULE: THU THẬP DỮ LIỆU BẮT BUỘC CHÈN LÊN HÀNG ĐẦU (ROW 2) & TRA CỨU VLOOKUP DÒNG ĐẦU TIÊN (STRICT TOP-INSERT & FIRST-MATCH SSOT POLICY)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (TOP-INSERT & VLOOKUP MATCH POLICY)**:
+> > 1. **Dữ Liệu Mới Nhất BẮT BUỘC Ở Hàng Đầu (Newest Record Always on Top / Row 2)**: MỌI luồng thu thập dữ liệu (Collect Solution Telegram, MDG, Cable, Refuel, Asset, Construction, v.v.) khi ghi nhận tin nhắn từ Telegram / Webhook vào Google Sheets BẮT BUỘC phải chèn dòng mới lên **HÀNG ĐẦU** (Hàng 2 — ngay dưới dòng tiêu đề Header: `sheet.insertRowBefore(2)` hoặc `sheet.insertRowsBefore(2, n)`).
+> > 2. **TUYỆT ĐỐI CẤM Dùng `appendRow()` Xuống Đáy Bảng**: CẤM TUYỆT ĐỐI việc dùng `appendRow()` chèn dữ liệu mới xuống đáy bảng làm trôi dữ liệu, làm giảm hiệu năng tra cứu và gây sai lệch thứ tự thời gian!
+> > 3. **Cơ Chế Tra Cứu VLOOKUP Lấy Bản Ghi Đầu Tiên (First-Match Principle)**: Vì dữ liệu mới nhất luôn nằm ở Hàng 2, các hàm tra cứu và đối chiếu (như cập nhật Cột H/I trên tab `Site down Clear`) BẮT BUỘC áp dụng cơ chế VLOOKUP lấy bản ghi ĐẦU TIÊN tìm thấy từ trên xuống dưới để đảm bảo luôn lấy được dữ liệu Solution mới nhất!
+>
+> ---
+>
+> # ⏳ STRICT 10-MINUTE DEBOUNCE RULE: PHÁT HIỆN DỮ LIỆU MỚI BẮT BUỘC CHỜ 10 PHÚT ĐỂ DÁN ĐẦY ĐỦ MỚI GỬI (STRICT 10-MINUTE STABILIZATION BUFFER POLICY)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (10-MINUTE DATA STABILIZATION POLICY)**:
+> > 1. **Phát Hiện Dữ Liệu Mới Bắt Buộc Đợi 10 Phút**: Khi phát hiện dữ liệu trên bảng tính có sự thay đổi (hash nội dung thay đổi / có dòng mới được dán vào), Bot **TUYỆT ĐỐI KHÔNG ĐƯỢC GỬI NGAY LẬP TỨC**. Bắt buộc phải ghi nhận mốc thời gian phát hiện (`PENDING_CHANGE_TIME`) và chờ đếm ngược **đủ 10 phút** để người dùng dán đầy đủ, hoàn chỉnh toàn bộ dữ liệu.
+> > 2. **Tự Động Reset Đếm Ngược Nếu Tiếp Tục Dán Thêm**: Nếu trong vòng 10 phút người dùng tiếp tục dán thêm dữ liệu làm thay đổi hash, bộ đếm 10 phút sẽ được **tự động reset lại từ đầu** tính từ lần chỉnh sửa cuối cùng.
+> > 3. **Gửi Bản Tin Hoàn Chỉnh Khi Đủ 10 Phút & Xóa Tin Cũ**: Khi dữ liệu đã giữ nguyên ổn định đủ 10 phút, Bot mới phát bản tin hoàn chỉnh đến các nhóm Telegram (Team 1..4, Control) và xóa toàn bộ tin nhắn cũ tương ứng!
+>
+> ---
+>
+> # 🔁 STRICT RULE: LƯU HASH / FINGERPRINT THÌ BẮT BUỘC PHẢI ĐỌC LẠI VÀ SO SÁNH TRƯỚC KHI HÀNH ĐỘNG — TUYỆT ĐỐI CẤM "GHI RỒI BỎ ĐÓ" (STRICT WRITE-THEN-READ-BACK & ZERO DEAD-CHECK POLICY)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (ANTI DEAD-CHECK & MANDATORY READ-BACK POLICY)**:
+> > 1. **Lưu Hash / State Thì BẮT BUỘC Phải Đọc Lại Và So Sánh (Mandatory Read-Back Comparison)**: Mọi giá trị kiểm tra (MD5 hash, fingerprint, timestamp, trạng thái cờ) khi đã được **GHI** vào `ScriptProperties`, `CacheService`, database hoặc biến toàn cục, thì ở chu kỳ tiếp theo BẮT BUỘC phải có dòng code **ĐỌC LẠI** giá trị cũ đã lưu, **SO SÁNH** với giá trị mới, và **QUYẾT ĐỊNH** hành động (gửi / bỏ qua / cập nhật) dựa trên kết quả so sánh!
+> > 2. **TUYỆT ĐỐI CẤM "Ghi Rồi Bỏ Đó" (Zero Write-Only / Dead-Check Code)**: CẤM TUYỆT ĐỐI việc `computeMd5_()` rồi `setProperty("HASH_...", hash)` mà KHÔNG CÓ dòng `getProperty("HASH_...")` ở đầu chu kỳ để so sánh trước khi quyết định gửi. Đây là **anti-pattern "Dead Check"** — viết code kiểm tra nửa vời, có tính mà không có so, dẫn đến gửi tin trùng lặp spam liên tục!
+> > 3. **Quy Tắc 3 Bước Bắt Buộc Cho Mọi Cơ Chế Chống Trùng (Mandatory 3-Step Dedup Lifecycle)**:
+> >    - **Bước 1 — ĐỌC (Read Old)**: `const oldHash = props.getProperty("HASH_KEY") || "";`
+> >    - **Bước 2 — SO (Compare)**: `if (newHash === oldHash) { skip; }`
+> >    - **Bước 3 — GHI (Write New)**: `props.setProperty("HASH_KEY", newHash);` (CHỈ ghi sau khi đã gửi thành công)
+> >    - Nếu chỉ có Bước 3 mà thiếu Bước 1 + 2 → **LỖI NGHIÊM TRỌNG**, phải sửa ngay!
+> > 4. **Kiểm Tra Trước Khi Deploy (Pre-Deploy Dead-Check Audit)**: Trước mỗi lần `clasp push` / deploy, BẮT BUỘC phải grep tìm tất cả các lệnh `setProperty("HASH_` hoặc `computeMd5_` trong code. Với mỗi lệnh tìm được, PHẢI xác nhận có dòng `getProperty("HASH_` tương ứng **TRƯỚC** vòng lặp gửi tin. Nếu không tìm thấy → CHẶN deploy, sửa ngay!
+> > 5. **Bài Học Thực Tế (Postmortem v26 — GAS-SOLUTION-CLEAR-6)**: Phiên bản cũ đã tính `computeMd5_(messageText)` và lưu `HASH_CLEAR_T1..T4` + `HASH_CLEAR_CONTROL` sau mỗi lần gửi, nhưng KHÔNG BAO GIỜ đọc lại hash cũ để so sánh trước khi gửi → Bot gửi tin trùng lặp mỗi khi ô E2 thay đổi dù danh sách trạm giống hệt lần trước. Đã sửa tại v26 bằng cách thêm Bước 1 (Read) + Bước 2 (Compare) đúng chuẩn.
+>
+> ---
+>
+> # 🛡️ STRICT RULE: BẢO VỆ WEBHOOK BỌC THÉP CHO TOÀN BỘ TELEGRAM BOT — TUYỆT ĐỐI CẤM ĐỂ TRỐNG WEBHOOK DẪN ĐẾN BỊ CHIẾM QUYỀN LONG-POLLING SPAM (STRICT BOT WEBHOOK LOCK & ZERO LONG-POLLING HIJACK POLICY)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (BOT WEBHOOK LOCK & ANTI-HIJACK POLICY)**:
+> > 1. **Bắt Buộc Luôn Kích Hoạt Webhook Cho Mọi Telegram Bot (Mandatory Active Webhook Lock)**: Tất cả Bot Telegram trong hệ thống (kể cả Bot nhận lệnh, Bot thu thập dữ liệu hay Bot chuyên gửi thông báo 1 chiều như `SEND_BOT`) BẮT BUỘC PHẢI LUÔN ĐƯỢC CÀI ĐẶT WEBHOOK HỢP LỆ trỏ về endpoint máy chủ an toàn của hệ thống (Vercel Proxy / Google Apps Script).
+> > 2. **TUYỆT ĐỐI CẤM Để Trống Webhook (`url: ""`)**: CẤM TUYỆT ĐỐI để trạng thái Webhook rỗng. Khi Webhook bị rỗng, Telegram sẽ mở cổng Long-Polling (`getUpdates`), tạo điều kiện cho các script bên ngoài hoặc kẻ gian chiếm quyền token để đọc tin nhắn và phát tán tin nhắn spam/phishing (ví dụ: ép tham gia kênh rác *"To use this bot, you must join our channel"*).
+> > 3. **Cơ Chế Khóa Cứng (Instant 409 Conflict Shield)**: Việc duy trì Webhook kích hoạt là cơ chế bọc thép tự nhiên của Telegram để ngắt lập tức 100% mọi kết nối Long-Polling bất hợp pháp từ bên ngoài (`409 Conflict: can't use getUpdates while webhook is active`).
+> > 4. **Ghế Giám Sát Tự Động Đối Soát Webhook (Auditor Webhook Enforcement)**: Ghế `AUDITOR-9.1` định kỳ quét kiểm tra trạng thái `getWebhookInfo` của toàn bộ Bot trong hệ thống. Nếu phát hiện bất kỳ Bot nào bị mất Webhook hoặc có `pending_update_count > 50`, Auditor BẮT BUỘC tự động kích hoạt lại Webhook và xóa sạch tin rác (`drop_pending_updates: true`)!
+
+---
+> # 🎯 STRICT RULE: GAS NÀO SỬA GAS NẤY — TUYỆT ĐỐI CẤM TIỆN TAY GỘP CHUNG / SỬA CHÉO DỰ ÁN (STRICT DEDICATED GAS SCOPE ISOLATION)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (GAS SCOPE ISOLATION)**:
+> > 1. **GAS Nào Sửa GAS Nấy**: Mỗi khi người dùng yêu cầu sửa tính năng thuộc phân hệ nào, BẮT BUỘC chỉ tìm đúng thư mục clasp và Script ID của dự án GAS chuyên biệt đó (`QLTC_GAS`, `apps_script_sitedown`, `apps_script_tc`, `apps_script_attendance`, `apps_script_solution_clear`).
+> > 2. **CẤM TUYỆT ĐỐI GỘP CHUNG / SỬA CHÉO**: Tuyệt đối KHÔNG ĐƯỢC nhồi nhét code hoặc copy đè file giữa các dự án GAS. Site Down chạy độc lập 100% trên `apps_script_sitedown`, Main Operations chạy độc lập trên `QLTC_GAS`, Solution Clear chạy độc lập trên `apps_script_solution_clear`!
+> > 3. **Kiểm Tra Đủ File Trước Khi Push**: Trước khi `clasp push`, PHẢI đếm đủ số file chuẩn của từng dự án (`QLTC_GAS` = 17 files, `apps_script_sitedown` = 1 file, `apps_script_tc`, `apps_script_attendance`, `apps_script_solution_clear` = 2 files).
+> > 4. **Khóa Chặt Ghế Kết Nối Ngoại Giao**: Mọi webhook tiếp nhận từ Telegram và GitHub Actions phải gắn liền với đúng Ghế Kết Nối Bên Ngoài (`EXT-OPS-HUB`, `EXT-SITEDOWN-RELAY`, `EXT-TC-CONSTRUCTION`, `EXT-ATTENDANCE-BOT`, `EXT-SOLUTION-CLEAR`). `@tni_site_down_bot` tiếp nhận cảnh báo trạm down.
+
+---
+
+# 🎯 STRICT RULE: PHẢI XÁC ĐỊNH ĐÚNG DỰ ÁN GAS TRƯỚC KHI SỬA — TUYỆT ĐỐI KHÔNG TIỆN TAY UPDATE TẦM BẬY VÀO CHỖ KHÁC (EXACT DEDICATED GAS TARGETING POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (EXACT GAS PROJECT TARGETING)**: TRƯỚC KHI SỬA HOẶC THÊM BẤT KỲ TÍNH NĂNG NÀO TRÊN GOOGLE APPS SCRIPT (GAS), BẮT BUỘC PHẢI TRA CỨU ĐỐI CHIẾU ĐÚNG DỰ ÁN GAS CHUYÊN BIỆT THEO BẢN ĐỒ ĐỊNH DANH 4 DỰ ÁN GAS. TUYỆT ĐỐI KHÔNG ĐƯỢC TIỆN TAY SỬA NHẦM, UPDATE TẦM BẬY HOẶC NHỒI NHÉT CODE CỦA DỰ ÁN NÀY SANG DỰ ÁN KHÁC!
+
+---
+
+# 👥 STRICT SSOT RULE: QUY TẮC NGUỒN NHÂN SỰ DUY NHẤT & LỌC ĐỘNG RESIGN (SSOT STAFF ROSTER & DYNAMIC ACTIVE STAFF FILTER POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SSOT STAFF ROSTER & ZERO-HARDCODED-RANGE POLICY)**:
+> 1. **Nguồn Dữ Liệu Nhân Sự Duy Nhất (Single Source of Truth - SSOT)**: MỌI script báo cáo, thống kê, kiểm toán (Report 4, Report 5, Report 6, Refuel, Attendance, v.v.) BẮT BUỘC phải lấy danh sách nhân sự từ tab **`Staff`** (GID `1684930643`) trong Spreadsheet `1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8`.
+> 2. **Tự Động Lọc Bỏ 100% Nhân Viên Đã Nghỉ Việc (Resign Filter)**: BẮT BUỘC kiểm tra Cột N (`Exit / Status`). Nếu Cột N có nội dung (chứa `Resign` hoặc ngày nghỉ việc) $\rightarrow$ LOẠI BỎ 100%, TUYỆT ĐỐI KHÔNG đưa vào danh sách làm việc (Active)!
+> 3. **CẤM TUYỆT ĐỐI Hardcode Dải Hàng Tĩnh (Zero Hardcoded Row Ranges)**: CẤM TUYỆT ĐỐI việc dùng `range(3, 59)`, `rows 4-38`, `rows 52-55`... BẮT BUỘC phải quét toàn bộ bảng động dựa trên Cột M (Team: `Team 01`..`Team 05`) và Cột N (Active/Resign).
+> 4. **Định Danh Bằng Telegram User ID Dạng Số (Cột A)**: Ưu tiên tuyệt đối định danh bằng Telegram User ID dạng số bất biến ở Cột A. Fallback so khớp chuỗi tên (Cột F) đã được chuẩn hóa (lowercase, bỏ khoảng trắng) khi chưa có ID.
+> 5. **CẤM Lấy Bảng Chia Việc Vận Hành Làm Nguồn Nhân Sự**: Tab `Task remain` (GID `133591305`) chỉ là bảng chia việc theo đợt / theo dõi WO, TUYỆT ĐỐI KHÔNG được dùng làm nguồn danh sách nhân sự!
+
+---
+
+# 🛑 STRICT ANTI-LOOP & CIRCUIT-BREAKER RULE: THẤY LẶP LÀ DỪNG NGAY — CẤM TỰ Ý SPAM TIN RÁC VÀO GROUP & CHỈ BÁO VỀ GHẾ LỖI ADMIN (STRICT ANTI-LOOP & ZERO-SPAM POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (ANTI-SPAM & CIRCUIT-BREAKER POLICY)**:
+> 1. **Thấy Lặp Dừng Ngay (Instant Circuit-Breaker on Loop Detection)**: Khi phát hiện bất kỳ dấu hiệu lặp tin nhắn mẫu, bảng cũ, hoặc lỗi dữ liệu nguồn $\rightarrow$ BẮT BUỘC NGỪNG GỬI VÀO GROUP NGAY LẬP TỨC. Tuyệt đối CẤM việc tự ý retry liên tục gửi lại tin rác / bảng cũ vào các nhóm Telegram làm việc!
+> 2. **Tin Lỗi Chỉ Báo Về Ghế Giám Sát (DM Admin `6859790680`)**: Mọi cảnh báo kỹ thuật, lỗi công thức, lỗi nhân sự, lỗi bảng đứng CHỈ ĐƯỢC PHÉP báo cáo riêng về DM Admin `6859790680`, TUYỆT ĐỐI CẤM gửi tin cảnh báo lỗi nội bộ vào các nhóm Team / Control!
+> 3. **Cấm Gửi Bảng Dữ Liệu Cũ (Anti-Stale Dispatch Guard)**: Mọi bản tin báo cáo trước khi phát BẮT BUỘC phải kiểm tra tính tươi mới của ngày tháng. Nếu dữ liệu bị đứng/chưa cập nhật $\rightarrow$ Báo động về DM Admin, TUYỆT ĐỐI KHÔNG gửi bảng cũ hôm trước gây nhiễu loạn thông tin!
+> 4. **Phòng Thủ Công Thức Sheet (Formula-Shield & Safe Parsing)**: Mọi hàm đọc Google Sheets BẮT BUỘC phải cô lập các ô lỗi công thức (`#REF!`, `#VALUE!`, `#DIV/0!`, `#NAME?`, `#CIRC!`) thành giá trị rỗng an toàn, TUYỆT ĐỐI KHÔNG để script bị crash khi bảng tính bị người dùng sửa công thức.
+> 5. **Khóa Chặt Trí Nhớ Chống Tái Diễn Lỗi (Zero-Recurrence Core Law)**: Sau mỗi lần sửa bất kỳ lỗi nào, AI BẮT BUỘC phải ghi nhận chi tiết nguyên nhân gốc và phương án xử lý vào `AGENTS.md` và `history/backup_context_...md` để triệt tiêu 100% nguy cơ tái diễn!
+
+---
+
+---
+
+# 🛡️ STRICT SENTINEL & SYSTEM INTEGRITY RULE: 5 NGUYÊN TẮC VÀNG CHỐNG TÁI DIỄN LỖI & TRIỆT TIÊU ĐIỂM MÙ GIÁM SÁT (ZERO-BLIND-SPOT & STRICT SYSTEM INTEGRITY POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG CHO MỌI PHIÊN AI (5 GOLDEN ANTI-RECURRENCE LAWS)**:
+> 1. **CẤM Báo Cáo All Green Khi Chưa Đọc Được Dữ Liệu Thực Tế (Zero Silent-Pass on Ingestion Failure)**:
+>    - Nếu bất kỳ cảm biến hay công cụ kiểm toán nào (Telethon, API, Webhook, Google Sheet) bị lỗi kết nối, bị chặn IP, hay bắt `except` mà không lấy được dữ liệu tin nhắn $\rightarrow$ BẮT BUỘC coi là Cảnh Báo Vàng/Đỏ (`UNVERIFIED / BLIND SPOT`), TUYỆT ĐỐI CẤM xem đó là "0 lỗi" rồi báo cáo `🟢 1, 2, 3, 4 OK`!
+> 2. **Khởi Tạo Biến Mặc Định & Biên Dịch Cú Pháp Trước Khi Giao (Strict Variable Initialization & Compile Check)**:
+>    - Mọi hàm Python/JS khi trả về dữ liệu qua các nhánh logic BẮT BUỘC phải khởi tạo biến `result = ...` mặc định ngay dòng đầu tiên của hàm trước bất kỳ vòng lặp `for` hay khối `try/except` nào.
+>    - BẮT BUỘC phải chạy `python -m py_compile [file.py]` để bắt sạch lỗi cú pháp / biến chưa định nghĩa trước khi commit & push!
+> 3. **Khóa Chặt Whitelist `.claspignore` & Đếm Đủ 18 File Trước Khi Push (Strict GAS Whitelist Lock)**:
+>    - Thư mục clasp sử dụng cơ chế `**` chặn toàn bộ $\rightarrow$ MỌI file `.gs` (cũ lẫn mới) BẮT BUỘC phải có tiền tố `!filename.gs` trong `.claspignore`. Trước khi chạy `clasp push`, PHẢI đối chiếu đếm đủ 18 file (17 `.gs` + 1 `appsscript.json`), nếu thiếu bất kỳ file nào CẤM push đè lên GAS Cloud!
+> 4. **CẤM Trỏ Webhook Telegram Trực Tiếp Vào Google Apps Script (Strict Reverse-Proxy Rule)**:
+>    - Google Cloud Web App luôn trả về mã điều hướng `302 Found` cho các request POST. Telegram từ chối xử lý chuyển hướng dẫn đến kẹt hàng đợi `pending_update_count`.
+>    - MỌI Webhook Telegram Bot (`Search`, `Asset`, `Site Down`, `Construction`, `Attendance`) BẮT BUỘC phải đi qua Vercel Reverse Proxy (`/api/...`) để theo dõi chuyển hướng và trả `HTTP 200 OK` tức thì cho Telegram!
+> 5. **Kiểm Toán Lịch Trình Tích Lũy Toàn Bộ Các Mốc Trong Ngày (Cumulative All-Day Schedule Audit)**:
+>    - Ghế Giám Sát khi quét lịch sử tin nhắn nhóm PHẢI đối chiếu TẤT CẢ các mốc giờ báo cáo đã trôi qua từ 00:00 sáng đến giờ hiện tại, không được chỉ kiểm tra trong cửa sổ hẹp $\pm 4$ phút, để đảm bảo bất kỳ bản tin nào bị sập trong ngày đều bị phát hiện ngay lập tức!
+
+---
+
+# 🛡️ STRICT RULE: KIẾN TRÚC 7 TRỤ CỘT BẤT KHẢ XÂM PHẠM (ZERO-FAILURE ARCHITECTURE)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (ZERO BUG POLICY)**: TUYỆT ĐỐI KHÔNG ĐƯỢC CÀI ĐẶT CODE CÓ KHẢ NĂNG GÂY NGHẼN, TỰ HỦY RUNNER HAY SẬP CHUỖI LIÊN HOÀN (DÙ CỐ Ý HAY VÔ TÌNH). MỌI COMPONENT BẮT BUỘC PHẢI TUÂN THỦ 7 TRỤ CỘT:
+> 1. **Cửa Sổ Kháng Trễ Chặt (Tight Sliding Window Timing)**: Cửa sổ chấp nhận trễ tối đa ±4 phút. Nhịp :06 chấp nhận :00-:10; phút :11-:20 sleep đến :36. Nhịp :36 chấp nhận :21-:40; phút :41-:59 sleep đến :06 giờ kế. TUYỆT ĐỐI KHÔNG chạy ngay tại :20 hay :50!
+> 2. **Quét Lịch Sử Duy Nhất 1 Lần (Single-Pass Scanning)**: Mỗi nhóm Telegram chỉ quét đúng 1 lần duy nhất (< 3s) và so khớp tiêu đề trong RAM, triệt tiêu 100% nguy cơ Timeout và Telegram FloodWait.
+> 3. **Cô Lập Lỗi Độc Lập (Zero Cascading Failure)**: Mọi script độc lập phải được bọc cô lập lỗi (`python script.py || true`) để không bao giờ làm chết chùm các báo cáo khác.
+> 4. **Khóa Độc Quyền Phiên Telethon (Concurrency Locking)**: Cài đặt `concurrency: group: ...` trên GitHub Actions để các tác vụ Telethon không bao giờ tranh chấp hay đè phiên.
+> 5. **Kênh Kép Song Hành (GAS Direct First, GitHub Second)**: GAS Cloud đảm nhiệm phát tin chính; GitHub Actions đóng vai trò dự phòng và cào Telethon.
+> 6. **Cô Lập Biến Toàn Cục GAS (GAS Global Scope Isolation)**: Tất cả file `.gs` trong cùng 1 dự án dùng chung Global Scope — KHÔNG khai báo trùng tên biến. Chỉ giữ 4 dự án GAS chuẩn (TNI = 18 files, TNI Site Down Bot, TNI Attendance Bot, TC). ⚠️ `clasp push` SẼ XÓA file trên GAS mà không có trong thư mục local — PHẢI đảm bảo đủ 18 file trước khi push!
+> 7. **Xử Lý Gia Tăng Chống Timeout (Incremental Processing)**: GAS giới hạn 6 phút — phải đánh dấu dòng đã xử lý (Note), chỉ xử lý dòng MỚI, có cơ chế dừng an toàn 5 phút. KHÔNG dùng `--force` trên workflow_dispatch tự động.
+
+---
+
+# 🇬🇧 STRICT RULE: CHATBOT RESPONSES & TEMPLATE CONTENTS MUST BE IN ENGLISH
+
+> ⚠️ **QUY TẮC BẮT BUỘC**: TOÀN BỘ NỘI DUNG PHẢN HỒI TỰ ĐỘNG, THÔNG BÁO, MENU VÀ TEMPLATE CỦA CHATBOT GỬI TRÊN TELEGRAM BẮT BUỘC PHẢI BẰNG TIẾNG ANH 100% (ENGLISH ONLY FOR ALL BOT MESSAGES & TEMPLATES).
+
+---
+
+# ⏰ STRICT SCHEDULE RULE: REPORT 1, 2, 3, 4 DAILY SENDING TIMES
+
+> ⚠️ **QUY TẮC BẮT BUỘC**: THỜI GIAN GỬI BÁO CÁO TỰ ĐỘNG CHO REPORT 1, 2, 3, 4 (TEAMS 1 TO 4 VIA GITHUB ACTIONS — TOA 1+11) LÀ ĐÚNG **05:46 AM** VÀ **15:46 PM** HÀNG NGÀY; VÀ TOA BOTLOOKUP RELAY LÀ ĐÚNG PHÚT **:06** VÀ **:36** HÀNG GIỜ (MÚI GIỜ MYANMAR `Asia/Yangon` UTC+6:30).
+
+---
+
+# 🛡️ STRICT RULE: ĐỌC VÀ TUÂN THỦ TUYỆT ĐỐI DOCUMENTATION TRƯỚC KHI SỬA KẾT NỐI & ENDPOINT
+
+> ⚠️ **QUY TẮC BẮT BUỘC**: TUYỆT ĐỐI KHÔNG ĐƯỢC TIỆN TAY THAY ĐỔI HOẶC ĐOÁN ĐƯỜNG DẪN WEBHOOK / ENDPOINT CỦA BẤT KỲ BOT NÀO. PHẢI KIỂM TRA DOCS CHUẨN TRƯỚC KHI THỰC HIỆN!
+
+---
+
+# 📥 STRICT DATA COLLECTION RULE: NEWEST DATA ALWAYS INSERTED AT THE VERY TOP
+
+> ⚠️ **QUY TẮC BẮT BUỘC THU THẬP DỮ LIỆU**: MỌI BỘ THU THẬP THÔNG TIN (MDG REPORT, INVENTORY, REFUEL REQUEST, DAILY REPORT, DAILY PLAN, READ GROUP LOGS, V.V.) KHI GHI VÀO GOOGLE SHEETS BẮT BUỘC PHẢI CHÈN DỮ LIỆU MỚI LÊN ĐẦU BẢNG TÍNH (DÒNG 2, NGAY BÊN DƯỚI HÀNG TIÊU ĐỀ HEADER ROW 1 DÙNG `insertRowsBefore(2, ...)` HOẶC RECORD DÒNG 2). TUYỆT ĐỐI KHÔNG ĐƯỢC NỐI DỮ LIỆU VÀO CUỐI BẢNG TÍNH (`appendRow`) LÀM NGƯỜI DÙNG PHẢI KÉO XUỐNG DƯỚI!
+
+---
+
+# 🔬 STRICT RULE: QUÉT DEPENDENCY BIẾN / HÀM TRƯỚC KHI XÓA — CHỐNG ORPHAN REFERENCE (STRICT VARIABLE DEPENDENCY SCAN BEFORE DELETE)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (ZERO ORPHAN REFERENCE POLICY)**: KHI XÓA HOẶC REFACTOR BẤT KỲ HÀM / BIẾN / BLOCK CODE NÀO, BẮT BUỘC PHẢI:
+> 1. **Grep Toàn Bộ Tham Chiếu (Full Dependency Scan)**: Trước khi xóa hàm `foo()` hoặc biến `bar`, BẮT BUỘC chạy `grep -rn "foo\|bar"` trên TOÀN BỘ file/project để tìm TẤT CẢ nơi tham chiếu. Xóa hoặc thay thế TẤT CẢ chỗ dùng trước khi commit.
+> 2. **Test End-to-End Sau Deploy (Post-Deploy Smoke Test)**: Sau khi clasp push + deploy, BẮT BUỘC gửi 1 tin nhắn/ảnh test thực tế qua Telegram để verify luồng end-to-end không crash. Kiểm tra GAS Execution Logs (hoặc Logs sheet) trong 5 phút đầu để confirm 0 Exception.
+> 3. **Bài Học v640**: Phiên AI ngày 09/08 xóa hàm `identifyFaces_()` nhưng quên xóa 3 chỗ dùng biến `extractedImageName` → `ReferenceError` crash doPost → mất 5 ngày dữ liệu điểm danh (17/08-22/08). KHÔNG BAO GIỜ ĐƯỢC LẶP LẠI!
+
+---
+
+# 🔄 STRICT RULE: ĐỒNG BỘ THỦ CÔNG BẢNG THỜI GIAN KHI SỬA LỊCH — CẤM TỰ ĐỘNG (MANUAL SCHEDULE SYNC ONLY POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (MANUAL SCHEDULE SYNC POLICY)**:
+> 1. **Khi Sửa Hoặc Thêm Lịch Chạy Mới (Schedule Change Sync)**: Mỗi khi thay đổi, thêm mới hoặc xóa bất kỳ Toa / thời gian chạy nào trong `train_5min.yml` hoặc bất kỳ workflow nào, BẮT BUỘC phải đồng bộ lại bảng **"Time Rain 5 min"** (Tab `Time Rain 5 min`, GID `2003037043` trong bảng tính `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow`) để phản ánh chính xác lịch mới.
+> 2. **Chỉ Đồng Bộ Khi Người Dùng Nói "đồng bộ thời gian đi"**: AI KHÔNG ĐƯỢC tự động đồng bộ. Chỉ khi Người Dùng nói **"đồng bộ thời gian đi"**, AI mới gọi GAS action `sync_schedule` để ghi toàn bộ bảng thời gian chuẩn lên sheet. Ghi dòng cuối: `"manual sync — DD/MM/YYYY HH:MM MMT"`.
+> 3. **Bảng Phải Khớp 100% Với Workflow (Zero Drift)**: Mọi thời gian, tên Toa, Engine type trong bảng phải khớp chính xác 1-to-1 với `check_time` trong `train_5min.yml`.
+
+---
+
+# 🏛️ STRICT RULE: 8 TRỤ CỘT KIẾN TRÚC BI PORTAL (BI ARCHITECTURE PILLARS)
+
+> ⚠️ **QUY TẮC BẮT BUỘC**: MỌI TAB / COMPONENT MỚI TRÊN BI PORTAL BẮT BUỘC PHẢI TUÂN THỦ 8 TRỤ CỘT SAU. VI PHẠM = PHẢI REFACTOR TRƯỚC KHI DEPLOY!
+> 1. **SSOT — Nguồn Dữ Liệu Duy Nhất (Single Source of Truth)**: TUYỆT ĐỐI KHÔNG hardcode data trong HTML. Mọi bảng dữ liệu phải được render ĐỘNG từ GAS API → `fetch()` → render DOM. Khi cần sửa nội dung hiển thị → sửa trên Google Sheet, KHÔNG sửa HTML.
+> 2. **Security-First — Bảo Mật Server-Side**: Phân quyền phải được kiểm tra **tại GAS server** (đối chiếu sheet `Permit BI`), client-side chỉ là lớp UI bổ sung. KHÔNG chỉ dựa vào `localStorage` hay ẩn nút. Phân 3 cấp: VIEWER (xem) → EDITOR (sửa E:F) → ADMIN (sửa A:D + xóa).
+> 3. **Separation of Concerns — Tách Biệt Trách Nhiệm**: Mỗi tab MỚI phải gói logic trong **1 namespace riêng** `window.TabName = { init, loadData, render, ... }`. KHÔNG dùng biến global rời. Mỗi tab tự quản lý fetch/render/state.
+> 4. **Data Contract — Hợp Đồng Dữ Liệu**: Mọi GAS API response phải trả format chuẩn: `{ status, version, timestamp, data, meta, error }`. Column mapping khai báo trong GAS config, KHÔNG giả định thứ tự cột. Date format: `DD/MM/YYYY` (hiển thị) / ISO 8601 (API).
+> 5. **Error Isolation — Cô Lập Lỗi**: 1 tab lỗi KHÔNG BAO GIỜ ảnh hưởng tab khác. Mọi `fetch()` phải có `.catch()` với fallback UI (error banner + nút Retry). Timeout fetch: max 15 giây.
+> 6. **Scalable Tabs — Kiến Trúc Tab Mở Rộng**: Thêm tab mới phải theo checklist 8 bước: (1) Khai báo config, (2) Thêm nav button, (3) Thêm panel div, (4) Tạo namespace JS, (5) Đăng ký permission, (6) Thêm GAS endpoint, (7) Test isolation, (8) Cập nhật docs.
+> 7. **Performance Budget — Ngân Sách Hiệu Năng**: First Contentful Paint ≤ 2s, Tab switch ≤ 100ms, API response ≤ 5s, Max 500 rows/tab (quá → pagination), Polling interval = 30s.
+> 8. **Change Management — Quản Lý Thay Đổi**: Version number trong comment dòng 1 HTML. Mỗi thay đổi GAS ghi `// vYYYY-MM-DD — [mô tả]`. Backup trước khi sửa lớn. Cập nhật 3 docs: `SYSTEM_DOC.md`, `system_map.md`, `AGENTS.md`.
+
+---
+
+## 📌 1. Bản đồ Webhook Cố Định (Strict Endpoint Registry)
+
+Mọi thao tác cài đặt hoặc khôi phục Webhook Telegram đều phải đối chiếu chính xác 100% với danh sách sau:
+
+| Bot Name | Telegram Username | Webhook Endpoint URL | File Handler trong Codebase |
+|---|---|---|---|
+| **Search Bot** | `@SEARCHTNITASKWOBOT` | `https://tni-bot.vercel.app/api/search_bot` | `api/search_bot.py` |
+| **Asset Bot (Collector)** | `@TNIASSETorderREQUEST_BOT` | `https://tni-bot.vercel.app/api/collector` | `api/collector.py` |
+| **Site Down Bot (Relay)** | `@tni_site_down_bot` | `https://tni-bot.vercel.app/api/site_down_relay` | `botlookup_relay.py` |
+| **Construction Bot** | `@8903841312` (`10 TNI_SITE`) | `https://tni-bot.vercel.app/api/construction` | `api/construction.py` |
+
+---
+
+## 📋 2. Quy trình 3 bước bắt buộc trước khi chỉnh sửa:
+>
+> ---
+>
+> # 🎯 STRICT RULE: PHẢI XÁC ĐỊNH ĐÚNG DỰ ÁN GAS TRƯỚC KHI SỬA — TUYỆT ĐỐI KHÔNG TIỆN TAY UPDATE TẦM BẬY VÀO CHỖ KHÁC (EXACT DEDICATED GAS TARGETING POLICY)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC (EXACT GAS PROJECT TARGETING)**: TRƯỚC KHI SỬA HOẶC THÊM BẤT KỲ TÍNH NĂNG NÀO TRÊN GOOGLE APPS SCRIPT (GAS), BẮT BUỘC PHẢI TRA CỨU ĐỐI CHIẾU ĐÚNG DỰ ÁN GAS CHUYÊN BIỆT THEO BẢN ĐỒ ĐỊNH DANH 4 DỰ ÁN GAS. TUYỆT ĐỐI KHÔNG ĐƯỢC TIỆN TAY SỬA NHẦM, UPDATE TẦM BẬY HOẶC NHỒI NHÉT CODE CỦA DỰ ÁN NÀY SANG DỰ ÁN KHÁC!
+>
+> ---
+>
+> ---
+>
+> # 🛡️ STRICT SENTINEL & SYSTEM INTEGRITY RULE: 5 NGUYÊN TẮC VÀNG CHỐNG TÁI DIỄN LỖI & TRIỆT TIÊU ĐIỂM MÙ GIÁM SÁT (ZERO-BLIND-SPOT & STRICT SYSTEM INTEGRITY POLICY)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG CHO MỌI PHIÊN AI (5 GOLDEN ANTI-RECURRENCE LAWS)**:
+> > 1. **CẤM Báo Cáo All Green Khi Chưa Đọc Được Dữ Liệu Thực Tế (Zero Silent-Pass on Ingestion Failure)**:
+> >    - Nếu bất kỳ cảm biến hay công cụ kiểm toán nào (Telethon, API, Webhook, Google Sheet) bị lỗi kết nối, bị chặn IP, hay bắt `except` mà không lấy được dữ liệu tin nhắn $\rightarrow$ BẮT BUỘC coi là Cảnh Báo Vàng/Đỏ (`UNVERIFIED / BLIND SPOT`), TUYỆT ĐỐI CẤM xem đó là "0 lỗi" rồi báo cáo `🟢 1, 2, 3, 4 OK`!
+> > 2. **Khởi Tạo Biến Mặc Định & Biên Dịch Cú Pháp Trước Khi Giao (Strict Variable Initialization & Compile Check)**:
+> >    - Mọi hàm Python/JS khi trả về dữ liệu qua các nhánh logic BẮT BUỘC phải khởi tạo biến `result = ...` mặc định ngay dòng đầu tiên của hàm trước bất kỳ vòng lặp `for` hay khối `try/except` nào.
+> >    - BẮT BUỘC phải chạy `python -m py_compile [file.py]` để bắt sạch lỗi cú pháp / biến chưa định nghĩa trước khi commit & push!
+> > 3. **Khóa Chặt Whitelist `.claspignore` & Đếm Đủ 18 File Trước Khi Push (Strict GAS Whitelist Lock)**:
+> >    - Thư mục clasp sử dụng cơ chế `**` chặn toàn bộ $\rightarrow$ MỌI file `.gs` (cũ lẫn mới) BẮT BUỘC phải có tiền tố `!filename.gs` trong `.claspignore`. Trước khi chạy `clasp push`, PHẢI đối chiếu đếm đủ 18 file (17 `.gs` + 1 `appsscript.json`), nếu thiếu bất kỳ file nào CẤM push đè lên GAS Cloud!
+> > 4. **CẤM Trỏ Webhook Telegram Trực Tiếp Vào Google Apps Script (Strict Reverse-Proxy Rule)**:
+> >    - Google Cloud Web App luôn trả về mã điều hướng `302 Found` cho các request POST. Telegram từ chối xử lý chuyển hướng dẫn đến kẹt hàng đợi `pending_update_count`.
+> >    - MỌI Webhook Telegram Bot (`Search`, `Asset`, `Site Down`, `Construction`, `Attendance`) BẮT BUỘC phải đi qua Vercel Reverse Proxy (`/api/...`) để theo dõi chuyển hướng và trả `HTTP 200 OK` tức thì cho Telegram!
+> > 5. **Kiểm Toán Lịch Trình Tích Lũy Toàn Bộ Các Mốc Trong Ngày (Cumulative All-Day Schedule Audit)**:
+> >    - Ghế Giám Sát khi quét lịch sử tin nhắn nhóm PHẢI đối chiếu TẤT CẢ các mốc giờ báo cáo đã trôi qua từ 00:00 sáng đến giờ hiện tại, không được chỉ kiểm tra trong cửa sổ hẹp $\pm 4$ phút, để đảm bảo bất kỳ bản tin nào bị sập trong ngày đều bị phát hiện ngay lập tức!
+> > 6. **Khóa Chặt Mốc Giờ Kép Tàu 5 Phút (Train Schedule Dual-Tick Alignment Policy)**:
+> >    - Mọi mốc giờ kiểm tra trong `train_5min.yml` BẮT BUỘC phải cài đặt cơ chế kiểm tra mốc kép (Dual-Tick Match) bám sát các tick tàu 5 phút (:01, :06, :11, :16, :21, :26, :31, :36, :41, :46, :51, :56 MMT), ví dụ `(check_time 07 18 || check_time 07 16)`, `(check_time 08 28 || check_time 08 26)`, `(check_time 08 48 || check_time 08 46)` để kháng trễ hàng đợi GitHub Runner 100%, triệt tiêu hoàn toàn sự cố MISSED báo cáo!
+> > 7. **Khóa Chặt Bộ Lọc Hàng Đọc Quân Số Nhân Sự (Strict Roster Row Range Policy - Row 4-38 & 52-55)**:
+> >    - Bảng Task Sheet GID `133591305` phân bổ nhân viên từ Row 4 đến Row 38 (Hàng 38 là Kyaw Nyein Thu thuộc Team 4) và Team Leaders ở Row 52-55. CẤM TUYỆT ĐỐI việc cắt sớm tại hàng 37 (`37 < sheet_row < 52`) làm rụng quân số của Team 4. Bộ lọc chuẩn bất biến là `if sheet_row < 4 or (38 < sheet_row < 52) or sheet_row > 55: continue`.
+> > 8. **Khóa Cố Định Workflow Name Khi Dispatch Từ GAS Cloud (Zero-Stale-Workflow Dispatch Policy)**:
+> >    - Hàm `triggerDailyWorkflow()` trên GAS Cloud khi dispatch GitHub Actions BẮT BUỘC phải trỏ đúng tên file workflow đang hoạt động (`train_5min.yml/dispatches`), kèm bảng ánh xạ `reportMap` chuẩn hóa, CẤM TUYỆT ĐỐI dùng tên file cũ đã xóa/đổi tên (`daily_reports.yml`).
+>
+> ---
+>
+> # 🛡️ STRICT RULE: KIẾN TRÚC 7 TRỤ CỘT BẤT KHẢ XÂM PHẠM (ZERO-FAILURE ARCHITECTURE)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC (ZERO BUG POLICY)**: TUYỆT ĐỐI KHÔNG ĐƯỢC CÀI ĐẶT CODE CÓ KHẢ NĂNG GÂY NGHẼN, TỰ HỦY RUNNER HAY SẬP CHUỖI LIÊN HOÀN (DÙ CỐ Ý HAY VÔ TÌNH). MỌI COMPONENT BẮT BUỘC PHẢI TUÂN THỦ 7 TRỤ CỘT:
+> > 1. **Cửa Sổ Kháng Trễ Chặt (Tight Sliding Window Timing)**: Cửa sổ chấp nhận trễ tối đa ±4 phút. Nhịp :06 chấp nhận :00-:10; phút :11-:20 sleep đến :36. Nhịp :36 chấp nhận :21-:40; phút :41-:59 sleep đến :06 giờ kế. TUYỆT ĐỐI KHÔNG chạy ngay tại :20 hay :50!
+> > 2. **Quét Lịch Sử Duy Nhất 1 Lần (Single-Pass Scanning)**: Mỗi nhóm Telegram chỉ quét đúng 1 lần duy nhất (< 3s) và so khớp tiêu đề trong RAM, triệt tiêu 100% nguy cơ Timeout và Telegram FloodWait.
+> > 3. **Cô Lập Lỗi Độc Lập (Zero Cascading Failure)**: Mọi script độc lập phải được bọc cô lập lỗi (`python script.py || true`) để không bao giờ làm chết chùm các báo cáo khác.
+> > 4. **Khóa Độc Quyền Phiên Telethon (Concurrency Locking)**: Cài đặt `concurrency: group: ...` trên GitHub Actions để các tác vụ Telethon không bao giờ tranh chấp hay đè phiên.
+> > 5. **Kênh Kép Song Hành (GAS Direct First, GitHub Second)**: GAS Cloud đảm nhiệm phát tin chính; GitHub Actions đóng vai trò dự phòng và cào Telethon.
+> > 6. **Cô Lập Biến Toàn Cục GAS (GAS Global Scope Isolation)**: Tất cả file `.gs` trong cùng 1 dự án dùng chung Global Scope — KHÔNG khai báo trùng tên biến. Chỉ giữ 4 dự án GAS chuẩn (TNI = 18 files, TNI Site Down Bot, TNI Attendance Bot, TC). ⚠️ `clasp push` SẼ XÓA file trên GAS mà không có trong thư mục local — PHẢI đảm bảo đủ 18 file trước khi push!
+> > 7. **Xử Lý Gia Tăng Chống Timeout (Incremental Processing)**: GAS giới hạn 6 phút — phải đánh dấu dòng đã xử lý (Note), chỉ xử lý dòng MỚI, có cơ chế dừng an toàn 5 phút. KHÔNG dùng `--force` trên workflow_dispatch tự động.
+>
+> ---
+>
+> # 🇬🇧 STRICT RULE: CHATBOT RESPONSES & TEMPLATE CONTENTS MUST BE IN ENGLISH
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC**: TOÀN BỘ NỘI DUNG PHẢN HỒI TỰ ĐỘNG, THÔNG BÁO, MENU VÀ TEMPLATE CỦA CHATBOT GỬI TRÊN TELEGRAM BẮT BUỘC PHẢI BẰNG TIẾNG ANH 100% (ENGLISH ONLY FOR ALL BOT MESSAGES & TEMPLATES).
+>
+> ---
+>
+> # ⏰ STRICT SCHEDULE RULE: REPORT 1, 2, 3, 4 DAILY SENDING TIMES
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC**: THỜI GIAN GỬI BÁO CÁO TỰ ĐỘNG CHO REPORT 1, 2, 3, 4 (TEAMS 1 TO 4 VIA GITHUB ACTIONS — TOA 1+11) LÀ ĐÚNG **05:46 AM** VÀ **15:46 PM** HÀNG NGÀY; VÀ TOA BOTLOOKUP RELAY LÀ ĐÚNG PHÚT **:06** VÀ **:36** HÀNG GIỜ (MÚI GIỜ MYANMAR `Asia/Yangon` UTC+6:30).
+>
+> ---
+>
+> # 🛡️ STRICT RULE: ĐỌC VÀ TUÂN THỦ TUYỆT ĐỐI DOCUMENTATION TRƯỚC KHI SỬA KẾT NỐI & ENDPOINT
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC**: TUYỆT ĐỐI KHÔNG ĐƯỢC TIỆN TAY THAY ĐỔI HOẶC ĐOÁN ĐƯỜNG DẪN WEBHOOK / ENDPOINT CỦA BẤT KỲ BOT NÀO. PHẢI KIỂM TRA DOCS CHUẨN TRƯỚC KHI THỰC HIỆN!
+>
+> ---
+>
+> # 📥 STRICT DATA COLLECTION RULE: NEWEST DATA ALWAYS INSERTED AT THE VERY TOP
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC THU THẬP DỮ LIỆU**: MỌI BỘ THU THẬP THÔNG TIN (MDG REPORT, INVENTORY, REFUEL REQUEST, DAILY REPORT, DAILY PLAN, READ GROUP LOGS, V.V.) KHI GHI VÀO GOOGLE SHEETS BẮT BUỘC PHẢI CHÈN DỮ LIỆU MỚI LÊN ĐẦU BẢNG TÍNH (DÒNG 2, NGAY BÊN DƯỚI HÀNG TIÊU ĐỀ HEADER ROW 1 DÙNG `insertRowsBefore(2, ...)` HOẶC RECORD DÒNG 2). TUYỆT ĐỐI KHÔNG ĐƯỢC NỐI DỮ LIỆU VÀO CUỐI BẢNG TÍNH (`appendRow`) LÀM NGƯỜI DÙNG PHẢI KÉO XUỐNG DƯỚI!
+>
+> ---
+>
+> # 🔬 STRICT RULE: QUÉT DEPENDENCY BIẾN / HÀM TRƯỚC KHI XÓA — CHỐNG ORPHAN REFERENCE (STRICT VARIABLE DEPENDENCY SCAN BEFORE DELETE)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC (ZERO ORPHAN REFERENCE POLICY)**: KHI XÓA HOẶC REFACTOR BẤT KỲ HÀM / BIẾN / BLOCK CODE NÀO, BẮT BUỘC PHẢI:
+> > 1. **Grep Toàn Bộ Tham Chiếu (Full Dependency Scan)**: Trước khi xóa hàm `foo()` hoặc biến `bar`, BẮT BUỘC chạy `grep -rn "foo\|bar"` trên TOÀN BỘ file/project để tìm TẤT CẢ nơi tham chiếu. Xóa hoặc thay thế TẤT CẢ chỗ dùng trước khi commit.
+> > 2. **Test End-to-End Sau Deploy (Post-Deploy Smoke Test)**: Sau khi clasp push + deploy, BẮT BUỘC gửi 1 tin nhắn/ảnh test thực tế qua Telegram để verify luồng end-to-end không crash. Kiểm tra GAS Execution Logs (hoặc Logs sheet) trong 5 phút đầu để confirm 0 Exception.
+> > 3. **Bài Học v640**: Phiên AI ngày 09/08 xóa hàm `identifyFaces_()` nhưng quên xóa 3 chỗ dùng biến `extractedImageName` → `ReferenceError` crash doPost → mất 5 ngày dữ liệu điểm danh (17/08-22/08). KHÔNG BAO GIỜ ĐƯỢC LẶP LẠI!
+>
+> ---
+>
+> # 🔄 STRICT RULE: ĐỒNG BỘ THỦ CÔNG BẢNG THỜI GIAN KHI SỬA LỊCH — CẤM TỰ ĐỘNG (MANUAL SCHEDULE SYNC ONLY POLICY)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC (MANUAL SCHEDULE SYNC POLICY)**:
+> > 1. **Khi Sửa Hoặc Thêm Lịch Chạy Mới (Schedule Change Sync)**: Mỗi khi thay đổi, thêm mới hoặc xóa bất kỳ Toa / thời gian chạy nào trong `train_5min.yml` hoặc bất kỳ workflow nào, BẮT BUỘC phải đồng bộ lại bảng **"Time Rain 5 min"** (Tab `Time Rain 5 min`, GID `2003037043` trong bảng tính `1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow`) để phản ánh chính xác lịch mới.
+> > 2. **Chỉ Đồng Bộ Khi Người Dùng Nói "đồng bộ thời gian đi"**: AI KHÔNG ĐƯỢC tự động đồng bộ. Chỉ khi Người Dùng nói **"đồng bộ thời gian đi"**, AI mới gọi GAS action `sync_schedule` để ghi toàn bộ bảng thời gian chuẩn lên sheet. Ghi dòng cuối: `"manual sync — DD/MM/YYYY HH:MM MMT"`.
+> > 3. **Bảng Phải Khớp 100% Với Workflow (Zero Drift)**: Mọi thời gian, tên Toa, Engine type trong bảng phải khớp chính xác 1-to-1 với `check_time` trong `train_5min.yml`.
+>
+> ---
+>
+> # 🏛️ STRICT RULE: 8 TRỤ CỘT KIẾN TRÚC BI PORTAL (BI ARCHITECTURE PILLARS)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC**: MỌI TAB / COMPONENT MỚI TRÊN BI PORTAL BẮT BUỘC PHẢI TUÂN THỦ 8 TRỤ CỘT SAU. VI PHẠM = PHẢI REFACTOR TRƯỚC KHI DEPLOY!
+> > 1. **SSOT — Nguồn Dữ Liệu Duy Nhất (Single Source of Truth)**: TUYỆT ĐỐI KHÔNG hardcode data trong HTML. Mọi bảng dữ liệu phải được render ĐỘNG từ GAS API → `fetch()` → render DOM. Khi cần sửa nội dung hiển thị → sửa trên Google Sheet, KHÔNG sửa HTML.
+> > 2. **Security-First — Bảo Mật Server-Side**: Phân quyền phải được kiểm tra **tại GAS server** (đối chiếu sheet `Permit BI`), client-side chỉ là lớp UI bổ sung. KHÔNG chỉ dựa vào `localStorage` hay ẩn nút. Phân 3 cấp: VIEWER (xem) → EDITOR (sửa E:F) → ADMIN (sửa A:D + xóa).
+> > 3. **Separation of Concerns — Tách Biệt Trách Nhiệm**: Mỗi tab MỚI phải gói logic trong **1 namespace riêng** `window.TabName = { init, loadData, render, ... }`. KHÔNG dùng biến global rời. Mỗi tab tự quản lý fetch/render/state.
+> > 4. **Data Contract — Hợp Đồng Dữ Liệu**: Mọi GAS API response phải trả format chuẩn: `{ status, version, timestamp, data, meta, error }`. Column mapping khai báo trong GAS config, KHÔNG giả định thứ tự cột. Date format: `DD/MM/YYYY` (hiển thị) / ISO 8601 (API).
+> > 5. **Error Isolation — Cô Lập Lỗi**: 1 tab lỗi KHÔNG BAO GIỜ ảnh hưởng tab khác. Mọi `fetch()` phải có `.catch()` với fallback UI (error banner + nút Retry). Timeout fetch: max 15 giây.
+> > 6. **Scalable Tabs — Kiến Trúc Tab Mở Rộng**: Thêm tab mới phải theo checklist 8 bước: (1) Khai báo config, (2) Thêm nav button, (3) Thêm panel div, (4) Tạo namespace JS, (5) Đăng ký permission, (6) Thêm GAS endpoint, (7) Test isolation, (8) Cập nhật docs.
+> > 7. **Performance Budget — Ngân Sách Hiệu Năng**: First Contentful Paint ≤ 2s, Tab switch ≤ 100ms, API response ≤ 5s, Max 500 rows/tab (quá → pagination), Polling interval = 30s.
+> > 8. **Change Management — Quản Lý Thay Đổi**: Version number trong comment dòng 1 HTML. Mỗi thay đổi GAS ghi `// vYYYY-MM-DD — [mô tả]`. Backup trước khi sửa lớn. Cập nhật 3 docs: `SYSTEM_DOC.md`, `system_map.md`, `AGENTS.md`.
+>
+> ---
+>
+> ## 📌 1. Bản đồ Webhook Cố Định (Strict Endpoint Registry)
+>
+> Mọi thao tác cài đặt hoặc khôi phục Webhook Telegram đều phải đối chiếu chính xác 100% với danh sách sau:
+>
+> | Bot Name | Telegram Username | Webhook Endpoint URL | File Handler trong Codebase |
+> |---|---|---|---|
+> | **Search Bot** | `@SEARCHTNITASKWOBOT` | `https://tni-bot.vercel.app/api/search_bot` | `api/search_bot.py` |
+> | **Asset Bot (Collector)** | `@TNIASSETorderREQUEST_BOT` | `https://tni-bot.vercel.app/api/collector` | `api/collector.py` |
+> | **Site Down Bot (Relay)** | `@tni_site_down_bot` | `https://tni-bot.vercel.app/api/site_down_relay` | `botlookup_relay.py` |
+> | **Construction Bot** | `@8903841312` (`10 TNI_SITE`) | `https://tni-bot.vercel.app/api/construction` | `api/construction.py` |
+>
+> ---
+>
+> ## 📋 2. Quy trình 3 bước bắt buộc trước khi chỉnh sửa:
+>
+> 1. 📖 **Đọc lại Docs hiện hành**: Phải đọc `SYSTEM_DOC.md`, `system_map.md` và `history/backup_context_...md` trước khi gọi bất kỳ lệnh `setWebhook` hay sửa URL kết nối nào.
+> 2. 🔍 **Xác minh Bot Token & Webhook URL**: Tuyệt đối không gán nhầm Bot Token của Search Bot (`@SEARCHTNITASKWOBOT`) vào Webhook của Site Down Relay hay Collector.
+> 3. 💾 **Thực hiện đủ 10 bước Quy tắc "LƯU ĐI BỌC THÉP HOÀN HẢO" bắt buộc**:
+>    - **Bước 1:** **Snapshot Backup Context**: Cập nhật chi tiết phân tích, bối cảnh và số hiệu phiên bản vào `history/backup_context_YYYYMMDD_vXXX.md`.
+>    - **Bước 2:** **Đồng Bộ Mã Nguồn Phân Hệ Độc Lập**: Chạy `master_sync_all.py` đồng bộ đúng phân hệ:
+>      - 17 files `QLTC_GAS` -> `Task and WO/apps_script/`
+>      - 1 file `apps_script_sitedown/site_down_v2.gs` -> `tni-sitedown/`
+>      - File Python dùng chung -> 3 repos cục bộ.
+>    - **Bước 3:** **Git Commit & Push Cả 3 Repos Local**: Push đồng thời lên GitHub `MON6879/tni-sitedown-relay`, `MON6879/TNI-DONE`, `phonghdpxd-cmd/tni-bot`.
+>    - **Bước 3.5:** **Đẩy Code GAS Lên Cloud & Xác Minh Deployment (Mandatory GAS Deploy & Verify)** — Khi có sửa đổi file `.gs` trong bất kỳ phân hệ nào, BẮT BUỘC phải thực hiện đúng 4 Ghế GAS Operations theo thứ tự:
+>      - **Ghế GAS-VERIFY-0**: `(Get-ChildItem [Thư_Mục_Phân_Hệ]\*.gs).Count` — PHẢI đủ số file chuẩn (`QLTC_GAS` = 17, `apps_script_sitedown` = 1, `apps_script_tc`, `apps_script_attendance`), nếu THIẾU → DỪNG NGAY!
+>      - **Ghế GAS-PUSH-1**: `npx clasp push` (chạy trong thư mục phân hệ đó) — PHẢI thấy "Pushed N files."
+>      - **Ghế GAS-DEPLOY-2**: `npx clasp deploy -i [DEPLOYMENT_ID_CHUẨN] -d "v[XXX] [mô tả]"` — Version PHẢI TĂNG!
+>      - **Ghế GAS-AUDIT-3**: `npx clasp pull` (chạy trong thư mục pull/verify) + `Compare-Object` — PHẢI = 0 khác biệt!
+>      - TUYỆT ĐỐI KHÔNG ĐƯỢC báo "hoàn thành" khi chưa qua đủ 4 Ghế!
+>    - **Bước 4:** **Dọn Sạch Bộ Nhớ Đệm**: Dọn dẹp sạch sẽ 100% tất cả cache `__pycache__` trên toàn bộ thư mục.
+>    - **Bước 5:** **Khóa Cứng & Giám Sát Webhooks**: Chạy `master_sync_all.py` quét 4 Webhooks Telegram, xác nhận trạng thái `LOCKED` và `Pending = 0`.
+>    - **Bước 6:** **Cập Nhật Tài Liệu Hệ Thống (Mandatory 3-Docs Sync)**: Khi thêm/xóa/sửa Toa, Ghế, Endpoint, Cron Schedule hoặc cấu trúc hệ thống, BẮT BUỘC phải cập nhật đồng bộ 3 file: `system_map.md`, `SYSTEM_DOC.md` và `AGENTS.md` (Bản đồ Webhook). TUYỆT ĐỐI KHÔNG ĐƯỢC để tài liệu lệch so với code!
+>    - **Bước 7:** **Kiểm Thử Thực Tế & Bằng Chứng Số Liệu (Live Output Verification)**: Chạy test payload/script trực tiếp lên endpoint Web App, in ra log HTTP 200 `{"ok": true}` để xác nhận 0 lỗi phát sinh.
+>    - **Bước 8:** **Xác Minh Không Tác Dụng Phụ (Zero Side-Effect Check)**: Đảm bảo các Toa/Ghế khác trong hệ thống vẫn hoạt động nguyên vẹn 100%.
+>    - **Bước 9:** **Báo Cáo Rõ Ràng Cho Người Dùng**: Báo cáo rõ Số Chuyến Tàu, Số Toa Tàu & Số Ghế (Chuyến Tàu Số # — Toa # — Ghế Nội Bộ # — Ghế Ngoại Giao #) và Version Deployment mới nhất (KHÔNG chèn tên/số ghế vào nội dung tin nhắn Telegram Chatbot gửi cho nhân viên)!
+>
+> ---
+>
+> # 👑 STRICT 1% ENGINEERING RULE: 7 NGUYÊN TẮC THÉP ĐỈNH CAO CHỐNG TÁI DIỄN LỖI 100% (TOP 1% MASTER POLICIES)
+>
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG CHO MỌI PHIÊN AI KẾ TIẾP**:
+> > 
+> > ### 1. 🚫 CẤM DÙNG `setWebhook` TRONG KEEPALIVE ĐỊNH KỲ (ANTI-RETRY-LOOP POLICY):
+> > - **Cốt Lõi**: Trong các workflow/script chạy lặp định kỳ (ví dụ đoàn tàu 5 phút `train_5min.yml`), **TUYỆT ĐỐI CẤM GỌI LỆNH `setWebhook`**! Gọi `setWebhook` liên tục mỗi 5 phút sẽ reset kết nối Telegram, ép Telegram replay lại toàn bộ hàng đợi retry và sinh ra hiện tượng **bot tự động spam tin lặp liên tục mỗi 5 phút**!
+> > - **Quy Chuẩn Keepalive**: Sưởi ấm kết nối Telegram Bot Webhook **CHỈ ĐƯỢC DÙNG `getWebhookInfo`** hoặc gửi request `GET /ping` an toàn.
+> > - **Tầng Dedup 6 Giờ Bắt Buộc**: Mọi Webhook xử lý tin nhắn của Bot trên GAS/Python BẮT BUỘC phải có bộ nhớ đệm `CacheService` / Memory lưu cả `update_id` và `message_id` với thời gian sống **tối thiểu 6 giờ (21600s)** để chặn đứng 100% các lượt retry muộn từ Telegram.
+> >
+> > ### 2. 🔒 KHỚP LỆNH CHÍNH XÁC 100% & DEBOUNCE ALBUM ẢNH (EXACT MATCH & ALBUM DEBOUNCE):
+> > - **Cốt Lõi**: Xử lý lệnh lấy mẫu (Template/Slash command) **BẮT BUỘC phải khớp chính xác 100%** (`cleanKey === normCmdKey`), TUYỆT ĐỐI CẤM dùng `indexOf !== -1` hoặc so khớp một phần dẫn đến trả lời nhầm mẫu tin khác.
+> > - **Khóa Debounce Nhóm (4 Giây)**: Mọi lệnh slash command phải có khóa debounce tối thiểu 4 giây theo từng `chat_id` để khi nhân viên gửi album 5-10 ảnh có kèm caption lệnh thì bot chỉ trả lời duy nhất 1 lần, không được bắn 5-10 tin nhắn lặp!
+> >
+> > ### 3. 👥 ĐỒNG BỘ ĐẦY ĐỦ NHÓM MỚI VÀO CẤU HÌNH VÀ GHẾ GIÁM SÁT (FULL GROUP LIFECYCLE SYNC):
+> > - **Cốt Lõi**: Khi người dùng thêm bất kỳ nhóm làm việc mới nào (ví dụ: `TEAM 1 CONSTRUCTION`, `TEAM 2 CONSTRUCTION`...), AI BẮT BUỘC phải cập nhật đồng thời đủ 3 điểm:
+> >   1. Lấy đúng `chat_id` bằng công cụ Telethon/API và lưu vào `tni_config.py`.
+> >   2. Khai báo nhóm vào danh sách giám sát của **Ghế AUDITOR-9.1** (`system_auditor.py`).
+> >   3. Cập nhật hàm bóc tách tên nhóm (`extractTeamNameFromText`) trong GAS để Google Sheet ghi nhận đúng cột!
+> >
+> > ### 4. 🎯 CẤM HARDCODE NGẮT DẢI DÒNG MÙ — ĐỌC ĐỘNG THEO DỮ LIỆU THỰC TẾ (DYNAMIC ROSTER & ZERO BLIND-ROW-SKIPPING POLICY):
+> > - **Cốt Lõi**: Tuyệt đối CẤM hardcode ngắt quãng dòng dạng `if (32 < sheet_row < 52): continue` dựa trên phán đoán chủ quan. Mọi hàm lấy danh sách nhân sự/dữ liệu BẮT BUỘC phải quét toàn bộ các dải hợp lệ, tự động lọc bỏ các giá trị `0`, `nan`, rỗng và nhận diện linh hoạt theo header Team Leader (`52..55`) và cột Team `TEAM01..04`. Triệt tiêu hoàn toàn lỗi **Roster Deficit**!
+> >
+> > ### 5. 🛡️ BẢO VỆ TIN NHẮN PHÂN MẢNH MULTIPART & SO KHỚP NỘI DUNG THỰC TẾ (MULTIPART-AWARE DEDUP & ZERO FALSE DUPLICATE ALARM):
+> > - **Cốt Lõi**: Khi kiểm toán nhân đôi tin nhắn, công cụ giám sát BẮT BUỘC phải:
+> >   1. Nhận diện hậu tố phân mảnh `(Part X/Y)` để không gom nhầm các phần nối tiếp của cùng một bản tin dài.
+> >   2. So khớp nội dung thân bài thực tế (`is_same_content`): Chỉ báo động đỏ khi các tin nhắn **trùng lặp hoàn toàn nội dung** gửi trong khoảng thời gian $\le 180$ giây.
+> >
+> > ### 6. 🚫 CHẶN ĐỨNG CONFLICT MARKERS TRƯỚC KHI COMMIT & DEPLOY (ZERO-GIT-CONFLICT & PRE-COMMIT LINT GATE):
+> > - **Cốt Lõi**: Tuyệt đối CẤM commit bất kỳ file `.yml`, `.py`, `.gs`, `.json` nào có chứa dấu hiệu xung đột merge Git (`<<<<<<< HEAD`, `=======`, `>>>>>>>`). Script `master_sync_all.py` được trang bị cổng bảo vệ tự động quét và chặn đứng tức thì quy trình commit nếu phát hiện bất kỳ conflict marker nào còn sót lại.
+> >
+> > ### 7. 🔒 KHÓA 3 TẦNG BẢO VỆ AUTO-COPY LIÊN SHEET (TRIPLE-GUARD IDEMPOTENT COPY POLICY):
+> > - **Cốt Lõi**: Mọi tác vụ tự động sao chép / dán dữ liệu liên Sheet (`auto_copy_processor.gs`) BẮT BUỘC phải tuân thủ 3 tầng bảo vệ bất biến:
+> >   1. **`LockService.getScriptLock()`**: Chống xung đột đồng thời (Race Condition) giữa Time Trigger và Webhook call.
+> >   2. **Pre-Paste Deduplication Guard**: Quét `existingSignatures` tại Sheet đích trước khi dán, bỏ qua 100% dòng đã tồn tại (chống lỗi `Double`).
+> >   3. **`SpreadsheetApp.flush()`**: Ép Google Sheet tính lại công thức Cột A liên-sheet lập tức ngay sau khi dán.
+
+---
+
+# 🚫 STRICT RULE: CẤM TỰ Ý TẠO / THAY ĐỔI TEMPLATE MENU BOT KHI CHƯA CÓ YÊU CẦU (ZERO-UNAUTHORIZED-MENU POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (ZERO-UNAUTHORIZED-MENU CREATION)**:
+> 1. **CẤM Tự Ý Tạo Menu**: AI TUYỆT ĐỐI KHÔNG ĐƯỢC tự ý tạo, thêm, hoặc thay đổi danh sách lệnh menu bot (Telegram `setMyCommands`, text menu response `/menu`) khi Người Dùng CHƯA YÊU CẦU rõ ràng!
+> 2. **CẤM Tự Ý Thêm Lệnh Vào Menu**: Khi triển khai tính năng mới, KHÔNG ĐƯỢC tự tiện thêm lệnh vào menu dropdown hay text menu. Chỉ thêm khi Người Dùng chỉ định cụ thể.
+> 3. **Menu Là Tài Sản Của Người Dùng**: Mọi thay đổi về cấu trúc, thứ tự, nội dung menu phải có sự đồng ý rõ ràng bằng văn bản từ Người Dùng trước khi thực hiện.
+
+---
+
+# 💾 STRICT RULE: GHI DỮ LIỆU TRƯỚC — GỬI TIN SAU — TUYỆT ĐỐI CẤM ĐỂ CRASH GỬI TIN CHẶN MẤT DỮ LIỆU (STRICT DATA-FIRST SEND-LAST & ZERO DATA-LOSS-BY-CRASH POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (DATA-FIRST SEND-LAST POLICY)**:
+> 1. **Ghi Dữ Liệu Trước, Gửi Tin Sau (Data Write Before Message Send)**: Mọi script thu thập dữ liệu BẮT BUỘC phải ghi dữ liệu vào Google Sheet / Database **TRƯỚC KHI** gửi tin nhắn báo cáo ra Telegram. TUYỆT ĐỐI CẤM đặt lệnh ghi Sheet SAU lệnh `send_message` — vì nếu `send_message` crash (MessageTooLongError, FloodWait, NetworkError...) thì dữ liệu sẽ bị mất hoàn toàn!
+> 2. **Bài Học Report 6 (30/08/2026)**: Script `daily_read_report.py` đặt `log_read_group_to_gas()` SAU `client.send_message(control_id, report)` → Tin CONTROL dài >4096 ký tự → `MessageTooLongError` → crash → Sheet đóng băng 5 ngày (25/08-30/08) mà không ai phát hiện!
+> 3. **Bắt Buộc Guard Độ Dài Telegram (Message Length Guard)**: Mọi tin nhắn gửi qua Telegram (cả Bot API lẫn Telethon) BẮT BUỘC phải kiểm tra `len(message) <= 4096` TRƯỚC KHI gửi. Nếu quá dài → cắt/chia nhỏ, TUYỆT ĐỐI KHÔNG gửi thô để crash!
+> 4. **Wrap Send Trong Try/Except (Never Let Send Crash Kill Script)**: Mọi lệnh `send_message`, `UrlFetchApp.fetch(sendMessage)` BẮT BUỘC phải nằm trong `try/except` (Python) hoặc `try/catch` (GAS). Lỗi gửi tin KHÔNG ĐƯỢC phép làm sập toàn bộ script!
+
+---
+
+# 🔐 STRICT RULE: TELETHON SESSION HEALTH — CẤM IM LẶNG KHI SESSION CHẾT & BẮT BUỘC CẢNH BÁO NGAY (STRICT TELETHON SESSION HEALTH & ZERO SILENT SESSION FAILURE POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (TELETHON SESSION HEALTH POLICY)**:
+> 1. **Session Telethon Là Tài Nguyên Sống Còn (Session Is Critical Resource)**: `TELEGRAM_SESSION` (StringSession) dùng cho tài khoản cá nhân `@Phongha79` là tài nguyên duy nhất cho phép `GetMessageReadParticipantsRequest` (Report 6) và gửi Note dưới tên user (Report 4 step 9 trong `cron_send.py`). Nếu session chết → toàn bộ chuỗi Report 4→6 sụp đổ!
+> 2. **CẤM Dùng Session Đồng Thời Từ 2 IP (Zero Concurrent Session Usage)**: Telegram KHÓA VĨNH VIỄN session khi phát hiện dùng từ 2 IP cùng lúc (`AuthKeyDuplicatedError`). BẮT BUỘC chỉ chạy Telethon session từ MỘT NƠI DUY NHẤT (GitHub Actions). CẤM chạy local cùng lúc với GitHub Actions! Nếu cần test local → tạo session riêng hoặc tạm tắt workflow.
+> 3. **Bắt Buộc Phát Hiện & Cảnh Báo Khi Session Lỗi (Mandatory Session Failure Alert)**: Mọi script dùng Telethon BẮT BUỘC phải bắt các lỗi session (`AuthKeyDuplicatedError`, `AuthKeyUnregisteredError`, `SessionRevokedError`, `UserDeactivatedBanError`) và GỬI CẢNH BÁO NGAY cho Admin qua Bot API (vì Telethon đã chết, phải dùng Bot fallback). CẤM TUYỆT ĐỐI chỉ `print(error)` rồi `return {}` im lặng!
+> 4. **Bài Học Report 6 (25-30/08/2026)**: Session cũ bị `AuthKeyDuplicatedError` → `cron_send.py` step 9 im lặng skip gửi Note → `daily_read_report.py` không tìm thấy Note hợp lệ (tin của Bot không đếm được) → Report 6 gửi toàn Read=0 suốt 5 ngày → Sheet đóng băng → không ai biết cho đến khi Người Dùng phát hiện thủ công!
+> 5. **CẤM Gửi Báo Cáo "Toàn Số 0" Mà Không Cảnh Báo (Zero Silent All-Zero Report)**: Nếu Report 6 phát hiện TOÀN BỘ teams đều `Read = 0` (tức là `sum(cnt_d0) == 0` cho tất cả T1-T4) → BẮT BUỘC phải gửi cảnh báo `⚠️ ALERT: Read API returned 0 for ALL teams — possible session/API failure` cho Admin (`6859790680`) thay vì gửi báo cáo vô nghĩa!
+> 6. **Auditor Phải Kiểm Tra Nội Dung, Không Chỉ Ngày (Content Freshness, Not Just Date Freshness)**: Ghế AUDITOR-9.1 BẮT BUỘC phải kiểm tra THÊM: nếu dữ liệu Sheet Read Group có ngày hôm nay nhưng toàn bộ status = "Unread" với trend 0/0/0 → **FAIL** (dữ liệu giả, không phải dữ liệu thật).
+
+---
+
+# 🎯 STRICT RULE: BẮT BUỘC WHITELIST ĐÚNG DEPLOYMENT ID & KIỂM TRA PHẢN HỒI HTTP 200 + JSON STATUS OK (STRICT ENDPOINT WHITELISTING & 2-TIER API VERIFICATION POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (ENDPOINT WHITELIST & API VERIFICATION POLICY)**:
+> 1. **Bắt Buộc Dùng Cơ Chế Whitelist (Mandatory Deployment ID Whitelisting)**: Khi bất kỳ script Python nào cần gửi dữ liệu hoặc gọi API tới Google Apps Script (GAS), BẮT BUỘC phải dùng cơ chế **Whitelist** — tức là CHỈ chấp nhận biến môi trường URL nếu nó chứa đúng đoạn mã Deployment ID chuẩn của phân hệ đó (ví dụ: `AKfycbz-NZlBk8q2` cho `QLTC_GAS`, `AKfycbyCibIj` cho `apps_script_sitedown`, `AKfycbw-QYNe` cho `apps_script_solution_clear`). Nếu không khớp $\rightarrow$ ÉP BUỘC dùng `PRIMARY_GAS_URL` chuẩn của phân hệ đó!
+> 2. **TUYỆT ĐỐI CẤM Cơ Chế Blacklist Nửa Vời (Zero Weak Blacklisting Anti-Pattern)**: CẤM TUYỆT ĐỐI việc viết `if not URL or "BLACKLIST_ID" in URL: URL = FALLBACK` — vì khi chạy đa repo (ví dụ chạy trên repo `tni-sitedown-relay` với GitHub Secrets của Site Down), blacklist sẽ bỏ lọt và gửi nhầm dữ liệu sang endpoint của phân hệ khác, gây tê liệt bảng tính!
+> 3. **Bắt Buộc Kiểm Tra Phản Hồi 2 Tầng (Mandatory 2-Tier Response Verification)**: Mọi lệnh `requests.post()` hoặc `requests.get()` gửi dữ liệu vào GAS BẮT BUỘC phải kiểm tra cả 2 tầng:
+>    - **Tầng 1 (HTTP Status)**: `resp.status_code == 200`.
+>    - **Tầng 2 (Payload Status)**: `resp.json().get("status") == "ok"` hoặc `resp.json().get("ok") == True`.
+>    - **TUYỆT ĐỐI CẤM "Báo Cáo Thành Công Ảo" (Zero Hallucinated Success Log)**: CẤM TUYỆT ĐỐI việc in log "Logged N records successfully" khi chưa kiểm tra `status == "ok"` từ JSON phản hồi của máy chủ! Nếu server trả về lỗi (như `Unknown action`), BẮT BUỘC phải in Warning/Alert và ghi log thất bại.
+> 4. **Bài Học Thực Tế Report 6 (02/09/2026)**: `daily_read_report.py` chạy trên repo `MON6879/tni-sitedown-relay`, lấy `APPS_SCRIPT_URL` của Site Down GAS $\rightarrow$ Gửi `log_read_group` sang Site Down GAS $\rightarrow$ Site Down GAS trả về `{"ok":false,"msg":"Unknown action: log_read_group"}` $\rightarrow$ Code cũ không kiểm tra phản hồi JSON, vẫn in log ảo đã ghi thành công $\rightarrow$ Bảng tính `Read Group` (GID `870080250`) bị đứng suốt từ 30/08 đến 02/09 dù Telegram vẫn tự gửi tin đều đặn! Đã sửa triệt để bằng Whitelist `AKfycbz-NZlBk8q2` + Kiểm tra 2 tầng HTTP & JSON.
+
+---
+
+# 🕒 STRICT FULL TIMESTAMP RULE: THU THẬP NGÀY BẮT BUỘC PHẢI KÈM GIỜ:PHÚT:GIÂY (DD/MM/YYYY HH:MM:SS) — ZERO DATE-ONLY STAMP POLICY
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (FULL DATETIME COLLECTION POLICY)**:
+> 1. **Thu Thập Ngày Bắt Buộc Kèm Giờ:Phút:Giây (Full Timestamp Mandatory)**: Mọi dữ liệu thu thập tự động từ Telegram Bot (Daily Plan, Daily Report, Cable, MDG, Inventory Fuel, Change Oil, Asset Order, Refuel, Attendance, Solution...) khi ghi nhận cột **Date / Timestamp / Submitted At** vào Google Sheets hoặc Database BẮT BUỘC phải lưu đầy đủ cả Ngày và Giờ:Phút:Giây theo định dạng:
+>    $$\text{DD/MM/YYYY HH:mm:ss}$$
+>    (Ví dụ: `02/09/2026 13:36:51`).
+> 2. **TUYỆT ĐỐI CẤM Chỉ Lưu Ngày Cụt Lủn (Zero Date-Only Timestamp)**: CẤM TUYỆT ĐỐI việc chỉ ghi `02/09/2026` hoặc `31/08/2026 00:00:00` mà thiếu thời gian thực tế gửi tin! Ghi thiếu giờ sẽ làm mất hoàn toàn khả năng truy vết thứ tự và thời điểm nộp báo cáo thực tế của nhân viên/đội trong ngày.
+> 3. **Tự Động Ghép Giờ Nếu Form Chỉ Có Ngày (Auto-Combine Date with Submit Time)**: Nếu tin nhắn/form của người dùng chỉ ghi tiêu đề ngày (ví dụ `Daily Plan: 2/9/2026`), Bot và GAS Backend BẮT BUỘC phải tự động lấy giờ phút giây lúc nhận tin nhắn (`msg.date` hoặc `now_mm`) để ghép thành chuỗi hoàn chỉnh `02/09/2026 HH:mm:ss` trước khi chèn vào bảng tính.
+> 4. **Tin Nhắn Phản Hồi Bot Luôn Có Giờ (Bot Response Must Show Full Time)**: Tin nhắn Bot phản hồi thu thập (`📋 Daily Plan ✅ #DP-xxx | 📍 Team X | 🗓️ DD/MM/YYYY HH:mm:ss`) BẮT BUỘC phải hiển thị đầy đủ thời gian thu thập.
+
+---
+
+# 🧹 STRICT MULTI-LINE HEADER MATCHING & FULL-SCOPE PURGE RULE: QUÉT ĐA DÒNG TIÊU ĐỀ & XÓA TRIỆT ĐỂ CẢ TIN NOTE USER (STRICT MULTI-LINE HEADER SCANNING & USER-NOTE PURGE POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (MULTI-LINE HEADER & FULL PURGE POLICY)**:
+> 1. **Bắt Buộc Quét Toàn Bộ Khối Tiêu Đề (Tối Thiểu 6 Dòng Đầu / 400 Ký Tự)**: Mọi hàm xóa tin nhắn cũ (`tg_delete_by_title`, `delete_old_messages_bot`, `delete_by_titles_batch_telethon`) BẮT BUỘC phải đọc và chuẩn hóa tối thiểu **6 dòng đầu tiên** (hoặc 400 ký tự đầu) của tin nhắn để so khớp tiêu đề/từ khóa định danh báo cáo (`title_prefix.lower() in header_clean.lower()`).
+> 2. **TUYỆT ĐỐI CẤM Chỉ Đọc `first_line` (`split('\n')[0]`)**: CẤM TUYỆT ĐỐI việc chỉ lấy dòng 0 để so sánh! Trong thực tế vận hành, tin nhắn Bot thường bắt đầu bằng tag nhóm (ví dụ `@TNI_FUEL`, `@SEARCHTNITASKWOBOT`), icon hoặc banner trạng thái ở dòng 1 khiến tiêu đề báo cáo thực tế bị đẩy xuống dòng 2 hoặc dòng 3. Nếu chỉ đọc dòng 0 $\rightarrow$ **Trượt so khớp 100%**, tin cũ không bị xóa, gây tích tụ và nhân đôi tin nhắn nghiêm trọng!
+> 3. **Bắt Buộc Xóa Sạch Tin Note Cũ Của User (`@Phongha79`) Bằng `revoke=True`**: Khi gửi báo cáo mới (đặc biệt là các báo cáo có gửi kèm tin Note chỉ đạo giao việc từ tài khoản `@Phongha79` như Refuel, Daily Plan, Cable, EOD), script dọn tin BẮT BUỘC phải tìm và xóa triệt để cả tin Note cũ của User trong nhóm bằng Telethon (`await client.delete_messages(chat_id, [msg.id], revoke=True)`), không được chỉ xóa tin của Bot mà để sót tin nhắn của User làm rác group!
+> 4. **Mọi Hàm Gửi Báo Cáo Phải Kích Hoạt `tg_send_fresh()`**: Mọi script phát tin báo cáo định kỳ (`refuel_send.py`, `refuel_plan_report.py`, `cron_send.py`, `daily_read_report.py`, `daily_plan_report.py`, `daily_bod_assign.py`) BẮT BUỘC phải gọi cơ chế gửi tươi `tg_send_fresh()` hoặc hàm dọn tin trước khi phát tin mới. TUYỆT ĐỐI CẤM dùng `requests.post(sendMessage)` thô mà không có bước dọn tin cũ!
+
+---
+
+# 🛡️ STRICT AUDITOR SSOT PARITY & ZERO FALSE-ALARM RULE: ĐỒNG BỘ 100% CẤU HÌNH LỊCH, LỌC ĐÚNG NGÀY & QUÉT CỘT DỮ LIỆU THẬT (STRICT AUDITOR SSOT PARITY & ZERO FALSE-POSITIVE POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (AUDITOR SSOT PARITY POLICY)**:
+> 1. **Đồng Bộ 100% Ma Trận Lịch Trình Với Workflow Thực Tế (Schedule Matrix Parity)**: Mảng `SCHEDULE_RULES` của Ghế Giám Sát (`system_auditor.py`) BẮT BUỘC phải lấy nguồn SSOT trực tiếp và đồng bộ 100% với các mốc giờ chạy thực tế trong file `.github/workflows/train_5min.yml`. Tuyệt đối CẤM lưu mốc giờ cũ/bỏ hoang (như `06:06` Plan 5C), gây báo động giả `MISSED` ảo!
+> 2. **Bắt Buộc Lọc Đúng Ngày Hôm Nay Trước Khi Tính Độ Trễ (Strict Date-Match Before Delay Calculation)**: Khi kiểm tra đúng giờ (Schedule Adherence), Ghế Giám Sát BẮT BUỘC phải lọc chặt `msg.date_str == today_d` TRƯỚC KHI tính khoảng cách phút (`diff = abs(msg_total_min - target_total_min)`). TUYỆT ĐỐI CẤM lấy tin nhắn của ngày hôm qua (ví dụ tin 14:15 hôm qua) đem so với mốc giờ sáng hôm nay (07:18), tạo ra độ trễ ảo hàng trăm phút ("Lệch 417p")!
+> 3. **Đồng Bộ GID Tab Sheet Chuẩn, Cấm Dùng GID Đã Bị Xóa (Live Tab GID Whitelisting)**: Danh mục `SHEET_CONNECTORS` của Auditor BẮT BUỘC phải trỏ đúng GID tab dữ liệu thật đang hoạt động (ví dụ: `Search Site Clear` GID `610944071`, `Read Group` GID `870080250`). TUYỆT ĐỐI CẤM giữ GID cũ đã bị xóa/đổi tên (như GID `582589665`), khiến Google Sheets trả về trang Dashboard lỗi dẫn đến báo động `#REF!` giả!
+> 4. **Chỉ Quét Lỗi Công Thức Trong Vùng Dữ Liệu Hoạt Động ($\le 30$ Cột)**: Khi kiểm tra lỗi công thức (`#REF!`, `#VALUE!`, `#DIV/0!`), Auditor BẮT BUỘC phải phân tích CSV và CHỈ quét trong phạm vi các cột dữ liệu hoạt động thực tế ($\le 30$ cột đầu). TUYỆT ĐỐI CẤM quét toàn văn chuỗi CSV dính vào các ô nháp bỏ hoang tận cột 116..138 ở góc xa của bảng tính!
+
+---
+
+# 🏷️ STRICT COLLECTOR AUDIT TRAIL RULE: BẮT BUỘC LUÔN CÓ MÃ REF, NGÀY (DATE) VÀ GIỜ (TIME) GỬI LÊN TELEGRAM (MANDATORY REF, DATE & TIME AUDIT TRAIL POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG CHO MỌI PHÂN HỆ THU THẬP (COLLECTOR)**:
+> 1. **Bắt Buộc Đủ 3 Trường Nhận Diện (Mandatory 3 Audit Fields)**: Mọi bảng tính thu thập dữ liệu tự động từ Telegram (Refuel, Cable, Solution Clear, Rescue Site Down Long Time, Inventory, Attendance, Survey, v.v.) BẮT BUỘC phải luôn ghi nhận đầy đủ 3 trường tối thiểu:
+>    - **Mã REF Duy Nhất (REF Code)**: Mã định danh bản ghi (ví dụ: `#RSC_yyMMdd_xxxx`, `#REF_xxxx`, `#SOL_xxxx`) để phân biệt độc nhất, truy vết và đính kèm hình ảnh/ghi chú tiếp theo.
+>    - **Ngày Gửi Lên Telegram (Telegram Date)**: Định dạng chuẩn `DD/MM/YYYY` lấy trực tiếp từ `message.date` của Telegram (quy đổi sang Myanmar Time UTC+6:30).
+>    - **Giờ Gửi Lên Telegram (Telegram Time)**: Định dạng chuẩn `HH:mm:ss` (hoặc `HH:mm`) lấy trực tiếp từ `message.date` của Telegram.
+> 2. **Tách Rõ Ràng Hoặc Định Dạng Chuẩn Trên Sheet (Dedicated Columns)**: BẮT BUỘC tách thành 2 cột riêng biệt (`Telegram Date` và `Telegram Time`) hoặc ghi rõ chuỗi đầy đủ `dd/MM/yyyy HH:mm:ss` ở các cột đầu tiên của bảng tính để người quản lý dễ dàng lọc, sắp xếp, đối chiếu và thống kê dữ liệu.
+> 3. **Phản Hồi Telegram Bắt Buộc Kèm REF và Thời Gian**: Tin nhắn phản hồi tự động cho người gửi (tối đa 2 dòng chuẩn) BẮT BUỘC phải hiển thị rõ mã `#[Mã REF]` và thời điểm gửi `🗓️ [DD/MM/YYYY HH:MM]` để nhân viên có căn cứ đối chiếu ngay trong nhóm chat.
+
+---
+
+# 🛡️ POST-MORTEM RULES — 07/09/2026: GAS SHEET DATE/TIME OBJECT + UPSERT ROW OFFSET (BẮT BUỘC ÁP DỤNG MỌI PHIÊN AI SAU)
+
+> ⚠️ **3 QUY TẮC PHÒNG NGỪA BẮT BUỘC — ĐÚC TỪ BUG THỰC TẾ (REPORT 6 — READ GROUP SHEET)**:
+>
+> ### 🔴 RULE PM-1: GAS `getValues()` TRẢ VỀ DATE OBJECT — TUYỆT ĐỐI CẤM DÙNG `.toString()` TRỰC TIẾP
+> - **Lỗi gốc (07/09/2026)**: `handleLogReadGroup()` và `handleGetReadGroupToday()` dùng `(row[0] || "").toString().trim()` để đọc cột ngày từ Sheet. GAS `getValues()` trả về **JavaScript `Date` object**, không phải string. Kết quả: `row[0].toString()` ra `"Mon Sep 07 2026 00:00:00 GMT+0630..."` → không bao giờ khớp `"07/09/2026"` → UPSERT map luôn miss (INSERT trùng lặp mỗi lần chạy), GET filter bỏ qua tất cả rows → Report 6 báo **Read: 0** dù sheet đầy dữ liệu.
+> - **Fix bắt buộc**: Dùng helper `fmtDate_(val)` — kiểm tra `instanceof Date` trước, sau đó mới `Utilities.formatDate(val, TZ, "dd/MM/yyyy")`. TUYỆT ĐỐI CẤM `.toString()` trực tiếp trên giá trị từ `getValues()` khi cột đó có thể chứa Date.
+> - **Áp dụng cho**: Mọi cột ngày (`dd/MM/yyyy`) trong tất cả GAS functions đọc sheet: `handleLogReadGroup`, `handleGetReadGroupToday`, bất kỳ hàm mới nào đọc cột date từ sheet.
+>
+> ### 🟡 RULE PM-2: GOOGLE SHEETS AUTO-CONVERT STRING TIME → TIME OBJECT — BẮT BUỘC `'` PREFIX KHI GHI, `instanceof Date` KHI ĐỌC
+> - **Lỗi gốc (07/09/2026)**: GAS ghi `"16:36"` (string) vào cột thời gian. Sheets tự nhận diện chuỗi giống giờ và convert thành Time object nội bộ. Khi GAS đọc lại, nhận về Date epoch 1899: `"Sat Dec 30 1899 16:36:00 GMT+0624"` → Telegram nhận chuỗi lỗi này nguyên vẹn.
+> - **Fix WRITE bắt buộc**: Thêm tiền tố `'` khi ghi vào sheet để force plain-text: `"'" + timeString`. TUYỆT ĐỐI CẤM ghi chuỗi `"HH:mm"` thuần vào cột time vì Sheets sẽ auto-convert.
+> - **Fix READ bắt buộc**: Kiểm tra `instanceof Date` → `Utilities.formatDate(rawTime, TZ, "HH:mm")`. Nếu là string → `.replace(/^'/, "")` để strip prefix.
+> - **Áp dụng cho**: Mọi cột time (`HH:mm`, `HH:mm:ss`), cột trend (`1/0/0`), bất kỳ cột nào có dạng số/giờ cần giữ nguyên string trong tất cả GAS collector functions.
+>
+> ### 🔴 RULE PM-3: GAS UPSERT — `insertRowsBefore` ĐẨY ROW INDEX — BẮT BUỘC INSERT TRƯỚC, UPDATE SAU VỚI OFFSET
+> - **Lỗi gốc (07/09/2026)**: Code cũ UPDATE existing rows TRƯỚC rồi INSERT new rows. Sau `insertRowsBefore(2, N)`, existing rows bị đẩy xuống N dòng nhưng map `keyToSheetRow` vẫn trỏ row số cũ → UPDATE ghi đè sai dòng, corrupt dữ liệu.
+> - **Fix bắt buộc**: Tách 2 danh sách `insertRows[]` và `updateOps[]`. **INSERT trước toàn bộ**, **UPDATE sau với `correctedRow = sheetRow + insertRows.length`**. TUYỆT ĐỐI CẤM UPDATE row index cũ sau khi đã gọi `insertRowsBefore`.
+> - **Áp dụng cho**: Mọi hàm GAS UPSERT dùng `insertRowsBefore()` để chèn dữ liệu mới lên đầu sheet (Read Group, Cable, Refuel, MDG, Attendance v.v.).
+
+---
+
+# POST-MORTEM RULES — 07/09/2026: TELEGRAM LINE-TOO-LONG → TIMESTAMP OVERLAP (TOA 12 / GHẾ ASSET-4D)
+
+> ### Nguồn gốc: **Toa 12 — Ghế Asset-4d** (`cron_send.py` → `build_team_asset_msg()`)
+> - **Toa 12** (`train_5min.yml`): Chạy **05:51 và 15:51 MMT**, gửi Report 4 (EOD Task & Stats + Asset 4d + Note). Lệnh: `python cron_send.py` hoặc `python cron_send.py --asset_only`.
+> - **Ghế Asset-4d**: Hàm `build_team_asset_msg()` trong `cron_send.py` — gửi báo cáo '4d. Asset progress for material – TeamX' tới từng nhóm team riêng (T1/T2/T3/T4 PLAN-ALARM groups).
+> - **Phát hiện**: 08/09/2026 — sau 3 giờ điều tra, 4 lần chạy workflow vẫn không thấy `All:` trên Telegram.
+
+> ### RULE PM-4: TELEGRAM DÒNG THỐNG KÊ — CẤM ĐỂ `All:/Total:` CUỐI DÒNG QUÁ DÀI (>45 KÝ TỰ), BẮT BUỘC XUỐNG DÒNG RIÊNG
+
+> - **Root Cause chính xác**: `build_team_asset_msg()` nối `All: X /Y` vào CUỐI chuỗi stats ~65 ký tự trên cùng 1 dòng. Telegram **wrap** dòng dài đó xuống dòng mới. Phần `All: 14/3` bị đẩy xuống dòng cuối bubble và **trùng vị trí với timestamp** (ví dụ `21:41` ở bottom-right) → người dùng không thấy `All:` dù code đã đúng 100%. Lỗi không phải code, không phải GHA cache, không phải GAS — mà là **Telegram UI line-wrap + timestamp overlap**.
+> - **Rule bắt buộc**: Khi viết hàm sinh báo cáo Telegram có dòng tóm tắt thống kê dài >45 ký tự, BẮT BUỘC tách các field quan trọng (`All:`, `Total:`, `Grand:`) ra **DÒNG RIÊNG** bằng `\n`. TUYỆT ĐỐI CẤM nối chúng vào cuối dòng stats dài.
+> - **Pattern chuẩn (dùng cho mọi toa/ghế)**:
+>   - SAI — `All:` bị timestamp che: `lines.append(f'   3Day: {d2}  7Day: {d6}  Month: {d15}  All: {total}/{done}')`
+>   - ĐÚNG — `All:` trên dòng riêng: `lines.append(f'   3Day:...Month:')` rồi `lines.append(f'   All: {total} /{done}')`
+> - **Đã fix**: **Toa 12 / Ghế Asset-4d** — `build_team_asset_msg()` trong `cron_send.py` — commit `b60e556` ✅
+> - **Cần kiểm tra các toa còn lại**:
+>   - **Toa 1+11 / Ghế Report-1,2,3**: `build_search_summary()`, `build_team_report()` trong `backlog_send.py`
+>   - **Toa 9 / Ghế Refuel**: `refuel_plan_report.py` — dòng tóm tắt tổng hợp
+>   - **Toa 5 / Ghế Plan-5C**: `daily_plan_report.py` — dòng summary cuối
+>   - **Toa 6.1 / Ghế Site-Clear**: `site_clear_report.py` — dòng count
+>   - **Toa 12 / Ghế Asset-4d CONTROL SITE**: `build_asset_msg()` — dòng grand total
+> - **Kiểm tra phòng ngừa bắt buộc**: Trước deploy bất kỳ hàm báo cáo nào, đếm ký tự dòng cuối. Nếu >45 ký tự → BẮT BUỘC tách ra dòng riêng.
+
+
+---
+
+# POST-MORTEM RULES — 07/09/2026: TELEGRAM LINE-TOO-LONG → TIMESTAMP OVERLAP (TOA 12 / GHẾ ASSET-4D)
+
+> ### Nguồn gốc: **Toa 12 — Ghế Asset-4d** (`cron_send.py` → `build_team_asset_msg()`)
+> - **Toa 12** (`train_5min.yml`): Chạy **05:51 và 15:51 MMT**, gửi Report 4 (EOD Task & Stats + Asset 4d + Note). Lệnh: `python cron_send.py` hoặc `python cron_send.py --asset_only`.
+> - **Ghế Asset-4d**: Hàm `build_team_asset_msg()` trong `cron_send.py` — gửi báo cáo '4d. Asset progress for material – TeamX' tới từng nhóm team riêng (T1/T2/T3/T4 PLAN-ALARM groups).
+> - **Phát hiện**: 08/09/2026 — sau 3 giờ điều tra, 4 lần chạy workflow vẫn không thấy `All:` trên Telegram.
+
+> ### RULE PM-4: TELEGRAM DÒNG THỐNG KÊ — CẤM ĐỂ `All:/Total:` CUỐI DÒNG QUÁ DÀI (>45 KÝ TỰ), BẮT BUỘC XUỐNG DÒNG RIÊNG
+
+> - **Root Cause chính xác**: `build_team_asset_msg()` nối `All: X /Y` vào CUỐI chuỗi stats ~65 ký tự trên cùng 1 dòng. Telegram **wrap** dòng dài đó xuống dòng mới. Phần `All: 14/3` bị đẩy xuống dòng cuối bubble và **trùng vị trí với timestamp** (ví dụ `21:41` ở bottom-right) → người dùng không thấy `All:` dù code đã đúng 100%. Lỗi không phải code, không phải GHA cache, không phải GAS — mà là **Telegram UI line-wrap + timestamp overlap**.
+> - **Rule bắt buộc**: Khi viết hàm sinh báo cáo Telegram có dòng tóm tắt thống kê dài >45 ký tự, BẮT BUỘC tách các field quan trọng (`All:`, `Total:`, `Grand:`) ra **DÒNG RIÊNG** bằng `\n`. TUYỆT ĐỐI CẤM nối chúng vào cuối dòng stats dài.
+> - **Pattern chuẩn (dùng cho mọi toa/ghế)**:
+>   - SAI — `All:` bị timestamp che: `lines.append(f'   3Day: {d2}  7Day: {d6}  Month: {d15}  All: {total}/{done}')`
+>   - ĐÚNG — `All:` trên dòng riêng: `lines.append(f'   3Day:...Month:')` rồi `lines.append(f'   All: {total} /{done}')`
+> - **Đã fix**: **Toa 12 / Ghế Asset-4d** — `build_team_asset_msg()` trong `cron_send.py` — commit `b60e556` ✅
+> - **Cần kiểm tra các toa còn lại**:
+>   - **Toa 1+11 / Ghế Report-1,2,3**: `build_search_summary()`, `build_team_report()` trong `backlog_send.py`
+>   - **Toa 9 / Ghế Refuel**: `refuel_plan_report.py` — dòng tóm tắt tổng hợp
+>   - **Toa 5 / Ghế Plan-5C**: `daily_plan_report.py` — dòng summary cuối
+>   - **Toa 6.1 / Ghế Site-Clear**: `site_clear_report.py` — dòng count
+>   - **Toa 12 / Ghế Asset-4d CONTROL SITE**: `build_asset_msg()` — dòng grand total
+> - **Kiểm tra phòng ngừa bắt buộc**: Trước deploy bất kỳ hàm báo cáo nào, đếm ký tự dòng cuối. Nếu >45 ký tự → BẮT BUỘC tách ra dòng riêng.
+
+
+---
+
+# POST-MORTEM RULES — 08/09/2026: THIEU DONG BO 2 REPO + SAI TEN WORKFLOW OPTION (PM-5)
+
+> ### Nguon goc: **Toa 12 / Ghe Asset-4d** — sua cron_send.py chi trong tni-bot, khong sync sang tni-search
+> - **Root Cause**: Fix `b60e556` chi push vao `phonghdpxd-cmd/tni-bot`. Nhung `MON6879/TNI-DONE` (tni-search) cung co `train_5min.yml` va `cron_send.py` rieng — GHA co the chay tu repo nao anh trigger. Do do tni-search chay code cu khong co `All:`.
+> - **Root Cause 2**: AI huong dan "chon Report 3.1 trong workflow" — nhung ten dung trong dropdown la **"Report 4d - Asset progress"** (da doi ten). Sai ten khien anh khong tim thay va chay nham option.
+
+> ### RULE PM-5: SAU MOI SUA CODE BAT CU FILE NAO — BAT BUOC DONG BO CA 2 REPO VA KIEM TRA DUNG TEN WORKFLOW
+
+> **A — BAT BUOC DONG BO CA 2 REPO TRUOC KHI BAO 'DA XONG' (MANDATORY DUAL-REPO SYNC)**
+> - Khi sua bat ky file nao trong `Task and WO/` (tni-bot), BAT BUOC phai:
+>   1. Push `tni-bot` (`phonghdpxd-cmd/tni-bot`) truoc
+>   2. Copy file da sua sang `tni-search/` (`MON6879/TNI-DONE`) ngay lap tuc
+>   3. Push `tni-search` ngay sau do
+>   4. CHI BAO "DA LUU DI" khi CA 2 commit deu thanh cong
+> - TUYET DOI CAM chi push 1 repo roi bao "da xong" — vi ca 2 repo deu co `train_5min.yml` va GHA co the chay tu repo nao.
+> - **Files phai dong bo ca 2 repo (bat buoc)**:
+>   - `cron_send.py` — Toa 12 / Ghe Report-4 + Asset-4d
+>   - `backlog_send.py` — Toa 1+11 / Ghe Report-1,2,3
+>   - `manual_send_ui.py` — Ghe Manual Send
+>   - `api/search_bot.py` — Ghe Search Bot
+>   - `api/solution_clear.py` — Ghe Site-Clear
+
+> **B — BAT BUOC KIEM TRA VA NOI DUNG TEN CHINH XAC TRONG WORKFLOW DROPDOWN (ZERO WRONG OPTION NAME)**
+> - Truoc khi huong dan anh "Run workflow", AI BAT BUOC phai doc file `.github/workflows/train_5min.yml` de lay chinh xac TEN OPTION trong `inputs.report_type` (vi ten co the thay doi qua cac phien).
+> - TUYET DOI CAM tu y doan ten option theo ky niem cu (vi du "Report 3.1") neu chua doc lai file yml.
+> - **Hien tai cac ten option dung** (doc tu train_5min.yml):
+>   - Asset report 4d: Doc lai trong yml truoc khi bao
+>   - Full pipeline: Doc lai trong yml truoc khi bao
+
+> **C — GHE GIAM SAT DONG BO (SYNC WATCHDOG SEAT)**
+> - Sau moi lan "Lu Di", AI BAT BUOC kiem tra: `git diff HEAD origin/main -- <file>` tren CA 2 repo.
+> - Neu diff != 0 o bat ky repo nao -> BAT BUOC push ngay, CẤM bao "da xong".
+
+---
+
+# 📅 POST-MORTEM RULE — 08/09/2026: REPORT 5.1 TARGET DATE ANCHOR POLICY (TOA 5 / GHẾ PLAN-5.1)
+
+> ### Nguồn gốc: **Toa 5 — Ghế Daily Plan 5.1** (`daily_plan_report.py` → `run_morning()`)
+> - **Lỗi thực tế (08/09/2026)**: Khi Report 5.1 chạy lúc 15:26 (ca chiều), đoạn code `if now.hour >= 14: target_date = now + timedelta(days=1)` tự động đẩy ngày báo cáo sang ngày mai (`09/09/2026`). Dẫn đến: Tiêu đề in `5.1 Report — Plan (09/09/2026)`, ngày gửi in `📅 09/09/2026 | 🕐 15:28` (dù thực tế đang là ngày 08/09), danh sách nộp plan báo toàn bộ các đội `Not yet submitted (Deadline: before 07:00 on 10/09/2026)`, và thống kê 3Day bị đảo lộn.
+> - **Nguyên nhân gốc (Root Cause)**: Code giả định sau 14:00 thì chuyển sang làm plan ngày mai, nhưng Report 5.1 thực tế là báo cáo giám sát tình hình nộp và thực thi Plan trong suốt ngày làm việc **hôm nay** (chạy các mốc 06:06, 08:28, 09:56, 15:26, 22:06).
+>
+> ### 🔴 RULE PM-6: REPORT 5.1 LUÔN NEO CHẶT VÀO NGÀY HÔM NAY (TODAY) — CẤM TỰ Ý NHẢY NGÀY
+> 1. **Target Date Luôn Là Ngày Hôm Nay**: Trong `run_morning()`, `target_date = now` và `date_str = now.strftime("%d/%m/%Y")`. **TUYỆT ĐỐI CẤM** dùng logic `now.hour >= 14: target_date = now + 1` làm trôi ngày của Report 5.1.
+> 2. **Deadline Luôn Theo Đúng Ngày Làm Việc**: Hạn nộp Plan cho ngày `date_str` là `before 07:00 on {date_str}`. **TUYỆT ĐỐI CẤM** cộng thêm 1 ngày (`next_day_str`) vào deadline của ngày làm việc đó.
+> 3. **Đồng Bộ Sang Runner Repo**: Bất kỳ sửa đổi nào trên `daily_plan_report.py` BẮT BUỘC phải đồng bộ cả sang `Task and WO` (tni-bot) và `tni-sitedown` (runner GHA) trước khi báo hoàn tất.
+
+---
+
+# 🤖 POST-MORTEM RULE — 08/09/2026: UNIFIED BOT MENU & RESPONSE ARCHITECTURE (GHẾ BOT-1C + SEARCH-3D)
+
+> ### Nguồn gốc: **Ghế Bot-1C (Solution Clear)** + **Ghế Search-3D (Task & WO)**
+> - **Yêu cầu (08/09/2026)**: Sắp xếp lại toàn bộ menu Telegram khi gõ `/` theo đúng thứ tự chuẩn 1..6: (1) `Plan T{x} Template`, (2) `Plan T{x} S1 Template`, (3) `Daily result template`, (4) `Solution [FT]`, (5) `List Long time T{x}`, (6) `Template Site down long time`. Xóa bỏ hoàn toàn lệnh `/refresh` (đã có Toa 6.1 Site Clear Today chạy tự động hàng ngày). Bot 3D bỏ trả lời Plan và Daily (nhường cho Bot 1C), sưởi ấm 1C bằng thời gian keepalive của 3D để phản hồi nhanh tức thì.
+>
+> ### 🔴 RULE PM-7: GỘP MENU TELEGRAM TẬP TRUNG & SƯỞI ẤM PHẢN HỒI TỨC THÌ (ZERO BOT CONFLICT)
+> 1. **Một Bot Duy Nhất Quản Lý Menu Nhóm Chat**: Để menu khi gõ `/` hiển thị đúng thứ tự 1..6, BẮT BUỘC toàn bộ 6 loại lệnh phải được đăng ký bởi Bot 1C (`TNICLEARSITEBOT`). Bot 3D (`SEARCHTNITASKWOBOT`) BẮT BUỘC phải xóa scope chat trong các nhóm team (`deleteMyCommands`) để không đè menu hay trả lời trùng lặp.
+> 2. **Bot 3D Bỏ Hẳn Plan và Daily Result — Chuyển Giao Trọn Vẹn Sang Bot 1C**: Bot 3D bỏ hoàn toàn việc trả lời lệnh `/plan`, `/daily` VÀ bỏ hẳn cơ chế thu thập Plan / Daily Result trong group để tránh phản hồi trùng lặp. Bot 1C là bot duy nhất gửi template và thu thập đồng bộ.
+> 3. **Sưởi Ấm (Keepalive) Toa 0 Cho Cả 1C**: Để Bot 1C phản hồi nhanh như 3D (dưới 1 giây, tránh cold start của Apps Script và Vercel Serverless), BẮT BUỘC phải ping cả Vercel Proxy `api/solution_clear` và Web App GAS của 1C trong Toa 0 Keepalive (`train_5min.yml`) mỗi 5 phút một lần.
+
+---
+
+# 📸 POST-MORTEM RULE — 08/09/2026: DAILY RESULT 10-MIN PHOTO WINDOW & SINGLE FOLDER LINK POLICY (GHẾ DAILY-REPORT-COLLECTOR)
+
+> ### Nguồn gốc: **Ghế Daily Report Collector** (`daily_report_collector.gs` @407 / `search_bot.py`)
+> - **Vấn đề thực tế (08/09/2026)**: Khi nhân viên nộp Daily Result, hệ thống lưu ảnh bằng cách dàn trải link ảnh lẻ vào từng cột (Col S `Photo 1` -> Col X `Photo 6`) và không có giới hạn thời gian nhận ảnh (không có window expiry). Điều này dẫn tới 3 hạn chế nghiêm trọng: (1) Quản lý muốn tải ảnh về phải click từng link ảnh lẻ 6 lần rất mất thời gian; (2) Ảnh gửi sau nhiều giờ hoặc nhiều ngày vẫn vô tình bị gắn vào dòng cũ do không đóng phiên; (3) Khi nhân viên nộp lần 2 thì ảnh không phân định được thuộc lần 1 hay lần 2.
+> - **Nguyên nhân gốc (Root Cause)**: Hàm `handleDailyPhoto` tìm 50 dòng gần nhất khớp `tgId` rồi ghi link file Drive riêng lẻ vào cột ảnh trống đầu tiên, không có cơ chế timeout theo phiên gửi text, không gom vào thư mục con của lần submit.
+>
+> ### 🔴 RULE PM-8: THU THẬP HÌNH ẢNH DAILY RESULT VÀO 1 FOLDER DRIVE RIÊNG VÀ KHÓA CỬA SỔ 10 PHÚT THEO ID
+> 1. **Cửa Sổ Nhận Ảnh Khóa Cứng 10 Phút Theo ID**: Sau khi nhân viên (Telegram ID) gửi text Daily Result, hệ thống mở cửa sổ nhận ảnh đúng **10 phút** (`DAILY_WIN_EXPIRY_{tgId}`). Quá 10 phút BẮT BUỘC từ chối nhận ảnh cho ID đó (`📷 ❌ Photo window expired (>10 mins after text)`).
+> 2. **Gom Toàn Bộ Ảnh Vào 1 Thư Mục Drive Duy Nhất**: Tất cả ảnh gửi trong 10 phút được lưu vào 1 thư mục Google Drive riêng của lần báo cáo đó (`1 VCM BRANCH TNI / 2.5 Daily report and Businesstrip Telegram / [tgId] / [YYYYMMDD_HHmm]_REF[ref]`).
+> 3. **Ghi 1 Link Thư Mục Duy Nhất Vào Cột S**: Trên Google Sheet tab `Daily report and Bussiness`, Cột S (`Photo Folder`) CHỈ ghi 1 link duy nhất dẫn đến thư mục Drive để quản lý bấm "Download all" 1 lần. TUYỆT ĐỐI KHÔNG dàn trải link lẻ sang 6 cột Photo 1-6.
+> 4. **Hỗ Trợ Nộp Lần 2 (Reset Window & Thư Mục Mới)**: Nếu cùng 1 ID gửi text Daily Result lần 2, hệ thống tự động reset cửa sổ 10 phút mới cho lần 2 và tạo thư mục Drive riêng biệt mới cho REF lần 2.
+
+---
+
+# 🔒 POST-MORTEM RULE — 08/09/2026: ĐỘC QUYỀN BOT 1C CHO PLAN & DAILY RESULT (ZERO 3D DUPLICATION & STRICT ARITY INTEGRITY) (PM-9)
+
+> ### Nguồn gốc: **Ghế Bot-1C (Solution Clear @48)** + **Ghế Search-3D (Task & WO v4.3)**
+> - **Yêu cầu thực tế (08/09/2026)**: "Bỏ hẳn 3D Plan và Daily result đi không chỉ có 1C thôi và đồng bộ thu thập chưa?"
+> - **Nguyên nhân gốc (Root Cause)**: 
+>   1. Khi nhân viên nộp bài Plan hoặc Daily Result vào nhóm, Bot 3D (`search_bot.py`) vẫn chạy khối `is_daily_plan` và `is_daily`, gọi Main GAS và gửi thêm 1 tin nhắn xác nhận ra nhóm, dẫn đến 2 Bot (1C và 3D) cùng thu thập và spam 2 tin phản hồi trùng lặp.
+>   2. Hàm `syncDailyResultToMainGas_` trong Bot 1C khai báo 5 tham số (`text, senderId, senderName, chatId, msgDate`) nhưng tại `doPost` chỉ gọi với 4 đối số (`rawText, senderName, chatId, message.date`), làm lệch toàn bộ vị trí tham số (`chatId` nhận giá trị timestamp `message.date`), khiến Telegram API trả về lỗi 400 Bad Request và không gửi được tin xác nhận ra nhóm.
+>   3. Bot 1C có dòng `rawText.replace(/@\w+/g, "")` dẫn đến việc xử lý nhầm các lệnh có tag bot khác (ví dụ `/daily_result@SEARCHTNITASKWOBOT`).
+>
+> ### 🔴 RULE PM-9: PHÂN ĐỊNH ĐỘC QUYỀN BOT XỬ LÝ NHIỆM VỤ & KHÓA CHẶT THAM SỐ GỌI HÀM VÀ BOT TAG TARGETING
+> 1. **Độc Quyền 1 Bot Duy Nhất Đảm Nhiệm (Single Dedicated Bot Ownership)**: Kể từ 08/09/2026, **CHỈ CÓ DUY NHẤT Bot 1C (`TNICLEARSITEBOT`)** đảm nhiệm toàn bộ quy trình Plan và Daily Result (bao gồm: gửi template, thu thập dữ liệu vào Sheet SSOT, gửi xác nhận REF, và nhận ảnh trong cửa sổ 10 phút). Bot 3D (`SEARCHTNITASKWOBOT`) **BỎ HẲN 100%**: không đăng ký lệnh menu, không phản hồi lệnh template, không thu thập và không gửi bất kỳ tin nhắn nào liên quan đến Plan / Daily Result ra nhóm.
+> 2. **Khóa Chặt Số Lượng Tham Số Gọi Hàm (Strict Function Arity Integrity)**: Khi gọi hàm sync webhook nội bộ trong GAS (như `syncDailyResultToMainGas_`), BẮT BUỘC phải đối chiếu 100% thứ tự và số lượng tham số khai báo (`text, senderId, senderName, chatId, msgDate`). TUYỆT ĐỐI CẤM thiếu tham số (đặc biệt là `senderId`), tránh làm trôi biến khiến `chatId` nhận nhầm giá trị timestamp dẫn đến Telegram API trả về lỗi 400.
+> 3. **Bỏ Qua Lệnh Tag Hướng Tới Bot Khác (Strict Bot Tag Guard)**: Khi Bot nhận lệnh có định dạng `/<cmd>@<bot_username>`, nếu `<bot_username>` không khớp chính xác với username của Bot (ví dụ `@TNICLEARSITEBOT`), Bot BẮT BUỘC phải bỏ qua (ignore) ngay lập tức, TUYỆT ĐỐI KHÔNG strip bỏ `@...` rồi tự tiện xử lý câu lệnh của bot khác.
+
+---
+
+# 🚨 POST-MORTEM RULE — 08/09/2026: CHỐNG XUNG ĐỘT PHIÊN TELETHON TRÊN GITHUB ACTIONS & BỌC THÉP SOLE RUNNER CHO SITE DOWN (RULE PM-10)
+
+> ### Nguồn gốc: **Phân hệ Site Down Relay** (otlookup_relay.py / otlookup_relay.yml / GitHub Secrets)
+> - **Vấn đề thực tế (08/09/2026)**: Phân hệ Site Down bị đứng từ mốc 19:38 MMT. Toàn bộ các lần chạy sau đó (19:49, 20:08, 20:38, 21:08 MMT) đều bị fail ở giây thứ 13-16 của bước Run Site Down Relay, khiến Google Sheet Site Down không cập nhật dữ liệu mới và tin báo cáo ETA phải dừng lại.
+> - **Nguyên nhân gốc (Root Cause)**: 
+>   1. Xung đột phiên Telethon MTProto RPC 406 (AuthKeyDuplicatedError): Hai runner GitHub Actions ở 2 repository khác nhau (MON6879/tni-sitedown-relay và MON6879/TNI-DONE) đều cấu hình chạy workflow otlookup_relay.yml với cùng một TELEGRAM_SESSION. Khi 2 runner ở 2 IP khác nhau của datacenter GitHub Actions kết nối vào Telegram, máy chủ Telegram lập tức kích hoạt cơ chế bảo mật khóa phiên vì phát hiện session key bị sử dụng đồng thời ở hai địa chỉ IP khác nhau.
+>   2. Secret TELEGRAM_SESSION trong GitHub Secrets bị lỗi thời sau đợt khóa session, không đồng bộ với session string hợp lệ trong môi trường local.
+>
+> ### 🔴 RULE PM-10: DUY NHẤT 1 RUNNER ĐỘC QUYỀN CHO TELETHON & ĐỒNG BỘ CHUẨN GITHUB SECRETS (STRICT SINGLE RUNNER TELETHON POLICY)
+> 1. **Một Runner Duy Nhất Cho Tác Vụ Telethon (Sole Runner Only)**: TUYỆT ĐỐI CẤM cấu hình hoặc kích hoạt cùng một workflow Telethon (otlookup_relay.yml, daily_read_report.py, v.v.) trên nhiều hơn một repository. Repo MON6879/tni-sitedown-relay là **RUNNER ĐỘC QUYỀN DUY NHẤT** chạy otlookup_relay.py. Toàn bộ các repo khác (MON6879/TNI-DONE, phonghdpxd-cmd/tni-bot) BẮT BUỘC phải disable hoặc xóa bỏ workflow này để ngăn ngừa triệt để lỗi AuthKeyDuplicatedError.
+> 2. **Kiểm Soát Concurrency & Giữ Khoảng Cách Nhịp An Toàn**: Workflow sử dụng Telethon BẮT BUỘC phải đặt concurrency: group: ... với cancel-in-progress: false và đảm bảo các nhịp chạy (cron schedule) cách nhau tối thiểu 20-30 phút, tuyệt đối không để runner sau khởi động khi runner trước chưa giải phóng kết nối Telegram.
+> 3. **Tự Động Cập Nhật Secrets Khi Đổi Session**: Khi cập nhật session Telethon mới (get_session.py), BẮT BUỘC phải cập nhật đồng bộ trọn bộ 3 biến (TELEGRAM_SESSION, TELEGRAM_API_ID, TELEGRAM_API_HASH) vào GitHub Secrets của repo runner và kiểm tra bằng một lệnh dispatch live ngay lập tức để xác nhận HTTP 200 / Status Success trước khi bàn giao.
+
+---
+
+# 🤖 POST-MORTEM RULE — 09/09/2026: PHỤC HỒI ĐỘC QUYỀN BOT 3D CHO PLAN VÀ DAILY RESULT (ZERO BOT 1C LEAKAGE & STRICT 3D OWNERSHIP) (RULE PM-11)
+
+> ### Nguồn gốc: **Ghế Search-3D (Task & WO v4.3)** + **Ghế Bot-1C (Solution Clear @50)**
+> - **Yêu cầu thực tế (09/09/2026)**: "Đọc lại lịch sử hôm qua đã chuyển ra sao và sửa lại như cũ chỉ có 3D hiện Plan và daily report trong group Team"
+> - **Lịch sử & Bối cảnh**: 
+>   Hôm qua (08/09/2026), hệ thống đã thử chuyển Plan và Daily Result sang Bot 1C (TNICLEARSITEBOT) để gom chung menu 1..6 (RULE PM-7 & PM-9). Tuy nhiên, việc vận hành thực tế chứng minh Bot 3D (SEARCHTNITASKWOBOT) xử lý Plan và Daily ổn định hơn, nhanh hơn (Vercel Serverless + in-memory cache), và kết nối trực tiếp với Main Hub GAS (QLTC_GAS) để nộp ảnh vào thư mục Drive và lưu vào Sheet SSOT.
+> - **Nguyên tắc phân định mới (09/09/2026)**:
+>   1. **Bot 3D (SEARCHTNITASKWOBOT) Đảm Nhiệm Độc Quyền Plan & Daily**:
+>      - Menu trong các Group Team: Bot 3D hiển thị lệnh `plan_t{x}`, `plan_t{x}_s1`, `daily`.
+>      - Phản hồi mẫu (Template): Trả lời mẫu khi người dùng gọi `/daily`, `/daily_result`, `/plan*`.
+>      - Thu thập dữ liệu (Collector): Thu thập Daily Plan (`store_daily_plan_to_sheet`) và Daily Result (`submit_daily`).
+>      - Thu thập hình ảnh (Photo Collector): Nhận ảnh đính kèm Daily Result trong cửa sổ 10 phút (`submit_photo`).
+>   2. **Bot 1C (TNICLEARSITEBOT) Bỏ Hoàn Toàn Plan & Daily**:
+>      - Menu Telegram của Bot 1C trong các nhóm Team: BỎ 100% các lệnh Plan và Daily. CHỈ GIỮ LẠI: Solution FT (`sol_<ft_name>`), Long time list (`long_time_t{x}`), Template long time (`template_long_time`).
+>      - Bot 1C không phản hồi lệnh template Plan/Daily, không thu thập và không nhận ảnh Daily.
+>
+> ### 🔴 RULE PM-11: PHÂN ĐỊNH RÕ RÀNG BOT 3D QUẢN LÝ TOÀN BỘ VÒNG ĐỜI PLAN & DAILY REPORT
+> 1. **Bot 3D Sở Hữu Độc Quyền Toàn Bộ Vòng Đời Plan & Daily**: Mọi tính năng liên quan đến Plan (mẫu, gửi, sửa, ghi nhận REF) và Daily Result (mẫu, gửi kết quả, ghi nhận REF, nộp ảnh trong 10 phút) BẮT BUỘC do Bot 3D (SEARCHTNITASKWOBOT) quản lý 100%.
+> 2. **Làm Sạch Menu 1C Tận Gốc Cả Trên Telegram API**: Khi chuyển đổi quyền hạn giữa các bot, BẮT BUỘC phải gọi `setMyCommands` trên Telegram Bot API để xóa sạch lệnh cũ khỏi giao diện nhóm của nhân viên, không chỉ sửa code trên GAS mà để menu cũ trôi nổi trên Telegram.
+> 3. **Đồng Bộ Bộ 3 Repository**: Code của `search_bot.py` BẮT BUỘC phải đồng bộ 100% (cùng mã MD5) trên cả 3 repository: `Task and WO`, `tni-search`, và `tni-sitedown`.
+
+---
+
+# 📊 POST-MORTEM RULE — 09/09/2026: ĐỘC LẬP BẢNG ETA TỪNG ĐỘI & LÀM MỚI BẢNG TIN NHẮC NHỞ 30 PHÚT (RULE PM-12)
+
+> ### Nguồn gốc: **Toa ETA — Ghế Share-ETA** (`search_bot.py` / `cron_send.py` / `site_down_clear_solution.gs` @52)
+> - **Lỗi thực tế (09/09/2026)**: 
+>   1. Hình 2 cho thấy tin nhắc nhở ETA không tách chính xác T1 và T1 S1 (trạm của subteam bị lẫn vào team chính, trong khi tin nhắn subteam không có các mục 1.1, 1.2, 1.3).
+>   2. Hàm `isEtaShareResponse_` và `collectEtaShare_` trên GAS map nhầm mục 1.4 thành "Battery Temp High", regex chỉ chấp nhận gạch dài `—` (gõ gạch `-` bị UNKNOWN), và chỉ bắt bullet `^•` (bỏ qua bullet `✅`, `*`, `-`).
+>   3. Hàm `get_today_eta_from_sheet()` trên Python không ghi đè dữ liệu cũ khi nhân viên nộp cập nhật ETA mới hơn trong ngày.
+>   4. Hàm `send_share_eta_reminders()` trong `cron_send.py` chặn gửi lặp nếu timestamp Site Down chưa đổi, khiến tiến độ cập nhật ETA sống của nhân viên bị dừng không gửi cập nhật mỗi 30 phút.
+> - **Nguyên nhân gốc (Root Cause)**: Code cũ đọc từ Cột C vốn chỉ có alarm breakdown của main teams, và hardcode `if not is_subteam` bỏ qua 1.1..1.3 cho subteam. Dedup check dựa vào timestamp sheet nguồn thay vì bucket 30 phút.
+>
+> ### 🔴 RULE PM-12: ĐỌC ĐÚNG BẢNG PHÂN TÁCH ĐỘC LẬP BP..BW & LÀM MỚI NHẮC NHỞ 30 PHÚT THEO BUCKET
+> 1. **Đọc Đúng Bảng Phân Tách Từng Cột Riêng (Columns BP..BW)**: Mọi logic tạo template và reminder ETA BẮT BUỘC đọc từ bảng phân tách cột riêng cho từng Team và Subteam (`T1`, `T1 S1`, `T2`, `T2 S1`, `T3`, `T3 S1`, `T4` tại columns BP..BW, rows 5..9 trên Sheet GID 0). Tuyệt đối CẤM gộp chung subteam vào main team hoặc bỏ qua các mục 1.1..1.4 của subteam!
+> 2. **Ghi Nhận Phản Hồi Linh Hoạt & Đè Mới Nhất**: Hàm thu thập ETA trên GAS (`collectEtaShare_`) BẮT BUỘC chấp nhận mọi loại dấu gạch (`[-—–]`), mọi loại bullet (`(?:•|✅|\*|-)`), và map đúng mục 1.4 thành "1.4 Site Down". Trên Python, dữ liệu nộp sau trong ngày có FT+ETA BẮT BUỘC ghi đè dữ liệu cũ hơn.
+> 3. **Làm Mới Nhắc Nhở 30 Phút Bằng Bucket**: Chốt chặn chống trùng lặp nhắc nhở ETA trong `cron_send.py` BẮT BUỘC dùng bucket 30 phút (`HH_11` và `HH_41`) để đảm bảo mỗi nhịp :11 và :41 MMT đều gửi bản cập nhật sống mới nhất kèm xóa tin cũ, TUYỆT ĐỐI KHÔNG chặn gửi chỉ vì timestamp bảng nguồn botlookup chưa thay đổi.
+
+---
+
+# 🏗️ POST-MORTEM RULE — 09/09/2026: QUY CHUẨN 10 CỘT BẢNG INPUT CONSTRUCTION (COL H TEMPLATE, COL I CONTENT + PHOTOS, COL J PO ĐIỀN TAY) (RULE PM-13)
+
+> ### Nguồn gốc: **Phân Hệ TNI Construction (Bot 10 TNI_SITE)** (`13_TNI_CONSTRUCTION.gs` / QLTC_GAS @409)
+> - **Lỗi & Bất Cập Thực Tế (09/09/2026)**:
+>   1. Layout cũ dàn trải 20 cột (Delivery, Team received material, Plan, Upgraded, Revoked material, Degraded, Solared...) khiến mỗi dòng chỉ có 1 ô dữ liệu còn 11 ô khác bị trống, khó xem và quản lý.
+>   2. Khi ảnh đến mà phiên activeCols rỗng, bot fallback mù quáng về Cột 8 (`Delivery`), khiến ảnh của mọi công việc khác (như `Upgraded`, `Solared`...) bị nhét nhầm vào cột `Delivery`.
+>   3. Cột `PO` và `Name TNI` không có ranh giới rõ ràng, thiếu chỗ điền tay mã PO độc lập.
+> - **Yêu Cầu Chuẩn Hóa Của Người Dùng**:
+>   "Cột H này lấy tương ứng khi có người cập nhật theo template và cột H giống như tiêu đề còn cột I là nội dung tất cả của người gởi và cột J là là cột Po điền tay"
+>   "Tôi đã tạo sheet mới bạn sửa lại và thu thập lại từ đầu cho sheet này: Input Construction (GID 397336359)"
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   Kiến trúc đa cột (multi-column) cố định mỗi loại template vào 1 cột riêng không phù hợp với nhu cầu tổng hợp động và dễ gây lỗi fallback sai cột khi nhận ảnh.
+>
+> ### 🔴 RULE PM-13: CẤU TRÚC 10 CỘT CHUẨN CHO SHEET INPUT CONSTRUCTION VÀ GOM TOÀN BỘ TEXT + ẢNH VÀO CỘT I
+> 1. **Cấu Trúc 10 Cột Bất Biến Của Sheet `Input Construction`**:
+>    - `Col A (1)`: `REF` (STT tự tăng bắt đầu lại từ 1).
+>    - `Col B (2)`: `ID Telegram` (Telegram User ID).
+>    - `Col C (3)`: `Tên theo telegram in group` (Tên hiển thị Telegram).
+>    - `Col D (4)`: `Date time sent group` (Thời gian gửi tin: `dd/MM/yyyy HH:mm`).
+>    - `Col E (5)`: `Date Conten` (Ngày nội dung trích xuất từ tin nhắn: `dd/MM/yyyy`).
+>    - `Col F (6)`: `Team` (Team trích xuất: `TEAM 1`, `TEAM 2`, `TEAM 3`, `TEAM 4`).
+>    - `Col G (7)`: `Name TNI` (Mã trạm TNI tự trích xuất, hỗ trợ điền tay đè nếu cần).
+>    - `Col H (8)`: `Template` (Tiêu đề loại báo cáo lấy tương ứng theo Cột A của tab `Template Cons`, vd: `Delivery`, `Upgraded`, `Plan`, `Team received material`, `Solared`...).
+>    - `Col I (9)`: `Content` (Toàn bộ nội dung văn bản của người gửi + link ảnh `📥 DOWNLOAD ALL (N Photos)` nối ở cuối ô).
+>    - `Col J (10)`: `PO` (Dành riêng cho người quản lý tự điền tay mã PO — Bot TUYỆT ĐỐI KHÔNG BAO GIỜ ghi đè lên Cột J).
+> 2. **Ảnh Chỉ Gom Vào Cột I — Tuyệt Đối Cấm Rơi Sang Cột Khác**:
+>    Mọi link Drive `📥 DOWNLOAD ALL (N Photos): [URL]` của ảnh gửi trong cửa sổ 10 phút BẮT BUỘC chỉ được nối vào cuối ô Cột I (`Content`) của dòng STT tương ứng. TUYỆT ĐỐI CẤM fallback về Cột H hoặc bất kỳ cột nào khác!
+> 3. **Tự Động Khởi Tạo Đúng 10 Cột Khi Tạo Mới**:
+>    Hàm `ensureConstructionSheetHeaders_` BẮT BUỘC thiết lập đúng 10 cột chuẩn trên tab `Input Construction` và xóa mọi cột thừa vượt quá 10 cột.
+
+---
+
+# 📊 POST-MORTEM RULE — 09/09/2026: CÔNG THỨC MẢNG TỔNG HỢP TAB GENERAL (PO, TEMPLATE, SỐ LƯỢNG HOÀN THÀNH, TEXTJOIN CỘT G) & CHỐNG LỖI DÒNG MA KHI BẢNG RỖNG (RULE PM-14)
+
+> ### Nguồn gốc: **Bảng Tổng Hợp TNI Construction (Tab General, GID 983482833)** (`13_TNI_CONSTRUCTION.gs` / QLTC_GAS @415)
+> - **Lỗi & Bất Cập Thực Tế (09/09/2026)**:
+>   1. Khi bảng `Input Construction` trống (chỉ có dòng tiêu đề), công thức mảng động bọc ngoài bằng `IFERROR(LET(... HSTACK(uPairs, counts, sites)), "")` sinh ra 1 dòng "ma" chứa giá trị rỗng và số 0 (`['', '0', '', '']`).
+>   2. **Nguyên Nhân Gốc (Root Cause)**: Trong Google Sheets, khi bọc `IFERROR` ngoài cùng một mảng tạo bởi `HSTACK`, việc bọc lỗi diễn ra trên từng ô tử riêng biệt (element-wise). Do hàm `COUNTIFS(rawPO, p, rawTmpl, t)` trả về kết quả số `0` (không phải mã lỗi), ô này không bị `IFERROR` bắt, dẫn đến mảng không rỗng hoàn toàn mà bung ra 1 hàng `['', '0', '', '']`.
+> - **Yêu Cầu Chuẩn Hóa Của Người Dùng**:
+>   "tạo cho tôi 1 file tổng hợp 1 là PO trước đến unique Cột H và đến cột số lượng hoàn thành theo cột H và textjoin(" , " các cột G trong sheet https://docs.google.com/spreadsheets/d/1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8/edit?gid=983482833#gid=983482833"
+>
+> ### 🔴 RULE PM-14: QUY CHUẨN BẢNG TỔNG HỢP TAB GENERAL VÀ TẦNG BẢO VỆ COUNTA TRƯỚC KHI GỌI FILTER/MAP
+> 1. **Cấu Trúc 4 Cột Bất Biến Của Tab `General`**:
+>    - `Col A (1)`: `PO` (Sắp xếp theo thứ tự bảng chữ cái của mã PO điền tay ở Col J của `Input Construction`).
+>    - `Col B (2)`: `Template` (Các loại template unique trích xuất từ Col H của `Input Construction` theo từng PO).
+>    - `Col C (3)`: `Số lượng hoàn thành` (Đếm số lượng báo cáo hoàn thành theo cặp `PO` + `Template` bằng `COUNTIFS`).
+>    - `Col D (4)`: `Danh sách trạm (Name TNI)` (Gộp các mã trạm TNI duy nhất hoàn thành bằng `TEXTJOIN(", ", TRUE, UNIQUE(FILTER(...)))`).
+> 2. **Chốt Chặn `COUNTA = 0` Bắt Buộc Trong Công Thức Mảng Động**:
+>    Mọi công thức mảng tổng hợp động (`LET`, `FILTER`, `HSTACK`, `MAP`) BẮT BUỘC phải kiểm tra `IF(COUNTA('Input Construction'!H2:H)=0, "", LET(...))` ngay từ đầu trước khi gọi `FILTER` và `MAP`. TUYỆT ĐỐI CẤM chỉ bọc `IFERROR(HSTACK(...))` ở ngoài cùng vì Google Sheets đánh giá lỗi theo từng phần tử (element-wise), khiến các hàm đếm như `COUNTIFS` trả về `0` (không phải error) và tạo ra dòng ma `['', '0', '', '']` khi bảng tính nguồn chưa có dữ liệu!
+
+---
+
+# 🛑 POST-MORTEM RULE — 09/09/2026: NGẮT TOÀN DIỆN TAB CŨ COLLECT DATA (GID 1235005577) & KHÓA DUY NHẤT VÀO INPUT CONSTRUCTION (GID 397336359) (RULE PM-15)
+
+> ### Nguồn gốc: **Phân Hệ TNI Construction (Bot 10 TNI_SITE)** (`13_TNI_CONSTRUCTION.gs` / QLTC_GAS @417)
+> - **Lỗi & Yêu Cầu Của Người Dùng (09/09/2026)**:
+>   "thu thập giống cơ chế sheet cũ và ngắt thu của link này luôn https://docs.google.com/spreadsheets/d/1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8/edit?gid=1235005577#gid=1235005577"
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   Tab cũ `Collect Data` (GID `1235005577`) với cấu trúc 20 cột cũ cần được bọc thép ngắt hoàn toàn khỏi luồng thu thập. Trong code còn lưu biến `SHEET_COLLECT_LEGACY: 'Collect Data'` có nguy cơ gây nhầm lẫn hoặc ghi đè nếu dev sau gọi lại.
+>
+> ### 🔴 RULE PM-15: NGẮT THU THẬP TAB COLLECT DATA VÀ GIỮ CƠ CHẾ GOM LINK ẢNH VÀO CỘT I
+> 1. **Ngắt Hoàn Toàn Thu Thập Vào Tab `Collect Data` (GID `1235005577`)**:
+>    TUYỆT ĐỐI CẤM mọi hoạt động ghi, chèn dòng hoặc thu thập mới vào tab `Collect Data`. Toàn bộ dữ liệu báo cáo mới 100% BẮT BUỘC chỉ được ghi vào tab `Input Construction` (GID `397336359`). Xóa bỏ hoàn toàn mọi biến `SHEET_COLLECT_LEGACY` khỏi mã nguồn.
+> 2. **Giữ Nguyên Cơ Chế Thu Thập Ảnh Như Sheet Cũ Vào Cột I**:
+>    Cơ chế thu thập ảnh được giữ nguyên vẹn 100% theo chuẩn của sheet cũ: Toàn bộ ảnh gửi trong vòng 10 phút được lưu vào Google Drive (`2.10 TNI PHOTO CONSTRUCTION/Report_STT_xxx`), và dòng link tải toàn bộ ảnh `📥 DOWNLOAD ALL (N Photos): [URL]` được nối vào cuối ô văn bản tại Cột I (`Content`).
+
+---
+
+# ⛽ POST-MORTEM RULE — 09/09/2026: QUY CHUẨN MẪU TEMPLATE INVENTORY FUEL, PARSER CHỐNG NHẢY DÒNG & BẢO TOÀN NGUYÊN VẸN CỘT SHEET (RULE PM-16)
+
+> ### Nguồn gốc: **Phân Hệ Thu Thập Inventory Fuel (Ghế 2B / Bot @TNIASSETorderREQUEST_BOT)** (`api/collector.py`, `apps_script_mdg.gs` / QLTC_GAS @421, Sheet `Inventory Main DG` tab GID 0 trên `1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y`)
+> - **Lỗi & Yêu Cầu Của Người Dùng (09/09/2026)**:
+>   "Inventory fuel:
+>   DG ID: TNIXXXX
+>   Fuel cm: 
+>   Fuel %: 
+>   KWH in CSU: 
+>   DG Kwh : 
+>   DG Rh: 
+>   Note: sửa lại template"
+>   "cột thu thập thì giữ nguyên"
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. Template cũ dùng các trường `Fuel level:`, `Kwh:`, `Rh:`. Người dùng đổi sang `KWH in CSU:`, `DG Kwh :`, `DG Rh:`.
+>   2. Hàm `parse_inv_fields()` cũ dùng regex `\s*:\s*(.+?)(?=\n|$)`. Do `\s` trong Python khớp cả dấu xuống dòng `\n`, nên khi một trường để trống trên cùng dòng (ví dụ `Inventory fuel:`), regex sẽ nuốt tiếp dòng sau, dẫn đến `f["inventory fuel"]` bị gán nhầm thành `"DG ID: TNI0051"`.
+>   3. Người dùng yêu cầu nghiêm ngặt *"cột thu thập thì giữ nguyên"*, nên không được thêm/bớt/đổi tên 27 cột của Sheet `Inventory Main DG`. Cần ánh xạ vị trí tương ứng: `KWH in CSU` vào Col I (`Fuel Level`), `DG Kwh` vào Col J (`KWh`), `DG Rh` vào Col K (`RH`), trong khi toàn văn báo cáo vẫn bảo toàn 100% tại Col O (`Raw Content`).
+>
+> ### 🔴 RULE PM-16: BẢO TOÀN NGUYÊN VẸN CỘT THU THẬP & REGEX PARSER CHỐNG NHẢY DÒNG
+> 1. **Bảo Toàn 100% Cột Thu Thập (Zero Sheet Schema Mutation)**:
+>    Khi người dùng yêu cầu cập nhật template nhưng chỉ thị *"cột thu thập thì giữ nguyên"*, TUYỆT ĐỐI CẤM chèn thêm cột, xóa cột hay sửa header trên Google Sheet. Các trường mới phải được ánh xạ vào đúng cột sẵn có theo thứ tự logic hoặc lưu trữ an toàn, đảm bảo không phá vỡ liên kết của các cột downstream (Confirm, Photos, Raw Content).
+> 2. **Regex Parser Tuyệt Đối Cấm Nuốt Dòng Bằng `\s*`**:
+>    Khi bóc tách key-value từ tin nhắn chat, BẮT BUỘC dùng regex neo dòng `rf"(?i)(?:^|[\r\n])[^\w\r\n]*{word_pattern}[ \t]*:[ \t]*(.*?)(?=\r?\n|$)"` thay vì `\s*:\s*`. Khoảng trắng trước/sau dấu hai chấm `:` CHỈ được dùng `[ \t]*` để không bao giờ nuốt sang dòng kế tiếp khi trường hiện tại để trống.
+> 3. **Đồng Bộ Đồng Thời 2 Nhánh Lấy Mẫu Template**:
+>    Khi sửa template trả về từ lệnh `/...`, BẮT BUỘC sửa đồng thời ở cả nhánh xử lý chuyên biệt theo nhóm (`handle_mdg`) VÀ nhánh lệnh tổng (`handle`), đảm bảo người dùng gõ lệnh ở group làm việc hay gửi tin riêng (DM) với Bot đều nhận đúng mẫu chuẩn 100%.
+---
+
+# 📊 POST-MORTEM RULE — 09/09/2026: KHÓA CỨNG DẢI Ô BẰNG `INDIRECT` CHO CÁC BẢNG TỔNG HỢP LIÊN KẾT SHEET CÓ CHÈN DÒNG ĐẦU (RULE PM-17)
+
+> ### Nguồn gốc: **Bảng Tổng Hợp TNI Construction (Tab General, GID 983482833)** (`13_TNI_CONSTRUCTION.gs` / QLTC_GAS @423, Sheet `1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8`)
+> - **Lỗi Thực Tế (09/09/2026)**:
+>   Khi bot thu thập dữ liệu chèn dòng mới vào dòng 2 của bảng nguồn (`sheet.insertRowsBefore(2, 1)`), Google Sheets tự động tịnh tiến (shift) mọi tham chiếu dải ô trong công thức của bảng tổng hợp từ `H2:H`, `J2:J`, `G2:G` thành `H3:H`, `H4:H`, `H5:H`... Điều này khiến bảng tổng hợp hoàn toàn bỏ qua các dòng mới nhất ở đầu bảng, dẫn đến `COUNTA = 0` và bảng tổng hợp bị trắng trơn!
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   Tham chiếu dải ô thông thường (kể cả dùng dấu `$` như `$H$2:$H`) vẫn bị Google Sheets tự động trượt chỉ số dòng khi có thao tác `insertRowsBefore(2)` xảy ra phía trên hoặc ngay tại dòng bắt đầu của dải ô.
+>
+> ### 🔴 RULE PM-17: BẮT BUỘC DÙNG `INDIRECT` CHO CÁC DẢI Ô TRONG CÔNG THỨC MẢNG TỔNG HỢP
+> 1. **Khóa Tuyệt Đối Dải Ô Bằng `INDIRECT` (Zero Row-Shift Guarantee)**:
+>    Khi viết công thức mảng tổng hợp (`LET`, `FILTER`, `UNIQUE`, `MAP`, `COUNTIFS`) đọc dữ liệu từ một sheet có cơ chế chèn dòng ở đầu (`insertRowsBefore(2)` hoặc `insertRowsBefore(3)`), BẮT BUỘC phải bọc tất cả các dải ô nguồn trong hàm `INDIRECT` dạng chuỗi văn bản cố định:
+>    - `INDIRECT("'Input Construction'!H2:H")`
+>    - `INDIRECT("'Input Construction'!J2:J")`
+>    - `INDIRECT("'Input Construction'!G2:G")`
+>    TUYỆT ĐỐI CẤM dùng tham chiếu dải ô trần (`'Input Construction'!H2:H`) vì sẽ bị tịnh tiến trượt dòng sau mỗi lần bot nộp báo cáo!
+> 2. **Xử Lý Điều Kiện Logic Boolean Trong `FILTER` Khi Tham Chiếu Trống**:
+>    Trong biểu thức điều kiện của `FILTER`, để so khớp chính xác cả trường hợp ô có giá trị và ô hoàn toàn rỗng/trống (`""`), BẮT BUỘC dùng biểu thức đại số boolean đồng nhất kích thước:
+>    `((p="")*((rawPO="")+(ISBLANK(rawPO))) + (p<>"")*(rawPO=p))*(rawTmpl=t)`
+>    TUYỆT ĐỐI CẤM dùng `IF(scalar, array, array)` bên trong `LAMBDA` vì sẽ làm co mảng về 1 phần tử scalar, gây lỗi lệch kích thước dải ô `#VALUE! (FILTER has mismatched range sizes)`.
+
+---
+
+# ⏱️ POST-MORTEM RULE — 10/09/2026: LIÊN KẾT TRỰC TIẾP BOT NỐI TIẾP QUA GAS WEBHOOK HANDOFF & KHÓA CHẶT CRON TRÙNG LẶP (RULE PM-18)
+
+> ### Nguồn gốc: **Phân Hệ Site Down (Bot 5T) & ETA Reminders (Bot 2D)** (`site_down_v2.gs` Version `@97`, `api/search_bot.py` v4.5, `train_5min.yml`)
+> - **Lỗi Thực Tế (10/09/2026)**:
+>   Bot 5T gửi tin danh sách trạm sập lúc 05:39. Nhân viên mong muốn đúng 30 giây sau Bot 2D gửi bản tin nhắc nhở ETA Update. Nhưng thực tế Bot 2D bị trễ tới 5 phút (đến tận 05:44 mới gửi).
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   Hai bot chạy trên 2 hệ thống lịch trình hoàn toàn tách rời: Bot 5T gửi theo sự kiện cào dữ liệu Site Down (:06 và :36 MMT), còn Bot 2D lại nằm trên lịch trình cron định kỳ `train_5min.yml` chờ đến nhịp :11 và :41 MMT mới kích hoạt cờ `share_eta`. Do GitHub Actions runner mất 3-4 phút để cấp phát và khởi động máy ảo, cron :41 bị trễ đến :44 mới chạy, tạo ra khoảng cách 5 phút bất hợp lý. Đồng thời, do Telegram API chặn bot đọc tin nhắn của bot khác trong nhóm chat, Bot 2D không thể "nghe" tin nhắn của Bot 5T trong group Telegram.
+>
+> ### 🔴 RULE PM-18: LIÊN KẾT TRỰC TIẾP BOT NỐI TIẾP QUA GAS WEBHOOK HANDOFF & XÓA CRON TRÙNG LẶP
+> 1. **Cơ Chế Handoff Trigger Chính Xác Thời Gian (Precision Delay Handoff)**:
+>    Khi Bot B là bản tin phụ thuộc/nối tiếp của Bot A (ví dụ Bot 2D gửi ETA Update nối tiếp sau Bot 5T Site Down):
+>    - BẮT BUỘC phải thực hiện liên kết trực tiếp ở tầng code: Ngay khi Bot A gửi xong (`processSiteDownColC` hoàn tất thành công) ➔ Đếm đúng thời gian chờ (`Utilities.sleep(30000)` = 30 giây) ➔ Gọi Webhook kích hoạt Bot B phát tin ngay lập tức qua Vercel Serverless (`api/search_bot?action=send_eta_reminders`).
+>    - TUYỆT ĐỐI CẤM để Bot B chạy theo lịch hẹn giờ độc lập (cron GitHub Actions) rồi hy vọng 2 tiến trình khớp giờ với nhau!
+> 2. **Dọn Dẹp Triệt Để Cron Cũ (Zero Duplicate / Ghost Triggers)**:
+>    Khi chuyển đổi một tác vụ từ cron định kỳ sang liên kết Handoff Trigger:
+>    - BẮT BUỘC phải vô hiệu hóa điều kiện kích hoạt tự động theo cron trên GitHub Actions (`train_5min.yml`: `SHARE_ETA=false`), chỉ giữ lại tùy chọn kích hoạt thủ công qua `workflow_dispatch`.
+>    - TUYỆT ĐỐI CẤM để cả 2 cơ chế (Handoff + Cron cũ) cùng chạy song song, vì sẽ gây hiện tượng gửi lặp lại 2 lần cách nhau vài phút!
+> 3. **Bảo Đảm Đúng Bot Token Nghiệp Vụ (Strict Bot Identity Ownership)**:
+>    Bản tin nhắc nhở ETA Update (`📋 TX — ETA Update`) BẮT BUỘC phải phát từ Bot 2D (`2. TNI Auto Report Daily`, `@TNIREPORTTASK_BOT`, Token ID `8897800070`). Trong code gửi tin, BẮT BUỘC ưu tiên `SEND_BOT_TOKEN`, TUYỆT ĐỐI KHÔNG để lọt sang token khác (`SEARCH_BOT_TOKEN`).
+
+# 🛡️ POST-MORTEM RULE — 11/09/2026: TÁCH BIỆT LUỒNG ETA CHỈ TRẢ LỜI CỘT C & KHÓA CHẶT AW7 KHÁNG TIN CŨ LỆCH THỜI GIAN VỚI CỘT A (RULE PM-19)
+
+> ### Nguồn gốc: **Phân Hệ Site Down (Bot 5T) & ETA Reminders (Bot 2D)** (site_down_v2.gs Deployment @100, Bảng tính 1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow GID 0)
+> - **Lỗi Thực Tế (11/09/2026)**:
+>   1. Sau khi Bot 5T gửi tin trạm sập (Cột C, ví dụ 15:30), bảng SUMMARY (AW7) bị gửi ra nhóm chat mang mốc giờ cũ (13:49) và nội dung cũ của đợt trước, gây lệch thời gian nghiêm trọng với Cột A.
+>   2. Bản tin ETA Update của Bot 2D xuất hiện ngay sau tin AW7, tạo cảm giác ETA đang trả lời cho AW7 thay vì trả lời theo Cột C.
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. Trong doPost() action store_site_down: Khi botlookup cào dữ liệu mới về Cột A, code đã tự động gọi luôn processSummaryAwAz(sheet, false) (Luồng 2 AW7). Trong khi đó, ô AW7 chưa cập nhật kịp và vẫn mang timestamp cũ (13:49/17:16). Do 	sKey !== lastTs, AW7 bị gửi ra nhóm chat cùng lúc với đợt cào Cột A!
+>   2. Hàm processSummaryAwAz() có nhận định sai lầm (// Logic đúng: tsKey mới ≠ lastTs → GỬI NGAY. Không cần freshness check), thiếu 2 tầng bảo vệ sống còn: (a) Không kiểm tra độ tươi mới isDataFresh_, (b) Không so sánh mốc giờ AW7 với Cột A (parseA1Timestamp), dẫn đến việc để lọt tin cũ cách hiện tại 1-4 tiếng!
+>
+> ### 🔴 RULE PM-19: TÁCH BIỆT TUYỆT ĐỐI LUỒNG CỘT C / ETA & 2 CHỐT CHẶN THÉP CHỐNG LỆCH THỜI GIAN CHO AW7
+> 1. **Cào Cột A CHỈ Chạy Duy Nhất Cột C (Dedicated Col C in store_site_down)**:
+>    - Khi Webhook nhận action store_site_down từ relay, BẮT BUỘC CHỈ ĐƯỢC chạy processSiteDownColC(sheet, true) để gửi Tin 1 và sau đó 30s kích hoạt Bot 2D ETA Reminders.
+>    - **TUYỆT ĐỐI CẤM** gọi processSummaryAwAz (Luồng 2 AW7) bên trong action store_site_down! Luồng AW7 là bảng tổng hợp độc lập, không được phép chen vào nhịp cào Cột A làm gián đoạn luồng Cột C ➔ ETA.
+> 2. **ETA Bot 2D CHỈ Phục Vụ Cột C (ETA Exclusively for Column C)**:
+>    - Bản tin nhắc nhở ETA Update (📋 TX — ETA Update) CHỈ ĐƯỢC PHÉP theo sau và phản hồi cho danh sách trạm của Cột C (Tin 1).
+>    - **TUYỆT ĐỐI CẤM** để luồng AW7 kích hoạt ETA, và không bao giờ gửi tin AW7 chen vào giữa Cột C và ETA!
+> 3. **2 Chốt Chặn Thép Chống Gửi Tin Cũ Cho AW7 (Double-Forensic Guard for AW7)**:
+>    Hàm processSummaryAwAz BẮT BUỘC phải vượt qua đầy đủ 2 chốt chặn trước khi được phép gửi bất kỳ tin nào ra nhóm:
+>    - *Chốt Chặn 1 (Freshness Guard)*: if (!isDirectPush && !isDataFresh_(tsKey, 45)) ➔ Nếu timestamp AW7 cách hiện tại > 45 phút ➔ **BỎ QUA 100% (RETURN FALSE)**!
+>    - *Chốt Chặn 2 (Anti-Mismatch with Column A Guard)*: Lấy tsA1 = parseA1Timestamp(sheet). Nếu parseTsToMinutes_(tsKey) < parseTsToMinutes_(tsA1) ➔ Timestamp AW7 CŨ HƠN Cột A ➔ **BỎ QUA 100% (RETURN FALSE)**! Tuyệt đối không bao giờ gửi bảng AW7 khi Cột A đã có mốc giờ mới hơn!
+
+# 🛡️ POST-MORTEM RULE — 12/09/2026: ĐỊNH TUYẾN BÁO CÁO CABLE LINK DOWN (BOT 15) CHU KỲ :16/:46, LÀM SẠCH NGẮT DÒNG CỘT C & XÓA TIN CŨ BỌC THÉP (RULE PM-20)
+
+> ### Nguồn gốc: **Phân Hệ Cable Link Down Report (Bot 15 TNI CABLE)** (`cable_link_down_report.py`, Sheet `1C8hU8SXpOdq-v6z7iLGoqwDJmO9DYudZ3rhflb7LC8Y` Tab `Link down now` GID `263097982`, Group `8 TNI CABLE BROKEN SOS` ID `-5531350787`)
+> - **Yêu Cầu Vận Hành Thực Tế (12/09/2026)**:
+>   1. Gửi báo cáo toàn bộ sự cố tuyến cáp đang đứt từ Cột C của tab `Link down now` vào nhóm `8 TNI CABLE BROKEN SOS` mỗi 30 phút một lần qua Bot 15 TNI CABLE (`8758104446:...`).
+>   2. Giờ gửi phải muộn hơn nhịp Site Down (:06/:36), sắp xếp thời gian hợp lý không để trùng giờ với các Toa khác trong Đoàn Tàu 5 phút.
+>   3. Phải tuân thủ Rule "tin nào xóa tin nấy" (xóa tin phiên trước trước khi gửi tin mới).
+>   4. 100% tiếng Anh, không dùng Telethon quét lại group chat (Sheet SSOT).
+>
+> ### 🔴 RULE PM-20: 4 CHỐT CHẶN BẢO VỆ CHO PHÂN HỆ CABLE LINK DOWN REPORT
+> 1. **Lịch Khởi Hành Chu Kỳ :16 & :46 MMT (Zero Collision with Site Down & ETA)**:
+>    - Toa Cable Link Down BẮT BUỘC phải khởi hành tại **phút :16 và :46 MMT** của mỗi giờ.
+>    - Thời điểm này đến sau Site Down (:06/:36) đúng 10 phút, và sau Toa ETA (:11/:41) đúng 5 phút, bảo đảm các Toa ưu tiên cao đã xử lý hoàn tất mà không bao giờ gây nghẽn hàng đợi trên máy ảo runner.
+> 2. **Chuẩn Hóa Ngắt Dòng Dữ Liệu Cột C (Clean Multi-line Formatting)**:
+>    - Dữ liệu trong ô Cột C của Sheet thường gom chung nhiều dòng (`link down: ...`, `Plz note ...`) thành một chuỗi dính liền khoảng trắng khi xuất qua CSV.
+>    - Code đọc Sheet BẮT BUỘC phải áp dụng regex chuẩn hóa ngắt dòng:
+>      - `re.sub(r'\s+(link down\s*:)', r'\n\1', val, flags=re.IGNORECASE)`
+>      - `re.sub(r'\s+(Plz\s+note\b)', r'\n\1', clean_val, flags=re.IGNORECASE)`
+>      trước khi hiển thị lên tin nhắn Telegram để nhân viên dễ đọc và nắm bắt vị trí đứt cáp.
+> 3. **Cơ Chế "Tin Nào Xóa Tin Nấy" Bằng Bot API & Lưu Message ID Qua GAS (Strict Bot Clean-Up)**:
+>    - BẮT BUỘC dùng `delete_old_messages_bot(token, cid, gas_url, key)` với key cố định `CABLE_LINK_DOWN_REPORT` trước khi gửi tin mới.
+>    - Bot 15 là Admin của nhóm `-5531350787` nên được phép xóa tin của chính nó. Sau khi gửi tin mới thành công, BẮT BUỘC lưu ngay Message ID mới vào GAS PropertiesService qua `save_msgids(gas_url, key, [new_mid])`.
+> 4. **Tích Hợp Tuần Tự Trong `train_5min.yml` & Đồng Bộ Secret (Single Train Integration)**:
+>    - Toa Cable Link Down BẮT BUỘC nằm trong `train_5min.yml` với cờ `steps.sched.outputs.cable_ld == 'true'`, bọc lệnh chạy `python cable_link_down_report.py || true`.
+>    - Secret `CABLE_BOT_TOKEN` BẮT BUỘC được cấu hình trên GitHub Repository quản lý runner (`MON6879/tni-sitedown-relay`).
+
+# 🛡️ POST-MORTEM RULE — 12/09/2026: THU THẬP TEMPLATE 1 HAI DẠNG (DUAL-TYPE) CHO BOT 15 TNI CABLE & TỰ ĐỘNG GOM ẢNH THEO DÒNG (RULE PM-21)
+
+> ### Nguồn gốc: **Phân Hệ Thu Thập Báo Cáo Sự Cố Cáp (Bot 15 TNI CABLE)** (`api/cable_bot.py`, `apps_script_cable.gs`, Group `8 TNI CABLE BROKEN SOS` ID `-5531350787`)
+> - **Yêu Cầu Vận Hành Thực Tế (12/09/2026)**:
+>   Nhân viên hiện trường có 2 cách gửi thông tin bắt đầu sự cố cáp (Template 1 / Step 1) trước khi gửi ảnh:
+>   1. Gõ cú pháp Team notice: `Team [X] today()...` (chờ Step 2 `Incident Name : ...`).
+>   2. Sao chép trực tiếp tin tiến độ sự cố tuyến cáp từ báo cáo định kỳ: `Progress: ... <=> ... link down ...` (ví dụ: `Progress: 12/09/26 07:38 <=> 🟢 T3 - IP : TNI0341SRT001-TNI0507SRT001\n🔗 link down - 07/09/26 13:10 => 11/09/2026 18:24:34 Ground condition not yet good`).
+>   Bot 15 BẮT BUỘC phải nhận diện cả 2 dạng này là Template 1 để tự động tạo dòng mới Hàng 2 với mã REF, gán đúng Team Name, ghi nhận sự cố và kích hoạt sẵn cơ chế gom ảnh vào đúng dòng.
+>
+> ### 🔴 RULE PM-21: 4 NGUYÊN TẮC THU THẬP TEMPLATE 1 HAI DẠNG CHO CABLE BOT
+> 1. **Nhận Diện Kép Cho Template 1 (Dual-Type Step 1 Recognition)**:
+>    - `is_type1`: Khớp khi có `Team \d+` kèm `today / route broken / splicer` hoặc `parse_cable_type()`.
+>    - `is_type2`: Khớp khi text chứa `link down` kèm (`progress`, `<=>`, mã `T1..T4`, `SRT`, hoặc `TNIxxxx`).
+>    - Tuyệt đối bỏ qua tin nhắn tự động của chính Bot 15 (`🔌 15 TNI CABLE — LINK DOWN REPORT`) để chống vòng lặp.
+> 2. **Trích Xuất Team Name & Đồng Bộ Chấm Màu Site Down**:
+>    - BẮT BUỘC nhận diện cả `Team X` và `T[1-4]` (bao gồm `T1s1..T4s1`, `T1 S1..T4 S1`), gán chấm màu đồng nhất (`🟠T1/T1 S1`, `🔵T2/T2s1`, `🟢T3`, `🟡T4`).
+> 3. **Phân Tách Luồng Xử Lý Loại 1 vs Loại 2 (Type 1 vs Type 2 Routing Split)**:
+>    - **Loại 1 (`is_type1 and not is_type2`)**: Gọi `cable_add_template` → INSERT ROW MỚI vào tab **Detail cable** (Cột J Route Broken). Tạo mã REF, khởi tạo cơ chế gom ảnh.
+>    - **Loại 2 (`is_type2 and not is_type1`)**: Gọi `cable_update_link_now` → UPDATE ô Cột C của tab **Link down now** (GID `263097982`) — đây là SSOT cho auto-report `:16/:46`. KHÔNG tạo row mới. Không cần REF.
+>    - **TUYỆT ĐỐI KHÔNG** dùng `cable_add_template` cho Loại 2 vì nó chỉ ghi vào audit collector mà KHÔNG cập nhật SSOT auto-report. Nội dung dòng 2 (`🔗 link down - [date] => [ETA]`) sẽ mãi không được lưu vào đúng chỗ.
+> 4. **Khóa State Gom Ảnh Theo Dòng (Photo-Row Anchor Lock)**:
+>    - Bot phản hồi xác nhận 2 dòng chuẩn gọn:
+>      `🔌 REF:{ref_pad} | {team_tag} | 🗓️ {date} {time}`
+>      `📷 Reply photos to attach | ✅ Reply Done to close`
+>    - Caching cả `msg.message_id` và `bot_msg.message_id` vào `MSG_REF_CACHE`, kèm fallback trong `resolve_ref_from_msg()` và fallback ±15 phút theo `sender_id` trong GAS để đảm bảo ảnh gửi kèm hoặc reply đều rơi vào đúng Cột I (`Photos`) của dòng vừa tạo.
+>
+> ### 🔴 RULE PM-26: PHÂN TÁCH 2 TAB CABLE SSOT — CẤM NHẦM `cable_add_template` vs `cable_update_link_now`
+> Khi làm việc với phân hệ Cable Bot, BẮT BUỘC hiểu rõ 2 tab HOÀN TOÀN RIÊNG BIỆT:
+>
+> | Tab | GID | Ghi bởi | Đọc bởi | Vai trò |
+> |---|---|---|---|---|
+> | **Detail cable** | (mặc định) | `cableAddTemplate()` via action `cable_add_template` | Manual / admin | Audit trail cho mỗi sự cố mới |
+> | **Link down now** | `263097982` | `cableUpdateLinkNow()` via action `cable_update_link_now` | `cable_link_down_report.py` (:16/:46) | **SSOT** cho báo cáo tiến độ tự động |
+>
+> - **Khi thêm chức năng GHI vào Cable**: BẮT BUỘC hỏi "đây là sự cố mới hay progress update cho link đang down?"
+>   - Sự cố mới → `cable_add_template` → Detail cable
+>   - Progress update → `cable_update_link_now` → Link down now
+> - **TUYỆT ĐỐI CẤM** dùng `cable_add_template` cho progress update Type 2 vì không bao giờ cập nhật SSOT auto-report.
+
+---
+
+# 📊 STRICT BI PORTAL & LIVE SYNC RULE: CẤM HARDCODE DỮ LIỆU CŨ — BẮT BUỘC ĐỒNG BỘ 100% SỐNG QUA GHẾ BI-WO-SYNC (STRICT BI PORTAL ZERO-STALE-DATA & SEAT BI-WO-SYNC POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (BI PORTAL FRESHNESS & SEAT BI-WO-SYNC STANDARD)**:
+> 
+> ### 🔴 RULE PM-27: QUY ĐỊNH VẬN HÀNH GHẾ BI-WO-SYNC (TOA WO DETAIL) & BẢO VỆ BI PORTAL
+> 1. **Tuyệt Đối Cấm Hardcode Dữ Liệu Tĩnh Lâu Ngày (Zero Stale Static Data Policy)**:
+>    - Toàn bộ các bảng biểu trên BI Portal (`index.html`, `executive_dashboard.html`), đặc biệt là Tab 3 (WO Detail) và Executive Summary, TUYỆT ĐỐI KHÔNG ĐƯỢC để dữ liệu ngày cũ cố định (như sự cố tồn đọng ngày 05/08).
+>    - Mọi dữ liệu hiển thị BẮT BUỘC phải được kết nối nguồn sống (Live SSOT) hoặc tự động làm mới từ Google Sheets định kỳ.
+> 2. **Định Danh Chính Thức: Ghế BI-WO-SYNC (Toa WO Detail)**:
+>    - **Tên ghế**: `Ghế BI-WO-SYNC` (Toa WO Detail trong đoàn tàu thời gian `train_5min.yml`).
+>    - **File thực thi**: `sync_wo_detail.py`.
+>    - **Nguồn dữ liệu (SSOT)**: 
+>      - Tab `Progress Team Task and WO+Oil` (GID `159298579`) từ Google Sheet `13p_63iH1H2sW3Z7z_Wb8FbvM7e_Peb9iO29kM57iGq0`.
+>      - Tab `Sum all WO Team` (GID `1840482617`).
+>    - **Lịch chạy định kỳ**: Nhịp 05:46 và 15:46 MMT hàng ngày (khớp với chu kỳ chốt ca sáng và chiều của các đội kỹ thuật), đồng thời cho phép kích hoạt thủ công qua `workflow_dispatch`.
+> 3. **Kiến Trúc Hai Lớp Fallback Chống CORS & Nghẽn Mạng (Dual-Layer Sync Architecture)**:
+>    - **Lớp 1 (Batch Offline Cache)**: `sync_wo_detail.py` chạy trên GitHub Actions cào live Google Sheets, tạo file `api/wo_detail_cache.json` và tiêm trực tiếp HTML mới nhất vào `index.html` & `executive_dashboard.html`, đẩy lên GitHub Pages/Vercel.
+>    - **Lớp 2 (Client Live Fetch)**: Frontend JavaScript (`refreshWoDetailLive()`) tự động fetch từ Serverless API endpoint `/api/bi_data?action=wo_detail`. Nếu API bận hoặc offline, tự động fallback sang Google Sheets GViz endpoint (`gviz/tq?tqx=out:csv`). Tuyệt đối KHÔNG dùng URL `export?format=csv` gây lỗi CORS trên trình duyệt!
+> 4. **Checklist Kiểm Tra Khi Chạm Vào BI Portal**:
+>    - ① Chạy `python sync_wo_detail.py` kiểm tra parsing 7 bảng và tính toán tổng số WO.
+>    - ② Kiểm tra `grep 05/08` hoặc các mốc ngày cũ xem đã bị thanh lọc 100% chưa.
+>    - ③ Kiểm tra endpoint `/api/bi_data?action=wo_detail` có trả về JSON hợp lệ với status 200 hay không.
+>    - ④ Đồng bộ đồng thời cả 3 repositories (`Task and WO`, `tni-search`, `tni-sitedown`) và root.
+
+---
+
+# 🛒 STRICT SALES & TELEGRAM COLLECTOR RULE: BẢO VỆ CẤU TRÚC CỘT TEMPLATE & TRUY VẾT ẢNH ĐỘNG (STRICT TELEGRAM SALES TEMPLATE & DYNAMIC COLUMN MAPPING POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SALES TEMPLATE & DYNAMIC PHOTO MAPPING STANDARD)**:
+> 
+> ### 🔴 RULE PM-28: QUY ĐỊNH CẤU TRÚC CỘT THU THẬP TỪ TEMPLATE TELEGRAM DẠNG PHÂN CÁCH (|) & TRUY VẾT CỘT ẢNH ĐỘNG
+> 1. **Khớp Cột 1-1 Với Template Người Dùng**:
+>    - Khi người dùng cấu hình template trong tab `Template Sale` dạng `[Keyword] : Field 1 | Field 2 | ...`:
+>    - Sheet đích (Target Tab) BẮT BUỘC phải có đầy đủ:
+>      - Cột định danh: `REF ID`
+>      - Cột thời gian: `Date` (Ngày), `Time` (Giờ)
+>      - Các cột thông tin chính tương ứng 1-1 với template: `Product Name`, `Quantity`, `Serial Number` (hoặc `Serial Numbers List`), `Buyer's Name` (hoặc `Dealer Name`), `Phone Number`, `Note`.
+>      - Cột thu thập hình ảnh: `Drive Photos` (chứa URLs ảnh lưu vào Google Drive).
+>      - Cột tải tất cả: `Download All Link` (link folder Drive chứa toàn bộ ảnh của đơn hàng).
+>      - Cột nhân viên: `Staff Name` (tên người gửi tin).
+> 2. **Tuyệt Đối Cấm Hardcode Vị Trí Cột Ảnh (Zero Hardcoded Column Index)**:
+>    - Trong các hàm cập nhật link ảnh (`updateOrderPhotoLinks`), BẮT BUỘC phải tra cứu động vị trí cột `Drive Photos` và `Download All Link` bằng cách đọc header row 1 (`toLowerCase().includes("photo")`, `toLowerCase().includes("download")`).
+>    - TUYỆT ĐỐI CẤM hardcode vị trí cột cố định (ví dụ Cột 10, Cột 11) vì khi người dùng thêm cột `Serial` hoặc `Quantity`, số thứ tự cột bị dịch chuyển sẽ gây ghi đè làm hỏng dữ liệu thông tin khách hàng!
+> 3. **Bảo Tồn 100% Nội Dung Tab Template Sale Do Người Dùng Tạo**:
+>    - Khi chạy hàm `setupAllSheets()` hoặc đồng bộ, CHỈ ĐƯỢC PHÉP tạo thêm tab mới và đặt tiêu đề chuẩn cho các tab đích.
+>    - TUYỆT ĐỐI CẤM ghi đè hoặc xóa các dòng template mà người dùng đã soạn trong tab `Template Sale`.
+
+---
+
+# 💵 STRICT BRANCH & COMPANY FINANCE RULE: CƠ CHẾ TÀI CHÍNH CHI NHÁNH & CÔNG TY — GIÁ GỐC (83%) + LN TRẢ VỀ CTY (17%) = GIÁ BÁN THẤP NHẤT (100%), TĂNG GIÁ THỰC BÁN & LỢI NHUẬN CHI NHÁNH (RULE PM-29 & BRANCH-COMPANY MARGIN FORMULA POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (BRANCH-COMPANY MARGIN FORMULA & SUMMARY STANDARD)**:
+> 
+> ### 🔴 RULE PM-29: QUY ĐỊNH CƠ CHẾ PHÂN CHIA TÀI CHÍNH GIỮA CHI NHÁNH & CÔNG TY TRONG BÁN HÀNG
+> 1. **Cơ Chế Tài Chính 5 Cột Bắt Buộc (The 5 Core Financial Columns)**:
+>    - **Cột 1 — Giá Gốc Đầu Vào (83%)** (Cost Price $C$): Mức giá chi nhánh tự bỏ vốn mua hàng từ nhà cung cấp hoặc nhập kho.
+>    - **Cột 2 — Lợi Nhuận Trả Về Cty 17% / SP** ($\text{LN Cty 17\%} = C \times \frac{17}{83}$ hoặc $\text{Giá Sàn} \times 17\%$): Khoản lợi nhuận cam kết bắt buộc phải nộp trả về Công ty trên mỗi sản phẩm bán ra.
+>    - **Cột 3 — Mức Giá Bán Thấp Nhất (100%)** ($\text{Giá Sàn Thấp Nhất} = C + \text{LN Cty 17\%} = \frac{C}{0.83}$): Mức giá sàn tối thiểu được phép bán ra. Chi nhánh tuyệt đối KHÔNG được phép bán dưới mức giá sàn này vì sẽ không đủ bù vốn giá gốc và 17% nộp về công ty.
+>    - **Cột 4 — Giá Thực Bán** (Actual Selling Price $P_{\text{act}}$): Mức giá thực tế chi nhánh bán cho khách hàng hoặc đối tác (chi nhánh có quyền tăng giá bán cao hơn mức giá sàn thấp nhất).
+>    - **Cột 5 — Lợi Nhuận Chi Nhánh / SP** ($\text{LN Chi Nhánh} = \max(0, P_{\text{act}} - \text{Mức Giá Bán Thấp Nhất})$): Toàn bộ phần chênh lệch dôi dư khi chi nhánh bán cao hơn mức giá sàn thuộc về quyền lợi và lợi nhuận ròng của Chi nhánh (100%).
+> 2. **Cơ Chế Báo Cáo Tổng Hợp Toàn Cảnh (Master Summary Cockpit)**:
+>    - `Tổng LN Trả Về Cty` = $\text{Tổng Đã Bán} \times \text{LN Trả Về Cty 17\% / SP}$.
+>    - `Tổng LN Chi Nhánh` = $\text{Tổng Đã Bán} \times \text{LN Chi Nhánh / SP}$.
+>    - `Tổng Doanh Thu Thực Bán` = $\text{Tổng Đã Bán} \times \text{Giá Thực Bán}$.
+>    - `Tổng Giá Trị Tồn Kho Giá Gốc` = $\text{Tồn Kho Tổng} \times \text{Giá Gốc Đầu Vào (83\%)}$.
+> 3. **Bảo Đảm Tính Nhất Quán 100% Trên Toàn Hệ Thống**:
+>    - Toàn bộ các bảng tính (`NhapHang`, `Tổng Hợp`, `Consignment`), mã nguồn Apps Script (`apps_script_ups_solar`) và Giao diện Web App (`ups_manager.html`) BẮT BUỘC phải áp dụng chính xác công thức toán học và cấu trúc cột này!
+
+---
+
+# 📊 STRICT TEAM SUMMARY PARSING RULE: PHÂN TÁCH KỸ SƯ CÁ NHÂN VS TỔNG HỢP TOÀN ĐỘI & TỰ ĐỘNG TÍNH TOÁN DATE LABELS (STRICT TEAM SUMMARY ISOLATION & DYNAMIC DATE POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (TEAM SUMMARY ISOLATION & DYNAMIC DATE STANDARD)**:
+> 
+> ### 🔴 RULE PM-30: NGUYÊN TẮC PHÂN TÁCH KỸ SƯ CÁ NHÂN VS TỔNG HỢP TOÀN ĐỘI TRÊN GOOGLE SHEET
+> 1. **Phân Tách Tuyệt Đối 2 Vùng Dữ Liệu Khi Parse Bảng Tính Tổng Hợp**:
+>    - Khi đọc bảng tính Google Sheet chứa cả danh sách kỹ sư cá nhân và dòng tổng kết toàn đội (ví dụ tab `Sum all WO Team` GID `1840482617`):
+>    - Các dòng trên (dòng 3 đến 31) là dữ liệu của từng kỹ sư riêng lẻ. Dòng tổng kết của các Đội nằm ở phân vùng phía dưới (từ dòng 35 trở đi).
+>    - **TUYỆT ĐỐI CẤM** dùng `rows.find()` tìm mã đội chung chung quét từ dòng đầu tiên, vì sẽ bắt nhầm kỹ sư cá nhân đầu tiên thuộc đội đó (khiến số liệu toàn đội hàng trăm WO bị biến thành số liệu 5-10 WO của 1 cá nhân)!
+>    - **BẮT BUỘC** tìm kiếm trên phân vùng tổng hợp (`rows.slice(35)`) và kiểm tra điều kiện kép: chứa mã đội (`MYT_TNI_TEAM01`..`04`) VÀ cột chức vụ chứa `'leader'` / `'Team leader'`.
+> 2. **Tự Động Tính Toán Động Mốc Ngày Tháng D0, D1, D2, Plan**:
+>    - Toàn bộ nhãn ngày tháng hiển thị (`Close D0`, `Close D1`, `Close D2`, `Plan D+1`) BẮT BUỘC phải được tính toán tự động dựa trên mốc thời gian thực tế `Export time` trích xuất từ Sheet.
+>    - **TUYỆT ĐỐI CẤM** fallback về các chuỗi ngày tháng cũ trong quá khứ (như `17/08`, `16/08`, `15/08`, `Plan: 18/08/26`).
+
+
+
+
+
+---
+
+# 🏢 STRICT HO PROFIT & TAX RATE INPUT RULE: LỢI NHUẬN & THUẾ PHẢI TRẢ VỀ TỔNG CÔNG TY — Ô NHẬP TAY % LINH HOẠT & CẤM ĐÁNH ĐỒNG KÝ GỞI (STRICT HO PROFIT & TAX OBLIGATION & DYNAMIC RATE INPUT POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (HO PROFIT & TAX OBLIGATION & DYNAMIC RATE INPUT STANDARD)**:
+> 
+> ### 🔴 RULE PM-31: ĐỊNH DANH CHUẨN LỢI NHUẬN & THUẾ NỘP CÔNG TY VÀ Ô NHẬP TAY % LINH HOẠT
+> 1. **Định Danh Đúng Bản Chất — CẤM Nhầm Lẫn Thành "Hoa Hồng Ký Gởi"**:
+>    - Khi tính toán khoản tiền trích nộp về Tổng Công Ty, BẮT BUỘC phải gọi đúng tên: **"Lợi Nhuận & Thuế Phải Trả Về Tổng Công Ty" (HO Profit & Tax Obligation)**.
+>    - **TUYỆT ĐỐI CẤM** nhầm lẫn hoặc hiển thị thành "Hoa hồng Ký gởi đã chia", vì đây là nghĩa vụ lợi nhuận và thuế pháp lý nộp về tổng công ty từ doanh thu bán hàng của chi nhánh.
+> 2. **Ô Nhập Tay Tỷ Lệ % Linh Hoạt (Zero Hardcoded Rate)**:
+>    - **TUYỆT ĐỐI CẤM** hardcode cố định số 17% trong logic hoặc trên giao diện mà không có khả năng điều chỉnh.
+>    - **BẮT BUỘC** cung cấp ô nhập tay tỷ lệ % (`cfg-cty-rate`, mặc định 17%, có thể đổi thành 15%, 18%, 20%...) lưu vào `localStorage`. Khi người dùng thay đổi tỷ lệ, toàn bộ công thức giá sàn, tiền nộp cty, lợi nhuận chi nhánh trên Dashboard, Nhập hàng, Ký gởi và Báo cáo P&L phải tự động tính toán lại 100%!
+
+---
+
+# ☀️ STRICT SOLAR QUOTATION & SHARING ISOLATION RULE: BÁO GIÁ VIETTEL CONSTRUCTION MYANMAR CHUẨN GOOGLE SHEET, WATERMARK CHỮ CHÌM & CÁCH LY LỊCH SỬ NHÂN VIÊN / GMAIL (STRICT SOLAR QUOTATION BRANDING, RE-PRINT & ROLE ISOLATION POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SOLAR QUOTATION BRANDING, RE-PRINT & ISOLATION STANDARD)**:
+> 
+> ### 🔴 RULE PM-32: BÁO GIÁ SOLAR VIETTEL CONSTRUCTION MYANMAR, WATERMARK CHỮ CHÌM, SỬA GIÁ & PHÂN QUYỀN CÁCH LY
+> 1. **Nhận Diện Thương Hiệu Báo Giá Viettel Construction Myanmar Bắt Buộc**:
+>    - Header báo giá BẮT BUỘC in màu ĐỎ đậm (`#dc2626`): **VIETTEL CONSTRUCTION MYANMAR COMPANY LIMITED**, địa chỉ: `No 1237 Waizanyantar Street, South Okkalapa, Yangon, Myanmar`, hotline: `0965 1900 009`, website: `www.viettelconstructionmyanmar.com`.
+>    - Tiêu đề báo giá tiếng Anh chủ đạo: **SOLAR SYSTEM QUOTATION**.
+>    - BẮT BUỘC chèn chữ chìm **watermark mờ** (`VIETTEL CONSTRUCTION MYANMAR`, opacity ~0.04-0.06) in nghiêng chéo nền toàn bộ trang in.
+> 2. **Bám Sát 100% Cấu Trúc Bảng Tính Mẫu Google Sheet GID `1879621220`**:
+>    - Bảng vật tư phải đủ 9 cột: `No.` | `Material Specifications` | `Brand` | `Unit` | `Qty` | `Unit Price (Kyats/Currency)` | `Total Amount` | `Remark / Warranty`.
+>    - Tích hợp sẵn mẫu 6kW Solar System chuẩn (19,584,000 Kyats) và tiến độ thanh toán 3 đợt: 50% (Ký HĐ), 40% (Giao hàng), 10% (Bàn giao).
+> 3. **Cho Phép Sửa Giá Trực Tiếp & In Lại Báo Giá Ngay Lập Tức**:
+>    - Người dùng có thể chọn bất kỳ báo giá cũ nào từ dropdown theo tên khách hàng / mã báo giá để load lại toàn bộ dữ liệu.
+>    - Cho phép sửa trực tiếp từng đơn giá, số lượng, vật tư và bấm "Lưu / Cập Nhật Báo Giá" hoặc "In / In Lại Báo Giá" để xuất ra bản in mới nhất.
+> 4. **Bảo Mật Phân Quyền Cách Ly Tuyệt Đối (Strict Role / Staff / Gmail Isolation)**:
+>    - Khi chia sẻ báo giá cho nhân viên nào hoặc gửi qua Gmail nào, người đó CHỈ ĐƯỢC PHÉP xem lịch sử báo giá của chính mình, TUYỆT ĐỐI KHÔNG được xem báo giá của nhân viên hay khách hàng khác!
+> 5. **Lưu Trữ Tập Trung Vào 1 Sheet Duy Nhất**:
+>    - Toàn bộ thông tin báo giá, lịch sử sửa giá và người được chia sẻ BẮT BUỘC lưu vào đúng 1 tab duy nhất: `Báo Giá Solar` trên Master Google Sheet `1s-V0owHlwub4qrCxTUvKmXp4PWZthzk5oKhi5m_wQBA`.
+
+# 🏪 POST-MORTEM RULE — 15/09/2026: ĐĂNG KÝ QUẢN TRỊ PHÂN HỆ TNI SALE — 3 GHẾ CHUYÊN BIỆT & BẢO MẬT GAS & CHUYỂN SSOT (RULE PM-33)
+
+> ### Nguồn gốc: **Phúc Tra Chuyên Gia Hệ Thống TNI Sale (15/09/2026)**
+> - **Root Cause**: Phân hệ TNI Sale (13 module: Nhập hàng, Bán hàng, Tồn kho, Tạm ứng, Đại lý, Ký gởi, CRM, Báo giá UPS, Báo giá Solar, Quảng cáo, Leads, Profit/Loss, Reports) đang hoạt động **HOÀN TOÀN NGOÀI RADAR HỆ THỐNG QUẢN TRỊ** — không có trong AGENTS.md, system_map.md, hay train_5min.yml. Dữ liệu chính nằm trên `localStorage` (mất khi xóa cache). Bot token hardcode công khai. GAS Access = `ANYONE_ANONYMOUS`.
+>
+> ### 🔴 RULE PM-33: 6 NGUYÊN TẮC QUẢN TRỊ PHÂN HỆ TNI SALE
+> 1. **3 Ghế Chuyên Biệt Bắt Buộc (Mandatory 3-Seat Assignment)**:
+>    - `Ghế WEB-SALE-16`: Frontend `tni_sale.html` (static SPA 164KB, 13 module, song ngữ VN/EN).
+>    - `Ghế GAS-SALE-16`: Backend GAS Sale — **Dedicated GAS** `apps_script_ups_solar/TNI Sale.js` (Deploy `AKfycbx09J8PPi_IN3_n_ho8QF4RapsPh5uzLchVfS9T89iuw-4QMZWU_ynlhzDvav4wRvj4`) + **Main GAS** `QLTC_GAS/sale_backend.gs` (CRUD `sale_*` actions).
+>    - `Ghế BOT-SALE-16`: Telegram Sale Collector Bot (Token `8647102342` trong `ScriptProperties`), thu thập đơn hàng, lưu ảnh Drive Folder `11HcMa63slXPOHrveHxmqZTZerzKPfjVt`.
+> 2. **Sửa TNI Sale GAS → Vào Đúng Project Chuyên Biệt (Strict Dedicated GAS Targeting)**:
+>    - Sửa logic thu thập / webhook / Telegram: VÀO `apps_script_ups_solar` (Script riêng, deploy `AKfycbx09J8PPi...`).
+>    - Sửa CRUD cơ bản (`sale_add/get/update/delete/bulk`): VÀO `QLTC_GAS/sale_backend.gs` (nằm trong Main GAS Hub, deploy `AKfycbz-NZlBk...`).
+>    - TUYỆT ĐỐI CẤM nhầm project khi sửa!
+> 3. **Bảo Mật Bắt Buộc (Mandatory Security)**:
+>    - Bot Token BẮT BUỘC lưu trong `ScriptProperties` (`PropertiesService.getScriptProperties()`), TUYỆT ĐỐI CẤM hardcode trực tiếp trong code.
+>    - GAS doPost() BẮT BUỘC kiểm tra API key hoặc caller identity trước khi thực thi.
+>    - Khi sửa code frontend `tni_sale.html`, TUYỆT ĐỐI CẤM để lộ API key, bot token, hoặc secret nào trong HTML source.
+> 4. **Sheet TNI Sale SSOT (Single Source of Truth)**:
+>    - Spreadsheet ID: `1s-V0owHlwub4qrCxTUvKmXp4PWZthzk5oKhi5m_wQBA`.
+>    - 12 tabs chuẩn: `Tổng Hợp`, `Sales Record`, `Sales to dealers`, `Consignment`, `Warranty requests`, `Warranty fulfillment`, `Face+Tiktok`, `NhapHang`, `Đã bán`, `Báo Giá Solar`, `List Group Telegram`, `Template Sale`.
+> 5. **Công Thức Tài Chính Chuẩn 83%/17% Bất Biến**:
+>    - Giá Gốc = 83% vốn đầu vào.
+>    - LN Trả Cty = `Math.round(giá_gốc / 83 * 17)` (17% tổng giá 100%).
+>    - Giá Sàn = Giá Gốc + LN Cty (100%).
+>    - LN Chi Nhánh = `Math.max(0, giá_thực_bán - giá_sàn)`.
+>    - TUYỆT ĐỐI CẤM sửa công thức này mà không có phê duyệt từ quản lý!
+> 6. **Lộ Trình Chuyển Đổi Storage (Migration Roadmap)**:
+>    - Hiện tại: `localStorage` = primary, Google Sheet = backup (fire-and-forget sync).
+>    - Mục tiêu: Chuyển Google Sheet thành SSOT, frontend đọc từ GAS endpoint, localStorage chỉ là cache.
+>    - Khi chuyển đổi, BẮT BUỘC phải giữ nguyên 100% dữ liệu hiện có, TUYỆT ĐỐI CẤM mất dữ liệu!
+
+# 🛡️ POST-MORTEM RULE — 16/09/2026: CẤM DUPLICATE `let`/`const` TRONG CÙNG SCOPE & BẮT BUỘC UNICODE ESCAPE CHO KÝ TỰ ĐẶC BIỆT (RULE PM-33 & PM-34)
+
+> ### Nguồn gốc: **v809 — Fatal SyntaxError giết toàn bộ BI Portal** (`index.html`, `executive_dashboard.html`)
+> #### RULE PM-33: TUYỆT ĐỐI CẤM Khai Báo Lại Biến `let`/`const` Trong Cùng `<script>` Block
+> 1. Khi thêm, di chuyển hoặc merge block JavaScript trong file HTML, **BẮT BUỘC** phải `Select-String` hoặc `grep` kiểm tra tên biến `let`/`const` mới **TRƯỚC KHI commit** để đảm bảo KHÔNG CÓ khai báo trùng lặp trong cùng `<script>` block.
+> 2. Lỗi `SyntaxError: Identifier '...' has already been declared` sẽ **giết chết toàn bộ** `<script>` block — không chỉ phần code bị trùng mà **TẤT CẢ** functions, event handlers, modals, charts trong block đó đều chết theo — gây ảnh hưởng diện rộng (tabs, audio, modals, charts đều chết cùng lúc).
+> 3. **TUYỆT ĐỐI CẤM** copy-paste code JavaScript mới vào file mà không xóa code cũ trước!
+>
+> #### RULE PM-34: BẮT BUỘC Dùng Unicode Escape Cho Ký Tự Đặc Biệt Tiếng Việt/Myanmar Trong JavaScript Inline
+> 1. Khi viết chuỗi tiếng Việt hoặc Myanmar trong JavaScript inline (`<script>` block của HTML), **BẮT BUỘC** phải dùng Unicode escape sequences (`\u00E0` cho `à`, `\u1EBFn` cho `ến`, v.v.) thay vì ký tự gốc trực tiếp.
+> 2. File HTML có thể bị thay đổi encoding khi chuyển qua các công cụ edit/copy/paste/Git/PowerShell `Set-Content`, gây corruption ký tự thành dấu `?` (mojibake).
+> 3. **TUYỆT ĐỐI CẤM** viết trực tiếp ký tự tiếng Việt có dấu hoặc tiếng Myanmar vào source code JavaScript — luôn dùng Unicode escape!
+
+# 🌐 POST-MORTEM RULE — 16/09/2026: PHÂN HỆ TNI SALE BẮT BUỘC ĐỒNG BỘ 100% SONG NGỮ ANH - VIỆT KHI THÊM MỚI / SỬA ĐỔI (RULE PM-35)
+
+> ### Nguồn gốc: **Phúc Tra Giao Diện TNI Sale (16/09/2026)**
+> - **Root Cause**: Giao diện `tni_sale.html` khi mới mở hoặc khi chuyển đổi ngôn ngữ bị tình trạng "nửa nạc nửa mỡ" (nút ghi EN nhưng nội dung và sidebar hardcode tiếng Việt; hoặc khi bấm chuyển tiếng Việt thì các bảng/card JS không đồng bộ theo). Nguyên nhân do từ điển `DICT` cũ chỉ có 13 keys của form nhập hàng, các hàm JS render không kiểm tra trạng thái ngôn ngữ `currentLang`, và khi thêm tab/chức năng mới bị hardcode chuỗi một ngôn ngữ duy nhất vào mã nguồn.
+>
+> ### 🔴 RULE PM-35: 5 NGUYÊN TẮC BẮT BUỘC SONG NGỮ ĐỒNG BỘ CHO PHÂN HỆ TNI SALE
+> 1. **Mặc Định Tiếng Anh 100% (English by Default)**: Giao diện Web App TNI Sale (`tni_sale.html`) khi người dùng mở trang BẮT BUỘC hiển thị 100% tiếng Anh (`currentLang = 'en'`). Mọi nhãn sidebar, tiêu đề tab, thẻ cards, form, nút bấm, tiêu đề bảng, thông báo alert, và trạng thái rỗng (empty states) đều phải là tiếng Anh chuẩn.
+> 2. **Đồng Bộ Song Ngữ 100% Khi Chuyển Đổi (Full Synchronous Dual-Language Toggle)**:
+>    - Khi người dùng bấm nút chuyển đổi ngôn ngữ (`🌐 EN (Click to VN)` / `🌐 VN (Click to EN)`), **TOÀN BỘ** giao diện (Sidebar, Page Title, Topbar, Panel Headers, Form Labels, Placeholders, Table Headers, Summary Cards, Alerts) BẮT BUỘC phải chuyển đổi đồng bộ 100% sang ngôn ngữ được chọn.
+>    - Hàm `applyLang(lang)` BẮT BUỘC phải re-render ngay lập tức tab đang mở (`renders[activeSec]()`) để cập nhật toàn bộ bảng biểu và cards sống sang ngôn ngữ mới.
+>    - **TUYỆT ĐỐI CẤM** để sót bất kỳ chuỗi text nào không chuyển đổi (nửa tiếng Anh, nửa tiếng Việt)!
+> 3. **BẮT BUỘC Song Ngữ Khi Thêm Mới / Chỉnh Sửa Bất Kỳ Thành Phần Nào (Mandatory Bilingual on Add/Edit)**:
+>    - Khi thêm bất kỳ tab mới, form mới, trường nhập liệu mới, nút bấm mới, thẻ card mới hoặc cột dữ liệu mới:
+>    - **BẮT BUỘC** phải đăng ký đồng thời cả 2 bộ ngôn ngữ trong `NAV_TITLES` và `DICT` (`en` và `vi`).
+>    - **BẮT BUỘC** gắn thuộc tính `data-lang="key"` cho nhãn text và `data-lang-ph="key"` cho input placeholder.
+>    - Mọi hàm JS render bảng (`tbl`), thẻ tổng hợp (`cardsHtml`), thông báo (`al()`) **BẮT BUỘC** kiểm tra `const isVi = currentLang === 'vi'` để hiển thị chính xác theo ngôn ngữ hiện hành.
+>    - **TUYỆT ĐỐI CẤM** viết chuỗi text hardcode trực tiếp vào HTML hoặc JS mà không qua hệ thống song ngữ!
+> 4. **Bảo Tồn Công Thức & Logic Phân Phối Lợi Nhuận**: Dù ở ngôn ngữ nào, các khái niệm tài chính chuẩn: Base Cost 83% (Giá Gốc), HO Profit 17% (LN Trả Cty), Price Floor 100% (Giá Sàn), Branch Retained Profit (Lợi Nhuận Chi Nhánh) BẮT BUỘC phải giữ nguyên tính chính xác tuyệt đối.
+> 5. **Đồng Bộ 3 Repos & Deploy Vercel Ngay Lập Tức**:
+>    - Sau mọi lần chỉnh sửa `tni_sale.html`, BẮT BUỘC copy đồng bộ sang cả 2 repository: `Task and WO/tni_sale.html` và `tni-search/tni_sale.html`.
+>    - Tiến hành commit và push đồng thời cả 3 repos để Vercel tự động build và deploy phiên bản live mới nhất cho người dùng!
+
+# 🛡️ POST-MORTEM RULE — 17/09/2026: ESCAPE SCRIPT TAG INLINE, CHUẨN HÓA NEWLINE JS & CHỐNG TRỪ KHO 2 LẦN (RULE PM-36 & PM-37)
+
+> ### Nguồn gốc: **Nâng Cấp Bảng Giá 4 Tầng, Xuất Kho & Tài Chính TNI Sale (17/09/2026)**
+> - **Root Cause 1**: Chèn thẻ `<script>` bên trong template string `document.write()` trong file HTML khiến trình duyệt và Node.js parse nhầm thẻ đóng `</script>` dẫn đến kết thúc sớm toàn bộ script block, sinh lỗi `SyntaxError: Unexpected end of input`.
+> - **Root Cause 2**: Tạo chuỗi CSV generator bằng multiline string `'''...'''` trong python khiến `\n` biến thành raw newline giữa 2 dấu ngoặc kép `""` trong JS, sinh lỗi `SyntaxError: Invalid or unexpected token`.
+> - **Root Cause 3**: Khi xuất kho (Smart Dispatch) chọn đại lý, nếu vừa ghi vào sổ cái `ban` vừa ghi trùng sang sổ con `pp` mà hàm `getTK()` quét đồng thời cả 2 sổ thì tồn kho bị trừ gấp đôi (`ton = nhap - ban - pp`).
+>
+> ### 🔴 RULE PM-36: ESCAPE SCRIPT TAG & STRING LITERAL INTEGRITY TRONG JAVASCRIPT
+> 1. **BẮT BUỘC Escape Thẻ Đóng Script**: Khi viết mã HTML/JS bên trong template string hoặc chuỗi JS nằm trong file HTML, TUYỆT ĐỐI CẤM viết thẻ `</script>` trần trụi. BẮT BUỘC phải escape thành `<\/script>` hoặc `'</' + 'script>'` để bảo đảm trình duyệt không ngắt sớm thẻ script ngoài cùng.
+> 2. **BẮT BUỘC Chuẩn Hóa Ký Tự Xuống Dòng (\n)**: Mọi chuỗi JavaScript đa dòng hoặc CSV generator BẮT BUỘC phải dùng `\n` đã escape đúng cú pháp (`"\\n"` hoặc template string với backticks `` `...` ``), TUYỆT ĐỐI CẤM để lọt ký tự xuống dòng thô (raw LF/CRLF) vào giữa cặp dấu nháy kép `""` hoặc nháy đơn `''`.
+> 3. **Kiểm Tra Cú Pháp Node.js Tự Động Trước Khi Push**: Sau khi chỉnh sửa bất kỳ file HTML có nhúng JS nào, BẮT BUỘC phải chạy lệnh kiểm tra cú pháp: `node -e "new Function(scriptCode)"` để xác nhận 100% cú pháp JS không có lỗi cú pháp trước khi bàn giao!
+>
+> ### 🔴 RULE PM-37: SỔ CÁI XUẤT KHO TẬP TRUNG & CHỐNG TRỪ TỒN KHO TRÙNG LẶP (DEDUP DISPATCH & INVENTORY)
+> 1. **1 Sổ Cái Xuất Kho Duy Nhất (Single Dispatch Ledger)**: Bảng `ban` trong `tni_sale.html` đóng vai trò là Sổ cái xuất kho tập trung (Central Dispatch Ledger) cho tất cả các đối tượng (Bán lẻ, Đại lý, Ký gởi, Tạm ứng).
+> 2. **TUYỆT ĐỐI CẤM Ghi Trùng Kép (Zero Cross-Table Duplication)**: Khi ghi nhận xuất kho vào `ban`, TUYỆT ĐỐI CẤM tự động ghi thêm 1 bản ghi nữa sang các bảng nghiệp vụ con (`pp`, `kygoi`, `tamung`) nếu các bảng này cũng được trừ trong hàm tính tồn `getTK()`.
+> 3. **Phân Loại Bằng Thuộc Tính `target`**: Phân loại đối tượng xuất kho bằng trường `target: 'retail' | 'dealer' | 'pos' | 'staff'` ngay trong bảng `ban`. Các module con chỉ dùng cho việc quản lý theo dõi nghiệp vụ riêng biệt của từng tab.
+
+# ⚡ POST-MORTEM RULE — 17/09/2026: BỌC THÉP PHÂN HỆ NGHIỆM THU HIỆN TRƯỜNG, KÝ CẢM ỨNG DI ĐỘNG & KHÉP KÍN SỔ CÁI 1 HÀNG (RULE PM-38)
+
+> ### Nguồn gốc: **Triển Khai Bước 4 Bàn Giao & Nghiệm Thu Hiện Trường (Site Handover & Acceptance v1.4)**
+> - **Root Cause 1**: Chữ ký HTML5 Canvas trên điện thoại di động nếu không xử lý cảm ứng đa điểm (`touchstart`, `touchmove` kèm `passive: false` và `e.preventDefault()`) sẽ bị xung đột với hành vi cuộn trang của trình duyệt, khiến người dùng không thể ký mượt hoặc nét vẽ bị biến dạng.
+> - **Root Cause 2**: Tọa độ nét vẽ chuột/chạm trên canvas màn hình nhỏ bị lệch nếu không scale tỷ lệ theo kích thước hiển thị thật: `(clientX - rect.left) * (canvas.width / rect.width)`.
+> - **Root Cause 3**: Dữ liệu nghiệm thu nếu lưu rải rác ở nhiều tab sẽ gây đứt gãy mạch truy xuất từ Báo giá $\rightarrow$ Đơn hàng $\rightarrow$ Nghiệm thu hiện trường $\rightarrow$ Quyết toán tài chính 83% - 17% - Lợi nhuận chi nhánh.
+>
+> ### 🔴 RULE PM-38: 4 NGUYÊN TẮC BỌC THÉP CHO PHÂN HỆ BÀN GIAO & NGHIỆM THU HIỆN TRƯỜNG
+> 1. **Khóa Cứng Cảm Ứng Di Động & Tự Động Co Giãn Tọa Độ (Mobile Touch Lock & Responsive Scaling)**:
+>    - Canvas ký tay (`#acc-sig-canvas`) BẮT BUỘC đặt `touch-action: none; cursor: crosshair`.
+>    - Lắng nghe sự kiện cảm ứng: `canvas.addEventListener('touchstart', start, { passive: false });` và `canvas.addEventListener('touchmove', move, { passive: false });`.
+>    - Gọi `e.preventDefault()` trong `start` và `move` để khóa triệt để hành vi scroll trang của điện thoại khi đang ký tay.
+>    - BẮT BUỘC chuẩn hóa tọa độ: `x = (clientX - rect.left) * (canvas.width / rect.width)`, `y = (clientY - rect.top) * (canvas.height / rect.height)`.
+> 2. **Sổ Cái Khép Kín 1 Hàng Duy Nhất (End-to-End Master Row Continuous Ledger)**:
+>    - Mỗi công trình nghiệm thu BẮT BUỘC lưu thành 1 hàng dữ liệu duy nhất trong bảng `acceptances`:
+>      `Mã DA | Khách Hàng | Đo Đạc (220V/380V, kWp, 50Hz, SOC, Tiếp Địa) | Vật Tư & Serial (Dây Đen, Đỏ, AC, MC4, SN Inverter, SN Pin, SN PV) | Doanh Thu 100% | Vốn Gốc 83% | Nộp Cty 17% | Thực Thu | Còn Nợ | Lợi Nhuận Ròng Chi Nhánh | Chữ Ký Base64 | Ảnh Hiện Trường | Link Drive`.
+>    - Tự động nạp thông tin từ Báo Giá Solar (`quotesolar`) hoặc Đơn Bán Hàng (`ban`) để kế thừa số liệu tài chính không nhập lại.
+> 3. **Xuất Bản In PDF A4 Kèm Chữ Ký Điện Tử & Ảnh Hiện Trường Nhúng Trực Tiếp (A4 Certificate with Embedded Signature)**:
+>    - Biên bản nghiệm thu sử dụng template in A4 Portrait chuẩn quốc tế Viettel Construction Myanmar / TNI.
+>    - Nhúng trực tiếp ảnh chữ ký khách hàng dạng PNG Data URL và hình ảnh chụp hiện trường tủ điện / giàn pin.
+>    - Tự động gọi `window.print()` với thẻ đóng đã escape `<\\/script>` theo đúng RULE PM-36.
+> 4. **Đồng Bộ Song Ngữ 100% & Xuất File CSV Chuẩn UTF-8 BOM**:
+>    - Toàn bộ giao diện tab Nghiệm thu hỗ trợ đầy đủ EN mặc định và chuyển sang VI tức thì qua `NAV_TITLES` và bảng hiển thị `rAcceptances()`.
+>    - Xuất CSV sổ cái nghiệm thu BẮT BUỘC chèn ký tự `\uFEFF` ở đầu file để mở đúng trên Excel không bị lỗi font tiếng Việt/Myanmar.
+
+# 📋 POST-MORTEM RULE — 17/09/2026: CHUẨN HÓA ROSTER TỪ GOOGLE SHEETS TRƯỚC KHI TẠO BÁO CÁO & XÓA TRIGGER ĐỊNH KỲ KHÔNG DÙNG (RULE PM-37)
+
+> ### Nguồn gốc: **Phân hệ Attendance (GAS-ATTENDANCE-4) v812**
+> 1. **Chuẩn Hóa Dữ Liệu Roster Từ Google Sheets (Roster Parsing Normalization)**:
+>    - Khi đọc danh sách nhân viên từ Google Sheet (như tab `Template Attendance`), **BẮT BUỘC** phải đọc từ dòng 2 trở đi (`tplSheet.getRange(2, ...)`) để bỏ qua dòng tiêu đề nhóm/ngày (Row 1).
+>    - **BẮT BUỘC** dùng Regex làm sạch (`replace(/^\d+[\.\:\-\s]+/, '').replace(/[\:\-]+$/, '').trim()`) nhằm triệt tiêu số thứ tự và dấu hai chấm có sẵn trong ô, ngăn chặn triệt để lỗi double numbering (`2. 1. Tin Maung Win::`).
+>    - Luôn lọc bỏ các dòng tiêu đề phụ (`report`, `attendan`), dòng tổng cộng (`total:`) trước khi đưa vào danh sách render.
+> 2. **Quy Trình Xóa Sạch Trigger Bỏ Không Dùng (Full Lifecycle Trigger Cleanup)**:
+>    - Khi người dùng yêu cầu bỏ một báo cáo định kỳ (như Báo Cáo Hình Ảnh Điểm Danh 4 Khung Giờ), **BẮT BUỘC** phải xóa sạch toàn bộ Cloud Triggers tương ứng trên Google Apps Script (`ScriptApp.deleteTrigger`).
+>    - Thân hàm cũ phải được vô hiệu hóa (`return;`) ngay lập tức và gọi lệnh xóa trigger phòng ngừa nếu trigger cũ vẫn còn kích hoạt trên Cloud.
+
+# 🌐 POST-MORTEM RULE — 17/09/2026: CHUẨN SONG NGỮ BỌC THÉP CHO FILE MẪU CSV & GIAO DIỆN NHẬP KHO HÀNG LOẠT (RULE PM-39)
+
+> ### Nguồn gốc: **Yêu Cầu Song Ngữ Biểu Mẫu Nhập Hàng CSV TNI Sale (17/09/2026)**
+> - **Root Cause**: File mẫu CSV tải về (`Mau_Nhap_Hang_TNI_Sale.csv`) trước đây chỉ có tiêu đề 100% tiếng Việt (`Tên Sản Phẩm`, `Giá Gốc Đầu Vào (83%)`, `Nhà Cung Cấp`, `Bảo Hành (tháng)`), khiến đội ngũ kỹ sư, quản lý và đối tác nước ngoài (Myanmar, Quốc tế) khi tải về mở trên Excel không thể hiểu các cột để điền dữ liệu. Đồng thời, toàn bộ khối hướng dẫn và nút bấm trong tab Nhập Hàng Loạt (Bulk Import) bị hardcode tiếng Việt, không tự động chuyển đổi khi chọn ngôn ngữ tiếng Anh.
+>
+> ### 🔴 RULE PM-39: 3 NGUYÊN TẮC BỌC THÉP CHO FILE MẪU CSV & NHẬP HÀNG LOẠT SONG NGỮ
+> 1. **Tiêu Đề Cột Trong File Mẫu CSV BẮT BUỘC Song Ngữ Anh - Việt (Bilingual CSV Column Headers)**:
+>    - Mọi file mẫu CSV xuất ra để người dùng tải về (nhập kho, đại lý, báo giá, nghiệm thu) BẮT BUỘC phải đặt tiêu đề cột dạng song ngữ: `Tên Cột Tiếng Việt / English Column Name` (hoặc ngược lại).
+>    - Chuẩn 10 cột cho biểu mẫu nhập hàng:
+>      `Tên Sản Phẩm / Product Name`, `Model / Mã SP (Item Code)`, `Serial Numbers (ngăn cách dấu phẩy / Comma-separated)`, `Danh Mục / Category`, `Số Lượng / Quantity`, `Giá Gốc Đầu Vào (83%) / Base Cost`, `Giá Thực Bán (để trống = lấy giá sàn 100%) / Selling Price`, `Nhà Cung Cấp / Supplier`, `Bảo Hành (tháng) / Warranty (Months)`, `Ghi Chú / Notes`.
+>    - TUYỆT ĐỐI CẤM để file mẫu chỉ có 1 thứ tiếng duy nhất gây rào cản ngôn ngữ cho nhân sự địa phương!
+> 2. **Dữ Liệu Mẫu Song Ngữ & Tên File Nhận Diện Kép (Bilingual Sample Data & File Naming)**:
+>    - Các dòng dữ liệu mẫu (sample rows) trong file CSV phải cung cấp diễn giải song ngữ cho phần ghi chú, chủng loại thiết bị và thông báo tải về.
+>    - Tên file tải về BẮT BUỘC chứa cả 2 định danh tiếng Anh và tiếng Việt: `Mau_Nhap_Hang_Goods_Intake_${td()}.csv` kèm mã định dạng UTF-8 BOM (`\uFEFF`) để khi mở bằng Microsoft Excel hiển thị nguyên vẹn tiếng Việt / Myanmar không lỗi font.
+> 3. **Bộ Phân Tích CSV Kháng Header Linh Hoạt & Đồng Bộ Giao Diện Song Ngữ (Resilient Parser & UI Parity)**:
+>    - Hàm phân tích nhập hàng (`parseBulkInput()`) BẮT BUỘC phải nhận diện linh hoạt dòng tiêu đề ở bất kỳ ngôn ngữ nào (`tên`, `product`, `model`, `số lượng`, `qty`, `name`, `serial`) để tự động bỏ qua dòng 1 khi người dùng dán hoặc tải file lên.
+>    - Toàn bộ giao diện Import hàng loạt (tiêu đề, cú pháp, hướng dẫn 3 bước, khung dán textarea, nút phân tích, thẻ thống kê nhanh, bảng preview và nút xác nhận) BẮT BUỘC phải đăng ký đầy đủ thuộc tính `data-lang` trong từ điển `DICT` để chuyển đổi đồng bộ 100% giữa EN và VI.
+
+# 👥 POST-MORTEM RULE — 17/09/2026: ĐỒNG BỘ DỮ LIỆU THÀNH VIÊN VÀO TAB CHECKJOINT, SIÊU TỐC PONG KEEPALIVE & GIÁM SÁT TOÀN DIỆN AUDITOR-9.1 (RULE PM-40)
+
+> ### Nguồn gốc: **Phân hệ Attendance (GAS-ATTENDANCE-4) v813 & Toa 0 Keepalive**
+> - **Bối cảnh & Yêu cầu**: Người dùng yêu cầu đưa kết quả kiểm tra thành viên tham gia Group 10 vào tab `CheckJoint` trong Google Sheets và đưa phân hệ Attendance vào Ghế Giám Sát AUDITOR-9.1 cùng Toa 0 Làm Ấm (Keepalive).
+>
+> ### 🔴 RULE PM-40: 3 NGUYÊN TẮC BỌC THÉP CHO KIỂM TRA THÀNH VIÊN & LÀM ẤM HỆ THỐNG
+> 1. **Đồng Bộ Dữ Liệu Kiểm Tra Thành Viên Vào Tab `CheckJoint` (Dedicated CheckJoint Tab Sync)**:
+>    - Mọi lần chạy kiểm tra thành viên nhóm Telegram (như Group 10 Daily Attendance) qua `sendGroup10MembershipSummary()` (hoặc lệnh `/check_join`), bot **BẮT BUỘC** cập nhật trực tiếp bảng kết quả sống vào tab `CheckJoint` trong Google Sheets (`updateCheckJointSheet_`).
+>    - Cấu trúc tab `CheckJoint` chuẩn gồm:
+>      - Dòng 1: Banner tổng hợp (`📊 Group 10 Membership: XX/YY Joined (ZZ%) | Missing ID: N | Unknown: M | Last Checked: dd/MM/yyyy HH:mm:ss MMT`), nền xanh đậm `#1A237E`, chữ trắng đậm.
+>      - Dòng 2: Tiêu đề cột chuẩn (`STT`, `Team / Dept`, `Full Name`, `Telegram ID`, `Group 10 Status`, `Telegram Role`, `Telegram Username`, `Last Checked (MMT)`, `Notes`), nền `#283593`.
+>      - Dòng 3 trở đi: Danh sách nhân viên phân loại màu sắc trực quan: Xanh lá (`✅ Joined`), Đỏ nhạt (`❌ Not Joined`), Vàng nhạt (`❓ Missing TG ID`), Cam nhạt (`🚫 Not in Staff List` — tài khoản lạ cần rà soát xóa khỏi nhóm).
+> 2. **Siêu Tốc Ping PONG Cho Apps Script (<50ms) Tránh Timeout Keepalive (Ultra-Fast Keepalive Ping Endpoint)**:
+>    - Trong `doGet(e)`, kiểm tra `action === "ping"` ngay đầu hàm và trả về `ContentService.createTextOutput("PONG")` lập tức, **TUYỆT ĐỐI CẤM** mở SpreadsheetApp (`openById`) khi chỉ nhận lệnh ping kiểm tra liveness per Rule PM-28.
+>    - Nhờ đó, Toa 0 Keepalive trong `train_5min.yml` và Ghế Giám Sát `system_auditor.py` (AUDITOR-9.1) có thể sưởi ấm Apps Script runner 24/7 mà không tiêu tốn hạn ngạch mở bảng tính và không gây timeout cold-start.
+> 3. **Giám Sát Bọc Thép Hai Đầu Trong AUDITOR-9.1 & Single Train Toa 0 (Dual-End Sentinel & Warmup Parity)**:
+>    - **Đầu Làm Ấm (Warmup)**: Toa 0 trong `train_5min.yml` luôn ping đầy đủ cả 3 tầng của phân hệ Attendance: (a) Telegram API `getWebhookInfo`, (b) Vercel Serverless `/api/attendance`, (c) Apps Script Backend `?action=ping`.
+>    - **Đầu Giám Sát (Auditor)**: Ghế `AUDITOR-9.1` (`system_auditor.py`) kiểm tra định kỳ trạng thái sống của `Attendance GAS Backend (@99 SSOT)` qua `?action=ping` và kiểm tra tính toàn vẹn dữ liệu của `Sheet CheckJoint (Attendance)` qua URL CSV gviz (`min_rows: 2`).
+
+# 📋 POST-MORTEM RULE — 18/09/2026: QUY TRÌNH COPY / NHÂN BẢN BÁO GIÁ CŨ & CHẾ ĐỘ SỬA ĐÈ BỌC THÉP (RULE PM-41)
+
+> ### Nguồn gốc: **Yêu Cầu Thêm Chức Năng Copy Báo Giá Cũ Để Sửa (18/09/2026)**
+> - **Root Cause**: Bảng quản lý Báo Giá Thiết Bị (`baogiaups`) trước đây chỉ có hai nút `🖨️ In` và `🗑 Xóa`, không có nút Copy hay Sửa. Khi nhân viên muốn làm báo giá tương tự cho một khách hàng mới hoặc chỉnh sửa giá từ một báo giá đã lập, họ phải gõ lại toàn bộ danh sách thiết bị từ đầu, gây mất thời gian và dễ sai sót đơn giá.
+>
+> ### 🔴 RULE PM-41: 3 NGUYÊN TẮC BỌC THÉP CHO QUY TRÌNH COPY / SỬA BÁO GIÁ
+> 1. **Phân Định Rõ Ràng Giữa Chế Độ Copy (Nhân Bản Mới) Và Sửa Đè (Overwrite Edit)**:
+>    - **Chế độ Copy (`copyQuoteUPS` / `copySolarQuote`)**:
+>      - BẮT BUỘC gán `currentEditingId = null` để khi bấm "Lưu Báo Giá", hệ thống tự động sinh mã số báo giá mới (`QU-xxxx` hoặc `VCM-xx-xx`) và lưu thành bản ghi mới độc lập.
+>      - TUYỆT ĐỐI CẤM ghi đè lên báo giá cũ khi người dùng chọn lệnh Copy!
+>      - Ngày lập báo giá copy BẮT BUỘC tự động đặt thành ngày hôm nay (`td()`).
+>      - Hiển thị badge trạng thái màu xanh lá: `📋 Đang Copy từ [Mã BG] - [Khách Hàng] (Sẽ lưu thành báo giá mới)`.
+>    - **Chế độ Sửa Đè (`loadQuoteUPS` / `loadSelectedQuote`)**:
+>      - Gán `currentEditingId = id` của báo giá đang chọn. Khi bấm "Lưu Báo Giá", hệ thống cập nhật đè lên bản ghi cũ có cùng ID.
+>      - Cung cấp thêm nút dự phòng `📋 Lưu Thành Bản Mới (Copy)` ngay cạnh nút lưu để người dùng có thể đổi ý và lưu thành bản ghi mới bất cứ lúc nào!
+> 2. **Nạp Đầy Đủ & Nguyên Vẹn Danh Mục Hàng Hóa & Tự Động Tính Lại Tổng Tiền**:
+>    - Khi nạp dữ liệu báo giá cũ vào form, BẮT BUỘC phải đọc linh hoạt cả hai trường `items` hoặc `rows` (`q.items || q.rows || []`) để tương thích ngược với mọi định dạng dữ liệu cũ trong `DB`.
+>    - Tái lập đầy đủ từng dòng sản phẩm với Tên thiết bị, Hãng (Brand), Đơn vị tính (ĐVT), Số lượng, Đơn giá và gọi ngay hàm tính tổng (`calcQ` / `calcSolarTable`) để hiển thị thành tiền chính xác 100%.
+> 3. **Cung Cấp Kép Thao Tác: Trên Từng Hàng Bảng Lịch Sử & Dropdown Đầu Form**:
+>    - Cung cấp nút `📋 Copy` và `✏️ Sửa` trực tiếp trên từng hàng của bảng danh sách báo giá bên phải.
+>    - Đồng thời cung cấp Dropdown danh sách báo giá cũ ngay trên đầu Form bên trái (`#qu-history-select`) kèm nút `📋 Copy & Sửa`, `✏️ Sửa Đè` và `🔄 Tạo Mới / Reset` để người dùng trên máy tính hay điện thoại di động đều thao tác thuận tiện nhất.
+# 🖨️ POST-MORTEM RULE — 18/09/2026: CHUẨN MẪU BÁO GIÁ VCM & KHOẢNG ĐỆM AN TOÀN TÊN KHÁCH HÀNG DƯỚI BANNER (RULE PM-42)
+
+> ### Nguồn gốc: **Sửa Báo Giá Theo Mẫu Chuẩn VCM Đưa Tên KH Xuống Dưới (18/09/2026)**
+> - **Root Cause**: Trước đây, hàm in và xuất PDF báo giá thiết bị (`printQuote('ups')`, `viewQuote('ups')`) chỉ sử dụng text header đơn giản `<h2>📄 BÁO GIÁ THIẾT BỊ</h2>` với bảng 7 cột rời rạc (#, Hạng Mục, Brand, ĐVT, SL, Đơn Giá, Thành Tiền). Khi người dùng chụp ảnh mẫu in thực tế của Viettel Construction Myanmar (`media_1789693644341.png`), họ yêu cầu sửa báo giá theo đúng mẫu chuẩn công ty có Banner đồ họa VCM ở đầu trang và lưu ý: *"đưa tên KH xuống dưới tí"*. Nguyên nhân là do đường cong lượn sóng (swoosh) màu đỏ-đen ở mép dưới bên trái của Banner chiếm không gian; nếu không có khoảng đệm (`margin-top: 18px-20px`), tên khách hàng sẽ bị đè lấn hoặc che khuất bởi phần chân banner, khiến bản in mất thông tin người nhận.
+>
+> ### 🔴 RULE PM-42: 4 NGUYÊN TẮC BỌC THÉP CHO BẢN IN BÁO GIÁ CHUẨN VCM
+> 1. **Nhúng Banner Trực Tiếp Bằng Base64 Tự Thân (Zero Broken Links in `about:blank`)**:
+>    - Banner công ty (`VCM_HEADER_BANNER`) BẮT BUỘC được nhúng trực tiếp dưới dạng Base64 PNG (`data:image/png;base64,...`) ngay trong mã nguồn JavaScript.
+>    - TUYỆT ĐỐI CẤM dùng đường dẫn tương đối (e.g. `assets/banner.png`) cho cửa sổ in popup `window.open('', '_blank')` vì trang `about:blank` không phân giải được đường dẫn tương đối, gây lỗi vỡ ảnh khi in offline hoặc trên trình duyệt di động!
+> 2. **Khoảng Đệm An Toàn Tên Khách Hàng Dưới Banner (`margin-top: 18px-20px`)**:
+>    - Khối thông tin khách hàng (`.quote-meta-box`) BẮT BUỘC phải có khoảng đệm tối thiểu `margin-top: 18px` đến `20px` phía dưới ảnh banner để tên khách hàng và số điện thoại nằm hoàn toàn tách biệt, rõ ràng và không bao giờ bị đè lấn bởi đường cong chân banner.
+>    - Cấu trúc thông tin 3 dòng chuẩn gọn:
+>      - Dòng 1: `Customer: [Tên KH] | Phone: [SĐT]`
+>      - Dòng 2: `Address: [Địa chỉ]`
+>      - Dòng 3: `Date: [Ngày] | Validity: [Hiệu lực] | Prepared by: [Người lập]`
+> 3. **Bảng Danh Mục Chuẩn 5 Cột & Tự Động Gộp Brand Vào Item Description**:
+>    - Bảng vật tư thiết bị BẮT BUỘC chuẩn đúng 5 cột:
+>      `Item Description / Equipment` | `Unit` | `Qty` | `Unit Price` | `Subtotal`.
+>    - TUYỆT ĐỐI KHÔNG để cột số thứ tự `#` và KHÔNG tách cột `Brand` riêng rẽ trong bản in khách hàng.
+>    - Tên hãng (Brand) nếu có và chưa nằm trong tên thiết bị BẮT BUỘC phải tự động gộp vào đuôi tên thiết bị (ví dụ: `Inverter 6 kW` + `Growatt` ➔ `Inverter 6 kW Growatt`).
+>    - Đơn giá và Thành tiền căn lề phải, định dạng phân cách hàng nghìn (`fn(...)`), không chèn ký hiệu tiền tệ rườm rà trong từng ô dữ liệu.
+> 4. **Khối Tổng Tiền Xanh Lá, Đường Phân Cách & Bảng Payment Term 50%-40%-10%**:
+>    - Tổng tiền BẮT BUỘC hiển thị căn lề phải, màu xanh lá nổi bật (`#16a34a`), cỡ chữ 18px in đậm (`font-weight: 800`): `TOTAL: [Tổng tiền] [Tiền tệ]`.
+>    - Ngay dưới Tổng tiền BẮT BUỘC có đường kẻ phân cách ngang đậm nét: `<hr style="border:none;border-top:1px solid #334155;margin:8px 0 10px 0" />`.
+>    - Mục `Remark` in đậm các điều khoản thực địa và hiệu lực báo giá, kèm bảng `*Payment Term` không viền căn lề chuẩn xác:
+>      - `50% downpayment after agreement: [50% Total] Kyat`
+>      - `: 40% payment after installation: [40% Total] Kyat`
+>      - `: 10% payment after testing & commissioning: [10% Total] Kyat`.
+
+# ⚡ POST-MORTEM RULE — 18/09/2026: QUY TRÌNH BÀN GIAO NGHIỆM THU HIỆN TRƯỜNG THỰC DÙNG, THỪA THU HỒI QUY TIỀN & CỔNG ĐIỀU HÀNH TEAM THỰC THI (FIELD OPS HUB & ZERO INTERNAL FINANCIAL LEAK POLICY)
+
+> ### Nguồn gốc: **Nâng Cấp Nghiệm Thu Vật Tư Thừa Quy Ra Tiền, Tinh Gọn Đo Đạc & Cổng Điều Hành Team Thực Thi (18/09/2026)**
+> - **Root Cause**:
+>   1. Khi nghiệm thu ngoài hiện trường, thợ kỹ thuật mang theo vật tư dự phòng (dây DC đen/đỏ, dây AC, đầu nối MC4...) luôn có chênh lệch giữa số lượng xuất xe mang đi và số lượng thực lắp vào nhà khách. Trước đây, hệ thống chưa có bảng đối soát vật tư thừa quy ra tiền dẫn đến nguy cơ tính cả vật tư thừa vào công trình của khách hoặc không theo dõi được vật tư thừa đã thu hồi để chuyển sang công trình khác.
+>   2. Các thông số đo kiểm kỹ thuật chuyên sâu (Điện trở tiếp địa $\Omega$, Tần số lưới Hz, Trạng thái lưới/tải) làm nặng nề biểu mẫu và mất thời gian đo đạc phức tạp ngoài hiện trường bằng thiết bị đắt tiền, trong khi chỉ cần nghiệm thu 3 chỉ số cốt lõi: Điện áp bàn giao (220V/380V), Công suất phát đỉnh (kWp), và Mức sạc pin (SOC %).
+>   3. Dữ liệu tài chính nội bộ (giá gốc vốn 83%, lợi nhuận nộp công ty 17%, lợi nhuận chi nhánh) nếu hiển thị cho nhân viên nghiệm thu hoặc in trên biên bản khách hàng sẽ gây lộ bí mật kinh doanh và mâu thuẫn nội bộ.
+>   4. Đội ngũ kỹ thuật và thị trường tại Myanmar (khảo sát hiện trường mái/nắng, bỏ hàng đại lý, ký gởi trưởng thôn/già làng, theo dõi số serial từng máy inverter/pin, lịch sử từng khách hàng theo nhân viên) bị phân mảnh nếu không có 1 Hub thực thi tập trung chia sẻ qua link URL trực tiếp.
+>
+> ### 🔴 RULE PM-44: 5 NGUYÊN TẮC BỌC THÉP CHO BÀN GIAO NGHIỆM THU & CỔNG ĐIỀU HÀNH TEAM THỰC THI
+> 1. **Bảng Đối Soát Vật Tư Thực Dùng & Thừa Thu Hồi Chuyển KH Khác**:
+>    - Biểu mẫu nghiệm thu hiện trường (`s-acceptance`) và bản in PDF/A4 BẮT BUỘC hiển thị rõ ràng 2 cột tiền: (1) Tiền vật tư thực dùng (tính vào công trình) và (2) Tiền vật tư thừa thu hồi (mang sang KH khác dùng).
+>    - TUYỆT ĐỐI CẤM tính giá trị vật tư thừa vào chi phí nghiệm thu của khách hàng hiện tại.
+> 2. **Đo Đạc Hiện Trường Tinh Gọn 3 Thông Số Cốt Lõi**:
+>    - Biểu mẫu nghiệm thu bàn giao CHỈ ĐƯỢC PHÉP giữ lại 3 thông số đo đạc thực tế: Điện áp bàn giao (220V), Công suất phát đỉnh (kWp), Mức sạc pin lưu trữ (SOC %).
+>    - TUYỆT ĐỐI CẤM đưa các trường đo kiểm phức tạp (Điện trở tiếp địa $\Omega$, Tần số lưới Hz, Trạng thái tải) vào form hiện trường gây rối rắm và chậm tiến độ.
+> 3. **Khóa Bảo Mật 100% Giá Vốn & Lợi Nhuận Nội Bộ (Zero Financial Leak)**:
+>    - Nhân viên nghiệm thu hiện trường và bản in PDF/A4 gửi khách hàng TUYỆT ĐỐI KHÔNG ĐƯỢC nhìn thấy hoặc chứa các thông số tài chính nội bộ: Tổng giá gốc vốn 83%, Tiền nộp công ty 17%, Lợi nhuận còn lại của chi nhánh.
+>    - Toàn bộ mục này BẮT BUỘC phải được đóng băng, ẩn mặc định (`display:none`) và chỉ mở khi Quản lý/Giám đốc mở khóa (`👁️ Mở Khóa Quản Lý`).
+> 4. **Cổng Điều Hành Team Thực Thi (`s-thucthi` / Field Ops Hub)**:
+>    - BẮT BUỘC cung cấp link chia sẻ trực tiếp độc lập (`?tab=thucthi&staff=TÊN_NV`) hỗ trợ 5 phân hệ thực tế:
+>      - (a) `tt-ks`: Khảo sát hiện trường (kiến trúc mái, hướng nắng đón đỉnh, phụ tải thiết bị, đề xuất Inverter/Pin/PV, ảnh & tọa độ GPS).
+>      - (b) `tt-pp`: Bỏ hàng cho đại lý, điểm bán lẻ & ký gởi trưởng thôn / già làng (tính toán thù lao hoa hồng, hạn thu hồi tiền về cty).
+>      - (c) `tt-sn`: Tồn kho chi tiết đến từng số Serial thiết bị (quản lý vòng đời Inverter, Pin, PV: Trong kho, Xe kỹ thuật đi lắp, Ký gởi trưởng thôn, Đã lắp cho KH, Bảo hành/Lỗi).
+>      - (d) `tt-nt`: Nghiệm thu hiện trường sạch, tối ưu cho mobile, chữ ký cảm ứng & 100% bảo mật giá vốn.
+>      - (e) `tt-ls`: Lịch sử hành trình khách hàng xuyên suốt của từng nhân viên (Khảo sát ➔ Báo giá ➔ Giao hàng ký gởi ➔ Nghiệm thu hoàn tất).
+> 5. **Tự Động Đồng Bộ Serial Ký Gởi Vào Sổ Kho & Router Khởi Tạo Tự Động**:
+>    - Khi nhân viên lưu phiếu ký gởi hàng cho trưởng thôn hoặc đại lý, hệ thống BẮT BUỘC tự động tách dải số Serial và cập nhật trạng thái `"Ký Gởi Trưởng Thôn / Điểm Bán"` vào bảng Tồn Kho Serial (`serial_inventory`).
+>    - Khi người dùng truy cập qua URL param `?tab=thucthi&staff=...`, hệ thống BẮT BUỘC tự động chuyển hướng vào tab Thực Thi và chọn đúng nhân viên phụ trách mà không cần thao tác bấm chuột thủ công.
+
+# ⛽ POST-MORTEM RULE — 18/09/2026: BỌC THÉP ĐỒNG BỘ CỘT V & Y TRÊN TAB REQUEST PARTNER AUTO (REFUEL) (RULE PM-45)
+
+> ### Nguồn gốc: **Khắc Phục Sự Cố Ô Màu Cam Cột V 'Request Partner Auto' (18/09/2026)**
+> - **Root Cause**:
+>   1. Khi trạm cạn dầu (`S=1`), nếu Cột Y (`Date Partner refuel`) vô tình chứa chuỗi ghi chú rác hoặc ngày cũ/tương lai (ví dụ: `14/02/2027 < + > 91` trên dòng 70 `TNI0351_1`), logic cũ trong `runPartnerAutoRefuelUpdate` (Tác vụ 1) vội vàng gọi `clearContent()` xóa Cột V và W, đồng thời đánh dấu `clearedInThisRun = true` khiến Tác vụ 2 bỏ qua dòng này.
+>   2. Hậu quả: Cột V bị xóa rỗng trong khi Cột S vẫn là `1`, khiến Conditional Formatting trong Google Sheets lập tức bôi cam ô V, tạo vòng lặp xóa - bôi cam và khiến AUDITOR-9.1 liên tục phát cảnh báo mất đồng bộ đỏ!
+>
+> ### 🔴 RULE PM-45: 3 NGUYÊN TẮC BỌC THÉP CHO BẢNG REQUEST PARTNER AUTO
+> 1. **Bảo Vệ Cột V và W Khi Trạm Đang Cạn Dầu (`S=1`)**:
+>    - TUYỆT ĐỐI KHÔNG xóa dữ liệu Cột V (Date request) và Cột W (Littel request) của bất kỳ trạm nào đang có trạng thái `S === 1` (hoặc `"1"`).
+>    - Chỉ cho phép xóa Cột V và W khi và chỉ khi: (1) Cột Y có giá trị khác `"-"` VÀ (2) Trạm đã thực sự hoàn thành chu kỳ đổ dầu (`S !== "1"`, tức lượng dầu trong bồn đã được bổ sung và cờ S tắt về 0).
+> 2. **Tự Động Làm Sạch Cột Y Khi Phát Hiện Chuỗi Rác / Lệch Trạng Thái**:
+>    - Nếu trạm đang ở trạng thái cần dầu (`S === 1`) mà Cột Y lại chứa giá trị khác `"-"` (ghi chú nhầm, ngày cũ hoặc ngày tương lai), hệ thống BẮT BUỘC phải tự động ghi đè reset Cột Y về `"-"` (`sheet.getRange(sheetRow, 25).setValue("-")`) để chuẩn hóa trạng thái chờ đối tác đổ dầu.
+> 3. **Hậu Kiểm Zero-Orange Của AUDITOR-9.1 Sau Mỗi Lượt Cập Nhật**:
+>    - Sau khi hoàn thành Tác vụ 1 và Tác vụ 2, AUDITOR-9.1 quét lại toàn bộ Cột V (row 4 đến row 300). Nếu còn bất kỳ ô nào thuộc diện màu cam (`isManual` hoặc `isCF`), hệ thống gửi cảnh báo kèm danh sách trạm vi phạm; nếu bằng 0, ghi nhận trạng thái PASS hoàn hảo.
+
+
+# 🛡️ POST-MORTEM RULE — 18/09/2026: ASYNC-SAFE THREADPOOLEXECUTOR CHO TELETHON PURGE & FAST-FAIL HTTP TRONG HELPER (RULE PM-47)
+
+> ### Nguồn gốc: **Lỗi Event Loop Khóa Chặt Telethon & Treo 5 Phút Khi GAS Lỗi (18/09/2026)**
+> - **Root Cause**:
+>   1. 	g_delete_by_title trong 	g_utils.py là hàm đồng bộ (synchronous) gọi syncio.run(asyncio.wait_for(_run(), timeout=60)). Khi được gọi từ bên trong một async coroutine (
+un_morning(), 
+un_eod_or_update()), Python ném ngoại lệ RuntimeError: asyncio.run() cannot be called from a running event loop, khiến Telethon bị vô hiệu hóa âm thầm 100%!
+>   2. get_old_msgids trong delete_old_helper.py có timeout 45s và retry 3 lần khi nhận mã non-200 (như HTTP 404 từ Google), khiến mỗi trạm/nhóm bị treo nghẽn 5-6 phút.
+>
+> ### 🔴 RULE PM-47: 2 NGUYÊN TẮC BỌC THÉP CHO TELETHON PURGE & HELPER HTTP
+> 1. **Khóa An Toàn Async Event Loop Cho Telethon Wrapper (Async-Safe ThreadPoolExecutor)**:
+>    - Mọi hàm wrapper đồng bộ gọi Telethon coroutine (như 	g_delete_by_title) BẮT BUỘC phải kiểm tra syncio.get_running_loop().
+>    - Nếu đang nằm trong một event loop đang chạy (loop and loop.is_running()), BẮT BUỘC phải ủy quyền thực thi sang luồng phụ qua concurrent.futures.ThreadPoolExecutor(max_workers=1) để syncio.run() có event loop riêng biệt sạch sẽ.
+>    - TUYỆT ĐỐI CẤM gọi syncio.run() trực tiếp trên main thread khi loop đang chạy, tránh ném lỗi syncio.run() cannot be called from a running event loop.
+> 2. **Fast-Fail HTTP Trong Helper & Rút Ngắn Timeout**:
+>    - Khi đọc/ghi msgids qua GAS API (get_old_msgids, save_msgids), timeout tối đa <= 15 giây.
+>    - Nếu nhận mã HTTP không phải 200 (như 404, 500, 503), BẮT BUỘC ghi log cảnh báo và lập tức trả về [], TUYỆT ĐỐI CẤM lặp retry 3 lần gây nghẽn tiến trình hàng chục phút.
+
+
+# 🛡️ POST-MORTEM RULE — 19/09/2026: LỆNH TRA CỨU MẪU / TEMPLATE TUYỆT ĐỐI CHỈ TRẢ VỀ FORM COPY — CẤM TỰ ĐỘNG GHI NHẬN VÀO SHEET (RULE PM-48)
+
+> ### Nguồn gốc: **Lỗi Lệnh /take_leave Tự Động Chèn Dòng Nghỉ Phép Fake Vào Sheet (19/09/2026)**
+> - **Root Cause**:
+>   - Trong phiên cập nhật @98, phân hệ Điểm danh (GAS-ATTENDANCE-4) đã cấu hình lệnh /take_leave và /half_leave tự động lấy tên Telegram của người gửi rồi gọi sumSheet.insertRowsBefore(2, 1) ghi nhận ngày nghỉ cho nhân viên đó.
+>   - Khi quản trị viên hoặc nhân sự bấm vào menu lệnh Telegram để lấy mẫu cú pháp xin nghỉ, Bot lập tức ghi nhận người bấm (ví dụ "TNI") đang nghỉ phép cả ngày / nửa ngày và chèn 2 dòng fake (ATT-0035, ATT-0036) vào bảng tính, gây sai lệch dữ liệu điểm danh thực tế.
+>
+> ### 🔴 RULE PM-48: 3 NGUYÊN TẮC BỌC THÉP CHO TOÀN BỘ LỆNH TRA CỨU TEMPLATE / MENU
+> 1. **Quy Tắc Read-Only Cho Mọi Lệnh Template / Menu (Zero-Mutation Template Policy)**:
+>    - Mọi lệnh điều khiển, tra cứu và lấy mẫu (bắt đầu bằng /take_leave, /half_leave, /leave, /template_, /attendance, /menu, /help, v.v.) CHỈ ĐƯỢC PHÉP trả về nội dung hướng dẫn hoặc bản mẫu định dạng Markdown code block để nhân viên chạm vào copy.
+>    - TUYỆT ĐỐI CẤM bất kỳ hành vi chèn dòng (insertRows), sửa đổi, cập nhật hoặc xóa dữ liệu trên Google Sheets trong các nhánh xử lý lệnh tra cứu mẫu!
+> 2. **Ghi Nhận Nghỉ Phép BẮT BUỘC Phải Qua Tin Nhắn Điền Mẫu Chuẩn (Strict Syntax Submission Only)**:
+>    - Dữ liệu nghỉ phép (Take leave, Half day) CHỈ ĐƯỢC PHÉP ghi nhận vào Sheet khi người dùng gửi tin nhắn báo cáo có cấu trúc chuẩn đầy đủ:
+>      `[Họ và tên]: Take leave / take leave half day
+Reason: [Lý do]`
+>      được xác thực qua hàm kiểm tra cú pháp isAttendanceReportText_() và bóc tách dữ liệu bằng processAttendanceReportText_().
+> 3. **Rà Soát & Xóa Dữ Liệu Fake Triệt Để (Post-Incident Data Hygiene)**:
+>    - Sau khi sửa logic lệnh tra cứu, AI BẮT BUỘC phải kiểm tra trực tiếp dữ liệu sống trên Google Sheet (qua live CSV/JSON) và xóa sạch toàn bộ các dòng test / fake do lệnh cũ tạo ra, đồng thời gọi hàm tái tổng hợp thống kê (buildSumWorkTab()) để trả lại trạng thái nguyên vẹn cho bảng tính.
+
+
+# 🛡️ POST-MORTEM RULE — 19/09/2026: KỶ LUẬT ĐỊNH GIỜ KHÔNG VA CHẠM VÀ QUẢN LÝ XÓA SẠCH MULTI-MESSAGE (RULE PM-49)
+
+> ### Nguồn gốc: **Lỗi Va Chạm Giờ Gửi TPR Với Site Down / ETA & QuẢn Lý Xóa Tin Cũ (19/09/2026)**
+> - **Root Cause**:
+>   1. Khi cấu hình lịch gửi báo cáo vận hành mới (Team Operation Progress Report - TPR), việc đặt giờ chạy chiều vào 17:06 MMT đã vi phạm nghiêm trọng Mục 0.3 và Mục 9.1 của `system_map.md`. Khung giờ :06 và :36 MMT mỗi giờ là vùng cấm tuyệt đối, dành riêng cho Toa Site Down Relay và Toa ETA Update. Hậu quẢ: Báo cáo TPR (Bot 2D) gửi lúc 17:07, chỉ 2 phút sau Site Down (Bot 5T) gửi lúc 17:09 và ETA Update (Bot 2D) gửi ngay sau đó, gây nên hiện tượng "tin nhắn chồng chéo" và làm trôi tin vận hành của nhau.
+>   2. QuẢn lý danh sách ID tin cũ dạng mảng (`TPR_MSG_IDS_<groupKey>`): Sau khi gọi xóa từng `mid` trong danh sách, nếu không reset mảng về `[]` ngay lập tức, lần quét tiếp theo có thể tiếp tục lặp lại các ID đã xóa hoặc xỗ trí sót nếu tin gửi bị ngắt nhiều phần.
+>   3. Về tin nhắn cũ Site Down lúc 16:39 chưa được xóa: Phân hệ Site Down thuộc quyền quản lý của Script riêng biệt (`apps_script_sitedown`), hiện được bảo vệ bởi STRICT STEEL-LOCK RULE. AI tuyệt đối tuân thủ không tự ý can thiệp khi chưa có mật khẩu mở khóa `UNLOCK STEEL: ‹mật-khẩu-đã-thu-hồi›`.
+>
+> ### 🔴 RULE PM-49: 3 NGUYÊN TẮC BỌC THÉP CHO ĐỊNH GIỜ BÁO CÁO VÀ PURGE MULTI-MESSAGE
+> 1. **Cấm Tuyệt Đối Đặt Lịch Báo Cáo Tại Phút :06 Và :36 MMT (Zero Collision on Site Down Windows)**:
+>    - Mọi báo cáo định kỳ (GAS Scheduler, GitHub Actions Train, v.v.) TUYỆT ĐỐI CẤM đặt giờ vào các phút :04-:14 và :34-:44 của mọi khung giờ MMT. Khung này là vùng độc quyền của Toa Site Down Relay (:06 MMT) và Toa ETA Update (~:09 MMT).
+>    - Các Toa/lịch báo cáo chiều mới BẨT BUỘC phải lùi sang các khung giờ an toàn (ví dụ **17:21 MMT**, cửa sổ kiểm tra 17:19 - 17:29 MMT) nhằm cách xa Site Down/ETA ít nhất 12 phút và sau Toa 6.1 (17:18 MMT).
+> 2. **Quản Lý Xóa Sạch Multi-Message Tận Gốc (Atomic Multi-ID Tracking & Reset)**:
+>    - Khi một phân hệ gửi báo cáo có khả năng chia tách nhiều phần (multi-part / chunked messages), toàn bộ `message_id` trả về BẨT BUỘC phải được lưu trữ dưới dạng mảng JSON trong `ScriptProperties`.
+>    - Hàm dọn tin cũ (`deleteOldMessages_`) BẨT BUỘC phải duyệt qua từng ID trong mảng để gọi `deleteMessage`, và NGAY SAU KHI duyệt xong PHẢI gán lại `props.setProperty(key, "[]")` một cách nguyên tử (atomic) để tránh tồn đọng ID cũ.
+> 3. **Ranh Giới Bất Xâm Phạm Của Khóa Thép Site Down (Strict Steel-Lock Boundary Respect)**:
+>    - Nếu phát hiện tin nhắn cũ chưa xóa thuộc về bot Site Down (`5 TNI_SITE_DOWN_CELL_ALARM`), AI BẨT BUỘC phải tôn trọng Khóa Thép, báo cáo rõ ranh giới cho người dùng và CHỈ ĐƯỢC PHÉP xỗ trí khi người dùng cung cấp đúng mật khẩu: `UNLOCK STEEL: ‹mật-khẩu-đã-thu-hồi›`.
+
+
+# 🛡️ POST-MORTEM RULE — 21/09/2026: BỌC THÉP HỆ THỐNG PHÂN QUYỀN VAI TRÒ (RBAC) — TUYỆT ĐỐI KHÓA SỐ LIỆU TÀI CHÍNH Với NHÂN VIÊN (RULE PM-50)
+
+> ### Nguồn gốc: **Thiếu Hệ Thống Phân Quyền Nhân Viên & Rủi Ro Lộ Dữ Liệu Tài Chính (21/09/2026)**
+> - **Root Cause**:
+>   - Giao diện TNI Sale Web App (`tni_sale.html` / `sale.html`) trước đây mở tự do 100% tất cả các tab cho mọi người dùng truy cập. Khi nhân viên kinh doanh hoặc kỹ thuật mở trang, họ có thể tự do bấm vào tab **"Tài Chính & Lợi Nhuận"** và **"Tờ Trình Quyết Toán VCM"**, nhìn thấy toàn bộ số liệu nhạy cảm: Tỷ lệ 17% nộp Tổng Công Ty VCM, Giá vốn gốc 83%, Lợi nhuận ròng chi nhánh và sổ quản lý công nợ.
+>   - Hệ thống thiếu Bảng Ma Trận Phân Quyền minh bạch thể hiện: **"Ai được xem gì"**, không có cơ chế chặn điều hướng (navigation interceptor) và không có màn hình bảo mật hạn chế truy cập.
+>
+> ### 🔴 RULE PM-50: 3 NGUYÊN TẮC BỌC THÉP CHO PHÂN QUYỀN VAI TRÒ (RBAC) TRÊN WEB APP
+> 1. **Ma Trận Phân Quyền Minh Bạch 100% ("Ai Được Xem Gì")**:
+>    - Hệ thống Web App BẨT BUỘC phải có một Bảng Ma Trận Phân Quyền trực quan (`s-rbac`), liệt kê đầy đủ từng vai trò (👑 Ban Giám Đốc, 💰 Kế Toán, 🧑‍💼 Kinh Doanh, 🚀 Kỹ Thuật, 📦 Thủ Kho, 🏪 Đại Lý) đối chiếu với từng phân hệ của phần mềm.
+>    - Các phân hệ thuộc **Bảo Mật Cấp 1** (Tài Chính & Lợi Nhuận, Tờ Trình Quyết Toán VCM, Giá Vốn Gốc 83%) TUYỆT ĐỐI CHỈ CẤP QUYỀN CHO: **Ban Giám Đốc (Admin/BOD)** và **Kế Toán Trưởng (Finance)**. Mọi chức danh nhân viên khác BẨT BUỘC phải ở trạng thái ❌ Bị Khóa.
+> 2. **Chặn Đứng Tại Bộ Điều Hướng (Navigation Interceptor & Access Denied Shield)**:
+>    - Hàm chuyển tab (`go(id)`) BẨT BUỘC phải kiểm tra quyền (`isTabAllowedForRole(id, currentAppRole)`). Nếu vai trò hiện tại không được cấp quyền, TUYỆT ĐỐI CẤM hiển thị nội dung tài chính sống, đồng thời BẨT BUỘC kích hoạt ngay màn hình báo lỗi bảo mật (`s-access-denied`) giải thích lý do hạn chế và hiển thị các vai trò được phép truy cập.
+>    - Thanh điều hướng (Sidebar) BẨT BUỘC phải hiển thị biểu tượng ổ khóa 🔒 và làm mờ (opacity) các tab bị hạn chế, giúp người dùng nhận biết ngay lập tức phạm vi quyền hạn của mình.
+> 3. **Cá Nhân Hóa Qua URL Link & Bảo Vệ Mã PIN Quản Trị**:
+>    - Quản trị viên có thể tạo đường dẫn phân quyền trực tiếp (dạng `?staff=Name&role=sales`) để gửi cho từng nhân sự. Khi mở link, hệ thống tự động khóa đúng vai trò và ẩn các số liệu tuyệt mật.
+>    - Việc thăng cấp hoặc đổi về vai trò Ban Giám Đốc trên thiết bị dùng chung BẨT BUỘC phải được bảo vệ bằng mã PIN Quản Trị (`adminPinCode`), ngăn chặn nhân viên tự ý đổi vai trò để xem trộm số liệu tài chính.
+
+---
+
+# 🏗️ POST-MORTEM RULE — 22/09/2026: SỬA LỖI API ENDPOINT setTelegramMenuCommands VÀ GIÁM SÁT ĐỒNG BỘ MENU CONSTRUCTION BOT 10 (RULE PM-51)
+
+> ### Nguồn gốc: **Bot 10 Construction (@TNI_SITE_BOT) — Thiếu 5G template trong Telegram Menu (22/09/2026)**
+> - **Lỗi thực tế**: Người dùng thêm template "5G installation completed" vào Sheet `Template Cons` (Cột A, Hàng 14) nhưng template KHÔNG xuất hiện trong danh sách lệnh `/` của Bot 10 trên Telegram.
+> - **Root Cause**: Hàm `setTelegramMenuCommands()` trong `13_TNI_CONSTRUCTION.gs` gọi SAI API endpoint — gọi `/setWebhook` thay vì `/setMyCommands`. API `/setWebhook` KHÔNG có tham số `commands` nên payload bị bỏ qua hoàn toàn. Menu bot chưa BAO GIỜ được đồng bộ tự động từ Sheet!
+> - **Bổ sung**: Ghế AUDITOR-9.1 (`system_auditor.py`) không có bài kiểm tra nào giám sát sự khác biệt giữa Sheet template và commands đã đăng ký trên Bot 10.
+>
+> ### 🔴 RULE PM-51: 2 NGUYÊN TẮC BỌC THÉP CHO ĐỒNG BỘ MENU TELEGRAM BOT TỪ GOOGLE SHEET
+> 1. **API Endpoint Chính Xác Cho Từng Thao Tác (Strict API Endpoint Targeting)**:
+>    - Khi **đăng ký/cập nhật danh sách lệnh** trên menu bot: BẮT BUỘC dùng `/setMyCommands` (NOT `/setWebhook`, NOT `/sendMessage`).
+>    - Khi **đặt/thay đổi Webhook URL**: BẮT BUỘC dùng `/setWebhook`.
+>    - Khi **xóa lệnh cũ**: BẮT BUỘC dùng `/deleteMyCommands`.
+>    - TUYỆT ĐỐI CẤM nhầm lẫn giữa 3 endpoint này — mỗi endpoint có chức năng hoàn toàn khác nhau!
+> 2. **Ghế AUDITOR-9.1 Giám Sát Đồng Bộ Menu Mọi Chu Kỳ (Mandatory Menu Sync Audit)**:
+>    - AUDITOR-9.1 BẮT BUỘC phải có bài kiểm tra `audit_construction_menu_sync()` chạy mỗi chu kỳ: Đọc Sheet `Template Cons` → So sánh với `getMyCommands` → Nếu lệch thì tự động gọi `setMyCommands` để đồng bộ.
+>    - Khi thêm Bot mới vào hệ thống, BẮT BUỘC phải bổ sung bài kiểm tra tương tự cho Bot đó vào AUDITOR-9.1.
+
+> ### 🔴 RULE PM-52: WEBHOOK DRIFT DETECTION & RECOVERY — TUYỆT ĐỐI KHÔNG ĐỂ BOT TRỎ SAI SERVER CŨ (ANTI-WEBHOOK-DRIFT POLICY)
+> **Root Cause (Sự Cố 22/09/2026)**: Construction Bot (`TNI_SITE_BOT`, token `8903841312`) bị webhook drift sang server cũ đã chết `https://tele.goldenherd.com/tg/webhook/8903841312` → `502 Bad Gateway` → toàn bộ lệnh `/5g_installation_completed` trong 4 nhóm TEAM CONSTRUCTION bị "đứng" không có phản hồi.
+> 1. **Quy Trình Xử Lý Khi Bot "Đứng" / Không Phản Hồi (Mandatory Webhook Drift Fix Protocol)**:
+>    - Bước 1: Gọi `getWebhookInfo` để xác nhận URL webhook hiện tại của bot bị nghi.
+>    - Bước 2: Nếu URL ≠ expected_url HOẶC `last_error_message` chứa `502 / 503 / Bad Gateway / timeout`: **BẮT BUỘC gọi `setWebhook` ngay lập tức** với `url=expected_url&drop_pending_updates=True`.
+>    - Bước 3: Verify lại bằng `getWebhookInfo` lần 2 — phải thấy `URL=expected_url`, `Pending=0`, `Last Error=None` mới được báo "Đã Fix".
+> 2. **Bảng Webhook URL Chuẩn Toàn Hệ Thống (Bất Biến)**:
+>    - Search Bot (`8606383435`): `https://tni-bot.vercel.app/api/search_bot`
+>    - Asset Collector (`8928677923`): `https://tni-bot.vercel.app/api/collector`
+>    - Site Down Relay (`8647102342`): `https://tni-sitedown.vercel.app/api/site_down_relay`
+>    - **Construction Bot (`8903841312`): `https://tni-bot.vercel.app/api/construction`**
+>    - Cable Bot 15 (`8758104446`): `https://tni-bot.vercel.app/api/cable_bot`
+>    - Attendance Bot (`8628370628`): `https://tni-bot.vercel.app/api/attendance`
+> 3. **Auditor Phải Giám Sát Tất Cả 6 Bot (Full Coverage Audit)**:
+>    - `system_auditor.py` → `BOT_REGISTRY` đã đăng ký đầy đủ 6 bot bao gồm Construction Bot.
+>    - BẮT BUỘC mọi bot trong `BOT_REGISTRY` đều được `audit_telegram_webhooks()` kiểm tra mỗi chu kỳ Auditor chạy.
+>    - TUYỆT ĐỐI CẤM bỏ sót bất kỳ bot nào ra khỏi vòng kiểm tra webhook định kỳ!
+
+> ### 🔴 RULE PM-53: BỌC THÉP QUY TRÌNH DEPLOY GAS (PUSH + DEPLOY -I) & CHUẨN RAM CACHE BẢNG CẤU HÌNH (TTL ≤ 60S + LỆNH /REFRESH) & CẤM PHÁN ĐOÁN MÒ THỜI GIAN ĐỒNG BỘ (GAS DEPLOYMENT PARITY & SHORT-TTL CONFIG CACHE POLICY)
+> **Root Cause (Sự Cố 22/09/2026)**:
+> 1. Khi Người Dùng hỏi thời gian đồng bộ template sửa trên Sheet, AI phán đoán bừa "0 giây ngay lập tức" mà không đọc code mã nguồn, trong khi code thực tế đang đặt RAM Cache `CacheService.getScriptCache()` lên tới **6 GIỜ (21,600s)**!
+> 2. `Template Cons` là bảng dữ liệu cấu hình người dùng thường xuyên cập nhật nội dung vật tư, nhưng hệ thống bị cache 6 tiếng không tự động cập nhật, và `onEdit` là simple trigger bị lỗi âm thầm do không đủ quyền OAuth khi gọi hàm gửi thông báo.
+> 3. AI thực hiện sửa code thêm endpoint xóa cache và chạy `clasp push` nhưng **QUÊN CHẠY `clasp deploy -i`**, dẫn đến Web App production vẫn chạy version cũ `@451`, cache vẫn nguyên vẹn và Người Dùng thử lại trên Telegram vẫn nhận template cũ!
+> 
+> **Quy Tắc Bắt Buộc (Mandatory Directives)**:
+> 1. **Khóa Thép Deploy GAS: `clasp push` + `clasp deploy -i` Không Tách Rời (Zero-Draft-Push Policy)**:
+>    - Mọi can thiệp vào các dự án Apps Script (`QLTC_GAS`, `apps_script_tc`, `apps_script_attendance`, v.v.) BẮT BUỘC phải chạy đủ:
+>      ① `npx clasp push --force` (đẩy mã nguồn lên Google Script).
+>      ② `npx clasp deploy -i <deploymentId> -d "..."` (cập nhật phiên bản chạy chính thức của Web App).
+>    - TUYỆT ĐỐI CẤM chỉ push mà không deploy! Bản live Web App CHỈ nhận code mới khi đã được deploy vào đúng `deploymentId`.
+>    - BẮT BUỘC kiểm tra kết quả terminal xuất hiện chuỗi `Deployed <deploymentId> @<version>`, và test endpoint HTTP trả về version mới trước khi báo hoàn thành!
+> 2. **Chuẩn RAM Cache Cho Bảng Cấu Hình Vận Hành (Max 60s TTL & On-Demand Invalidation)**:
+>    - Đối với mọi dữ liệu cấu hình do người dùng chỉnh sửa trên Google Sheets (Templates, Menus, Keywords, Mappings, Rules):
+>      (a) Thời gian lưu cache RAM (`CacheService.getScriptCache().put(...)`) **TỐI ĐA CHỈ ĐƯỢC PHÉP TỪ 30 ĐẾN 60 GIÂY** (TUYỆT ĐỐI CẤM cache hàng giờ >60s).
+>      (b) BẮT BUỘC phải hỗ trợ lệnh xóa cache trực tiếp trên Telegram (`/refresh`, `/reload`, `/sync`, `/clear_cache`) để người dùng có thể ép bot đọc live Sheet ngay lập tức sau khi sửa xong mà không cần chờ.
+>      (c) BẮT BUỘC phải expose action quản trị xóa cache (như `?action=clear_cons_cache`) trên Web App URL để kiểm toán và tích hợp tự động.
+> 3. **Cấm Đoán Mò Thời Gian Đồng Bộ Hoặc Cơ Chế Sync (Zero-Assumption Sync Policy)**:
+>    - Khi Người Dùng hỏi về thời gian đồng bộ, độ trễ hoặc cách thức bot nhận dữ liệu từ Google Sheets: AI BẮT BUỘC phải grep kiểm tra mã nguồn xem có RAM Cache (`CacheService`, `PropertiesService`, memory cache trong Python), kiểm tra TTL cụ thể và cron schedule.
+>    - TUYỆT ĐỐI CẤM trả lời "ngay lập tức" hoặc "0 giây" khi chưa chứng minh được bằng code rằng không có bất kỳ tầng cache hoặc độ trễ nào!
+
+> ### 🔴 RULE PM-54: BI PORTAL LIVE DATA SYNC ENGINE & ZERO HARDCODED STALE ROWS (BI PORTAL DUAL-LAYER SYNC POLICY)
+> **Root Cause (Sự Cố 22/09/2026)**:
+> Tab `BOD Assign` trên TNI Operations BI Portal (`index.html` & `executive_dashboard.html`) bị hardcode tĩnh 481 dòng từ ngày 22/06/2026 bởi một script scratch cũ và hoàn toàn không có hàm Live Fetch CSV cũng như không nằm trong phạm vi đồng bộ của Ghế `BI-WO-SYNC` (`sync_wo_detail.py`). Khi người dùng cập nhật dữ liệu mới trên Google Sheet tab `BOD assign` (GID `1482565085`), Portal vẫn hiển thị dữ liệu tĩnh cũ từ tháng 6 mà không tự cập nhật.
+> 
+> **Quy Tắc Bắt Buộc (Mandatory Directives)**:
+> 1. **Cơ Chế Kép Đồng Bộ BI Portal (Dual-Layer Sync Architecture)**:
+>    - **Lớp 1 (Client-Side Live Fetch)**: Mọi thẻ/tab dữ liệu trên BI Portal kết nối trực tiếp với Google Sheets (`WO Detail`, `BOD Assign`, `Plan - Result Dep`) BẮT BUỘC phải trang bị hàm Live Sync thời gian thực (`refresh...Live()`) sử dụng endpoint `gviz/tq?tqx=out:csv` (Zero-CORS). Hàm này BẮT BUỘC được tự động kích hoạt ngay khi người dùng chuyển sang tab tương ứng (`DOMContentLoaded` tab event binding), kèm theo nút bấm thủ công có icon xoay spinner (`<i class="fa-solid fa-spinner fa-spin"></i>`).
+>    - **Lớp 2 (Backend Offline Pre-rendered Batch)**: Ghế `BI-WO-SYNC` (`sync_wo_detail.py`) chịu trách nhiệm cào đồng thời cả tab `WO Detail` (GID `159298579`) và tab `BOD assign` (GID `1482565085`), tự động sinh mã HTML tiền kết xuất (pre-rendered) và tiêm vào toàn bộ các file `index.html` và `executive_dashboard.html` trong tất cả các repository, đồng thời lưu file cache JSON (`api/wo_detail_cache.json`, `api/bod_assign_cache.json`).
+> 2. **Tuyệt Đối Cấm Để Lại Dữ Liệu Tĩnh Hardcode (Zero Orphan Static Tables)**:
+>    - TUYỆT ĐỐI CẤM tạo các bảng HTML tĩnh chứa hàng trăm dòng dữ liệu giả lập/dữ liệu cũ mà không có cơ chế Live Fetch tự động làm mới.
+>    - Khi bổ sung tab mới vào BI Portal, BẮT BUỘC phải đăng ký nguồn dữ liệu GID vào `sync_wo_detail.py` và tích hợp hàm Live Fetch tương ứng trên frontend.
+> ### 🔴 RULE PM-55: KHÓA CỨNG XÁC MINH INDEX CỘT GOOGLE SHEET TRƯỚC KHI VIẾT CODE GAS — TUYỆT ĐỐI CẤM ĐẶT TÊN BIẾN KHÔNG PHẢN ÁNH ĐÚNG INDEX THỰC TẾ (STRICT LIVE-PROBE COLUMN INDEX VERIFICATION POLICY)
+> **Root Cause (Sự Cố 23/09/2026)**:
+> Hàm `sendTeamOperationProgressReports()` trong `team_progress_report.gs` khai báo comment `// WO: T (idx 19), U (idx 20), V (idx 21)=Team` nhưng live sheet thực tế: Team = col M (idx 12), Site = col L (idx 11), WO Name = col E (idx 4), Staff = col N (idx 13). Code đọc col V (idx 21) trống → TPR luôn báo `Work Orders Completed: 0 WO(s)`.
+>
+> **Quy Tắc Bắt Buộc (Mandatory Directives)**:
+> 1. **Xác Minh Live Trước Khi Viết Code (Live-First Column Probe)**: Khi viết hoặc review code đọc cột từ Google Sheet bằng index số (`row[19]`, `row[21]`...), AI BẮT BUỘC phải chạy probe thực tế (gspread, App Script Logger, hoặc CSV) để đọc ít nhất 5 dòng đầu và xác nhận **TÊN CỘT HEADER THỰC SỰ ↔ INDEX** trước khi lấy giá trị. TUYỆT ĐỐI CẤM suy luận index dựa trên tên cột chữ cái mà không kiểm tra header thực tế.
+> 2. **Comment Chuẩn Dạng Đầy Đủ**: Comment BẮT BUỘC ghi: `// Col L (idx 11) = Site, Col M (idx 12) = Team` (chữ cái + số index + tên thực). Khi phát hiện comment stale sai với live: BẮT BUỘC sửa ngay cả 2.
+> 3. **Phân Biệt 2 Nguồn Dữ Liệu Không So Sánh Được**: Report 4 EOD (`3Day: 8 /23 /2`) là **TL tự nhập** trên tab `Task remain` — KHÔNG PHẢI đếm tự động. TPR đọc tab `WO Close progress` và đếm WO thực tế theo ngày export. Hai nguồn này **hoàn toàn độc lập**, chênh lệch là BÌNH THƯỜNG. AI BẮT BUỘC giải thích rõ sự khác biệt này cho user, TUYỆT ĐỐI CẤM kết luận một trong hai là sai mà không kiểm tra cả 2 nguồn.
+>
+> ### 🔴 RULE PM-56: TAB GUIDE AUTO-SYNC TỪ TEMPLATE CONS & GHẾ AUDITOR-9.1 GIÁM SÁT 24/7 (STRICT CONSTRUCTION GUIDE AUTO-SYNC & AUDITOR SENTINEL POLICY)
+> **Root Cause (Sự Cố 24/09/2026)**:
+> 1. Khi người dùng hoặc admin bổ sung/sửa đổi mẫu template trong tab `Template Cons` của Google Sheet Construction (`1ViXXv5P8jSgx5heBqEP419ZkSR77C3OsflK0xpHMoi8`), tab `Guide` (tài liệu giải thích cho nhân viên và admin) không tự động cập nhật, dẫn đến tab `Guide` bị thiếu thông tin hoặc chỉ chứa dữ liệu cũ, không có các cột hướng dẫn chi tiết (Command Telegram chuẩn, Ý nghĩa công việc, Cần điền gì vào mẫu, Ảnh yêu cầu).
+> 2. Hệ thống thiếu trigger tự động trên Google Apps Script để đồng bộ tab `Guide` khi có chỉnh sửa trong `Template Cons`.
+> 3. Ghế `AUDITOR-9.1` (`system_auditor.py`) chưa có bài kiểm tra giám sát đối chiếu tính toàn vẹn và mức độ đồng bộ giữa tab `Template Cons` và tab `Guide`.
+>
+> **Quy Tắc Bắt Buộc (Mandatory Directives)**:
+> 1. **Đồng Bộ Tự Động Vào Tab `Guide` Với 8 Cột Chuẩn (Mandatory 8-Column Guide Schema)**:
+>    - Trong Google Apps Script (`13_TNI_CONSTRUCTION.gs`), hàm `syncGuideFromTemplate_()` BẮT BUỘC tự động trích xuất mọi template từ `Template Cons`, định dạng và ghi đầy đủ **8 cột chuẩn**:
+>      `STT | Lệnh (Key) | Command Telegram | Ý Nghĩa | Điền Gì Vào Mẫu | Ảnh Yêu Cầu | Mẫu Nội Dung Đầy Đủ | Cập Nhật Lần Cuối`.
+>    - Tự động áp dụng header nền `#0F172A`, chữ xanh cyan `#38BDF8`, cố định dòng đầu (`setFrozenRows(1)`), bật text wrapping và màu xen kẽ hàng.
+>    - Cơ chế kích hoạt: `onEdit` khi người dùng sửa `Template Cons` (cột 1 hoặc 4), endpoint Web App `?action=sync_guide_tab`, và chạy khi có lệnh cập nhật từ menu.
+> 2. **Ghế AUDITOR-9.1 Giám Sát & Tự Động Điền Bù (Sentinel Guide Auto-Remediation)**:
+>    - Trong `system_auditor.py`, hàm `audit_construction_guide_sync()` BẮT BUỘC chạy mỗi chu kỳ kiểm toán: Đọc dữ liệu sống qua GViz CSV của cả 2 tab `Template Cons` và `Guide`.
+>    - Nếu phát hiện `Guide` thiếu bất kỳ template nào so với `Template Cons`: TỰ ĐỘNG gọi API `?action=sync_guide_tab` sang Google Apps Script để điền bù và đồng bộ tức thì, đồng thời gửi thông báo chi tiết qua Telegram cho Admin.
+> 3. **Đồng Bộ Mã Nguồn Tuyệt Đối Giữa Các Repositories**:
+>    - Mọi cập nhật trong `system_auditor.py` BẮT BUỘC phải đồng bộ nguyên tử qua cả 2 repo `Task and WO` và `tni-search`.
+>    - BẮT BUỘC chạy `npx clasp push --force` và `npx clasp deploy -i <deploymentId>` sau mọi thay đổi trong `QLTC_GAS`.
+
+> ### 🔴 RULE PM-57: QUY TRÌNH BỌC THÉP BẢO MẬT WEB PUBLIC (GITHUB PAGES / VERCEL) — KHỬ TRÙNG 100% PII, CHỐNG LỘ SECRET & CỔNG MẬT KHẨU BẮT BUỘC KHI THÊM TÍNH NĂNG MỚI (STRICT PUBLIC WEB PORTAL SECURITY & MANDATORY ZERO-PII/SECRETS POLICY)
+> **Root Cause (Sự Cố 24/09/2026)**:
+> Khi đưa hệ thống bán hàng và điều hành (`sale.html`, `index.html`, `executive_dashboard.html`) lên các nền tảng lưu trữ web công khai (GitHub Pages public repo `MON6879/tni-sale-portal` hoặc Vercel), phát hiện các lỗ hổng bảo mật nghiêm trọng:
+> 1. Dữ liệu thật của nhân viên và đối tác (tên thật, số điện thoại thật, email cá nhân `@gmail.com`, địa chỉ trụ sở văn phòng) bị hardcode trực tiếp vào mã nguồn client-side HTML/JS, cho phép bất kỳ ai đọc source code trên GitHub đều nhìn thấy toàn bộ PII (Personally Identifiable Information).
+> 2. Các trang web điều hành (`index.html`, `executive_dashboard.html`) được public mà không có cổng bảo vệ mật khẩu, khiến bất kỳ ai có link đều xem được số liệu và bảng điều khiển nội bộ.
+> 3. Khi lập trình viên bổ sung tính năng mới, thường tiện tay đưa dữ liệu mẫu thật hoặc link trực tiếp mà không qua quy trình rà soát bảo mật.
+>
+> **Quy Tắc Bắt Buộc (Mandatory Directives)**:
+> 1. **Kỷ Luật Thép Khử Trùng Dữ Liệu Client-Side (Zero-PII Client Law)**:
+>    - TUYỆT ĐỐI CẤM hardcode bất kỳ thông tin cá nhân thật nào vào các file HTML/JS/CSS client-side công khai: CẤM số điện thoại thật (`09...`), CẤM email cá nhân (`@gmail.com`), CẤM tên nhân viên thật, CẤM địa chỉ văn phòng/nhà riêng thật, CẤM tên đối tác/khách hàng thật.
+>    - Mọi dữ liệu hiển thị mặc định, mẫu thử nghiệm (seed/preset data) BẮT BUỘC phải dùng định danh ẩn danh chuẩn:
+>      - Nhân sự: `Nguyễn Văn A`, `Trần Thị B`, `Staff Sales 01`, `Staff Tech 01`, `Staff Warehouse 01`...
+>      - Email công vụ: `sales01@tni.com`, `tech01@tni.com`, `admin@tni.com`...
+>      - Số điện thoại mẫu: `0965 000 001`, `0965 000 002`...
+>      - Địa chỉ: `Chi Nhánh TNI Region`, `Văn Phòng Đại Diện TNI Myanmar`...
+> 2. **Cổng Mật Khẩu Bắt Buộc Trên Mọi Trang Web (Mandatory Universal Password Gate)**:
+>    - 100% các file giao diện web (`.html`) thuộc hệ thống khi chạy trên môi trường công khai BẮT BUỘC phải tích hợp bộ cổng bảo vệ mật khẩu `#pwd-gate`:
+>      - Mã hóa một chiều bằng hàm băm SHA-256 (`crypto.subtle.digest`). TUYỆT ĐỐI CẤM lưu mật khẩu dạng plain text.
+>      - Phiên đăng nhập (Session) tự động hết hạn sau tối đa 8 tiếng (480 phút).
+>      - Cơ chế cưỡng bức / nhắc nhở đổi mật khẩu mới định kỳ sau mỗi 30 ngày sử dụng.
+>    - TUYỆT ĐỐI CẤM deploy bất kỳ file `.html` nào mở tự do không có cổng mật khẩu che chắn.
+> 3. **Cô Lập Bí Mật Server & Xác Thực 2 Đầu (Strict Server-Side Secret Isolation)**:
+>    - Toàn bộ Telegram Bot Token (`AAH...`), GitHub PAT (`ghp_...`), Google Service Account, Secret Key BẮT BUỘC nằm trong GitHub Secrets (Actions) hoặc GAS Script Properties. TUYỆT ĐỐI CẤM xuất hiện trong file HTML, JS frontend hoặc public repo.
+>    - Mọi API endpoint backend (Google Apps Script `doPost`/`doGet`) nhận dữ liệu từ web BẮT BUỘC phải xác thực Token (`saleAuth_`) và áp dụng giới hạn tần suất (Rate Limit 60 req/phút).
+>    - Phân quyền theo cột (Column-Level Security): Dữ liệu giá vốn và lợi nhuận 17% BẮT BUỘC phải được server tự động cắt bỏ (`stripFinanceCols_`) trước khi trả về cho vai trò không phải Admin/Finance.
+> 4. **Quy Trình 5 Bước Thẩm Định Bảo Mật Bắt Buộc Trước Khi Thêm Bất Kỳ Chức Năng Mới Nào (The 5-Step Pre-Deploy Security Verification Gate)**:
+>    Trước khi commit, push hoặc deploy bất kỳ tính năng, nút bấm, biểu mẫu, bảng dữ liệu hoặc trang web mới nào, AI BẮT BUỘC phải thực hiện đủ 5 bước:
+>    - **Bước 1 — Quét PII (Regex Scan)**: Chạy lệnh tìm kiếm regex quét toàn bộ file xem có SĐT thật (`09\d{8}`), email cá nhân (`@gmail.com`), họ tên thật.
+>    - **Bước 2 — Quét Secrets**: Quét tìm chuỗi nhạy cảm (`AAH`, `AIza`, `ghp_`, `token=`, `key=`).
+>    - **Bước 3 — Kiểm Tra Cổng Khóa**: Xác nhận trang mới đã kế thừa hệ thống `#pwd-gate` và cơ chế session SHA-256.
+>    - **Bước 4 — Kiểm Tra Quyền Backend (RBAC & Server Auth)**: Đảm bảo dữ liệu mới nếu có yếu tố tài chính/nhạy cảm phải được server GAS kiểm tra quyền trước khi gửi về client.
+>    - **Bước 5 — Đồng Bộ Khép Kín & Xóa Cache**: Đồng bộ nguyên tử file qua các kho lưu trữ tương ứng (`Task and WO`, `tni-search`), thông báo rõ cho người dùng các link đã cập nhật.
+
+> ### 🔴 RULE PM-58: KỶ LUẬT BỌC THÉP SONG NGỮ WEB PORTAL (BILINGUAL PARITY) — TUYỆT ĐỐI CẤM HARDCODE ĐƠN NGỮ VÀO MODULE MỚI & BẮT BUỘC ĐỒNG BỘ HOOK applyLang() (STRICT WEB BILINGUAL EN/VN PARITY POLICY)
+> **Root Cause (Sự Cố 26/09/2026)**:
+> Mặc dù hệ thống đã có rule nghiêm ngặt về Tiếng Anh cho Telegram Bot và nút chuyển đổi EN/VN trên Web App, khi xây dựng module mới Phân Quyền Vai Trò (RBAC) trên `sale.html`:
+> 1. Toàn bộ mảng dữ liệu `SYSTEM_MODULES` chỉ khai báo trường `name` và `desc` đơn ngữ bằng Tiếng Việt, thiếu hoàn toàn `name_en` và `desc_en`.
+> 2. Các thành phần giao diện (Banner, Quick Cards, Bảng ma trận, Hướng dẫn gửi link, Danh sách nhân sự) được hardcode chuỗi Tiếng Việt trực tiếp trong HTML/JS.
+> 3. Hàm chuyển đổi ngôn ngữ `applyLang(lang)` bị bỏ quên, không móc nối (hook) vào các hàm render của tab RBAC (`renderRBACMatrix`, `renderStaffUsersTable`, `renderRBACColToggles`, `updateRBACPanelStaticTexts`). Kết quả: Khi người dùng bấm sang chế độ `GB EN`, sidebar đổi tiếng Anh nhưng toàn bộ tab RBAC vẫn trơ ra Tiếng Việt.
+>
+> **Quy Tắc Bắt Buộc (Mandatory Directives)**:
+> 1. **Chuẩn Dữ Liệu Song Ngữ Bắt Buộc Cho Mọi Module Mới (Dual-Key Schema Standard)**:
+>    - Mọi mảng đối tượng, bảng cấu hình, danh sách phân hệ hiển thị trên giao diện Web BẮT BUỘC phải có đầy đủ cặp khóa song ngữ: `{ name: '...', name_en: '...', desc: '...', desc_en: '...' }`.
+>    - TUYỆT ĐỐI CẤM tạo mảng dữ liệu hiển thị chỉ có 1 trường ngôn ngữ Tiếng Việt duy nhất.
+> 2. **Kỷ Luật Hook Bắt Buộc Vào applyLang() (Mandatory applyLang Registration)**:
+>    - Khi thêm bất kỳ tab, section, modal hoặc bảng dữ liệu mới nào vào Web App, lập trình viên/AI BẮT BUỘC phải đăng ký hàm render tương ứng vào bên trong hàm `applyLang(lang)`.
+>    - Khi người dùng bấm nút đổi ngôn ngữ `toggleLang()`, toàn bộ nội dung của tab đang hiển thị BẮT BUỘC phải chuyển đổi tức thì mà không cần reload trang.
+> 3. **Phúc Tra Kiểm Thử 2 Chiều Trước Khi Bàn Giao (Bilingual Toggle Verification)**:
+>    - Trước khi commit/bàn giao bất kỳ tính năng web nào, BẮT BUỘC phải kiểm tra hiển thị ở cả 2 trạng thái: `lang === 'vi'` và `lang === 'en'`.
+>    - Nếu ở chế độ `EN` mà còn sót bất kỳ chữ Tiếng Việt nào trên giao diện ➔ Coi là LỖI NGÔN NGỮ CHƯA HOÀN THÀNH, TUYỆT ĐỐI CẤM báo "Đã xong"!
+
+---
+
+> ### 🔴 RULE PM-59: TIN SITE DOWN ALARM CHỒNG CHẤT — 3 NGUYÊN NHÂN GỐC & QUY TẮC BẮT BUỘC XÓA TIN CŨ TRONG GAS SITE DOWN (STRICT SITE DOWN OLD MESSAGE SWEEP POLICY)
+> **Root Cause (Sự Cố 29/09/2026 — Tin TNI_SITE_DOWN_CELL_ALARM chồng chất tất cả 4 nhóm)**:
+>
+> **Root Cause 1 — Cơ chế xóa có nhưng phụ thuộc vào `SD_MSGID_<key>` trong PropertiesService bị mất:**
+> Hàm `deleteOldMessages_(chatId, msgKey)` đọc `getSavedMsgIds_(msgKey)` từ GAS PropertiesService. Nếu GAS bị reset (deploy lại, hết quota, properties bị xóa), tất cả `SD_MSGID_*` biến mất → GAS không còn biết ID tin cũ là gì → không xóa được → mỗi lần chạy lại GỬI THÊM 1 tin mới chồng lên → nhóm Telegram tích lũy hàng chục tin Site Down cũ không ai xóa.
+>
+> **Root Cause 2 — Dedup timestamp A1 (`TS_KEY_A1`) bị reset hàng ngày lúc 03:30 nhưng MsgIDs KHÔNG bị reset:**
+> Code `checkAndSend()` mỗi ngày mới xóa `TS_KEY_A1` để GAS gửi lại bản tin mới buổi sáng. Nhưng `SD_MSGID_TIN1_T1..T4` KHÔNG bị reset theo → GAS cố xóa tin theo ID cũ từ hôm qua (đã >48h, Telegram từ chối) → xóa thất bại hoàn toàn → gửi tin mới chồng lên tin cũ hàng ngày.
+>
+> **Root Cause 3 — `deleteTelegramMsgBot_()` hardcode 1 token backup cũ `8647102342:AAGwI...` có thể đã hết hạn:**
+> Hàm xóa tin dùng 2 token: `[SD_BOT_TOKEN, "8647102342:AAGwI95-..."]`. Nếu token thứ 2 hết hạn hoặc bot đó không có quyền admin trong nhóm → cả 2 token thất bại → `deleteTelegramMsgBot_` trả về `false` nhưng không throw lỗi → `deleteOldMessages_` vẫn tiếp tục xóa `SD_MSGID_*` khỏi Properties (dòng 967: `finally { deleteProperty }`) → GAS mất dấu vết ID cũ mà tin vẫn còn trong nhóm.
+>
+> **Quy Tắc Bắt Buộc (Mandatory Directives)**:
+> 1. **Bắt Buộc Reset MsgIDs Cùng Với Timestamp Đầu Ngày (Mandatory Daily MsgID Sweep)**:
+>    - Khi `checkAndSend()` reset `TS_KEY_A1` lúc đầu ngày mới, BẮT BUỘC phải đồng thời gọi `deleteOldMessages_(chatId, "TIN1_" + team)` cho TẤT CẢ 5 nhóm (T1, T2, T3, T4, CONTROL) để dọn sạch tin cũ từ ngày hôm trước TRƯỚC KHI gửi tin mới buổi sáng.
+>    - TUYỆT ĐỐI CẤM reset chỉ `TS_KEY_A1` mà không kèm theo sweep dọn tin cũ.
+> 2. **Chỉ Dùng Token Chính Thức Đang Hoạt Động (Single Active Token Policy)**:
+>    - `deleteTelegramMsgBot_()` BẮT BUỘC chỉ dùng `SD_BOT_TOKEN` (lấy từ ScriptProperties) làm token duy nhất.
+>    - TUYỆT ĐỐI CẤM hardcode token backup lỗi thời vào mảng `tokens[]` — bot cũ/token cũ sẽ gây `deleteMessage` thất bại âm thầm, khiến GAS tưởng đã xóa nhưng tin vẫn còn trong nhóm.
+> 3. **Log Rõ Kết Quả Xóa — Không Được Im Lặng Khi Fail (Zero Silent Delete Failure)**:
+>    - `deleteTelegramMsgBot_()` BẮT BUỘC phải ghi `Logger.log` cả khi xóa thành công LẪN khi thất bại kèm mô tả lỗi từ Telegram API (`res.description`).
+>    - TUYỆT ĐỐI CẤM dùng `catch(e) {}` rỗng bên trong vòng lặp xóa — đây là anti-pattern che giấu lỗi, khiến tin không bị xóa mà không ai biết.
+> 4. **Sweep Proactive Bằng Telethon Khi Bot API Thất Bại >48h (Telethon Fallback Sweep)**:
+>    - Khi tin cũ đã quá 48h và Bot API không thể xóa (`can't be deleted for everyone`), hệ thống BẮT BUỘC phải dùng Telethon (`revoke=True`) trong `sweep_orphan_eta.py` để quét và xóa các tin Site Down Alarm cũ theo pattern tiêu đề (`TNI_SITE_DOWN_CELL_ALARM`, `Team.*Bokpyin`, `Team.*Dawei`...).
+>    - TUYỆT ĐỐI CẤM để tin Site Down Alarm tồn tại quá 48h trong nhóm — phải có fallback sweep Telethon chạy định kỳ (:11/:41 MMT) quét cả loại tin này.
+
+---
+
+> ### 🔴 RULE PM-60: SCRAPING THIẾU DỮ LIỆU KHI CHATBOT CHIA NHIỀU TIN — ANCHOR-BASED COLLECTION BẮT BUỘC (STRICT MULTI-PART BOT MESSAGE COLLECTION POLICY)
+> **Root Cause (Sự Cố 30/09/2026 — 172 trạm down nhưng GAS chỉ nhận phần cuối)**:
+>
+> Chatbot `/down_tni@auto_nocpro_bot` trả về 172 dòng station data → quá dài cho 1 tin Telegram → **tự động chia thành 3 tin riêng biệt**:
+> - **Tin 1**: Header `"Site down in Tanintharyi Region – ..."` + ~50 dòng đầu → **CÓ chữ "tanintharyi"**
+> - **Tin 2**: ~60 dòng tiếp → **KHÔNG có chữ "tanintharyi"** (chỉ là bảng số liệu thuần túy)
+> - **Tin 3**: ~60 dòng cuối → **KHÔNG có chữ "tanintharyi"** (chỉ là bảng số liệu thuần túy)
+>
+> Code cũ filter: `tni_messages = [m for m in bot_messages if "tanintharyi" in m.lower()]`
+> → Chỉ lấy được Tin 1, bỏ sót hoàn toàn Tin 2 và Tin 3 → **GAS nhận thiếu 2/3 dữ liệu!**
+>
+> Fix sai lần 1 (v841): `"\n".join(tni_messages)` — vẫn sai vì filter vẫn loại Tin 2+3.
+>
+> **Fix đúng (v842 — Anchor-Based Collection)**:
+> ```python
+> # Tìm INDEX tin đầu tiên có "tanintharyi" (anchor)
+> first_tni_idx = next((i for i, m in enumerate(bot_messages) if "tanintharyi" in m.lower()), None)
+> if first_tni_idx is not None:
+>     # Gom TẤT CẢ tin từ anchor trở đi — bao gồm cả tin 2+3 không có "tanintharyi"
+>     raw_text = "\n".join(bot_messages[first_tni_idx:])
+> ```
+>
+> **Quy Tắc Bắt Buộc (Mandatory Directives)**:
+> 1. **Anchor-Based Collection — Không Filter Từng Tin (Mandatory Anchor Strategy)**:
+>    - Khi cào dữ liệu từ chatbot có thể trả về nhiều tin split, BẮT BUỘC dùng chiến lược **ANCHOR**: tìm vị trí (index) tin đầu tiên có keyword nhận diện, rồi gom TẤT CẢ tin từ index đó trở đi.
+>    - TUYỆT ĐỐI CẤM dùng `[m for m in messages if keyword in m]` để filter từng tin — phương pháp này sẽ bỏ sót các tin tiếp theo không chứa keyword nhưng vẫn là phần của cùng 1 response!
+> 2. **Phân Biệt 2 Loại "Nhiều Tin Từ Bot" (Multi-Message Classification)**:
+>    - **Loại A — Split (Cần gom)**: Bot nhận 1 yêu cầu → trả về N tin liên tiếp do quá dài. Tin 1 có header/keyword, Tin 2..N là phần tiếp theo. **→ PHẢI GOM TẤT CẢ từ anchor.**
+>    - **Loại B — Nhiều lần relay cũ (Không gom)**: Nhiều lần chạy relay khác nhau → nhiều set tin cũ còn trong lịch sử. **→ CHỈ LẤY set tin từ lần relay HIỆN TẠI** (đã được lọc bằng `send_time` window).
+>    - `botlookup_relay.py` đã giải quyết Loại B bằng `send_time` window 35s — chỉ lấy tin sau khi gửi lệnh. Trong window này, tất cả tin từ bot = split parts của 1 response → áp dụng Anchor.
+> 3. **TUYỆT ĐỐI CẤM Chỉ Lấy 1 Tin Cuối Cùng (Zero Last-Only Fallback)**:
+>    - `tni_messages[-1]` hay `bot_messages[-1]` chỉ lấy phần cuối → bỏ toàn bộ header + phần đầu. **Đây là anti-pattern gây mất dữ liệu có hệ thống!**
+> 4. **Fix Cuối Cùng v843 — Điều Kiện TNI Left-3 (TNI Left-3 Dual-Condition Filter)**:
+>    - Nhận diện tin hợp lệ bằng **2 điều kiện OR**:
+>      - `"tanintharyi" in m.lower()` → Tin đầu tiên chứa header region
+>      - `any(line.strip()[:3].upper() == "TNI" for line in m.split("\n") if line.strip())` → Các tin tiếp theo chứa station ID
+>    - Logic này **mạnh hơn anchor-based** vì: (a) không phụ thuộc thứ tự tin, (b) tự loại tin rác từ user khác trong 35s window, (c) đúng với mọi N phần split bất kể số lượng.
+>    - BẮT BUỘC dùng hàm `is_tni_data_msg(m)` bọc 2 điều kiện trên, sau đó `[m for m in bot_messages if is_tni_data_msg(m)]` để gom đủ phần.
+
+> ### 🔴 RULE PM-61: BUG TỔNG KẾT WORK/WEEK THÁNG BỊ BLOCK BỞI ĐIỀU KIỆN TỔNG THÁNG — PHẢI DÙNG CHECK PER-DAY (STRICT PER-DAY LEAVE-CHECK FOR MONTHLY ACCUMULATION POLICY)
+> **Root Cause (Sự Cố 30/09/2026 — Work Month luôn = 0 dù nhân viên đi làm đủ ngày)**:
+>
+> Trong hàm `buildDailyAttendanceText_()` của `TNI attendance.js`, khi tích lũy `moW` (Work tháng) và `wkW` (Work tuần) từ dữ liệu ảnh trong `List Attendance`, code cũ kiểm tra điều kiện:
+> ```js
+> // ❌ SAI: a.moL và a.moH là TỔNG tháng — nếu có 1 ngày Leave thì block toàn bộ Work tháng còn lại!
+> if (mStr === curMonthStr && a.moL === 0 && a.moH === 0) a.moW++;
+> ```
+> Điều kiện `a.moL === 0` kiểm tra **tổng số Leave của cả tháng**. Khi nhân viên có dù chỉ 1 ngày Leave trong tháng, `a.moL` sẽ = 1 sau khi xử lý ngày Leave đó. Từ đó, tất cả các ảnh Work của các ngày còn lại trong tháng đều bị block → `moW` luôn = 0 dù nhân viên đi làm đầy đủ!
+>
+> **Fix đúng (v105 — Per-Day Check)**:
+> ```js
+> // ✅ ĐÚNG: Check Leave/Half của chính ngày dStr đó, không dùng tổng tháng
+> const thisDayL = (dStr === todayStr) ? a.tL : (dStr === yestStr) ? a.yL : (dStr === day2Str) ? a.d2L : 0;
+> const thisDayH = (dStr === todayStr) ? a.tH : (dStr === yestStr) ? a.yH : (dStr === day2Str) ? a.d2H : 0;
+> const isFarDay = (dStr !== todayStr && dStr !== yestStr && dStr !== day2Str); // Ngày xa hơn Day-3 không block
+> if (mStr === curMonthStr && (isFarDay || (thisDayL === 0 && thisDayH === 0))) a.moW++;
+> ```
+>
+> **Quy Tắc Bắt Buộc (Mandatory Directives)**:
+> 1. **TUYỆT ĐỐI CẤM Dùng Tổng Tháng Để Block Per-Day Accumulation**: Khi tích lũy số liệu theo tuần (`wkW`, `wkL`, `wkH`) hoặc theo tháng (`moW`, `moL`, `moH`) bằng cách duyệt từng dòng dữ liệu (mỗi dòng = 1 ngày cụ thể), BẮT BUỘC phải kiểm tra điều kiện conflict (Leave/Half) **của chính ngày dStr đó**, TUYỆT ĐỐI KHÔNG ĐƯỢC dùng bộ đếm tổng (`a.moL`, `a.moH`) để block — vì bộ đếm tổng tháng sẽ tăng dần qua mỗi vòng lặp và block toàn bộ các ngày Work còn lại!
+> 2. **Logic Per-Day Check Chuẩn Cho Ngày Trong 3 Ngày Gần**: Với `todayStr`, `yestStr`, `day2Str` → dùng bộ đếm ngày tương ứng (`a.tL`, `a.yL`, `a.d2L`) để check conflict của ngày đó.
+> 3. **Logic Cho Ngày Xa (Trước Day-3 — Chỉ Ảnh Hưởng Week/Month)**: Nếu `dStr` không phải 3 ngày gần (`isFarDay = true`) → ảnh chứng minh có mặt là đủ, KHÔNG BLOCK (vì không có per-day Leave counter riêng cho ngày xa).
+> 4. **Cùng Bug Áp Dụng Cho `wkW`**: Điều kiện `a.wkL === 0 && a.wkH === 0` khi tích lũy `wkW` cũng phải sửa theo nguyên tắc tương tự — dùng `isFarDay || (thisDayL === 0 && thisDayH === 0)`.
+
+---
+
+# 🔐 PM-63: TUYỆT ĐỐI CẤM HARDCODE GIÁ TRỊ HASH — BẮT BUỘC TÍNH TOÁN TRƯỚC KHI NHÚNG (ZERO HARDCODED HASH POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (PM-63 — ZERO HARDCODED HASH)**:
+> - **Root Cause**: Khi thêm tính năng SHA-256 PIN, AI hardcode giá trị `DEFAULT_PIN_HASH` là một chuỗi hex tự bịa (`9F735E0D...`) thay vì hash thật của `'7979'`. Kết quả: PIN `7979` không bao giờ match → toàn bộ user bị khóa khỏi admin → phải sửa khẩn cấp.
+> - **Rule bắt buộc**: Khi nhúng bất kỳ hash cứng (SHA-256, MD5, HMAC...) vào code, BẮT BUỘC phải tính giá trị thật trước bằng `python -c "import hashlib; print(hashlib.sha256('VALUE'.encode()).hexdigest())"` rồi mới copy vào source. TUYỆT ĐỐI CẤM tự đặt chuỗi hex tùy tiện và comment là "SHA-256 của X" mà không verify!
+> - **Checklist bắt buộc trước khi commit hash cứng**: ① Chạy lệnh tính hash thật ② So sánh với giá trị hardcode ③ Khớp 100% mới được commit.
+
+---
+
+# 🚀 PM-64: BẮT BUỘC DEPLOY NGAY SAU MỖI LẦN SỬA — TUYỆT ĐỐI CẤM TÍCH LŨY NHIỀU FIX RỒI DEPLOY GỘP (ZERO FIX-ACCUMULATE BEFORE-DEPLOY POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (PM-64 — INSTANT DEPLOY EVERY FIX)**:
+> - **Root Cause**: AI sửa nhiều lỗi liên tiếp (hash sai → PIN không hoạt động, staff table không hiện, collector_en.py syntax error) mà deploy gộp hoặc delay → User phải chờ nhiều phút, thấy lỗi vẫn còn → bức xúc "sửa không deploy cứ loanh quanh mãi".
+> - **Rule bắt buộc**: Sau MỖI LẦN sửa code (dù 1 dòng), BẮT BUỘC phải: ① Copy sync 3 repos ② `git commit + push` ③ `npx vercel --prod --yes` NGAY LẬP TỨC — không tích lũy 2–3 fix rồi deploy 1 lần. Mỗi fix = 1 deploy độc lập.
+> - **Ngoại lệ duy nhất**: Có thể gộp tối đa 2 fix trong 1 deploy nếu cả 2 fix liên quan cùng 1 root cause và hoàn thành trong vòng 60 giây.
+
+---
+
+# 🧪 PM-65: BẮT BUỘC SYNTAX CHECK TẤT CẢ PYTHON FILES TRƯỚC KHI DEPLOY VERCEL (MANDATORY PRE-DEPLOY SYNTAX VALIDATION)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (PM-65 — PRE-DEPLOY PYTHON SYNTAX CHECK)**:
+> - **Root Cause**: File `collector_en.py` có dấu `"` thừa ở line 165 gây `SyntaxError: unterminated string literal`. File này nằm trong Vercel API functions → nếu Vercel build với file lỗi syntax sẽ fail hoàn toàn, ảnh hưởng toàn bộ hệ thống. Bug này tồn tại từ trước và chỉ phát hiện khi chạy audit.
+> - **Rule bắt buộc**: Trước mỗi lần `npx vercel --prod --yes`, BẮT BUỘC phải chạy lệnh kiểm tra syntax toàn bộ Python API files:
+>   ```powershell
+>   Get-ChildItem "Task and WO\api" -Filter "*.py" | ForEach-Object { python -c "import py_compile; py_compile.compile(r'$($_.FullName)', doraise=True)" 2>&1 | Where-Object {$_} | ForEach-Object { Write-Host "$($_.Name): ❌ $_" } }
+>   ```
+>   Nếu có bất kỳ file nào lỗi syntax → BẮT BUỘC sửa xong trước khi deploy.
+
+---
+
+> ### 🔴 RULE PM-62: AW7 ĐỘC LẬP TUYỆT ĐỐI — CẤM THÊM GUARD SO SÁNH VỚI CỘT A / FRESHNESS CHECK (STRICT AW7-INDEPENDENCE & ANTI-OVER-ENGINEERING POLICY)
+> **Root Cause (Sự Cố 01/10/2026)**:
+> Commit `da358f0` thêm CHỐT CHẶN 2 so sánh `AW7 timestamp < A1 timestamp` → block gửi mỗi khi relay cào Cột A có timestamp mới hơn AW7 → AW7 cập nhật nhưng không gửi được tin.
+>
+> **Lịch sử sửa qua sửa lại làm phức tạp thêm**:
+> - `d9f8bfd`: Logic đơn giản nhất — đọc thẳng `sheet.getRange("AW7").getValue()`, chỉ dedup `TS_KEY_AW7`. **Chạy mượt.**
+> - `57b609b → c20b4ef`: Thêm freshness 30→60 min guard → block khi AW7 cũ hơn 60 phút.
+> - `d9f8bfd`: Bỏ freshness check. **Chạy mượt lại.**
+> - `da358f0`: Thêm CHỐT CHẶN 2 (AW7 vs A1) → **Bug: không gửi tin**.
+> - `9a06b3a`: Bỏ CHỐT CHẶN 2. **Nhưng vẫn còn wrapper `parseAW7Timestamp()` phức tạp + CHỐT CHẶN 1 (45 phút)**.
+> - `64eab61`: **Restore hoàn toàn về d9f8bfd**: đọc thẳng AW7, không wrapper, không freshness, không A1 guard. ✅
+>
+> **Quy Tắc Bắt Buộc (ANTI-OVER-ENGINEERING)**:
+> 1. **`processSummaryAwAz()` CHỈ ĐƯỢC CÓ 2 ĐIỀU KIỆN**: ① AW7 rỗng → skip. ② `tsKey === lastTs` → skip (dedup). **TUYỆT ĐỐI CẤM thêm bất kỳ guard thứ 3 nào** (freshness, so sánh A1, so sánh relayTs, v.v.).
+> 2. **ĐỌC THẲNG `sheet.getRange("AW7").getValue()`** — TUYỆT ĐỐI CẤM bọc thêm `parseAW7Timestamp()` hay hàm wrapper trung gian nào khác có thể fail.
+> 3. **Khi AW7 chạy tốt mà bị báo lỗi**: Trước khi sửa, BẮT BUỘC đọc `git log -- site_down_v2.gs` tìm commit gần nhất thêm code mới vào `processSummaryAwAz`. Đó là thủ phạm — REVERT về version trước đó.
+> 4. **ANTI-OVER-ENGINEERING**: Mỗi lần "fix" thêm guard vào AW7 = tạo thêm bug. Logic đơn giản nhất là đúng nhất. Resist the urge to add "safety" guards.
+
+---
+
+# 🚨 PM-66: TUYỆT ĐỐI CẤM KẾT THÚC SESSION KHI GAS CHỈ Ở @HEAD — BẮT BUỘC CLASP DEPLOY -I NGAY SAU CLASP PUSH (ZERO HEAD-ONLY GAS STATE POLICY)
+
+> ⚠️ **QUY TẮC BẮT BUỘC (PM-66 — ZERO HEAD-ONLY GAS)**:
+> - **Root Cause (01/10/2026)**: Fix `isFarDay` per-day Work check (v105) đã được viết vào file local + git commit trong session trước. `clasp push --force` chạy thành công lên `@HEAD`. NHƯNG quên chạy `clasp deploy -i <deploymentId>` → GAS production vẫn chạy version `@104` cũ → Work = 0/0/0/0/0 vẫn xảy ra. Session sau phải audit lại mới phát hiện.
+> - **Rule bắt buộc**: Sau MỌI lần sửa file GAS (`.gs`, `.js` trong `apps_script_*`), BẮT BUỘC hoàn tất ĐỦ 2 LỆNH trong cùng 1 session:
+>   ```
+>   ① npx clasp push --force
+>   ② npx clasp deploy -i <deploymentId> -d "<mô tả version>"
+>   ```
+>   Xác nhận terminal xuất hiện: `Deployed <deploymentId> @<version>` mới được phép báo "Đã xong".
+> - **TUYỆT ĐỐI CẤM** kết thúc session với GAS ở trạng thái `@HEAD` chưa deploy. `@HEAD` = bản nháp, KHÔNG phải production.
+> - **Deployment IDs các GAS chính**:
+>   | GAS | Deployment ID |
+>   |-----|---------------|
+>   | Attendance | `AKfycbyFIDGDS5k7wy-hNp2p1PNvte0CQ6cSiNYLyBmNc00Yi1b6IueOob9bKmu4zoQ1A6Cs` |
+>   | Site Down | `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` 🔒 |
+>   | Main Hub | Xem `system_map.md` |
+>   | Sale Backend | `AKfycbx09J8PPi_IN3_n_ho8QF4RapsPh5uzLchVfS9T89iuw-4QMZWU_ynlhzDvav4wRvj4` |
+
+---
+
+> ### 🔴 RULE PM-67: WINDOWS TASK SCHEDULER PHẢI CHẠY DƯỚI ĐÚNG USER ACCOUNT — TUYỆT ĐỐI CẤM ĐỂ CHẠY DƯỚI SYSTEM ACCOUNT (STRICT TASK SCHEDULER USER ACCOUNT POLICY)
+> **Root Cause (Sự Cố 01/10/2026 — ICT Auto Fetch không chạy)**:
+> Task `ICT_Auto_Fetch` đăng ký dưới **SYSTEM account** → `LastResult: 0x80070002` ("The system cannot find the file specified"). Nguyên nhân: SYSTEM account không có quyền truy cập:
+> - **D: drive** (network/secondary drive mapped cho user `HA DUC PHONG`)
+> - **Python path** `C:\Users\HA DUC PHONG\AppData\Local\...` (user-scope installation)
+> Script chạy tay dưới user bình thường thì OK hoàn toàn — chỉ fail khi Task Scheduler gọi.
+>
+> **Fix**: Đăng ký task với `LogonType Interactive` dưới đúng user `PHONGHD\HA DUC PHONG`:
+> ```powershell
+> $Principal = New-ScheduledTaskPrincipal -UserId "PHONGHD\HA DUC PHONG" -LogonType Interactive -RunLevel Highest
+> ```
+> Sau đó chạy script đăng ký bằng `powershell -ExecutionPolicy Bypass -File "...\update_task.ps1"` từ **CMD Admin** (không phải `& "..."` vì `&` là PowerShell operator, không phải CMD).
+>
+> **Quy Tắc Bắt Buộc**:
+> 1. **Mọi Scheduled Task chạy script Python/BAT truy cập D: drive hoặc Python user-scope** BẮT BUỘC đăng ký với `LogonType Interactive` dưới đúng user account. TUYỆT ĐỐI CẤM để mặc định SYSTEM account.
+> 2. **Chẩn đoán nhanh**: Nếu Task Scheduler báo `LastResult: 0x80070002` = "file not found" nhưng chạy tay OK → 100% là lỗi user account, không phải lỗi script.
+> 3. **Chạy .ps1 từ CMD Admin**: Dùng `powershell -ExecutionPolicy Bypass -File "path\script.ps1"`. TUYỆT ĐỐI CẤM dùng `& "path\script.ps1"` từ CMD vì `&` là toán tử PowerShell, CMD sẽ báo lỗi "& was unexpected".
+> 4. **File liên quan**: `D:\6. AI\1. QLTC\ICT Fetch\update_task.ps1` — đã cập nhật LogonType Interactive. Khi cần re-register task ICT, chạy file này bằng CMD Admin.
+
+> ### 🔴 RULE PM-68: ĐỒNG BỘ SLIDE CẨM NANG TỪ GOOGLE PRESENTATION & GHẾ GIÁM SÁT SENTINEL-GUIDE-SYNC (STRICT GUIDE PRESENTATION DYNAMIC SYNC & SENTINEL PURGE POLICY)
+> **Root Cause (Sự Cố 03/10/2026)**:
+> 1. Khi tài liệu trình chiếu Google Presentation (Slide Traing - Google Slides, ID 1UqHw1AzsKM-U-I5rhBTdqqSokeTuukrE_vsrL6xB2uI) được cập nhật, xóa slide cũ (giảm từ 44 slide xuống 41 slide), Web Portal (executive_dashboard.html) và thư mục tĩnh ssets/guide_slides/ vẫn lưu các file slide ảnh cũ (slide_42.jpg, slide_43.jpg, slide_44.jpg, ảnh Drive cũ tại slide 8).
+> 2. Trình duyệt client cache ảnh theo URL tĩnh, dẫn đến giao diện hiển thị hình ảnh slide đã bị xóa trên Google Slide, gây nhầm lẫn quy trình vận hành hiện trường.
+> 3. Một số slide bị tác giả kéo đồ họa tràn viền âm (off-canvas như Slide 4 cột 1) khiến render trang thông thường làm mất một phần đồ họa.
+>
+> **Biện Pháp Phòng Ngừa Kỷ Luật Thép (Bắt Buộc)**:
+> 1. **Đối Chiếu Số Lượng Slide Tuyệt Đối & Dọn Sạch File Cũ (Absolute Count Match & Stale File Purge)**: Khi đồng bộ từ Google Presentation, BẮT BUỘC phải đọc trực tiếp số lượng slide thực tế từ file export PDF mới nhất. Nếu tổng số slide giảm, BẮT BUỘC phải xóa sạch các file ảnh slide thừa cũ (slide_N.jpg với N > total) trên cả 3 thư mục ssets/guide_slides/ (root, 	ni-search, Task and WO). TUYỆT ĐỐI CẤM để lại file slide cũ gây sai lệch.
+> 2. **Khai Thác Ghế Giám Sát SENTINEL-GUIDE-SYNC & Nút Đồng Bộ Live (Supervisory Sentinel & Cache-Busting)**: BẮT BUỘC duy trì ghế giám sát SENTINEL-GUIDE-SYNC trong trung tâm điều hành supervisory-sentinel-card và tích hợp nút [Đồng Bộ Slide Mới] trên giao diện Guide For Staff. Hàm đồng bộ syncGuideSlidesLive() BẮT BUỘC đính kèm query string timestamp ?t=Date.now() vào thẻ <img> để buộc trình duyệt tải lại ảnh 2K mới nhất 100%, xóa bỏ triệt để cache cũ trên thiết bị của kỹ sư hiện trường.
+> 3. **Bảo Tồn Toàn Vẹn Đồ Họa Không Bị Cắt (Lossless Unclipped Graphic Extraction)**: Với các slide đồ họa bị kéo ra ngoài khung viền trắng (off-canvas âm như Slide 4 cột 1), BẮT BUỘC trích xuất đối tượng đồ họa gốc (raw graphic object xref) thay vì chụp trang (page pixmap) để giữ nguyên vẹn 100% cột và nội dung.
+
+
+
+> ### 🔴 RULE PM-69: BỌC THÉP ĐOÀN TÀU SALE — KHÔNG SECRET TRONG SOURCE, KHÔNG ENDPOINT GHI CÔNG KHAI, MỌI GHI SHEET PHẢI CÓ LOCK + ESCAPE + AUDIT (STRICT SALE TRAIN HARDENING POLICY)
+> **Root Cause (Sự Cố 03/10/2026 — 4 chuyên gia rà soát + phúc tra live)**:
+> 1. **Secret hardcode làm fallback**: `|| '<bot-token>'` trong `sale_backend.gs` (3 chỗ), `train_5min.yml` (3 chỗ, 2 bot), `sale_summary_report.py`. Token Sale **trùng token bot Site Down Relay** (`8647102342`) nên một lần lộ là lộ cả hai phân hệ.
+> 2. **`staff_save` / `staff_delete` / `staff_get` public, không xác thực** + `staffSavePublic_` `clearContents()` rồi ghi lại từ danh sách do client gửi → danh sách rỗng/cũ làm mất toàn bộ nhân sự.
+> 3. **TDZ**: `ss` dùng trước `const ss` trong `handleTelegramSaleCollect_` → `catch` nuốt lỗi → mọi đơn bị gán sai team `Dawei`.
+> 4. **Xác thực lỏng**: `g.email === token.split(':')[0]` — chỉ cần biết email là qua auth. `SALE_API_KEY` chưa đặt trong Script Properties nên API có token trả 500 (chưa từng chạy được trên production).
+> 5. **Không LockService**, id `Date.now()` trùng, `saleAdd_` (cột `id`) và Telegram (`_id`) lệch khóa nên `update/delete` không thấy dòng Telegram; `_ts` lẫn UTC và MMT.
+> 6. **Không escape**: `parse_mode:HTML` với dữ liệu người nhập; `sale.html` ghi `u.name` thẳng vào `innerHTML` và `onclick="deleteStaffUser('${name}')"` (XSS qua tên nhân sự).
+>
+> **Quy Tắc Bắt Buộc**:
+> 1. **CẤM literal secret** (bot token, API key, PIN) trong `.gs/.py/.yml/.html/.md`. Chỉ đọc `ScriptProperties` (GAS) hoặc `${{ secrets.X }}` (Actions). Hàm lấy token chỉ trả `''` + log khi thiếu, TUYỆT ĐỐI CẤM `|| '<literal>'`. Trước khi thêm bot mới: kiểm token đó có dùng chung với phân hệ khóa thép (Site Down) không — nếu có thì xoay token cần `UNLOCK STEEL`.
+> 2. **Endpoint ghi dữ liệu nhạy cảm (`staff_*`, `sale_*`, `telegram_sale_collect`) CẤM public thuần**: bắt buộc ≥1 lớp: token hợp lệ khớp `g.token` (CẤM khớp theo email), hoặc bằng chứng PIN phía server (`SALE_ADMIN_PIN_HASH` + khóa 5 lần/10 phút), hoặc secret webhook (`SALE_COLLECT_SECRET`, fail-closed khi chưa cấu hình).
+> 3. **Ghi đè cả tab (`clearContents`) chỉ khi**: (a) danh sách không rỗng, (b) đã chụp snapshot sang tab `*_backup`, (c) nằm trong `LockService.getScriptLock()`. CẤM ghi đè từ dữ liệu cache client mà không có 3 điều kiện này.
+> 4. **Mọi hàm ghi Sheet** dùng `withScriptLock_`, id sinh bằng `uniqueId_()` (CẤM `Date.now()` trần), `_ts` luôn `Asia/Yangon` dạng `yyyy-MM-dd HH:mm:ss`, giá trị chuỗi đi qua `sanitizeCell_` (chặn formula injection), cột hệ thống `id/_ts/_by/_id` bất biến khi update, mỗi lần sửa/xóa ghi tab `Sale Audit`.
+> 5. **Mọi chuỗi người dùng vào Telegram HTML hoặc `innerHTML`** BẮT BUỘC qua `escHtml_()` (GAS) / `escH_()` (web). Với handler inline dùng `escH_(JSON.stringify(v))`, CẤM nối `'${name}'` vào `onclick`.
+> 6. **Biến dùng trước khai báo (`const`)**: khi thêm khối `try/catch` quanh logic mới, BẮT BUỘC khai báo mọi biến dùng trong khối đó TRƯỚC khối; CẤM `catch` chỉ `Logger.log` mà không kiểm tra giá trị mặc định có làm sai dữ liệu (như gán nhầm team).
+> 7. **Cấu hình thiếu phải báo rõ** (`Server auth not configured`), CẤM trả `500 Internal error` che nguyên nhân. Sau khi deploy GAS bảo mật, BẮT BUỘC chạy kiểm tra live: không token → 401, email-only → từ chối, `staff_save` rỗng → 400, `telegram_sale_collect` không secret → 403.
+> 8. **Hai bản HTML cùng chức năng (`sale.html`, `tni_sale.html`) CẤM lệch nhau**; sửa một bản thì đồng bộ bản kia và `Task and WO`, kiểm `Get-FileHash` giống nhau.
+> 9. **Thao tác thủ công còn lại sau PM-69** (AI không làm thay được): đặt `SALE_API_KEY`, `SALE_ADMIN_PIN_HASH`, `SALE_COLLECT_SECRET`, `BOT_TOKEN` trong Script Properties; thêm GitHub Secrets `SALE_BOT_TOKEN`, `ASSET_BOT_TOKEN`; xoay token bot Sale/Site Down (cần mật khẩu khóa thép vì dùng chung).
+
+> ### 🔴 RULE PM-70: SALE — SPEC LÀ NGUỒN SỰ THẬT, VÒNG ĐỜI ĐƠN & LÔ GIỮ HÀNG DO SERVER KIỂM SOÁT
+> 1. **Mọi thay đổi nghiệp vụ Sale BẮT BUỘC sửa `SALE_SPEC.md` TRƯỚC, code SAU** (file ở root và `tni-search`). CẤM code ngoài SPEC; yêu cầu mới của chủ phải ghi vào SPEC ngay trong cùng phiên.
+> 2. **Trạng thái đơn do server đặt** (`Nháp → Đã gửi báo giá → Đã xác nhận nhận hàng → Đã thanh toán đủ`). CẤM client tự ghi `status/da_thu/con_no`; chỉ `sale_status`/`sale_payment` đổi chúng. Chủ đơn sửa/xóa khi còn `Nháp`; sau đó chỉ admin, mọi thay đổi ghi `Sale Audit`.
+> 3. **Mọi ghi mới BẮT BUỘC có `idem_key`** (gọi lại không tạo dòng trùng). Migration cột chỉ **thêm cuối, idempotent**, snapshot tab đã có dữ liệu (`bak_<tab>_v0`) trước khi đụng header; CẤM đổi thứ tự cột hay ghi đè dữ liệu thật.
+> 4. **Nghiệp vụ chủ đã chốt (03/10/2026)**: đại lý = bán đứt (trừ kho + doanh thu ngay, không nợ, không hoa hồng; chiết khấu nhập tay theo lô); ký gởi và lô giao nhân viên bắt buộc có serial, tối đa 60 ngày/lô, người giữ chỉ thấy lô của mình (lọc ở server); hàng trả và hàng hỏng do kho (`warehouse`) nhập, trả thì giảm trừ công nợ hàng của người giữ, hỏng thì theo dõi gởi bảo hành. CẤM tính hàng ký gởi vào doanh thu trước khi có đơn bán thật.
+> 5. **Báo cáo Sale gửi lên GROUP Telegram chỉ định** (tên ở `Cau Hinh.sale_report_group`, id từ tab `List Group Telegram`), CẤM DM dữ liệu lô cho từng người, CẤM đoán group khi chưa chỉ định (bỏ qua + báo DM Admin). Tin group KHÔNG chứa giá vốn/lợi nhuận/CK/hoa hồng. Tiền tệ **MMK**, CẤM hiển thị `₫`/VND. Toa Sale chạy **1 lần 17:30 MMT** (bỏ 11:30).
+> 6. **Ghế Sale tách rõ**: thực thi `WEB-SALE-16`, `GAS-SALE-16`, `BOT-SALE-16`, `TRAIN-SALE-1730`; giám sát `SENTINEL-SALE-RECON` (chạy trong Toa Auditor 9.1, chỉ báo không tự sửa) + `AUDITOR-9.1`. Mỗi thay đổi Sale phải nêu ghế bị ảnh hưởng; CẤM tạo workflow/cron/trigger riêng cho giám sát.
+> 7. **Rule sai chỗ nào sửa đúng chỗ đó**: khi SPEC đổi, dò và sửa mọi nơi còn ghi giá trị cũ (AGENTS.md, system_map.md, `train_5min.yml`, script, GAS) — danh sách ở `SALE_SPEC.md` mục 14; CẤM chỉ sửa SPEC rồi để rule/code cũ mâu thuẫn.
+> 8. **Chưa đạt nghiệm thu thì CẤM báo xong**: Phase 1a đã deploy (@474/@475) nhưng `sale_status/sale_payment/rule chủ đơn` chưa test live vì `SALE_API_KEY` chưa đặt; phải test trước khi báo hoàn thành các phase sau.
+
+---
+
+# 📌 PM RULES — POST-MORTEM TỪ BUG THỰC TẾ (AUTO-INJECTED)
+
+> **PM-R1 (01/10/2026) — Refuel Icon / Repo Isolation Vi Phạm**:
+> - **Root Cause**: Khi sửa `refuel_plan_report.py` (repo `tni-bot`), AI dùng `Copy-Item ... tni_site_down_repo\` — vi phạm Strict Repo Isolation (`tni-sitedown` chỉ phục vụ Site Down).
+> - **Rule**: Khi sửa file Python thuộc `Task and WO`, TUYỆT ĐỐI CẤM copy sang `tni_site_down_repo`. Chỉ `git push` vào đúng `phonghdpxd-cmd/tni-bot`.
+> - **Anti-pattern CẤM**: `Copy-Item "...refuel_plan_report.py" "...tni_site_down_repo\..."`
+
+> **PM-R2 (01/10/2026) — Icon Priority / Column Mapping Không Verify**:
+> - **Root Cause**: Thêm logic đọc cột Sheet mà không verify header trước → sửa nhiều vòng (ICT Grade → q → col Q → col R).
+> - **Rule**: Khi thêm logic đọc cột mới từ Google Sheet, BẮT BUỘC chạy `python -c "..."` đọc header row thực tế TRƯỚC khi viết code. TUYỆT ĐỐI CẤM đoán `column=X` mà không xác minh bằng dữ liệu thật.
+
+> **PM-68 (01/10/2026) — GAS Web App Redirect Kills POST Body (staff_get spinner bug)**:
+> - **Root Cause**: Google Apps Script Web App **luôn redirect POST -> GET (HTTP 302)** truoc khi thuc thi. Browser fetch() follow redirect chuyen thanh GET — **toan bo body JSON bi mat**. GAS nhan action="" -> tra response khong co ok:true -> portal fallback local -> spinner khong tat.
+> - **Rule**: Khi viet GAS public read-only endpoint (no auth), BAT BUOC dung **GET voi ?action=xxx query param**, TUYET DOI CAM dung POST voi body JSON cho public no-auth actions.
+> - **Pattern dung (Portal)**: fetch(GAS_URL + '?action=staff_get', { method: 'GET' })
+> - **Pattern dung (GAS)**: Xu ly trong doGetCollector_(e) voi e.parameter.action
+> - **Anti-pattern CAM**: fetch(GAS_URL, { method:'POST', body: JSON.stringify({action:'staff_get'}) })
+
+> **PM-69 (01/10/2026) — Them Action Moi Vao GAS Phai Cap Nhat CA 2 Duong Route**:
+> - **Root Cause**: staff_get them vao doPostCollector_ nhung QUEN them vao doGetCollector_ -> khi GAS redirect POST->GET, doGetCollector_ khong nhan duoc route.
+> - **Rule**: Khi them action moi vao GAS collector, BAT BUOC kiem tra CA 2 ham: doPostCollector_ (write) VA doGetCollector_ (read public). TUYET DOI CAM chi them vao 1 trong 2.
+> - **Checklist**: (1) doPostCollector_ co route? (2) doGetCollector_ co route? (3) handleSalePost_ public actions TRUOC auth check?
+
+> **PM-70 (02/10/2026) — Bot Thu Thập Mất Webhook Nhưng Ghế Giám Sát Bị Sót Trong Danh Mục (Zero Unmonitored Bot Policy)**:
+> - **Root Cause**: Bot thu thập `@TNI_FUEL` (`8811503647`) bị mất webhook (url="" rỗng, 36 tin nhắn bị nghẽn trong hàng đợi Telegram). Ghế giám sát `AUDITOR-9.1` (`system_auditor.py`) và Toa 0 Keepalive (`train_5min.yml`) **bị sót không đưa bot này vào danh mục kiểm tra `BOT_REGISTRY`**, dẫn đến bot bị rớt webhook nhưng Sentinel không phát hiện và không cảnh báo.
+> - **Rule**: Toàn bộ bot phục vụ thu thập tự động (Search, Asset, Site Down, Construction, Cable, Attendance, Refuel...) BẮT BUỘC 100% phải được đăng ký vào:
+>   1. `system_auditor.py` -> `BOT_REGISTRY` (Kiểm tra url, pending queue, latency, lỗi 302).
+>   2. `train_5min.yml` -> `Toa 0 Keepalive Ping All Endpoints & Webhooks` (Ping getWebhookInfo & endpoint Vercel mỗi nhịp tàu).
+> - **Checklist Khẩn Cấp Khi Bot Không Thu Thập**:
+>   1. Chạy ngay: `requests.get('https://api.telegram.org/bot<TOKEN>/getWebhookInfo')`
+>   2. Nếu `url == ""`: Gọi ngay `setWebhook` trỏ về đúng endpoint Vercel.
+>   3. Kiểm tra xem bot đã có mặt trong `system_auditor.py` và `train_5min.yml` chưa. Nếu chưa -> bổ sung ngay lập tức!
+
+
+> **PM-R3 (02/10/2026) — Hiển Thị Đầy Đủ Ghế Giám Sát Tick Xanh & Bảo Vệ Hàm Gửi Tin**:
+> - **Root Cause 1**: Báo cáo kiểm toán `build_master_audit_report()` trước đây chỉ hiển thị danh sách các ghế giám sát khi 0 lỗi & 0 cảnh báo. Khi có cảnh báo nhỏ (như WO Hoarding), danh sách các ghế giám sát bị ẩn mất, khiến người dùng không biết các ghế khác có hoạt động hay không.
+> - **Root Cause 2**: Khi thêm `notify_desktop()` bằng replace file ở phiên trước, hàm cốt lõi `send_report_telegram()` đã bị vô tình xóa đè, gây nguy cơ NameError lúc gửi báo cáo.
+> - **Rule**: Trong báo cáo kiểm toán hàng ngày của Toa Auditor (Ghế AUDITOR-9.1), BẮT BUỘC luôn luôn hiển thị khối trạng thái toàn bộ 10+ Ghế Giám Sát hệ thống với tick xanh ✅ cho các ghế đang hoạt động bình thường. Khi thêm/sửa bất kỳ hàm tiện ích nào, BẮT BUỘC kiểm tra hàm vận hành cốt lõi `send_report_telegram()` còn nguyên vẹn và kiểm tra `hasattr` trước khi bàn giao.
+
+> **PM-71 (02/10/2026) — ES6 Temporal Dead Zone (TDZ) & Undefined Variable Crash in Portal Runtime (Zero Uncaught Runtime Exception Policy)**:
+> - **Root Cause**:
+>   1. Trong `tni_sale.html`, hàm `applyLang(currentLang)` được gọi ở dòng 8394 trong khi các hằng số `SYSTEM_MODULES`, `ROLES`, `DEFAULT_STAFF_USERS` lại khai báo bằng `const` ở dòng 8589+. `applyLang` gọi `renderRBACMatrix` -> truy cập `SYSTEM_MODULES` khi chưa được khai báo -> JS ném `ReferenceError: Cannot access 'SYSTEM_MODULES' before initialization` (TDZ). Toàn bộ luồng khởi tạo script bị đứt gãy ngay từ lúc tải trang.
+>   2. Trong hàm `renderRBACMatrix()`, biến `overrides` được sử dụng (`overrideKey in overrides`) nhưng hoàn toàn không được khai báo -> ném `ReferenceError: overrides is not defined`. Lỗi này làm ngắt hàm, khiến các hàm render sau nó (`renderStaffUsersTable` và `populateStaffUserSelect`) không bao giờ được gọi -> giao diện trắng tinh.
+>   3. Mảng rỗng `[]` trong JavaScript là Truthy, nên cú pháp `DB.g('staff_directory') || DEFAULT_STAFF_USERS` nhận `[]` chứ không fallback về `DEFAULT_STAFF_USERS`.
+> - **Rule**:
+>   1. **Khóa Thép Thứ Tự Khai Báo (Zero Top-Level TDZ)**: Mọi hằng số danh mục cấu hình hệ thống (`ROLES`, `SYSTEM_MODULES`, `DEFAULT_STAFF_USERS`) BẮT BUỘC phải được khai báo TRƯỚC mọi hàm khởi tạo giao diện gọi đến chúng. Tuyệt đối không gọi các hàm render bảng dữ liệu bên trong hàm đổi ngôn ngữ `applyLang` trừ khi tab đó đang thực sự mở (`classList.contains('on')`).
+>   2. **Khai Báo Đầy Đủ Biến & Bọc Try/Catch Độc Lập Cho Từng Component**: Mọi hàm render component con (`matrix`, `staffTable`, `userSelect`) trong các tab quản trị BẮT BUỘC phải được bọc `try/catch` riêng biệt. Sự cố của 1 component không bao giờ được phép làm sập việc hiển thị của các component khác.
+>   3. **Fallback Cho Mảng Rỗng**: Khi kiểm tra dữ liệu từ cache LocalStorage hoặc API, BẮT BUỘC dùng `(cached && cached.length > 0) ? cached : DEFAULT_VALUES`, TUYỆT ĐỐI CẤM dùng `cached || DEFAULT` vì `[]` là truthy trong JS.
+
+> **PM-72 (03/10/2026) — Ký Gởi / Bán Sỉ Bulk Import Zero Cost-Price Leakage & Smart Inventory Auto-Link Policy**:
+> - **Requirement & Context**: Phân hệ Ký Gởi (`s-kygoi`) phục vụ nhân viên kinh doanh, điểm bán và đối tác gửi hàng. Nhân viên/đối tác lập file import KHÔNG ĐƯỢC PHÉP và KHÔNG CẦN BIẾT giá vốn gốc (83%). File import CHỈ yêu cầu: `Điểm Bán`, `Người Nhận`, `SĐT`, `Tên SP`, `Model`, `Số Lượng`, `Giá Bỏ Sỉ Hoặc Ký Gởi`, `Hạn (ngày)`, `Ghi Chú`.
+> - **Rule**:
+>   1. **Tuyệt Đối Giấu Cột Giá Gốc Khỏi File Mẫu Ký Gởi / Bán Sỉ (Zero Cost In Consignment Import)**: File template và khung dán của Ký Gởi TUYỆT ĐỐI KHÔNG chứa cột giá gốc đầu vào.
+>   2. **Cơ Chế Khớp Kho Thông Minh (Smart Inventory Auto-Link)**: Hệ thống tự động đối chiếu `Model` hoặc `Tên SP` với danh mục nhập kho (`DB.g('nhap')`) để tự động gán `spId`, `spN`, và `giagoc` ngầm phục vụ tính toán tài chính (hoa hồng 17% điểm bán & lợi nhuận công ty). Nếu là sản phẩm mới chưa có trong kho, tự động tạo mã và gán cờ `⚠️ SP Mới` mà không chặn người dùng import.
+>   3. **Chuẩn UX Đồng Nhất 2 Chế Độ (Single & Bulk Mode Parity)**: Mọi phân hệ có chức năng import hàng loạt BẮT BUỘC có thanh chuyển đổi chế độ (`➕ Tạo Đơn Lẻ` vs `📥 Import Hàng Loạt`), nút tải file mẫu chuẩn UTF-8 CSV BOM, khung dán từ Excel, khối thống kê nhanh và bảng xem trước (preview) kèm badge kiểm tra tính hợp lệ trước khi xác nhận lưu.
+
+
+> **PM-R4 (03/10/2026) — Hòa Chung Kênh Bán Hàng Web và Telegram (Unified Sales SSOT Policy)**:
+> - **Root Cause**: Phân hệ Bán Hàng trước đây bị chia cắt thành 2 luồng độc lập: Web UI lưu vào tab `Ban Hang` (qua `sale_backend.gs`), trong khi Telegram Bot lại lưu vào các tab riêng `Sales Record` / `Sales to dealers` (qua `TNI Sale.js`). Hậu quả là đơn hàng chốt trên Telegram không xuất hiện trên Web UI (Lịch Sử Bán Hàng bị rỗng), còn đơn bán trên Web thì không gửi thông báo cho đội ngũ trên Telegram.
+> - **Rule**: Mọi đơn bán hàng phát sinh từ Telegram (bán lẻ, bán sỉ đại lý, ký gởi) BẮT BUỘC phải được hàm `saveOrderToSheet` tự động đồng bộ chèn dòng trực tiếp vào tab `Ban Hang` (với `source = 'telegram'`) để Web UI đọc được ngay lập tức. Ngược lại, khi Web UI xuất kho qua `saleAdd_`, BẮT BUỘC gọi `notifyTelegramNewSale_` để bắn thông báo tự động lên Telegram Group bán hàng.
+
+> **PM-73 (03/10/2026) — Cơ Chế Mở: Dynamic Template Thu Thập Bán Hàng & Khảo Sát Tự Động Theo Tab Template Sale & Xóa Tin Telegram (Dynamic Template SSOT & Auto-Clean Protocol)**:
+> - **Yêu Cầu & Bối Cảnh**: Người dùng yêu cầu cơ chế mở 100%: mọi mẫu tin nhắn khảo sát, tiếp xúc khách hàng, bán hàng, ký gởi, bảo hành được cấu hình trực tiếp trong Tab `Template Sale` trên Google Sheet. Khi người dùng thêm, bớt, xóa, sửa mẫu trên Sheet thì toàn bộ hệ thống Bot và Web phải tự động nhận diện và cập nhật mà không cần sửa code.
+> - **Quy Trình Chuẩn (3 Bước Tự Động)**:
+>   1. **Dynamic Engine (SSOT)**: GAS `getDynamicSaleTemplates_()` và `templateSaleGet_()` tự động đọc các dòng dạng `Tên Mẫu : Cột 1 | Cột 2 | Cột 3` trong tab `Template Sale`.
+>   2. **Thu Thập & Xóa Tin Telegram**: Khi nhân viên gửi tin nhắn theo Template vào nhóm Telegram, Bot tự động bóc tách dữ liệu -> chèn vào **dòng 2** của Sheet đích tương ứng -> gọi Telegram API `deleteMessage` xóa sạch tin nhắn gốc của nhân viên trên nhóm -> bắn phản hồi xác nhận 2 dòng chuẩn.
+>   3. **Đồng Bộ Web Realtime**: Web `sale.html` bổ sung tab `📋 Mẫu Gửi Telegram` trong menu CRM & Survey, tự động pull danh sách mẫu từ Sheet kèm nút bấm "Sao Chép Mẫu" một chạm. Khi nhân viên mở các tab Bán Hàng, Khảo Sát, Tiếp Xúc, Web tự động pull dữ liệu sống từ Sheet để hiển thị ngay lập tức.
+
+> **PM-74 (03/10/2026) — Bán Hàng & Đại Lý Bulk Import Zero Cost-Price Leakage & Smart Auto-Link Protocol**:
+> - **Requirement & Context**: Người dùng yêu cầu bổ sung chức năng Import hàng loạt bằng file .CSV / Excel cho cả phân hệ **Bán Hàng & Xuất Kho (`#s-banhang`)** và **Đại Lý & Phân Phối (`#s-daily`)** (gồm cả Danh Sách Đại Lý `#td-ds` và Phân Phối Hàng Cho Đại Lý `#td-pp`), áp dụng chuẩn bảo mật giá vốn và quy trình UX 2 chế độ (Single & Bulk) như phân hệ Ký Gởi (`#s-kygoi`, Rule PM-72).
+> - **Root Cause & Rationale**:
+>   1. Nhân viên bán hàng và điều phối đại lý khi nhập file danh sách bán lẻ hoặc đơn giao hàng cho đại lý TUYỆT ĐỐI KHÔNG ĐƯỢC PHÉP và KHÔNG CẦN BIẾT giá vốn gốc (83%). File template Bán Hàng chỉ yêu cầu Đơn Giá Bán áp dụng; file template Phân Phối Đại Lý chỉ yêu cầu Giá Bỏ Sỉ thỏa thuận.
+>   2. Hệ thống tự động khớp kho thông minh theo `Model` hoặc `Tên Sản Phẩm` từ danh mục nhập kho (`DB.g('nhap')`) để trích xuất `spId`, `spN`, và `giagoc` ngầm phục vụ hạch toán tài chính (17% nộp Cty, LN Chi Nhánh). Sản phẩm mới được tự động gán cờ `⚠️ SP Mới` mà không chặn import.
+>   3. Khi import phân phối đại lý, nếu tên đại lý chưa có trong danh mục `DB.g('daily')`, hệ thống tự động tạo mới bản ghi đại lý để bảo đảm tính nhất quán dữ liệu toàn diện.
+> - **Rule**:
+>   1. **Tuyệt Đối Giấu Cột Giá Gốc Khỏi File Mẫu Bán Hàng & Phân Phối Đại Lý (Zero Cost In Sales & Dealer Distribution Import)**: Mọi template import (.CSV) và khung dán (paste area) của Bán Hàng và Phân Phối Đại Lý TUYỆT ĐỐI KHÔNG chứa cột giá gốc đầu vào (83%).
+>   2. **Cơ Chế Khớp Kho & Phân Bổ Ngầm Tự Động (Auto Cost-Allocation Engine)**: Tự động đối chiếu Model / Tên SP với `DB.g('nhap')` để lấy giá vốn ngầm tính 17% Cty và LN Chi Nhánh. Với sản phẩm mới, tự động tạo mã tạm và gán cờ `⚠️ SP Mới`.
+>   3. **Tự Động Tạo Đại Lý Mới (Auto-Create New Dealer On Import)**: Khi import phân phối đại lý, nếu tên đại lý chưa có trong `DB.g('daily')`, hệ thống tự động thêm đại lý vào danh mục để đồng bộ dữ liệu.
+>   4. **Chuẩn UX Đồng Nhất 2 Chế Độ (Single & Bulk Mode Parity)**: Mọi phân hệ có chức năng import hàng loạt BẮT BUỘC có thanh chuyển đổi chế độ (`➕ Tạo Đơn Lẻ` vs `📥 Import Hàng Loạt`), nút tải file mẫu chuẩn UTF-8 CSV BOM, khung dán từ Excel, khối 6 thẻ thống kê nhanh, và bảng preview chi tiết kèm badge kiểm tra tính hợp lệ trước khi xác nhận lưu.
+
+> **PM-75 (03/10/2026) — Attendance Telegram ID & Nickname Alias Mapping SSOT (Zero False Not-Report Policy)**:
+> - **Root Cause**: Trong phân hệ Điểm Danh (`apps_script_attendance/TNI attendance.js`), khi nhân viên nộp ảnh điểm danh qua Telegram Bot/Group, thông tin ghi vào tab `List Attendance` có `tgId` (Col D), username/nickname (Col E/F), và ảnh (Col G). Khi hàm `buildDailyAttendanceText_()` tạo danh sách nhân viên từ `Staff attendance`, tên nhân viên lấy từ `FullName` (Col F) hoặc `TgName` (Col C). Trước đây, logic đếm ảnh và phân loại ca (`early`/`late`/`after`) chỉ lấy `attKey = nameLow` từ `List Attendance`. Nếu tên Telegram trong `List Attendance` khác với họ tên đầy đủ trong `Staff attendance`, hệ thống không khớp được `bestPhotoSlot` và `attMap` -> nhân viên dù đã gửi ảnh và hiện ảnh (`Photo: 0/1/0/3/1`) nhưng vẫn bị đếm `Work: 0` và xếp vào nhóm `❌ Not Report (Leave)`!
+> - **Rule**:
+>   1. **Xây Dựng Bảng Ánh Xạ Bí Danh Hai Chiều (Bi-directional Alias Mapping SSOT)**: Trong `buildDailyAttendanceText_()`, khi quét bảng `Staff attendance`, BẮT BUỘC phải lập hai bảng ánh xạ: `tgIdToStaffName[tgId] = canonLow` và `aliasToStaffName[fullName.toLowerCase()] = canonLow`, `aliasToStaffName[tgName.toLowerCase()] = canonLow`.
+>   2. **Phân Giải Danh Tính Chuẩn Xác Từ List Attendance**: Khi duyệt ảnh trong `List Attendance`, BẮT BUỘC phân giải định danh theo thứ tự ưu tiên: `canonName = (tgId && tgIdToStaffName[tgId]) || aliasToStaffName[nameLow] || nameLow`. Dùng `canonName` để cập nhật `bestPhotoSlot`, `attMap` và đồng thời ghi nhận vào `photoMap[canonName]` để đảm bảo số liệu Work/Late/Photo luôn đồng bộ 100% cho mọi nhân viên.
+> **PM-76 (03/10/2026) — Khóa Thép Xóa Nhân Sự 2 Chiều & Chuẩn Hóa Chống Lỗi "Undefined" Trong Danh Bạ RBAC (Staff Directory 2-Way Deletion & Zero-Undefined Normalization Policy)**:
+> - **Yêu Cầu & Bối Cảnh**: Người dùng phản ánh lỗi *"sao không xóa được"* trong bảng Danh Sách Nhân Sự & Phân Quyền (`#s-rbac` trên Portal `sale.html`). Các dòng hiển thị tên nhân viên là `undefined`, chức danh `-`, vai trò mặc định, khung tạo link cá nhân hóa hiện `undefined (undefined)`, và khi bấm nút `🗑 Xóa` thì xác nhận `Confirm DELETE staff member: "undefined"` nhưng bấm OK không xóa được hoặc bị tải lại nguyên vẹn.
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. **Lệch Cấu Trúc Khóa Thuộc Tính**: Khi `staff_get` được gọi từ Web UI, phiên bản GAS Web App đang chạy (@462) trả về mảng các đối tượng có khóa là toàn bộ tiêu đề cột của Google Sheet (`"ID (Mã NV)"`, `"Full Name (Họ và Tên) *"`, `"Job Title (Chức Danh)"`...). Web UI (`tni_sale.html`) chỉ đọc thuộc tính viết tắt (`u.id`, `u.name`, `u.title`, `u.role`), dẫn đến toàn bộ trường dữ liệu bị `undefined` trên giao diện bảng và ô tạo liên kết cá nhân hóa.
+>   2. **Bộ Lọc Client Bị Lệch Kiểu**: Khi người dùng bấm nút `🗑 Xóa`, hàm `deleteStaffUser` nhận `userId` là chuỗi `"undefined"`, bộ lọc `list.filter(u => u.id !== userId)` so sánh chuỗi `"undefined"` với giá trị `undefined` của đối tượng (primitive) nên không loại bỏ được phần tử nào.
+>   3. **Thiếu Luồng Đồng Bộ Xóa Lên Google Sheet**: `deleteStaffUser` trước đây chỉ lọc trên `localStorage` mà KHÔNG HỀ gửi lệnh xóa/đồng bộ về Google Sheet (`staff_delete` hoặc `staff_save`). Ngay sau khi xóa, hàm gọi lại `renderStaffUsersTable()`, tiến trình chạy ngầm lập tức gọi `fetch(SALE_GAS_URL + '?action=staff_get')` tải lại nguyên vẹn các dòng từ Sheet về và ghi đè lại vào `localStorage`, khiến các dòng vừa xóa (hoặc các dòng `undefined`) lập tức hồi sinh ngay trước mắt người dùng!
+>   4. **Deployment ID Cũ Chưa Được Deploy Bản Mới**: Deployment ID `AKfycbylrXMEDKpBfvs9Wbr3kmoqrJ6UoWE1KaN-WC94mE2wm1V2MJUFu-zyYrzzm10Vo0Ue5Q` được dùng trong Web UI bị đóng băng tại `@462` (chứa logic cũ), trong khi code mới chỉ được cập nhật ở deployment khác `@466`.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (The 4-Pillar RBAC Directory Protocol)**:
+>   1. **Hàm Chuẩn Hóa Phòng Vệ Bắt Buộc (`normalizeStaffUser`)**: Mọi luồng dữ liệu nhân sự nạp vào Web (từ `localStorage`, từ Google Sheet fetch, từ file import CSV/Excel) BẮT BUỘC phải đi qua hàm `normalizeStaffUser(u)`. Hàm tự động nhận diện cả khóa viết tắt (`id`, `name`, `title`, `role`, `email`, `phone`) lẫn khóa tiêu đề Sheet đầy đủ (`ID (Mã NV)`, `Full Name (Họ và Tên) *`...), đồng thời **LỌC BỎ TRIỆT ĐỂ** bất kỳ bản ghi nào có `name === 'undefined'`, rỗng hoặc `null`. TUYỆT ĐỐI KHÔNG BAO GIỜ để chuỗi `undefined` lọt vào DOM hay ô select!
+>   2. **Đồng Bộ Xóa 2 Chiều Tức Thì (Optimistic UI + Live Sheet Sync)**: Khi người dùng bấm `🗑 Xóa`, `deleteStaffUser` BẮT BUỘC:
+>      - Cập nhật ngay trên `localStorage` và vẽ lại bảng DOM tức thì (Optimistic UI) để người dùng thấy dòng bị xóa biến mất ngay lập tức.
+>      - Đồng thời gửi ngay POST request qua `syncStaffDirectoryToSheet(cleanList)` (`Content-Type: text/plain;charset=utf-8` tránh CORS) để ghi đè danh sách sạch lên tab `staff` của Google Sheet.
+>      - Đồng thời gọi endpoint `staff_delete` (hỗ trợ cả GET và POST) để xóa triệt để dòng tương ứng và dọn sạch mọi dòng rác/undefined trên Google Sheet.
+>   3. **Tự Động Đồng Bộ Khi Thêm / Sửa / Đổi Vai Trò / Import**: Mọi hành động làm thay đổi danh sách nhân sự (`saveStaffUserModal`, `updateStaffAssignedRole`, `resetStaffDirectoryToClean`, `importStaffFromFile`) đều BẮT BUỘC gọi `syncStaffDirectoryToSheet` để bảo đảm tính nhất quán hai chiều (Web UI <-> Google Sheet tab `staff`) 100% thời gian thực.
+>   4. **Khóa Thép Deploy Đồng Nhất Cho Cả 2 Deployment ID GAS**: Khi sửa backend GAS (`QLTC_GAS`), AI BẮT BUỘC phải deploy cho CẢ 2 deployment ID (`AKfycbylrX...` và `AKfycbz-NZ...`) bằng lệnh `npx clasp deploy -i <id>`, bảo đảm Web UI luôn chạy trên phiên bản backend mới nhất (@467+).
+> **PM-77 (05/10/2026) — Thu Thập Ảnh Telegram Phân Loại Theo Template Trên Google Drive & Loại Bỏ Rào Cản Phân Quyền Khi Đã Quản Trị Qua Gmail (Template-Based Photo Drive Directory & Zero-Role-Barrier Policy)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Người dùng yêu cầu thu thập hình ảnh gửi lên Telegram theo từng template vào thư mục Drive cụ thể (`12V-UaZM1cSha8LihCjBHTOU_BEAk74p-` trong thư mục `1.9.1 Photo Sale solution`) và cung cấp 1 link xem tất cả hình ảnh.
+>   2. Người dùng yêu cầu bỏ lựa chọn vai trò (role selector / PIN gate) trên giao diện Web UI vì quyền truy cập đã được quản trị và chia sẻ trực tiếp qua Google Account / Gmail.
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. *Thiếu cấu trúc lưu trữ phân theo mẫu*: Trước đây, ảnh gửi kèm đơn hàng qua Telegram được lưu phân tán hoặc đưa vào thư mục chung, chưa tự động gom nhóm theo tên từng Template bán hàng (`1.9.1 Photo Sale solution/<Template Name>`).
+>   2. *Ảnh gửi trực tiếp trong caption chưa được bóc tách tức thì*: Khi nhân viên gửi ảnh kèm caption chứa cấu trúc template bán hàng, hệ thống trước đây phải đợi đến luồng xử lý ảnh riêng hoặc lưu đơn trước rồi đợi ảnh sau, dễ dẫn đến mất liên kết ảnh với đơn hàng.
+>   3. *Rào cản phân quyền trùng lặp trên Web UI*: Giao diện web trước đây duy trì dropdown chọn vai trò (`#role-selector-box`) kèm xác thực mã PIN quản trị, làm gián đoạn trải nghiệm của nhân viên dù người dùng đã được cấp quyền truy cập qua Gmail.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (The 3-Pillar Template Photo & Zero-Barrier Protocol)**:
+>   1. **Tự Động Phân Loại Thư Mục Ảnh Drive Theo Template**:
+>      - Cấu hình thư mục gốc `PHOTO_DRIVE_FOLDER_ID = "12V-UaZM1cSha8LihCjBHTOU_BEAk74p-"`.
+>      - Hàm `getOrCreateTemplateFolder(templateName)` tự động tìm hoặc tạo thư mục con `1.9.1 Photo Sale solution` bên trong thư mục gốc, và tạo các thư mục con theo tên từng Template (ví dụ: `1.9.1 Photo Sale solution/Bán lẻ UPS Solar`, `1.9.1 Photo Sale solution/Báo giá đại lý`...).
+>      - Cả ảnh gửi kèm caption đơn hàng lẫn ảnh gửi bổ sung trong phiên 10 phút BẮT BUỘC được tải về và lưu đúng thư mục template đó.
+>   2. **1 Link Xem Toàn Bộ Ảnh (Single Drive Viewer Link)**:
+>      - Mọi tin nhắn Telegram phản hồi chốt đơn / nộp ảnh BẮT BUỘC kèm theo link thư mục Google Drive để người dùng mở xem toàn bộ ảnh chỉ với 1 chạm.
+>      - Cột 11 trong bảng tính Bán Hàng (`Download All Link`) tự động điền URL thư mục Template trên Google Drive.
+>      - Trên thanh điều hướng Web UI (`sale.html`), nút `#role-selector-box` được thay thế bằng nút nổi bật: `📁 Kho Ảnh Drive (Photos)` trỏ trực tiếp đến thư mục ảnh chung `https://drive.google.com/drive/folders/12V-UaZM1cSha8LihCjBHTOU_BEAk74p-`.
+>
+> > ### 🔴 RULE PM-71: BỌC THÉP PHÂN HỆ SITE DOWN & CƠ CHẾ QUÉT DỌN TIN MỒ CÔI THEO BATCH-WINDOW (STRICT SITE DOWN DELETION & TELETHON BATCH-WINDOW SWEEP PROTOCOL)
+> > 
+> > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SITE DOWN DELETION & BATCH-WINDOW SWEEP POLICY)**:
+> > 1. **Triệt Tiêu Tuyệt Đối Trigger Ngầm Trên GAS (Strict Zero GAS Independent Trigger Policy)**: BẮT BUỘC xóa sạch trigger `checkAndSend_1min` và `checkAndSend` trên Apps Script qua `teardownGasTrain1min()` và endpoint `action=teardown_gas_train`. Tuyệt đối CẤM tạo time-driven trigger 1 phút chạy ngầm trên GAS gây xung đột race condition với webhook `store_site_down` làm phát 2 đợt tin trùng lặp trong vòng 1-2 giây.
+> > 2. **Bảo Toàn & Retry Message ID Trong GAS (Persistent MsgID Retention & Auto-Merge)**: Trong `deleteOldMessages_`, CHỈ ĐƯỢC PHÉP xóa ID khỏi `PropertiesService` khi API đã trả về thành công (hoặc tin không tồn tại / quá 48h). TUYỆT ĐỐI CẤM dùng `finally { deleteProperty }` vô điều kiện. Nếu xóa thất bại do lỗi mạng tạm thời hoặc rate limit 429, BẮT BUỘC giữ lại ID trong mảng lưu trữ. Khi phát tin mới trong `sendOrEditTelegramPre` / `sendOrEditTelegram`, BẮT BUỘC gộp (`Set([...unremoved, ...newIds])`) để lần gửi tiếp theo tự động dọn sạch cả tin cũ lẫn tin mới!
+> > 3. **Chunk Fallback Độc Lập (Safe Chunk-Preserving Fallback)**: Khi gửi tin `<pre>` thất bại, nhánh retry khi plain text BẮT BUỘC gửi theo từng biến `chunk` hiện tại, TUYỆT ĐỐI CẤM gửi cả khối `plainContent` thô dài tránh lỗi Telegram 400 Message Too Long (>4096 ký tự).
+> > 4. **Cơ Chế Quét Dọn Theo Batch Window 120s Trong Telethon (Batch-Window Sweep Protocol)**: Trong `sweep_orphan_eta.py`, toàn bộ tin Site Down phát trong vòng 120 giây tính từ tin mới nhất (`age_from_newest <= 120s`) được coi là 1 đợt phát hợp lệ (bảo toàn trọn vẹn cả Part 1, Part 2, và Tin 2). Chỉ các tin cũ hơn 120s mới bị coi là tin mồ côi và bị xóa sạch bằng `client.delete_messages(chat_id, chunk, revoke=True)`. Đồng thời tự động khử trùng lặp (dedup) nếu có hai chunk giống hệt nhau trong cùng một batch window.
+> > 5. **Nhận Diện Bot 5T Bọc Thép (Triple-Identifier Bot Guard)**: Nhận diện Bot 5T qua 3 tầng: `sender_id == 8647102342` (ID gốc bất biến), username (`tni_site_down_cell_alarmbot`), tiêu đề (`BOT_5T_NAMES`) và nội dung (`Total Site down`, `Dont Forget`, `HUB site TNI`, `SUMMARY — Team`). BẮT BUỘC loại trừ ID cá nhân Admin (`6859790680`) để không bao giờ xóa nhầm tin nhắn của con người.
+
+>   3. **Xóa Bỏ Rào Cản Phân Quyền Web UI Khi Đã Quản Trị Qua Gmail**:
+>      - Loại bỏ hoàn toàn dropdown vai trò `#app-role-select` và khóa PIN chuyển vai trò trên Web UI.
+>      - Mặc định khởi tạo `currentAppRole = 'admin'` và `isTabAllowedForRole = () => true` để toàn bộ nhân viên được chia sẻ quyền qua Gmail đều truy cập thông suốt 100% tất cả các tab chức năng.
+>
+> **PM-78 (06/10/2026) — Bọc Thép Phân Loại Template Báo Cáo: Bắt Buộc Neo Đầu Dòng (Anchored Start) & Khóa Chặt Điều Kiện Phản Hồi status == 'ok' Có DEF ID (Strict Anchored Template Parsing & Idempotent DEF Gate Policy)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Tại nhóm Telegram `9 TNI REQUEST REFUEL`, khi thành viên nhắn tin chat thông thường: *"Raja HO Sunil Fuel Aung Naing Refuel Team sent plan refuel we can change Plan in letter you request before 1 day at 10:00 Hein Nanda will request govement change for tomorrow not wait Site down"*, Bot tự động gửi phản hồi xác nhận sai: `⛽ Plan refuel ✅ # | 🗓️ 06/10/2026 10:35 📢 @Phongha79 Who is assigned to follow and monitor ?`.
+>   2. Người dùng yêu cầu làm rõ lý do tại sao bot lại trả lời cho tin nhắn chat tự do không bắt đầu bằng cú pháp chuẩn của Template, đồng thời yêu cầu xóa tin bot nhắn nhầm và sửa dứt điểm lỗi này ở cả bot và kịch bản GAS.
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. *Biểu thức chính quy không neo đầu dòng (Unanchored Matching)*: Cả `api/refuel_collector.py` và `apps_script_refuel_plan.gs` trước đây dùng tìm kiếm tự do trong văn bản (`re.search(r'\bplan\s*refuel\b', t)`, `.includes("plan")`, `.includes("request")`). Do đó, chỉ cần tin nhắn chat chứa cụm từ *"sent plan refuel"* hoặc *"request"* là bị nhận diện nhầm thành mẫu báo cáo.
+>   2. *Lỗi kiểm tra trạng thái lỏng lẻo trong luồng phản hồi (Status Logic Inversion)*: Khi GAS nhận diện rớt trạm (`entries.length === 0`), GAS trả về `{ status: "skip", message: "No sites parsed in Plan" }` mà không ghi dòng nào vào Google Sheets. Tuy nhiên, `refuel_collector.py` lại kiểm tra điều kiện `if result.get("status") != "error":`. Vì `"skip" != "error"` là `True`, bot Python vẫn coi là thành công và gửi phản hồi Telegram với mã DEF rỗng (`#`) và tag Leader.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (The 4-Pillar Anchored Template & DEF Gate Protocol)**:
+>   1. **Bắt Buộc Neo Đầu Dòng Chuẩn Xác (Strict Anchored Start Regex)**: Mọi regex phân loại mẫu báo cáo (`classify`) BẮT BUỘC phải bắt đầu bằng `^\s*...`:
+>      - `PLAN`: `^\s*(?:plan\s*refuel|team[\s_\-]*0*[1-4](?:\s*s\d+)?\s*plan(?:\s*refuel)?)\b` VÀ có mã trạm `\bTNI0*(\d{1,4})\b`.
+>      - `REQUEST`: `^\s*(?:request\s*refuel|team[\s_\-]*0*[1-4](?:\s*s\d+)?\s*request(?:\s*refuel)?)\b` VÀ có mã trạm `\bTNI0*(\d{1,4})\b`.
+>      - `FT_MONITOR`: `^\s*(?:name\s+of\s+ft\s+staff\s+member\s+accompanying\s+to\s+supervise|follow\s*monit[eo]r)\b` VÀ có mã trạm `\bTNI0*(\d{1,4})\b`.
+>      - `REFUELED`: `^\s*(?:dg\s*type|tni0*\d{1,4}\b.*dg\s*type)\b` VÀ có các trường kỹ thuật (`actual filled` / `csu reading` / `running hour` / `level %`) VÀ có mã trạm `\bTNI0*(\d{1,4})\b`.
+>      - `LETTER_SUBMIT`: `^\s*(?:•\s*)?(?:letter\s*submit|submit\s*letter)\s*[:\-]` hoặc kèm ngày tháng.
+>      - `LETTER_APPROVED`: `^\s*(?:•\s*)?(?:approved\s*letter|letter\s*approved|government\s+approved)\s*[:\-]`.
+>   2. **Khóa Chặt Điều Kiện Phản Hồi (Strict Reply Gate: status == "ok" AND valid def)**: Bot Python CHỈ ĐƯỢC PHÉP gửi tin nhắn phản hồi Telegram khi `result.get("status") == "ok" and result.get("def")`. Mọi trạng thái `"skip"`, `"error"` hoặc thiếu mã DEF BẮT BUỘC phải im lặng hoàn toàn, cấm gửi tin rác hoặc tag người dùng.
+>   3. **Đồng Bộ Song Mã Backend GAS (`apps_script_refuel_plan.gs`)**: Cập nhật hàm `collectMessage` trong GAS để dùng chung logic regex neo đầu dòng và nhận diện trường tường minh `"category"` từ Webhook truyền lên.
+>   4. **Triển Khai & Kiểm Chứng Live (Live Verification & Sweep)**: Dùng Telethon xóa tức thì tin bot nhắn sai trong nhóm Telegram, deploy mã nguồn Apps Script (`npx clasp push` & `npx clasp deploy -i AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA @478`), và push code Webhook Python lên Vercel.
+>
+> **PM-79 (06/10/2026) — Nguồn Dữ Liệu Báo Cáo Alarm Chia Sẻ ETA Chuẩn Xác Từ Tab GID 1839820494 & Khóa Chống Trộn Lẫn Trạm Site Down Vào Cell Down (Clean Alarm SSOT & Zero Cross-Contamination Protocol)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Người dùng phản ánh số liệu Cell Down trên bản tin `📋 T2 S1 — ETA Update` hiển thị sai thành 12 trạm trong khi thực tế toàn bộ Team 2 chỉ có đúng 8 Cell Down (T2 chính có 5 trạm, T2 S1 có 3 trạm).
+>   2. Người dùng đã chuẩn hóa bảng dữ liệu cảnh báo sống tại tab chuyên biệt `1839820494` (`https://docs.google.com/spreadsheets/d/1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow/edit?gid=1839820494`), phân tách rành mạch theo cột `Team` cho từng đội (`T1`, `T1 S1`, `T2`, `T2 S1`, `T3`, `T3 S1`, `T4`).
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. Trước đây, hàm `get_eta_share_templates()` trong `search_bot.py` đọc từ bảng phân tách cột BP..BW trên Sheet GID 0 (ô `BT6` cho T2 S1).
+>   2. Trên Sheet GID 0, ô `BT6` (Cell down của T2 S1) đã bị công thức/người dùng dồn nhầm toàn bộ 7 trạm Site Down (`TNI0391, TNI0515, TNI0442, TNI0164, TNI0215, TNI0289, TNI0007`) cùng với các trạm khác vào chung ô Cell Down, làm số lượng trạm bị đội lên thành 12 trạm thay vì 3 trạm thật.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (The 3-Pillar Clean Alarm & Zero-Contamination Protocol)**:
+>   1. **Đọc Nguồn Dữ Liệu Sống Chuẩn Xác Từ Tab `ALARM_GID = "1839820494"`**:
+>      - Cấu hình `ALARM_GID = "1839820494"` để đọc trực tiếp bảng Alarm sạch:
+>        - Cột A..E: `1.1 🔴 Cell Down` (lọc theo cột `Team`: T1 3 trạm, T1 S1 8 trạm, T2 5 trạm, T2 S1 3 trạm, T3 2 trạm, T3 S1 2 trạm, T4 2 trạm).
+>        - Cột F..J: `1.2 ⚙️ DG Abnormal` (lọc theo cột `Team`: T1 4 trạm, T1 S1 2 trạm, T2 2 trạm, T2 S1 1 trạm).
+>        - Cột K..N: `1.5 🌡️ Battery Temp High` (lọc theo cột `Team`: T1 8 trạm, T1 S1 1 trạm, T2 2 trạm).
+>        - Cột O..S: `1.3 ❌ DG Run >16H` (lọc theo cột `Team`: T1 3 trạm, T2 2 trạm, T4 1 trạm).
+>   2. **Tách Bạch 100% Site Down Khỏi Cell Down**:
+>      - Mục `1.4 📡 Site Down` được đọc riêng biệt từ Hàng 9 Sheet GID 0 (`Site down`), TUYỆT ĐỐI CẤM gộp trạm Site Down vào Cell Down.
+>      - Tự động duy trì cơ chế Fallback về Sheet GID 0 nếu tab `1839820494` tạm thời không truy cập được.
+>   3. **Đồng Bộ Song Mã Repositories (`Task and WO` & `tni-search`)**:
+>      - Đồng bộ 100% `search_bot.py` qua cả hai kho mã nguồn và triển khai kiểm tra live trên Vercel.
+> **PM-80 (06/10/2026) — Giám Sát Toàn Trình 4 Ca (Full-Lifecycle Continuous Multi-Shift Monitoring) & Dung Sai Kháng Trễ Hàng Đợi (Queue-Delay-Resilient Scheduling Protocol)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Người dùng thắc mắc: *"Kiểm tra tin nhắn 6 sao không có gởi vậy sao ghế giám sát không biết? Thêm rule giám sát phải toàn trình làm đi!"*
+>   2. Phúc tra thực tế:
+>      - Report 6 ca 17:18 MMT ĐÃ GỬI THÀNH CÔNG lúc 17:20:04 - 17:20:49 MMT hôm nay (Msg ID: T1 `12001`, T2 `10925`, T3 `10286`, T4 `8663`, CONTROL `108796`). Lúc người dùng hỏi vào lúc 17:15:59 MMT thì chưa tới giờ tàu chạy (17:18 MMT).
+>      - Tuy nhiên, ca 14:58 MMT trước đó đã bị trượt không gửi được, và Ghế Giám Sát AUDITOR-9.1 hoàn toàn không cảnh báo!
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. **Ghế Giám Sát Bị "Mù Ca Chiều/Tối/Đêm"**: Ghế AUDITOR-9.1 (`system_auditor.py`) chỉ được lên lịch chạy duy nhất 1 lần vào buổi sáng lúc `09:00 MMT` (`check_time_exact 09 00`). Toàn bộ hoạt động chiều, tối và đêm (14:58, 17:18, 17:30, 19:41, 20:56) hoàn toàn không có ai giám sát!
+>   2. **Dung Sai Quá Hẹp (Narrow Window Trap)**: Trong `train_5min.yml`, hàm `check_time_exact` có dung sai `DIFF <= 2` phút. Vì các mốc giờ kết thúc bằng số 8 (như 14:58, 07:18, 08:48, 10:18, 14:18, 17:18) cách các nhịp cron 5 phút ít nhất 2 đến 3 phút, khi máy ảo GitHub Actions runner bị delay khởi động hàng đợi 2-4 phút, cả 2 nhịp cron trước và sau đều rơi vào `DIFF >= 3` phút, dẫn đến việc bỏ sót hoàn toàn chuyến tàu!
+>   3. **Lệch Regex Tiêu Đề Báo Cáo**: Trong `system_auditor.py`, `SCHEDULE_RULES` dùng regex `r"6\.\s*Daily\s*Note\s*Read"`, không khớp với tiêu đề tin nhắn thực tế gửi trong nhóm: `📋 6. Report — Daily Note Read Report — Summary`.
+>   4. **Thiếu Giám Sát Toa Sale Summary (17:30 MMT)**: Toa Sale Summary chưa được đưa vào bộ luật kiểm toán `SCHEDULE_RULES`.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (The 4-Pillar Full-Lifecycle Monitoring Protocol)**:
+>   1. **Giám Sát Toàn Trình 4 Ca Bắt Buộc (4 Daily Mandatory Audit Shifts)**:
+>      - Cấu hình Ghế AUDITOR-9.1 chạy 4 ca định kỳ mỗi ngày trên `train_5min.yml`:
+>        - 🌅 **Ca Sáng (09:00 MMT)**: Hậu kiểm Báo cáo 1, 2, 3, 4, BOD, Plan 5C, Report 6 ca 1 (08:48), Report 6.1 ca 1 & 2 (07:18 & 10:18).
+>        - ☀️ **Ca Trưa / Đầu Chiều (14:35 MMT)**: Hậu kiểm Refuel ca 1 (10:06), Site Clear ca 3 (14:18), Refuel ca 2 (14:11).
+>        - 🌆 **Ca Chiều Tối (17:40 MMT)**: Hậu kiểm Report 6 ca 2 & 3 (14:58 & 17:18), Report 6.1 ca 4 (17:18), Toa Sale Summary (17:30).
+>        - 🌙 **Ca Đêm Chốt Ngày (21:15 MMT)**: Hậu kiểm Plan 5A (18:41), Plan 5B (19:11), Report 6 ca 4 (19:41), Refuel EOD (20:56).
+>   2. **Hàm Dung Sai Kháng Trễ Hàng Đợi (Queue-Delay-Resilient `check_time_tolerance_4m`)**:
+>      - Thiết lập hàm `check_time_tolerance_4m` với dung sai `DIFF <= 4` phút cho các mốc đơn lẻ không chia hết cho 5 (07:18, 08:48, 10:18, 14:18, 14:58, 17:18, 19:41), đảm bảo không bao giờ bị bỏ rơi chuyến tàu dù runner có bị nghẽn queue.
+>   3. **Tầng Chống Gửi Trùng In-Script (In-Script Dedup Gate < 20 Minutes)**:
+>      - Bổ sung tầng khóa an toàn trong `daily_read_report.py`: kiểm tra lịch sử 5 tin nhắn gần nhất trong CONTROL; nếu Report 6 đã được gửi trong vòng 20 phút qua, script lập tức thoát êm (`return`) với thông báo `Skipping duplicate run`, triệt tiêu 100% rủi ro gửi lặp tin nhắn khi nới dung sai.
+>   4. **Chuẩn Hóa Bộ Lọc Regex & Tích Hợp Toa Bán Hàng**:
+>      - Cập nhật pattern Report 6 thành `[r"6\.\s*(?:Report\s*—\s*)?Daily\s*Note\s*Read", r"Daily\s*Note\s*Read", r"Read\s*Report"]`.
+>      - Thêm Toa Sale Summary Report (17:30 MMT) vào `SCHEDULE_RULES`.
+>      - Toa Sale Summary gửi bản tổng hợp vào nhóm `CONTROL (-5251698940)` song song với nhóm bán hàng để Ban Điều Hành và Auditor đồng bộ theo dõi.
+>
+> **PM-81 (06/10/2026) — Tự Động Hóa Kiểm Tra Và Gửi Cột AW (AW7 SUMMARY AW-AZ) Khi Có Dữ Liệu Mới (Event-Driven New-Data Auto-Send & Single-Train Integration Policy)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Người dùng phản ánh: *"Tin nhắn của AW7 không chạy nữa là do đâu"*, *"Site down"*, *"Cột AW gởi khi có dữ liệu mới mà"*, *"AW7"*, *"tiếp"*.
+>   2. Bảng tính Sheet GID 0 (`1FvDhIwq8HxKfS2MqrwZMapIEsv7dwafaAVVnK0lpXow`) có các ô AW7, AX7, AY7, AZ7 chứa dữ liệu Tin 2 SUMMARY theo Team (T1-T4).
+>   3. Quy tắc cốt lõi: Cột AW BẮT BUỘC chỉ tự động gửi khi và chỉ khi có dữ liệu mới (`tsKey !== lastTs`).
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. Trong đợt dọn dẹp chống gửi trùng ở phiên v854 (`teardownGasTrain1min()`), trigger time-driven 1 phút trên GAS (`checkAndSend_1min`) đã bị xóa để triệt tiêu việc gửi tin nhắn lặp lại.
+>   2. Trước đó ở phiên v792, lời gọi `processSummaryAwAz` trong `store_site_down` đã bị loại bỏ vì khi Cột A vừa dán xong thì công thức AW7 của Google Sheets chưa kịp tính toán.
+>   3. Kết quả: **Không còn bất kỳ tiến trình nào định kỳ gọi kiểm tra ô AW7 nữa**. Khi Cột AW có dữ liệu mới hay giờ mới, hệ thống hoàn toàn không biết để gửi tự động.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (The 3-Pillar Event-Driven Auto-Send Protocol)**:
+>   1. **Khóa 3 Chốt Chặn Bất Biến trong Site Down GAS (`site_down_v2.gs` @100)**:
+>      - Chốt 1 (Chống trùng lặp): Timestamp ô AW7 phải khác với lần gửi trước (`tsKey !== lastTs`).
+>      - Chốt 2 (Tươi mới): Timestamp trong vòng 45 phút (`isDataFresh_(tsKey, 45)`).
+>      - Chốt 3 (Đồng bộ Cột A): Timestamp AW7 không được cũ hơn Cột A (`minAw >= minA1`).
+>   2. **Tích Hợp Nhịp 5 Phút Vào Đầu Tàu GAS (`QLTC_GAS` @482)**:
+>      - Trong hàm `dispatchTrain5Min()` (`14_GITHUB_DISPATCH.gs`), bổ sung lệnh gọi POST nhẹ nhàng tới endpoint `process_aw_az` của Site Down Webhook (`https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec`).
+>   3. **Dự Phòng Kép Trong Toa 0 Keepalive (`train_5min.yml`)**:
+>      - Thêm lệnh `curl` kiểm tra `action=process_aw_az` tại Toa 0 Keepalive của Đoàn tàu 5 phút (`Task and WO` & `tni-sitedown`). Khi phát hiện dữ liệu mới, GAS gửi ngay Tin 2; khi chưa có dữ liệu mới, GAS trả `sent_tin2: false` mà không gửi bất kỳ tin rác nào.
+>
+> **PM-82 (06/10/2026) — Tách Biệt Tuyệt Đối AW7 Khỏi Cột A/Cột C & Định Dạng Danh Sách Site Down Xuống Hàng Theo Từng Nhân Viên (AW7 Pure Independence & Per-Staff Monospace Newlines)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Người dùng yêu cầu mở khóa thép: `UNLOCK STEEL: ‹mật-khẩu-đã-thu-hồi›`.
+>   2. Người dùng chỉ thị rõ ràng:
+>      - *"ô AW7 này tuyệt đối không liên quan đến Cột A hay Cột C nó chỉ cần AW7 so sánh với tin trước của AW7 nếu khác thì gởi"*
+>      - *"AW7 trong phần Site down xuống hàng theo từng tên nhân viên cho dễ nhìn"*
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. **Ràng buộc chéo thừa thãi**: Trước đây hàm `processSummaryAwAz` kiểm tra chéo timestamp với Cột A (`minAw < minA1`), khiến ô AW7 dù có cập nhật mới nhưng nếu lệch giờ với Cột A thì bị chặn không cho gửi.
+>   2. **Trình bày khó theo dõi**: Trong Tin 2 (SUMMARY), toàn bộ trạm sập của tất cả nhân viên bị nối chung thành 1 dòng văn bản dài dằng dặc ngăn cách bởi dấu gạch ngang (`-`), khiến người điều hành và kỹ sư rất khó phân biệt trạm của từng nhân sự.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (Rule PM-82)**:
+>   1. **Độc Lập Thuần Túy 100% Cho AW7**:
+>      - Trong `site_down_v2.gs`, loại bỏ hoàn toàn việc so sánh với Cột A và Cột C.
+>      - So sánh độc lập hai chiều: `isChanged = (tsKey !== lastTs) || (currentContent !== lastContent)`.
+>      - Hễ phát hiện mốc giờ mới hoặc nội dung trong ô AW7 có sự thay đổi ➔ **GỬI NGAY**, cập nhật đồng thời `TS_KEY_AW7` và `SD_LAST_SENT_AW_CONTENT`.
+>      - Nếu không có gì thay đổi ➔ Bỏ qua trong êm đẹp (`sent_tin2: false`), bảo đảm zero spam.
+>   2. **Định Dạng Xuống Hàng Từng Nhân Viên Trong Site Down (`formatSiteDownStaffLines_`)**:
+>      - Bổ sung hàm helper `formatSiteDownStaffLines_` để tách từng nhân viên (`parts.split(/\s+-\s+(?:\/)?/)`) thành dòng riêng biệt với ký hiệu đầu dòng `• <Tên Nhân Viên> : <Danh sách trạm & số giờ down>`.
+>      - Áp dụng đồng bộ cho cả bản tin gửi riêng 4 Team (`buildAwAzTeamMessage`) và bản tin gửi nhóm CONTROL / DM (`buildAwAzControlMessage`).
+>   3. **Quy Trình Khóa Thép Bắt Buộc Trong Cùng 1 Phiên**:
+>      - Sửa code dứt điểm trong `apps_script_sitedown/site_down_v2.gs`.
+>      - `npx clasp push --force` & `npx clasp deploy -i AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-` lên Version **`@108`**.
+>      - Phúc tra live: POST `action=process_aw_az` thành công với `{"ok":true,"sent_tin2":true}` (lần 1) và `{"ok":true,"sent_tin2":false}` (lần 2).
+>      - Khóa Thép Site Down tự động đóng lại bảo vệ hệ thống.
+>
+> **PM-83 (06/10/2026) — Khóa Dedup Ô AW7 Thuần Túy Bằng Mốc Giờ Timestamp & Triệt Tiêu Vòng Lặp Gửi Lại Do Nhảy Số Giờ (Pure Timestamp-Only Dedup & Elimination of Duration-Tick Loop)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Người dùng thắc mắc: *"Sao AW7 lại 10 phút cập nhật dữ liệu cũ 1 lần vậy"* và gửi mật khẩu mở khóa: `UNLOCK STEEL: ‹mật-khẩu-đã-thu-hồi›`.
+>   2. Phúc tra thực tế: Bản tin `20:57` bị gửi lặp lại nhiều lần ra nhóm Telegram sau mỗi 10 phút.
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. Trong ô AW7, công thức Google Sheet tính toán **số giờ trạm sập (Duration)** theo thời gian thực (`STATION : DURATION`). Cứ sau mỗi 6-10 phút khi bảng tính tính toán lại, số giờ này tự động tăng lên 0.1h-0.2h (ví dụ `0.7h` -> `1.6h`, `213.3h` -> `214.1h`).
+>   2. Điều kiện dedup ở phiên trước: `isChanged = (tsKey !== lastTs) || (currentContent !== lastContent)`.
+>   3. Mặc dù mốc giờ `tsKey` không đổi (vẫn là `20:57`), nhưng chuỗi `currentContent` liên tục bị sai khác do số giờ trôi qua tăng lên, khiến `currentContent !== lastContent` luôn trả về `true`!
+>   4. Kết quả: Cứ mỗi 10 phút khi số giờ nhảy số, hệ thống lại hiểu nhầm là "nội dung cập nhật mới" và gửi lại bản tin cũ `20:57` ra nhóm!
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (Rule PM-83)**:
+>   1. **Khóa Dedup Duy Nhất Bằng Mốc Giờ `tsKey`**:
+>      - Trong `site_down_v2.gs` (hàm `processSummaryAwAz`), **LOẠI BỎ HOÀN TOÀN** việc so sánh chuỗi nội dung `currentContent !== lastContent`.
+>      - Bản chất một bản tin Site Down mới CHỈ xuất hiện khi mốc giờ ô AW7 thay đổi (`tsKey !== lastTs`). Việc số giờ trạm trôi qua tăng lên KHÔNG PHẢI là dữ liệu mới!
+>      - Cấu trúc khóa chuẩn:
+>        ```javascript
+>        if (tsKey === lastTs && !isDirectPush) {
+>          return false; // Mốc giờ chưa đổi → Chặn đứng 100%, không gửi lại!
+>        }
+>        ```
+>   2. **Triển Khai & Kiểm Chứng Live (Live Verification)**:
+>      - `clasp push` & `clasp deploy` cập nhật Web App Site Down lên **Version `@109`**.
+>      - Phúc tra live: Gọi POST `action: process_aw_az` trả về ngay `HTTP 200 {"ok":true,"sent_tin2":false}` (đã chặn đứng thành công, không gửi lại).
+>      - Khóa Thép Site Down tự động đóng lại bảo vệ hệ thống.
+>
+> **PM-84 (06/10/2026) — Ghế Tự Động Hóa NMS Nocpro Desktop Alarm (`DESK-NOCPRO-1`) & Ghế Giám Sát Độc Lập (`AUDITOR-NOCPRO-9.3`) (Desktop Automation SSOT, Datetime Preservation & Full Table Alignment)**:
+> - **Yêu Cầu & Bối Cảnh**:
+>   1. Người dùng yêu cầu tự động hóa trích xuất client NMS Nocpro (User: `phonghd`, Pass: `MytTNI@2026`): Đăng nhập tự động nếu chưa có, nếu đã đăng nhập sẵn thì không đăng nhập lại; đảm bảo tick chọn 4 mục trong `Alarm group` (`Downcell Alarm`, `Electromechanical monitoring`, `External Alarm BTS/NodeB/EnodeB`, `Flow Loss`), chọn `Export`, nhấp `Action`, chờ tải file Excel về.
+>   2. Dán toàn bộ dải dữ liệu từ cột `A:AA` vào Google Sheet tab `1. Input New` (GID `85422169`, Spreadsheet ID `1aAMxzyhiiYYZ1Hl8n8VYgXTfu3Cx_ivX6X-WSzXbFcI`).
+>   3. **Giữ trọn vẹn ô A1**: Ô A1 chứa thông tin thời gian xuất báo cáo gốc (`Exported Time: dd/MM/yyyy HH:mm:ss`), bắt buộc đọc và dán từ Dòng 1 để người dùng và các công thức downstream biết chính xác ngày giờ xuất file.
+>   4. **Xử lý triệt để cột J (`#####`)**: Cột J (`Start time`) trong file Excel gốc hiển thị `#####` do độ rộng cột hẹp. Khi đọc file bắt buộc lấy native datetime object và format chuẩn `dd/MM/yyyy HH:mm:ss`, tuyệt đối cấm dán thành chuỗi lỗi `#####`.
+>   5. **Phân định ghế & Lịch chạy 12 mốc**:
+>      - Ghế thực thi chính: `DESK-NOCPRO-1` (sẵn sàng mở rộng 4 thao tác tương tự `DESK-NOCPRO-2..5`).
+>      - Ghế giám sát độc lập: `AUDITOR-NOCPRO-9.3` (tích hợp vào `system_auditor.py`).
+>      - Lịch chạy Windows Task Scheduler (12 mốc giờ MMT): `05:46, 06:46, 07:46, 08:46, 11:46, 12:46, 15:46, 17:16, 17:46, 18:16, 19:16, 20:46`.
+> - **Nguyên Nhân Gốc & Giải Pháp Kỹ Thuật (Root Cause & Solution)**:
+>   1. **GUI Automation trên Java Client**: Client Nocpro là ứng dụng Java chạy trên desktop. Để nhấp chuột chính xác khi chạy tự động ngầm, cần dùng `OpenInputDesktop` và `SetThreadDesktop`, đồng thời đưa cửa sổ lên Foreground với kỹ thuật `AttachThreadInput` + `SetWindowPos(HWND_TOPMOST)`. Nút `Action` tại tọa độ logical chuẩn hóa `(324, 816)`.
+>   2. **Bảo tồn ô A1 & Cột J bằng openpyxl**: Đọc toàn bộ ma trận từ hàng 1 (`ws.cell(r, c).value`), chuyển đổi đối tượng `datetime.datetime` thành chuỗi định dạng `dd/MM/yyyy HH:mm:ss`, chuẩn hóa đủ 27 cột (A:AA) và gửi qua Web App GAS Hub (`handleNocproSyncSheet_`).
+>   3. **Endpoint kiểm toán độc lập**: GAS Web App cung cấp endpoint `?action=audit_nocpro` lưu trữ trạng thái phiên đồng bộ gần nhất, phục vụ Ghế Giám Sát `AUDITOR-NOCPRO-9.3` trong `system_auditor.py`.
+>
+> **PM-85 (07/10/2026) — Giới Hạn Cứng Bản Tin ETA Update Dừng Tại Mục 1.4 Site Down — Triệt Tiêu Mục 1.5 Battery Temp High & Các Mục Sau (Strict ETA Reminder 1.4-Cap & Zero-1.5 Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng chỉ thị dứt khoát: *"chỉ lấy đến 1.4 là hết không gởi thêm 1,5 gì nữa"* kèm ảnh chụp màn hình bản tin `📋 TX — ETA Update`.
+>   2. Trước đây trong hàm `get_eta_share_templates()` (`search_bot.py`), hệ thống tự động sinh thêm mục `1.5 🌡️ Battery Temp High: X site` (lấy từ cột K..N tab `ALARM_GID` 1839820494).
+> - **Nguyên Nhân Gốc (Root Cause)**:
+>   1. Cấu trúc hàm `get_eta_share_templates()` đọc cả 5 loại cảnh báo và tự động thêm mục `1.5 🌡️ Battery Temp High` nếu team có trạm báo nhiệt độ ắc quy cao.
+>   2. Tuy nhiên, quy trình vận hành và báo cáo thực địa của các Đội Kỹ Thuật (Teams & Subteams) chỉ tập trung vào 4 nhóm sự cố vận hành cốt lõi: `1.1 Cell Down`, `1.2 DG Abnormal`, `1.3 DG Run >16H`, và `1.4 Site Down`.
+>   3. Việc gửi thêm mục 1.5 gây rối loạn thông tin, tạo áp lực giải trình không cần thiết tại các nhóm điều hành chung.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (Rule PM-85)**:
+>   1. **Khóa Cứng Bản Tin Dừng Tại 1.4 (Strict 1.4 Hard-Cap)**:
+>      - Cắt bỏ hoàn toàn khối logic sinh mục `1.5 🌡️ Battery Temp High` trong `get_eta_share_templates()`.
+>      - Bỏ parsing cột 10-13 (`bat_temp`) từ tab `ALARM_GID`.
+>      - Biến đếm `total_sites` chỉ tính tổng của 4 mục (1.1 đến 1.4).
+>      - Bản tin `📋 TX — ETA Update` (cả bản tin gửi tự động qua `cron_send.py` / `build_smart_eta_reminder` lẫn lệnh bot `/share_eta`) bắt buộc dừng chính xác sau danh sách các trạm của `1.4 📡 Site Down`. Tuyệt đối không sinh thêm bất kỳ mục 1.5 hay mục nào sau đó!
+>   2. **Đồng Bộ Tri-Repo Parity Tuyệt Đối**:
+>      - Cập nhật đồng bộ trên cả `Task and WO/api/search_bot.py` và `tni-search/api/search_bot.py`.
+>      - Chạy đối chiếu `Compare-Object` đạt 0 sai khác trước khi commit và push.
+>      - Tuyệt đối tuân thủ Khóa Thép Site Down: Không can thiệp vào `apps_script_sitedown`, `botlookup_relay.py` hay repo `tni-sitedown-relay`.
+>
+> **PM-86 (07/10/2026) — Ghế Tự Động Hóa NMS Nocpro Alarm Status Cleared (`DESK-NOCPRO-2`) & Ghế Giám Sát Độc Lập (`AUDITOR-NOCPRO-9.4`) (Cleared Flow Loss Automation, Append-Only History & 8 MMT Slots)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng chỉ thị tự động hóa trích xuất NMS Nocpro cho phân hệ **Alarm Status Clear** theo 8 mốc giờ MMT: `06:16, 07:16, 08:16, 09:16, 11:50, 15:50, 17:50, 20:36`.
+>   2. **Tham số đầu vào động từ Google Sheet**:
+>      - Tab nguồn & đích: `1.1 Input Site Clear+History` (GID: `379017693`, Spreadsheet ID: `1aAMxzyhiiYYZ1Hl8n8VYgXTfu3Cx_ivX6X-WSzXbFcI`).
+>      - Đọc ngày bắt đầu tìm kiếm từ ô `AF4` (`Date start search`, ví dụ `03/10/2026`).
+>      - Đọc giờ bắt đầu tìm kiếm từ ô `AG4` (`Time start search`, ví dụ `10:04:16`).
+>   3. **Cấu hình trên client NMS Nocpro**:
+>      - `Start time from`: dán `AF4` vào ô ngày (`dd/MM/yyyy`) và `AG4` vào ô giờ (`HH:mm:ss`).
+>      - `Start time to`: ô ngày là `today + 1` (ngày mai `dd/MM/yyyy`) và ô giờ là `00:00:00`.
+>      - `Alarm group`: mở hộp thoại Option dialog, bỏ chọn toàn bộ và CHỈ TICK CHỌN DUY NHẤT 1 mục: `Flow Loss` (như trong Hình 2).
+>      - `Alarm status`: chọn `Cleared alarm`.
+>      - Bấm `Action` -> Lưu file báo cáo Excel `ACCESS_ALARM_MONITORING_*.xlsx`.
+>   4. **Xử lý dữ liệu & Ghi nối tiếp (Append Only)**:
+>      - Đọc dải dữ liệu từ dòng 4 trở đi (`A4:AA`), lọc bỏ các dòng trống.
+>      - Cột J (`Start time`) chuẩn hóa triệt để thành chuỗi `dd/MM/yyyy HH:mm:ss`, tuyệt đối cấm lỗi hiển thị `#####`.
+>      - **GHI NỐI TIẾP (APPEND)**: Dán vào hàng tiếp theo còn trống trong dải A:AA của tab `1.1 Input Site Clear+History` (bắt đầu từ hàng 6 trở đi), TUYỆT ĐỐI BẢO TOÀN toàn bộ các hàng lịch sử cũ trước đó, cấm clear/ghi đè như tab 1. Input New!
+>   5. **Phân định ghế & Lịch chạy 8 mốc MMT**:
+>      - Ghế thực thi chính: `DESK-NOCPRO-2` (`ICT Fetch/auto_nocpro_site_clear.py`).
+>      - Ghế giám sát độc lập: `AUDITOR-NOCPRO-9.4` (GAS endpoint `?action=audit_nocpro_2`).
+>      - Lịch chạy Windows Task Scheduler (`NOCPRO_ALARM_CLEAR_SYNC_DESK2`): `06:16, 07:16, 08:16, 09:16, 11:50, 15:50, 17:50, 20:36 MMT`.
+> - **Nguyên Nhân Gốc & Giải Pháp Kỹ Thuật (Root Cause & Solution)**:
+>   1. **Phân biệt triệt để Overwrite vs Append**: `DESK-NOCPRO-1` xóa và ghi đè tab `1. Input New` mỗi ca để theo dõi cảnh báo hiện hành; trong khi `DESK-NOCPRO-2` phục vụ lưu trữ lịch sử trạm clear theo thời gian, do đó backend GAS `handleNocproSyncClearHistory_` quét tìm `firstBlankRow` từ dưới lên và ghi nối tiếp `setValues` vào cuối bảng.
+>   2. **Chuẩn hóa form input và UI Automation Java**: Xử lý đầy đủ vòng đời: Auto-login nếu gặp cửa sổ Login (`phonghd` / `MytTNI@2026`), bung thanh công cụ đáy nếu bị gập, xóa và điền chính xác 4 ô thời gian bằng keybd_event unicode, điều hướng Option dialog tick chuẩn `Flow Loss`, và chuyển dropdown sang `Cleared alarm`.
+>   3. **Endpoint đọc tham số trực tiếp (SSOT Fresh Read)**: GAS Web App cung cấp endpoint `?action=nocpro_get_clear_params` đọc trực tiếp giá trị sống hiển thị của `AF4` và `AG4` từ Google Sheet bằng `getDisplayValue()`, kèm fallback đọc CSV công khai.
+>
+> **PM-87 (07/10/2026) — Chuỗi Tuần Tự 2 Tác Vụ Ghế DESK-NOCPRO-2: Clear Flow Loss Rồi Đến Clear Door Alarm — Tuyệt Đối Chờ Loss Xong Mới Đến Door (Strict Sequential Flow Loss -> Door Alarm Execution, Dynamic Option Search & Dual-Tab Append Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng chỉ thị mở rộng Ghế `DESK-NOCPRO-2` thành quy trình 2 phần chạy tuần tự:
+>      - **Phần 1 (Clear Flow Loss)**: Đọc tham số `AF4` & `AG4` từ tab `1.1 Input Site Clear+History` (GID `379017693`). Cấu hình Nocpro `Alarm status` = `Cleared alarm`, `Alarm group` = `Flow Loss`, `Start time from` = `AF4 AG4`, `Start time to` = `today + 1 00:00:00`. Export Excel và GHI NỐI TIẾP (APPEND) vào hàng trống tiếp theo từ hàng 6 trở đi.
+>      - **Phần 2 (Clear Door Alarm — "chờ Loss làm xong rồi mới đến door")**: Bắt buộc CHỜ Phần 1 hoàn thành 100%. Đọc tham số `AF3` & `AG3` từ tab `Door Alarm` (GID `2099413230`, Spreadsheet ID `1aAMxzyhiiYYZ1Hl8n8VYgXTfu3Cx_ivX6X-WSzXbFcI`). Cấu hình Nocpro `Alarm status` = `Cleared alarm`, reset `Alarm group`, tại `Alarm name` gõ tìm từ khóa `door` trong ô tìm kiếm của hộp thoại Option dialog, bấm `Select all` để chọn toàn bộ 5 cảnh báo cửa (`Battery Cabinet Door Alarm`, `DG Door Alarm`, `Door Alarm`, `Door open alarm`, `Door open alarm.`), `Start time from` = `AF3 AG3`, `Start time to` = `today + 1 00:00:00`. Export Excel và GHI NỐI TIẾP (APPEND) vào hàng trống tiếp theo từ hàng 8 trở đi của tab `Door Alarm`.
+>   2. Quy định thời gian: Cả 2 tác vụ chạy tuần tự trong cùng 1 phiên tại 8 mốc giờ MMT: `06:16, 07:16, 08:16, 09:16, 11:50, 15:50, 17:50, 20:36`.
+> - **Nguyên Nhân Gốc & Giải Pháp Kỹ Thuật (Root Cause & Solution)**:
+>   1. **Kỷ Luật Tuần Tự Tuyệt Đối (Single-Thread Sequential Execution)**: Client NMS Nocpro là ứng dụng giao diện đơn nhiệm chạy trên Desktop 2. Tuyệt đối KHÔNG ĐƯỢC chạy song song 2 luồng tự động hóa cùng lúc vì sẽ tranh chấp chuột, bàn phím và cửa sổ Option dialog, dẫn đến sai lệch bộ lọc cảnh báo. Bắt buộc: Task 1 (Flow Loss) chạy xong, nhận phản hồi HTTP 200 từ GAS, ngủ nghỉ 3 giây cho client NMS ổn định giao diện rồi mới bắt đầu Task 2 (Door Alarm).
+>   2. **Cơ Chế Dynamic Option Search (Gõ Tìm Kiếm + Select All)**: Cửa sổ Option dialog của Nocpro có danh sách cảnh báo biến động. Nếu dùng tọa độ dòng chuột cố định rất dễ click trượt. Giải pháp chuẩn xác: Click vào ô tìm kiếm của Option dialog `(dlg_left + 50, dlg_top + 38)`, dùng clipboard paste từ khóa `door` (hoặc `Flow Loss`), sau đó nhấp vào checkbox `Select all` `(dlg_left + 20, dlg_bottom - 45)` và bấm `OK` `(dlg_left + 110, dlg_bottom - 20)`. Cách này đảm bảo chọn trọn vẹn 100% các mục liên quan mà không phụ thuộc thứ tự danh sách.
+>   3. **Đa Hình Hóa Backend GAS (Dual-Tab Append & Audit)**: Hàm `handleNocproSyncClearHistory_` trong `apps_script_collector.gs` tự động nhận diện `target_gid` (`379017693` cho Flow Loss hoặc `2099413230` cho Door Alarm), xác định ngưỡng dòng khởi điểm (`minBlankRow = 6` cho tab 1.1, `minBlankRow = 8` cho tab Door Alarm), và ghi nhận audit riêng biệt vào `AUDIT_DESK_NOCPRO_2` và `AUDIT_DESK_NOCPRO_2_DOOR` phục vụ Ghế Giám Sát `AUDITOR-NOCPRO-9.4`.
+>   4. **Tự Động Đọc Tham Số SSOT Theo Tab**: Endpoint `?action=nocpro_get_clear_params` đọc `AF4/AG4` tab 1.1; endpoint `?action=nocpro_get_door_params` đọc `AF3/AG3` tab Door Alarm. Tuyệt đối không hardcode thời gian tìm kiếm.
+>
+> **PM-88 (08/10/2026) — Ghế DESK-NOCPRO-1: Chuẩn Hóa Tọa Độ Nút Chevron Mở Rộng Toolbar Đáy, Tự Động Đóng Excel Sau Khi Dán & Khóa Desktop Chống Xung Đột (Strict Bottom Toolbar Expansion, Auto-Closing Excel & Dedicated Desktop Coordination Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Giao diện NMS Nocpro khi mở toàn màn hình (Scale 1.75, độ phân giải vật lý 2560x1600) có thanh công cụ điều kiện lọc đáy mặc định bị thu gọn, chỉ để lộ thanh mỏng chứa nút hai mũi tên lên (`^^`).
+>   2. Người dùng chỉ thị: Bắt buộc phải bấm nút hai mũi tên lên (`^^`) ở góc trái đáy màn hình để mở rộng thanh điều kiện tìm kiếm; sau khi xuất file và dán đủ A:AA (27 cột từ Dòng 1) vào tab `1. Input New`, ứng dụng Excel tự động mở lên BẮT BUỘC phải được đóng/tắt ngay lập tức để không chiếm bộ nhớ hay khóa file.
+> - **Nguyên Nhân Gốc & Giải Pháp Kỹ Thuật (Root Cause & Solution)**:
+>   1. **Xác Định Tọa Độ Vật Lý Tuyệt Đối Của Nút Chevron (Exact Chevron Coordinates)**:
+>      - Thanh đáy thu gọn ở độ cao `y = 1546`, nút chevron hai mũi tên lên (`^^`) nằm ở tọa độ vật lý chính xác `(45, 1546)`.
+>      - Khi click chuột vào `(45, 1546)`, thanh điều kiện lọc sẽ bung lên đầy đủ hiển thị các ô lọc: `Start time from/to`, `Alarm group`, `Alarm status`, `Province`, v.v.
+>      - Các tọa độ chuẩn hóa sau khi bung: Nút `Search` tại `(160, 1398)`, Checkbox All đầu bảng (chọn tất cả cảnh báo, bên trái cột No.) tại `(16, 192)`, nút `Action` tại `(223, 868)`.
+>   2. **Tự Động Đóng Tiến Trình EXCEL Tức Thì (Zero Lingering Excel Processes)**:
+>      - Khi Nocpro hoàn tất xuất file, hệ thống sẽ tự động bật Microsoft Excel để mở file vừa xuất.
+>      - Kịch bản `auto_nocpro_desk1.py` sau khi phát hiện file mới và gửi dữ liệu thành công lên GAS Web App (tab `1. Input New`, GID `85422169`) BẮT BUỘC phải thực thi lệnh `Stop-Process -Name EXCEL -ErrorAction SilentlyContinue` để giải phóng hoàn toàn bộ nhớ RAM và đóng mọi cửa sổ Excel đang mở.
+>   3. **Bảo Toàn Trọn Vẹn Dữ Liệu Gốc Ô A1 & Cột J Datetime**:
+>      - Đọc chính xác từ Dòng 1 chứa `Exported Time: dd/MM/yyyy HH:mm:ss`, dòng 2 và dòng 3 giữ nguyên tiêu đề/header, dán đủ 27 cột (A:AA) đè lên tab `1. Input New`.
+>      - Cột J (`Start time`) luôn được format định dạng chuẩn `dd/MM/yyyy HH:mm:ss`, tuyệt đối cấm lỗi hiển thị `#####`.
+>   4. **Đồng Bộ Hoàn Trả Môi Trường Làm Việc (Clean Environment Restore)**:
+>      - Trước khi chạy: tự động chuyển sang Desktop chứa Nocpro hoặc đưa Nocpro lên foreground; sau khi hoàn tất: tự động đóng dialog phụ (nếu có bằng ESC) và hoàn trả quyền điều khiển bình thường cho người dùng.
+>
+> **PM-89 (08/10/2026) — Khóa Thép Bảo Vệ Dữ Liệu Zero-Wipe: Không Search & Không Có File Excel Export Thì Tuyệt Đối Không Được Xóa Dữ Liệu Trên Link Sheet (`DESK-NOCPRO-1` & Backend GAS) (Strict Zero-Wipe Data Protection & Dual-Guard Anti-Clear Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng chỉ thị nghiêm ngặt: *"Thêm tính năng không search và không có file excel export thì không được xóa dữ liệu trên link"*.
+>   2. Trước đây, backend GAS `handleNocproSyncSheet_` chỉ kiểm tra `if (!rows || rows.length === 0)` rồi gọi `ws.getRange(1, 1, currentLastRow, 27).clearContent()`. Nếu client gặp lỗi không Search được, không tạo ra file Excel mới hoặc gửi payload rỗng/lỗi, lệnh `clearContent()` có nguy cơ xóa trắng toàn bộ dữ liệu đang có trên tab `1. Input New` (GID: `85422169`, Spreadsheet ID: `1aAMxzyhiiYYZ1Hl8n8VYgXTfu3Cx_ivX6X-WSzXbFcI`).
+> - **Nguyên Nhân Gốc & Giải Pháp Kỹ Thuật (Root Cause & Solution)**:
+>   1. **Nguyên Nhân Kỹ Thuật (Root Cause)**:
+>      - Thiếu chốt kiểm duyệt 2 đầu (Client & Backend) trước khi gọi hành động hủy dữ liệu `clearContent()`.
+>      - Khi Search thất bại, kẹt nút hoặc không tải được file Excel mới về đĩa, nếu script client vẫn tiếp tục chạy hoặc gửi payload thiếu dữ liệu thực sự sẽ làm mất toàn bộ dữ liệu lịch sử cảnh báo đang phục vụ giám sát.
+>   2. **Tầng Bảo Vệ 1 — Client Python (`auto_nocpro_desk1.py`)**:
+>      - Trong `trigger_export_and_wait_file`: Nếu sau `timeout_sec` (90s) không phát hiện file Excel xuất mới hợp lệ (`ACCESS_ALARM_MONITORING_*.xlsx`), script ném ngoại lệ `TimeoutError` và **DỪNG NGAY LẬP TỨC**, tuyệt đối không gọi `process_and_sync_sheet`.
+>      - Trong `process_and_sync_sheet`: Bắt buộc kiểm tra `excel_file_path` tồn tại trên đĩa và đọc file ra mảng `rows`. Cấu trúc chuẩn file Nocpro tối thiểu phải có: Dòng 1 (Exported time), Dòng 2 (Tiêu đề bảng), Dòng 3 (Header cột), và từ Dòng 4 trở đi là dữ liệu cảnh báo thực sự. Nếu `len(rows) < 4` $\rightarrow$ ném lỗi và hủy phiên ngay, tuyệt đối không gửi request lên Google Apps Script!
+>   3. **Tầng Bảo Vệ 2 — Backend GAS (`handleNocproSyncSheet_` trong `apps_script_collector.gs` @488)**:
+>      - Bắt buộc kiểm tra đồng thời:
+>        ① `source_file` xuất từ Nocpro phải tồn tại và không rỗng: `if (!sourceFile) return json({ status: "error", code: "ZERO_WIPE_GUARD_NO_SOURCE", ... })`.
+>        ② Số dòng `rows` phải $\ge 4$: `if (!rows || rows.length < 4) return json({ status: "error", code: "ZERO_WIPE_GUARD_EMPTY_ROWS", ... })`.
+>      - **TUYỆT ĐỐI CHẶN ĐỨNG `clearContent()`**: Nếu 1 trong 2 điều kiện trên không thỏa mãn, backend lập tức từ chối request, ghi log `Logger.log` cảnh báo, và giữ nguyên vẹn 100% dữ liệu đang có trên dải `A:AA` của tab `1. Input New`.
+>   4. **Tích Hợp Chuyển Đổi Virtual Desktop Tự Động Bằng Thư Viện Chuyên Dụng (`pyvda`)**:
+>      - Client sử dụng `pyvda.VirtualDesktop(2).go()` để điều khiển mượt mà sang Desktop 2 thực thi Nocpro mà không cướp chuột hay làm gián đoạn người dùng ở Desktop 1.
+>      - Sau khi Action xuất file xong, đóng tiến trình Excel ngay và lập tức hoàn trả Desktop 1 bằng `pyvda.VirtualDesktop(1).go()`, đảm bảo an toàn tuyệt đối ngay cả khi gặp ngoại lệ (`try...finally`).
+>
+> **PM-90 (08/10/2026) — Bọc Thép Concurrency Điểm Danh Nhóm 10: Tách Khối Rebuild Nặng Khỏi Webhook doPost, Bảo Vệ LockService 10s & Chống Timeout Nuốt Tin (Strict Attendance Concurrency Protection, Zero-Heavy-Webhook & Retry-Safe Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng phản ánh sự cố: *"sao không thu thập có cái thu có cái không vậy"* kèm ảnh chụp màn hình nhóm **10. TNI DAILY ADDTENDANCE** vào sáng 08/10/2026 lúc 08:38 (PT), 08:39 (Khant Si Thu T3), 08:40 (Maung Maung T2) gửi ảnh nhưng hoàn toàn không được Bot ghi nhận vào Sheet `List Attendance`.
+>   2. Trong khi đó, các lượt điểm danh gửi riêng lẻ vào khung giờ sau đó (09:07, 09:11, 09:52, 10:31, 12:04, 12:11, 12:52, 13:48, 15:44) lại được ghi nhận bình thường.
+> - **Nguyên Nhân Gốc (Root Cause Analysis)**:
+>   1. **Anti-pattern gọi đồng bộ 2 hàm tái tạo toàn bộ Sheet trong luồng Webhook**: Trong `doPost(e)` của `TNI attendance.js`, mỗi khi có ảnh gửi đến, code tự động gọi `buildGeneralTab()` (quét toàn bộ lịch sử, tính toán 56 nhân sự, mất 17.36 giây) và `buildSumWorkTab()` (quét và tính toán lại công tháng của cả công ty, mất 10.55 giây). Tổng thời gian xử lý 1 ảnh lên tới 35-40 giây!
+>   2. **Vercel Proxy Timeout 25s nuốt chửng tin nhắn Telegram**: Vào giờ cao điểm sáng (08:30 - 08:45), các đội đồng loạt gửi ảnh điểm danh. Request thứ nhất chiếm dụng GAS 35s làm các request sau bị nghẽn và chờ quá 25s, khiến `api/attendance.py` văng `ReadTimeout`. Do khối `except` trả về HTTP 200 giả, Telegram coi như tin nhắn đã được giao và vĩnh viễn xóa bỏ các cập nhật đó khỏi hàng đợi (28 updates bị mất từ update 770994826 đến 770994854).
+>   3. **Thiếu LockService trên GAS**: Các luồng nhận ảnh đồng thời không có khóa độc quyền, dẫn đến xung đột khi ghi dòng số 2 trên `List Attendance`.
+>   4. **Định nghĩa khung giờ sáng bị hẹp (< 08:30)**: Hàm `getAttendanceSlot_` cắt mốc 08:30 làm các ảnh gửi 08:31 - 09:30 bị rơi vào `slot_custom_8`, gây sai lệch bộ đếm và nguy cơ bị chặn nhầm bởi `isAlreadyLoggedToday_`.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (Rule PM-90)**:
+>   1. **Tách Rời Hoàn Toàn Hàm Tái Tạo Bảng Khỏi doPost (Zero-Heavy-Webhook)**:
+>      - Cắt bỏ hoàn toàn lệnh gọi `buildGeneralTab()` và `buildSumWorkTab()` ra khỏi luồng `doPost` (cả luồng nhận ảnh và luồng text report). Luồng `doPost` CHỈ thực hiện tải ảnh, lưu Drive, chèn 1 dòng vào `List Attendance` và phản hồi Telegram (`✅ Recorded #...`). Thời gian xử lý rút từ 37s xuống chỉ còn **3 ~ 5 giây** (nhanh gấp 8 lần, không bao giờ lo chạm trần timeout).
+>      - Chuyển `buildGeneralTab()` và `buildSumWorkTab()` sang chạy định kỳ ở cuối batch của `sendDailyAttendanceTemplates()` (lúc 08:45 và 09:15 MMT) và `sendDailyAttendanceReport()` (lúc 09:00 MMT), hoặc khi người dùng gọi lệnh `/sum_work`.
+>   2. **Bọc Thép LockService Concurrency Cho Dòng Ghi Chú**:
+>      - Trang bị `LockService.getScriptLock()` với `waitLock(10000)` bọc chính xác quanh thao tác lấy `nextNum`, kiểm tra trùng lặp và ghi dòng `insertRowAfter(1)` + `setValues()` trong `doPost`.
+>   3. **Mở Rộng Khung Giờ Sáng (slot_morning_1 <= 09:30)**:
+>      - Chuẩn hóa `getAttendanceSlot_` để `slot_morning_1` bao phủ trọn vẹn từ đầu giờ sáng đến 09:30 MMT, khớp hoàn toàn với quy chế làm việc và cutoff 08:40 MMT.
+>   4. **Phản Hồi Lỗi 504 Để Telegram Tự Động Retry**:
+>      - Trong `api/attendance.py`, khi gặp ngoại lệ mạng hoặc timeout, trả về mã trạng thái HTTP 504 Gateway Timeout để Telegram giữ lại tin nhắn trong hàng đợi và tự động gửi lại thay vì xóa mất tin nhắn của nhân viên.
+>   5. **Tri-Repo Parity & Deploy Đồng Bộ**:
+>      - Deploy cả 2 deployment `@130` (`AKfycbzSz...`) và `@131` (`AKfycbyFID...`).
+>      - Đồng bộ file `api/attendance.py` sang `tni-search`. Không can thiệp sang `tni-sitedown` (tuân thủ Rule Repo Isolation).
+>
+> **PM-91 (09/10/2026) — Bảo Vệ Kép Luồng Dedup Summary Site Down: Chống Lặp Duration Và Chống Nghẽn Bỏ Sót Khi Bổ Sung Trạm (Strict Site Signature Dedup & Zero Bot Split-Part Loss Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng thắc mắc: *"sao không thu thập có cái thu có cái không vậy"* và *"sao file gốc có 3 Site Team 3 mà hai báo cáo tổng hợp sai là sao"* kèm ảnh chụp màn hình ô `AY7` có 3 trạm (`TNI0416 : 7.9, TNI0105 : 283.8, TNI0402 : 285.7`) nhưng 2 bản tin Telegram (`SUMMARY — SITE DOWN ALL TEAMS` và `SUMMARY — ALL TEAMS`) chỉ báo 1 trạm (`TNI0416 : 7.5`).
+>   2. Người dùng cung cấp mật khẩu mở khóa: `UNLOCK STEEL: ‹mật-khẩu-đã-thu-hồi›`.
+> - **Nguyên Nhân Gốc (Root Cause Analysis)**:
+>   1. **Cào Thiếu Data Do Chatbot Chia Nhiều Tin (Scraping Loss)**: Khi số lượng trạm sự cố lớn (29 trạm), bot `/down_tni@auto_nocpro_bot` trả về nhiều tin. Tin 1 chứa header `"Tanintharyi Region"` và các trạm sập gần nhất. Tin 2+ chứa các trạm sập lâu ngày (>100h) và KHÔNG chứa từ khóa `"tanintharyi"`. Code `botlookup_relay.py` trong repo `Task and WO` bị trôi phiên bản (chỉ filter `tni_messages = [m for m in bot_messages if "tanintharyi" in m.lower()]` và lấy `tni_messages[-1]`), làm rớt toàn bộ Tin 2 (trong đó có `TNI0105` và `TNI0402` của Team 3).
+>   2. **Khóa Dedup Quá Chặt Chặn Cả Cập Nhật Dữ Liệu Thực Tế (Over-Strict Timestamp-Only Dedup Blindspot)**: Để chống spam lặp tin khi công thức Duration nhảy số (`7.5h` -> `7.6h`), Rule PM-83 chỉ dedup bằng mốc giờ `tsKey` của ô AW7 (`09/10/2026 05:46`). Tuy nhiên, khi dữ liệu trạm được bổ sung vào Sheet (từ 1 trạm lên 3 trạm: `TNI0416` -> `TNI0416, TNI0105, TNI0402`), mốc giờ `tsKey` trong ô AW7 vẫn giữ nguyên `05:46`. Kết quả: `processSummaryAwAz` kiểm tra `tsKey === lastTs` thấy trùng nhau nên chặn 100% không cho gửi cập nhật, làm 2 báo cáo tổng hợp trên Telegram bị kẹt cứng ở số liệu cũ (1 trạm) dù Sheet đã có đủ 3 trạm!
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (Rule PM-91)**:
+>   1. **Đồng Bộ Hoá 100% Multi-Part Scraping (Tri-Repo Parity for `botlookup_relay.py`)**:
+>      - Bắt buộc dùng dual-condition `is_tni_data_msg(m)` (`"tanintharyi" in m` OR `any(line[:3] == "TNI")`) và gom `\n.join(tni_parts)` đồng bộ qua cả 3 repos (`Task and WO`, `tni-search`, `tni-sitedown`).
+>      - Tuyệt đối cấm dùng `tni_messages[-1]` hay chỉ filter bằng chữ "tanintharyi".
+>   2. **Dedup Bằng Station Signature Chống Nhảy Số Mà Vẫn Nhận Cập Nhật Trạm**:
+>      - Tạo signature `sigKey = tsKey + "__CNT:" + counts + "__SITES:" + sitesSig`.
+>      - Khi chỉ nhảy số giờ Duration (`7.5` -> `7.6`): `sitesSig` và `counts` không đổi $\rightarrow$ Chặn lặp 100% (tuân thủ PM-83).
+>      - Khi số lượng trạm hoặc mã trạm thay đổi (bổ sung từ 1 lên 3 trạm): `sigKey` thay đổi $\rightarrow$ Cho phép gửi cập nhật in-place ngay lập tức!
+>   3. **Tự Động Kích Hoạt `processSummaryAwAz` Trong `store_site_down`**:
+>      - Mỗi khi có đợt cào dữ liệu mới đẩy vào Cột A, sau khi flush tính toán xong Cột C, GAS tự động kiểm tra `processSummaryAwAz(sheet, false)` để đồng bộ Tin 2 ngay lập tức nếu danh sách trạm thay đổi.
+>   4. **Triển Khai & Kiểm Chứng Live (Live Verification)**:
+>      - Deploy `apps_script_sitedown` lên Version **`@111`** (Deployment `AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-`).
+>      - Live verify: Lần 1 trả về `{"ok":true,"sent_tin2":true}` (đã cập nhật thành công 3 trạm Team 3, 18 trạm Team 1, 11 trạm Team 2); Lần 2 trả về `{"ok":true,"sent_tin2":false}` (dedup chặn lặp thành công).
+>      - Khóa Thép Site Down tự động đóng lại bảo vệ hệ thống.
+>
+> **PM-92 (09/10/2026) — Khóa An Toàn Chống Chạy Nhầm Khi Khóa Màn Hình (`Win + L`) & Cơ Chế Fallback Đọc Kho Hàng SSOT Trong Sentinel Auditor (Strict Workstation Lock Guard & Zero-Secret Inventory GViz Fallback Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng thắc mắc: *"khi tôi bấm Cửa sổ + L thì có chạy nhầm bên trong không"*.
+>   2. Hệ thống cảnh báo tự động phát hiện:
+>      - `MISSED Report 5C (06:06 MMT)`: Báo lệch 144p so với tin 08:30.
+>      - `Không đọc được dữ liệu kho (Sale Inventory)`: GAS backend không trả dữ liệu do thiếu token trong runner.
+>      - Cảnh báo dữ liệu `LỆCH BẤT THƯỜNG 369 vs 155 WOs` & `3 KỸ SƯ Ứ ĐỌNG > 50 WOs`: Cần phân định rõ cảnh báo nghiệp vụ phát hiện từ Sheet SSOT so với lỗi hệ thống.
+> - **Nguyên Nhân Gốc (Root Cause Analysis)**:
+>   1. **Rủi ro khi bấm `Win + L` (Workstation Lock Conflict)**: Khi người dùng bấm `Win + L`, Windows chuyển desktop hiển thị sang desktop bảo mật `Winlogon`. Toàn bộ GUI automation sử dụng chuột và phím (`SetCursorPos`, `mouse_event`, `keybd_event`, clipboard paste `pyperclip`) trên desktop người dùng bị mất context rendering, dẫn đến nguy cơ chuột click lệch tọa độ hoặc dán nhầm vào ô khác nếu Nocpro vô tình ở trạng thái không lường trước.
+>   2. **Cảnh Báo Giả MISSED Do Cơ Chế Dọn Tin Rác (Purged/Superseded Slot Blindspot)**: Theo Rule PM-46, Toa 5 (Report 5C Morning) tự động xóa tin nhắn cũ của mốc trước (`06:06`) khi mốc mới (`08:28`) gửi lên để tránh rác nhóm CONTROL. Khi Auditor 9.1 quét lúc 09:03, tin 06:06 không còn trong nhóm, Auditor chỉ thấy tin 08:30 (diff 144m) nên báo nhầm `🔴 MISSED`.
+>   3. **Môi Trường Cron Thiếu Token Bí Mật Cho Kiểm Kho**: Module `audit_sale_inventory` gọi endpoint `sale_get` yêu cầu `SALE_ADMIN_TOKEN`. Khi chạy trên runner không có token, backend trả HTTP 401 Unauthorized, làm auditor không đọc được tồn kho.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (Rule PM-92)**:
+>   1. **Bọc Khóa An Toàn Chống Lock Màn Hình (`is_workstation_locked`)**:
+>      - Tích hợp hàm `is_workstation_locked()` vào cả 2 script tự động hóa desktop (`auto_nocpro_desk1.py` và `auto_nocpro_site_clear.py`).
+>      - Nếu `user32.OpenInputDesktop(0, False, 0x01FF)` trả về NULL (màn hình bị khóa `Win + L`), script lập tức **HỦY PHIÊN AN TOÀN (Safe Abort)**, ghi log cảnh báo, tuyệt đối không gửi chuột/phím mù mờ gây click nhầm.
+>      - **Khuyến nghị chuẩn**: Khi rời máy tính, người dùng chỉ tắt màn hình vật lý (nút nguồn) hoặc để Display Sleep tự tắt đèn nền (với cài đặt Sleep: Never, Screen Lock: Never) để bot tự động chạy ngầm an toàn.
+>   2. **Fallback Đọc Trực Tiếp 100% Google Sheet SSOT Qua GViz Cho Module Kiểm Kho**:
+>      - Cập nhật `audit_sale_inventory` trong `system_auditor.py`: Nếu không có `SALE_ADMIN_TOKEN`, tự động fallback đọc trực tiếp từ Google Sheet SSOT `1s-V0owHlwub4qrCxTUvKmXp4PWZthzk5oKhi5m_wQBA` qua GViz (`sheet=Nhap Hang`, `sheet=Ban Hang`, `sheet=Tam Ung`).
+>      - Không phụ thuộc bất kỳ secret hay token nào, tuân thủ 100% quy tắc Live Sheet SSOT Fresh Read và Zero-Secret trong cron.
+>   3. **Xử Lý Mốc Report 5C 06:06 Bị Thay Thế Bởi 08:28**:
+>      - Cập nhật logic `system_auditor.py`: Nếu mốc `06:06` đã có mốc kế tiếp `08:28` gửi thành công trong ngày hôm nay, auditor tự động ghi nhận trạng thái `🟢 SUPERSEDED` (Đã được cập nhật & thay thế), triệt tiêu hoàn toàn cảnh báo giả `🔴 MISSED`.
+>   4. **Phân Định Rõ Cảnh Báo Nghiệp Vụ Vận Hành**:
+>      - Cảnh báo `LỆCH BẤT THƯỜNG 369 vs 155 WOs` và `3 KỸ SƯ Ứ ĐỌNG > 50 WOs` là **Báo cáo phát hiện nghiệp vụ thực tế** từ Sheet SSOT (Team 1 Dawei có 373 WOs, 298 remain, 3 kỹ sư Phyo Htet Aung, Phyo Ko Ko, Aung Lwin Phyo quá hạn > 50 WOs). Đây là bằng chứng Ghế Giám Sát `BI-WO-SYNC` hoạt động rất mẫn cán, giúp lãnh đạo phát hiện điểm nghẽn điều hành để nhắc nhở Team 1 Dawei.
+>
+> **PM-93 (09/10/2026) — Phân Hệ Điểm Danh: Cập Nhật Mẫu Xin Nghỉ Phép Mới 'Dear BOD and HR i want' & Tự Động Phân Giải Họ Tên Từ Telegram ID (Strict Attendance Telegram ID Identity Resolution & New Leave Template Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng yêu cầu: *"sửa lại thu Template Take leave không cần ghi rõ họ tên vì đã có ID cá nhân rồi bạn sửa lại đi"* và *"sửa theo mẫu mới"*.
+>   2. Cú pháp mẫu xin nghỉ phép mới (được định nghĩa trên tab `Template Attendance` của Spreadsheet `18zQB4i0Fu4QfKKkkUZUd6SKWlEbdWDiwdpgNSaL9v54`):
+>      `Dear BOD and HR i want : Take leave / half day Date : Reason`
+>   3. Nhân viên gửi tin nhắn xin nghỉ phép cá nhân không cần gõ họ tên bằng tay, bot tự động nhận diện danh tính qua Telegram User ID (`msg.from.id` / `senderId`) để điền tên vào Google Sheet.
+> - **Nguyên Nhân Gốc (Root Cause Analysis)**:
+>   1. **Phụ Thuộc Thủ Công Vào Tên Trong Tin Nhắn (Manual Name Dependency Anti-pattern)**: Trước đây, template yêu cầu `Full Name: Take leave\nReason: `. Nhân viên phải tự gõ hoặc sửa chuỗi "Full Name" thành tên mình. Rất nhiều nhân viên để nguyên chữ "Full Name" hoặc viết sai chính tả, dẫn đến Sheet ghi nhận "Full Name" hoặc ghi nhầm tên.
+>   2. **Không Khai Thác Định Danh Telegram ID (Underutilizing Telegram ID SSOT)**: Telegram ID (`msg.from.id`) là định danh số bất biến, không thể giả mạo (unforgeable). Trong tab `Staff attendance`, Cột A chứa Telegram ID và Cột F chứa Full Name chính thức. Do đó, việc bắt nhân viên gõ tên là thừa thãi và gây rủi ro sai lệch dữ liệu.
+>   3. **Regex Cũ Cứng Nhắc (Rigid Regex Syntax)**: Hàm `isAttendanceReportText_` và `processAttendanceReportText_` trước đây chỉ bắt dạng `^[^:\n]+:\s*take\s*leave`. Khi nhân viên gửi cú pháp mới `Dear BOD and HR i want : Take leave Date : ...`, regex cũ hoàn toàn bỏ qua hoặc bắt nhầm `Dear BOD and HR i want` thành tên nhân viên!
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (Rule PM-93)**:
+>   1. **Cập Nhật Cú Pháp Mẫu Chuẩn Cho `/take_leave` và `/half_leave` (`handleAttendanceTemplateQuery_`)**:
+>      - Nghỉ cả ngày (`/take_leave`):
+>        `Dear BOD and HR i want : Take leave Date : \nReason : `
+>      - Nghỉ nửa ngày (`/half_leave`):
+>        `Dear BOD and HR i want : half day Date : \nReason : `
+>      - Hướng dẫn đi kèm: *"💡 Instruction: Tap text in box to copy, fill Date & Reason, then send to group."* (Không cần điền họ tên).
+>   2. **Mở Rộng Nhận Diện Cú Pháp Mới (`isAttendanceReportText_`)**:
+>      - Bổ sung regex: `/dear\s+bod(?:\s+and\s+hr)?(?:\s+i\s+want)?\s*:\s*(?:take\s*leave|half\s*day)/i` và `/(?:take\s*leave|half\s*day)\s*(?:date\s*:|reason\s*:)/i`.
+>   3. **Tự Động Phân Giải Danh Tính Từ Telegram ID (`processAttendanceReportText_`)**:
+>      - Xây dựng map tra cứu ngược `idToStaffMap[tgId] = fullName || tgName` từ tab `Staff attendance` (Col A: Telegram ID -> Col F: Full Name).
+>      - Khi nhân viên gửi tin theo mẫu mới: Trích xuất `Date` (nếu để trống tự động lấy ngày hiện tại múi giờ Yangon `dd/MM/yyyy`), `Reason`, phân loại `Take leave` vs `Half day`. Họ tên được lấy tự động 100% từ `idToStaffMap[senderId]`, fallback sang `senderName` hoặc `Staff (ID)` nếu ID chưa có trong danh sách.
+>   4. **Hỗ Trợ Tương Thích Ngược & Tự Động Thay Thế Placeholder**:
+>      - Nếu nhân viên vẫn gửi cú pháp cũ `Họ Tên: Take leave`, bot vẫn xử lý bình thường.
+>      - Nếu người gửi để nguyên placeholder `Full Name: Take leave`, bot tự động phát hiện placeholder và thay thế bằng họ tên thật tra cứu từ Telegram ID.
+>   5. **Triển Khai Đủ 2 Lệnh Clasp Deploy Cho Phân Hệ Điểm Danh**:
+>      - Deploy thành công lên cả 2 deployment: Primary Webhook `AKfycbzSz_ISXgertxBDadw4BBQX1JdMjW650_o4He0o4Lh-uf1hV5O3YaE-ohlqI2CHyAcVFg` (@132) và Secondary `AKfycbyFIDGDS5k7wy-hNp2p1PNvte0CQ6cSiNYLyBmNc00Yi1b6IueOob9bKmu4zoQ1A6Cs` (@133).
+>      - Live ping `?action=ping` phản hồi `PONG` (HTTP 200).
+>
+> **PM-94 (09/10/2026) — Phân Hệ BOD Assign: Khóa Chặt Cột R ("Control") Là Điều Kiện Bắt Buộc Gửi Cho Nhóm Control — Tuyệt Đối Cấm Fallback Sang Cột A/B/C Khi Cột R Rỗng (Strict BOD Assign Column R Control Gating & Zero-Fallback Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng phản ánh sự cố: *"Dữ liệu không có tại cột R tại sao gởi tin nhắn"* kèm ảnh chụp màn hình Sheet tab `BOD assign` (Cột R mang tiêu đề "Control" hoàn toàn trống không có dữ liệu) và ảnh tin nhắn Telegram từ `2. TNI Auto Report Daily` gửi lúc 18:37:
+>      `📋 BOD assign New task: Admin - Rule need follow: Regularly check the cameras of the teams and send daily alerts.`
+> - **Nguyên Nhân Gốc (Root Cause Analysis)**:
+>   1. **Lỗi Fallback Sai Nghiệp Vụ Tại `checkBodAssign`**:
+>      Trong file GAS `daily_bod_assign_notify.gs`, dòng code cũ đã viết:
+>      `const notifyContent = colR || (`${colA} - ${colB}: ${colC}`.trim());`
+>      Khi Cột R ("Control") hoàn toàn trống rỗng, code tự ý lấy Cột A (Role/Dep) - Cột B (PIC): Cột C (Task Content) làm nội dung rồi gửi lên nhóm Control qua template `"📋 BOD assign New task: " + notifyContent`.
+>   2. **Kích Hoạt Sai Toàn Bộ Dòng Tĩnh Do Thiếu Ràng Buộc Ngày Tháng**:
+>      Đoạn code: `if (!dateStr && (row[0] || row[1] || row[2])) { isToday = true; }` đã biến toàn bộ 450 dòng nhiệm vụ tĩnh (các dòng "Rule need follow" hoặc task quá khứ không ghi ngày) thành "công việc của ngày hôm nay", dẫn đến việc quét trúng dòng 2 và tự động bắn tin nhắn lên Control.
+> - **Quy Trình & Biện Pháp Khắc Phục Bọc Thép (Rule PM-94)**:
+>   1. **Cột R Là Cột Duy Nhất Định Tuyến Cho Control (Strict Col R Gating)**:
+>      - Chỉ gửi tin nhắn `"📋 BOD assign New task"` lên nhóm Control khi và chỉ khi Cột R có dữ liệu thực tế:
+>        `const hasTaskForControl = Boolean(colR && colR.length >= 2 && colR !== "- : -" && !colR.endsWith(": - : -") && !colR.endsWith(":"));`
+>      - **TUYỆT ĐỐI CẤM FALLBACK**: Nếu Cột R rỗng (`!hasTaskForControl`), hệ thống BỎ QUA HOÀN TOÀN, không bao giờ lấy Cột A, B, C để gửi cho Control! Nội dung gửi cho Control bắt buộc 100% lấy từ Cột R: `const msgText = "📋 BOD assign New task: " + colR;`.
+>   2. **Khóa Chặt Điều Kiện Ngày Giao Việc**:
+>      - Bãi bỏ hoàn toàn logic tự coi `row[0] || row[1] || row[2]` là hôm nay. Chỉ xử lý dòng nếu có ngày khớp với hôm nay (`isToday`), hoặc nếu ngày trống thì chỉ cho phép khi dòng đó có Cột R hoặc Cột T được nhập dữ liệu task mới.
+>   3. **Triển Khai & Kiểm Chứng Live (Deployment & Verification)**:
+>      - File GAS: `QLTC_GAS/daily_bod_assign_notify.gs` (đồng bộ `QLTC_GAS_PULL/daily_bod_assign_notify.js`).
+>      - Deploy đè Deployment chuẩn `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` lên Version **`@490`**.
+>      - Kiểm chứng Live: Endpoint `?action=ping` phản hồi HTTP 200 `PONG`.
+>
+> **PM-95 (10/10/2026) — Lá Chắn Bảo Vệ Bot Đa Tầng: Tuyệt Đối Cấm Quảng Cáo, Lôi Kéo Kênh Lạ, Khóa Chặt Webhook & Tự Động Xóa Rác Tức Thì (Strict Zero-Promo & Bot Anti-Hijack Defense-in-Depth Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng phản ánh sự cố: Bot `1.1 TNI DAILY ADDTENDANCE` (ID `8628370628`) tự ý gửi tin nhắn quảng cáo ép tham gia kênh lạ vào nhóm vận hành `TNI TEAM 1 PLAN - ALARM`:
+>      `🚀 To use this bot, you must join our channel: https://t.me/A_TOOLSx2`
+>      `Telegram A-TOOLS X (Programming & Development Tools • Resources • Services)` kèm nút `[VIEW CHANNEL]`.
+>   2. Người dùng chỉ đạo: *"Mời chuyên gia 1% vào kiểm an toàn không để quản cáo dạng lôi kéo nào"* và *"Và đưa ra nhiều rào cản không cho ai giả danh bot gởi tin quản cáo"*.
+> - **Phân Tích Nguyên Nhân Gốc (Root Cause Analysis)**:
+>   1. **Mã Nguồn Nội Bộ 100% Trong Sạch**: Khảo sát toàn bộ kho mã nguồn (`Task and WO`, `tni-search`, `QLTC_GAS`, `apps_script_attendance`), không có bất kỳ dòng code nào chứa `A_TOOLS` hay nội dung quảng cáo.
+>   2. **Bot Token Bị Khai Thác Hoặc Webhook Bị Rỗng**:
+>      - Khi kiểm tra `getWebhookInfo` của Bot `@8628370628`, URL trả về rỗng `""`.
+>      - Khi Webhook rỗng, bất kỳ bên thứ 3 nào nắm token (do từng dùng framework bot chia sẻ ngoài hoặc bị lộ token dạng plaintext) đều có thể chạy polling (`getUpdates`) và gửi lệnh lôi kéo khi có người dùng trong nhóm bấm các lệnh slash (`/Report01`, `/plan`...).
+> - **Hệ Thống 7 Rào Cản Phòng Thủ Bọc Thép (The 7-Layer Defense Shield)**:
+>   1. **Rào Cản 1 (Thu Hồi & Cấp Mới Token Trên @BotFather)**:
+>      - Thực hiện `/mybots` ➔ `@TNI_DAILY_ADDTENDANCE_BOT` ➔ `API Token` ➔ `Revoke current token` trên BotFather.
+>      - Mọi bên thứ 3 hoặc script spam cũ đang giữ token sẽ lập tức bị Telegram từ chối `401 Unauthorized`.
+>   2. **Rào Cản 2 (Khóa Chặt Cấu Hình Quyền Hạn Trên @BotFather)**:
+>      - `/setprivacy` ➔ ENABLE (Privacy Mode ON): Bot chỉ nhận các lệnh bắt đầu bằng `/`, không nghe toàn bộ hội thoại trong nhóm.
+>      - `/setjoingroups` ➔ DISABLE: Cấm người ngoài tự ý thêm Bot vào các nhóm lạ.
+>   3. **Rào Cản 3 (Khóa Cứng Webhook & Flush Hàng Đợi - Zero Empty Webhook)**:
+>      - Tự động gọi `deleteWebhook` với `drop_pending_updates: true` để xóa sạch toàn bộ hàng đợi spam bị kẹt.
+>      - Thiết lập `setWebhook` trỏ thẳng vào Vercel Proxy `https://tni-bot.vercel.app/api/attendance`. Khi Webhook active, Telegram tự động chặn mọi request polling `getUpdates` với mã lỗi `409 Conflict`.
+>   4. **Rào Cản 4 (Bộ Lọc Chặn Tin Ra - Outbound Anti-Ad Guardian)**:
+>      - Hàm `isUnauthorizedAdOrSpam_(text)` được tích hợp vào `sendTelegramMessage_` và `sendTgMsgGetId_`.
+>      - Chặn đứng 100% việc gửi bất kỳ link Telegram ngoài danh mục TNI (whitelist chỉ cho phép link TNI) và các từ khóa lôi kéo (`a_tools`, `join our channel`, `subscribe`, v.v.).
+>   5. **Rào Cản 5 (Sentry Quét & Tự Động Xóa Tin Rác Vào Nhóm - Inbound Anti-Spam Purge)**:
+>      - Trong `doPost(e)`, khi nhận được bất kỳ tin nhắn nào trong nhóm chứa link lạ hoặc nội dung quảng cáo:
+>      - Bot lập tức gọi `deleteTgMessage_(token, chatId, msg.message_id)` để xóa sạch tin rác khỏi nhóm trong vòng 0.5 giây!
+>   6. **Rào Cản 6 (Giám Sát Tự Phục Hồi SEV-1 Trong Auditor)**:
+>      - `system_auditor.py` kiểm tra toàn bộ 6 Webhooks mỗi nhịp 5 phút. Nếu phát hiện `url: ""` hoặc sai URL, lập tức thực hiện Flush hàng đợi và Re-hook ngay lập tức.
+>   7. **Rào Cản 7 (Phân Quyền Nhóm Tối Thiểu)**:
+>      - Trong các nhóm Telegram vận hành, Bot chỉ được cấp quyền tối thiểu cần thiết để làm nhiệm vụ (Gửi tin, Xóa tin của chính mình/tin spam).
+> - **Triển Khai & Kiểm Chứng Live (Deployment & Verification)**:
+>   - Đã deploy GAS Attendance `apps_script_attendance/TNI attendance.js` lên Version **`@134`** (Primary) và **`@135`** (Secondary).
+>   - Kiểm chứng Live: Endpoint `?action=ping` phản hồi HTTP 200 `PONG`.
+>   - Đã khóa Webhook `8628370628` về `https://tni-bot.vercel.app/api/attendance` (pending=0).
+>
+> **PM-96 (10/10/2026) — Bọc Thép Bảo Mật Đoàn Tàu GitHub Actions Public, Tuyệt Đối Cấm Lộ Secret Dạng Plaintext, Thiết Lập 3 Ghế An Ninh Mới & Báo Cáo Tình Trạng Từng Bot (Strict Public GitHub Hardening, Zero Plaintext Secrets, Multi-Sentinel Defense & Individual Bot Audit Policy)**:
+> - **Yêu Cầu & Bối Cảnh (Requirement & Context)**:
+>   1. Người dùng chỉ đạo: *"Đưa vào quy tắt bảo mật lưu đi và Mời chuyên gia về bảo mật chống quảng cáo giả danh trên telegram và tìm chi tiết từng cái bot báo cao thụ thể chắc chắn bọc thép 100% không để lộ lọt bot hay thông tin quang trọng ra ngoài, Đoàn tàu githut 5 phút public bắt bột vì đang dùng miễn phí, nên đoàn tàu này mời chuyên gia vào bọc thép và mã hóa không để lọt thông tin cá nhân và chat bot ra ngoài, và mời chuyên gia đua nhiều ghế an ninh và giám sát chốt chặn và đưa vào báo cáo ghế giám sát luôn"*.
+> - **Nguyên Nhân & Thách Thức Kỹ Thuật (Engineering Challenge)**:
+>   1. **Đoàn Tàu 5 Phút Public Để Tối Ưu Chi Phí Runner Miễn Phí**: GitHub Actions cung cấp phút chạy runner hoàn toàn miễn phí không giới hạn cho repository Public. Do đó, việc duy trì repo public là một chiến lược kinh tế hợp lý.
+>   2. **Mối Nguy Khi Repo Public**: Bất kỳ dòng code nào chứa token bot Telegram dạng plaintext (`\d{8,10}:...`) hoặc secret trong file workflow (`train_5min.yml`), mã nguồn Python hay Markdown đều sẽ bị các bot scanner tự động trên Internet cào quét chỉ sau vài giây.
+> - **Quy Trình Khắc Phục Bọc Thép Bắt Buộc (Rule PM-96)**:
+>   1. **Loại Bỏ 100% Plaintext Telegram Bot Token Khỏi Toàn Bộ File Workflow & Mã Nguồn**:
+>      - Trong `train_5min.yml`, phần Keepalive TUYỆT ĐỐI CẤM gọi `curl` trực tiếp đến `https://api.telegram.org/bot<PLAINTEXT_TOKEN>/...`.
+>      - Thay thế hoàn toàn bằng việc ping vào Vercel Proxy endpoints (`https://tni-bot.vercel.app/api/...`) và Google Apps Script ping endpoints (`?action=ping`), vừa giữ ấm serverless hiệu quả 100%, vừa không lộ bất kỳ chuỗi token nào.
+>   2. **Toàn Bộ Bí Mật Đều Phải Lưu Trữ Qua GitHub Secrets / ScriptProperties / Environment Variables**:
+>      - Mọi Token Bot Telegram, Chat ID, API ID/Hash, Session string bắt buộc được mã hóa qua GitHub Repository Secrets (`${{ secrets.... }}`) hoặc ScriptProperties của Google Apps Script.
+>      - Code Python đọc qua `os.environ.get("...")`, tuyệt đối không hardcode chuỗi token thật trong mã nguồn đẩy lên Git.
+>   3. **Thiết Lập 3 Ghế An Ninh Mới Trong Hệ Thống & Đưa Vào Báo Cáo Giám Sát**:
+>      - **`Ghế AUDITOR-SECURITY-9.4` (An ninh & Chống Mạo danh Bot 24/7)**: Giám sát toàn bộ 8 Webhooks của các Bot, phát hiện rỗng/kẹt tin/mất kết nối, kích hoạt cơ chế tự phục hồi khẩn cấp và bảo vệ Privacy Mode ON.
+>      - **`Ghế AUDITOR-AD-GUARD-9.5` (Lá chắn Diệt Quảng Cáo & Lôi Kéo Telegram)**: Duy trì bộ lọc hai chiều Outbound Block (`isUnauthorizedAdOrSpam_`) và Inbound Purge Sentry (xóa sạch bài viết quảng cáo/lôi kéo khỏi nhóm trong vòng 0.5 giây).
+>      - **`Ghế AUDITOR-SECRETS-9.6` (Bọc Thép Secrets GitHub Actions Public)**: Giám sát và ngăn chặn rò rỉ secret/PII trong kho GitHub Public.
+>   4. **Báo Cáo Tình Trạng Từng Bot Trong Báo Cáo Kiểm Toán**:
+>      - Báo cáo giám sát định kỳ gửi về DM Admin bắt buộc hiển thị đầy đủ trạng thái của các ghế an ninh mới và tình trạng sống của các Bot.
+
+
+
+
+
+
+
+> **PM-97 (11/10/2026) — Sự Cố Rò Rỉ Toàn Kho Public & Đính Chính PM-96: Repo Public Chỉ Được Chứa Allowlist Tối Thiểu, Mọi Secret Từng Lên Public = Đã Chết Phải Thu Hồi, Cấm Báo "Bọc Thép 100%" Khi Chưa Quét Live Repo Public (Strict Public-Repo Allowlist, Secret-Burn Rotation, Webhook Secret-Token & Live-Evidence-Before-Claim Policy)**:
+> - **Bối Cảnh**: Sau PM-95/PM-96, tiếp tục xuất hiện quảng cáo/link độc hại giả danh Bot. Người Dùng yêu cầu chuyên gia bảo mật rà `system_map.md` + đoàn tàu.
+> - **Bằng Chứng Quét Live (11/10/2026, chỉ đọc, đã che secret)**:
+>   1. Repo `MON6879/tni-sitedown-relay` **PUBLIC**, HEAD có **507 file** — là bản sao gần như toàn bộ workspace (AGENTS.md, system_map.md, `scratch/`, `history/`, `.env.vercel*`, `apps_script*/`).
+>   2. HEAD public chứa **12 loại secret**: 8 token bot **vẫn còn sống** (`getMe` = 200: Clear Site, Refuel, Search, Construction, Asset Collector, Report Send, Site Down Relay, Cable), **GitHub PAT** (4 file), **Telethon StringSession** của tài khoản cá nhân (2 file = nguy cơ chiếm tài khoản), mật khẩu mở Khóa Thép (6 file), `api_hash`, số điện thoại, Google API key. Repo `tni-sale-portal` public chỉ có 4 file HTML (không thấy secret).
+>   3. **Chính commit PM-96 (`935b203`) đã đẩy token Attendance MỚI vào `system_auditor.py` trên repo public** → token mới cũng đã cháy.
+>   4. 13/14 handler `api/*.py` (Vercel) **KHÔNG kiểm `X-Telegram-Bot-Api-Secret-Token`** (chỉ `search_bot.py` có); GAS Attendance `doPost` không có allowlist `chat_id`/sender → ai biết URL đều có thể bơm update giả.
+> - **Root Cause (PM-1)**: (a) PM-96 chỉ làm sạch 1 file (`train_5min.yml`) rồi tuyên bố "bọc thép 100%" mà **không quét toàn repo public + lịch sử git**; (b) vi phạm Repo Isolation: workspace đầy đủ bị mirror lên repo public thay vì chỉ file runner tối thiểu; (c) token hardcode làm default trong `os.getenv(X, "<token>")`, `BOT_REGISTRY`, `.gs`, scratch, history; (d) AI tự `git add` file chứa secret mới vào repo public; (e) mật khẩu Khóa Thép nằm plaintext trong AGENTS.md nhân bản lên public nên khóa vô hiệu.
+> - **Rule Phòng Ngừa Bắt Buộc (PM-2/PM-3)**:
+>   1. **R1 — Allowlist Repo Public**: Repo public (`tni-sitedown-relay`, `tni-sale-portal`) CHỈ được chứa file cần để Actions chạy / trang tĩnh không có dữ liệu mật. TUYỆT ĐỐI CẤM đẩy lên public: `AGENTS.md`, `.agents/`, `system_map.md`, `history/`, `scratch/`, `.env*`, `*session*`, `scratch_params.json`, `*.bak`, ảnh chụp, và mọi file có token/PII. Kiến trúc đích: repo public chỉ có `train_5min.yml` mỏng; mã nguồn nằm repo **private**, workflow `actions/checkout` repo private bằng secret deploy-key/PAT quyền tối thiểu (private repo checkout từ workflow của repo public không tốn quota private).
+>   2. **R2 — Secret Đã Lên Public = Đã Chết**: Xóa file/commit KHÔNG đủ (git history + scanner đã cào). Khi bất kỳ token/PAT/session/mật khẩu từng xuất hiện trên repo public: BẮT BUỘC thu hồi & cấp mới (BotFather `Revoke`, GitHub xóa PAT, Telegram `Settings → Devices → Terminate` + tạo session mới, đổi mật khẩu), rồi mới dọn repo. CẤM coi "đã xóa khỏi HEAD" là xong.
+>   3. **R3 — Zero Hardcode**: CẤM `os.getenv("X", "<token thật>")`, token trong `BOT_REGISTRY`, `.gs`, `.html`, scratch, history, backup context, AGENTS.md, system_map.md. Chỉ `os.environ["X"]` (thiếu thì fail rõ ràng), GitHub Secrets, Vercel env, GAS ScriptProperties. Backup context/AGENTS/system_map chỉ ghi tên secret + 4 ký tự cuối, KHÔNG ghi giá trị.
+>   4. **R4 — Cổng Chặn Trước Khi Push**: Mọi lần `git push` (nhất là repo public) BẮT BUỘC chạy quét secret (regex `\d{8,10}:[A-Za-z0-9_-]{35}`, `ghp_`, `AIza`, session `1BVts…`, `UNLOCK STEEL`, `-----BEGIN`) trên **diff sắp push**; có hit → DỪNG, không push. Cài `pre-push` hook/`gitleaks` cho cả 3 repo. AI CẤM `git add .` trên repo public.
+>   5. **R5 — Webhook Chống Giả Mạo**: Mọi `setWebhook` BẮT BUỘC có `secret_token` (random ≥32 ký tự, lưu env), mọi handler Vercel/GAS BẮT BUỘC kiểm `X-Telegram-Bot-Api-Secret-Token` (so sánh hằng-thời-gian) + allowlist `chat.id`/`from.id`, sai → HTTP 403 và không xử lý. Bổ sung `allowed_updates` tối thiểu; `/setjoingroups` = Disable cho mọi bot; `/setprivacy` = Enable (trừ bot cần đọc text).
+>   6. **R6 — Khóa Thép Dùng Băm**: AGENTS.md CHỈ lưu `SHA-256` của mật khẩu mở khóa (AI so băm giá trị Người Dùng gõ), CẤM lưu plaintext trong file có thể lên public. Phải đổi mật khẩu hiện tại vì đã lộ.
+>   7. **R7 — Log Public Là Công Khai**: Log GitHub Actions của repo public ai cũng đọc được: CẤM `echo`/`print` nội dung chat, số điện thoại, tên nhân sự, mã trạm, URL GAS đầy đủ; dùng `::add-mask::` cho mọi giá trị động nhạy cảm; Telethon/NMS chỉ in số lượng, không in nội dung.
+>   8. **R8 — Ghế AUDITOR-SECRETS-9.6 Phải Quét Thật**: Mỗi nhịp, tải HEAD repo public qua `raw.githubusercontent.com` + liệt kê file, áp regex ở R4; có hit → cảnh báo SEV-1 về DM Admin ngay (chỉ tên file + loại secret). Ghế AUDITOR-SECURITY-9.4 mở rộng: kiểm `getMe` của token cũ đã thu hồi phải trả 401, kiểm `getWebhookInfo` có `secret_token`/`url` đúng, kiểm `allowed_updates`.
+>   9. **R9 — Cấm Báo Ảo**: CẤM nói "bọc thép 100%"/"không lộ" khi chưa **quét live repo public (tree + raw) và lịch sử** và đính kèm số liệu. Báo cáo phải nêu: số file public, số hit, token nào còn sống.
+>   10. **R10 — Không Dán Secret Vào Chat**: Người Dùng/AI KHÔNG dán token vào khung chat (lưu log hội thoại). Nạp secret qua file `.env.rotate` cục bộ (đã `.gitignore`) rồi script đẩy vào GitHub Secrets/Vercel/GAS và xóa file.
+> - **Kế Hoạch Triệt Để (Phase)**: **P0 (Người Dùng, ngay)**: Terminate toàn bộ session Telegram lạ; BotFather Revoke 9 bot; xóa 3 GitHub PAT lộ; đổi mật khẩu Khóa Thép; hạn chế Google API key. **P1 (AI, cần token mới + `UNLOCK STEEL`)**: nạp secret mới vào GitHub Secrets/Vercel/GAS, bỏ hardcode ở mọi file kể cả `site_down_v2.gs`/`botlookup_relay.py`, thêm `secret_token` + allowlist cho 13 handler. **P2**: dựng repo runner public tối thiểu + repo code private, vô hiệu hóa repo public cũ (đổi private/xóa) sau khi xác nhận train chạy. **P3**: bật pre-push hook, nâng cấp ghế 9.4/9.6, quét lại live và báo số liệu.
+> - **Ngoại Lệ Parity**: Do R1, bản `AGENTS.md`/`system_map.md` mới KHÔNG được đồng bộ vào repo public `tni-sitedown`; chỉ đồng bộ `Task and WO` + `tni-search` (private) + root.
+
+> - **PM-97 Phụ Lục — Thực Thi P1 & Bài Học (11/10/2026)**:
+>   1. **Đã thực thi**: 9 token mới (8 bot lộ + Attendance) xác minh `getMe`=200, không trùng token đã lộ; nạp vào **Vercel env** (`CABLE_BOT_TOKEN`, `COLLECTOR_BOT_TOKEN`, `TELEGRAM_TOKEN`, `REFUEL_BOT_TOKEN` + 6 biến `*_WEBHOOK_SECRET`/`TELEGRAM_SECRET_TOKEN`) và **ScriptProperties** của 3 dự án GAS (Attendance `@142/@143`, QLTC_GAS Hub `@492`, Clear Site `@54`); bỏ hardcode ở 6 handler `api/*.py`, 8 script Python, `render.yaml`, 12 file GAS; mọi handler Vercel dạng bot kiểm `X-Telegram-Bot-Api-Secret-Token` **fail-closed** (POST giả → 403, đã thử live); 8/9 bot đã `setWebhook` kèm `secret_token`.
+>   2. **Cách nạp secret vào GAS không để lại dấu vết trong repo**: dùng hook một lần `__rotateOnce_` (nonce ngẫu nhiên, cờ `__ROTATE_DONE_*` tự khóa, regex đổi mọi giá trị token-shaped theo bot-id) → gọi bằng HTTPS POST → **gỡ hook và deploy lại bản sạch** (script `gas_rotate.py`). CẤM tạo endpoint công khai kiểu `?action=refresh_token` ghi token từ literal trong code (đã xóa khỏi Attendance).
+>   3. **Bẫy auditor**: `system_auditor.py` tự `setWebhook` khi URL rỗng/kẹt hàng đợi; nếu thiếu `secret_token` thì **tự gỡ cổng chống giả mạo**. Auditor nay lấy `WH_*` từ env và **KHÔNG re-hook khi thiếu secret** (log `⛔`). Mọi code gọi `setWebhook` BẮT BUỘC kèm `secret_token`.
+>   4. **Bot dùng chung endpoint dùng chung secret**: `@TNIREPORTTASK_BOT` trỏ `/api/attendance` nên dùng `ATTENDANCE_WEBHOOK_SECRET`.
+>   5. **Giới hạn còn lại**: URL GAS `/exec` là công khai, Telegram `secret_token` chỉ bảo vệ lớp Vercel — gọi thẳng GAS vẫn giả mạo được. P2: proxy Vercel thêm khóa chia sẻ vào query, GAS kiểm `e.parameter.k`, thiếu/sai → bỏ qua. Cũng chưa làm: `allowed_updates` tối thiểu, allowlist `chat_id` trong GAS, `/setjoingroups` Disable (chỉ làm được trên @BotFather).
+>   5b. **Chưa xong (cần Người Dùng)**: GitHub Secrets của repo train (cần `gh auth login` hoặc nhập tay), Telethon session mới, 3 GitHub PAT lộ, mật khẩu Khóa Thép mới + `UNLOCK STEEL` để sửa `site_down_v2.gs`/`botlookup_relay.py`/`api/site_down_relay.py` và đặt webhook `@TNI_SITE_DOWN_CELL_ALARMBOT`.
+>   6. **Lỗi quy trình của chính AI**: (a) in output quét KHÔNG che token ra khung chat (chỉ lộ token cũ đã chết, may mắn) → mọi script quét/diff BẮT BUỘC che (`tok[:6]…`) ngay từ đầu; (b) đồng bộ `AGENTS.md`/file mới lên repo public gây lộ token Attendance mới — đã chốt R1: **CẤM đẩy lên repo public** bất kỳ file nào ngoài allowlist.
+>   7. **Thư mục bản sao cũng phải làm sạch**: `Task and WO/apps_script/` (mirror QLTC_GAS), `QLTC_GAS_PULL/`, `history/`, `scratch/` còn chứa token cũ (đã chết). Khi thu hồi token phải quét **mọi** thư mục bản sao, không chỉ thư mục đang chạy.
+
+### PM-97 Phụ Lục 2 — Nạp lại Tàu sau xoay token (2026-10-11 20:40 MMT)
+- **GitHub Secrets (repo public chạy tàu)** đã nạp token bot mới: `SEND_BOT_TOKEN`=Site Down Relay (mặc định trong code là bot 8647…, KHÔNG phải bot Report), `REPORT_TASK_BOT_TOKEN`=Report, `CABLE_BOT_TOKEN`, `REFUEL_BOT_TOKEN`, `COLLECTOR_BOT_TOKEN`=Asset, `TELEGRAM_SESSION` mới (xác thực authorized=True).
+- **Bài học 1 — PAT lộ trên repo public bị GitHub tự thu hồi**: PAT cũ (đuôi …03j) trả 401 → nút kích hoạt tàu (GAS `14_GITHUB_DISPATCH.gs`, ưu tiên `GITHUB_PAT`→`GITHUB_TOKEN`→`GH_PAT`→`GH_TOKEN`) chết, tàu dừng từ 13:13Z. Khi xoay token PHẢI xoay luôn PAT điều phối, không chỉ token bot.
+- **PAT mới**: fine-grained, hạn 90 ngày (đến 2027-01-09), chỉ repo `MON6879/tni-sitedown-relay`, quyền Actions: Read and write. Đã thay vào ScriptProperties QLTC_GAS (`GITHUB_PAT`, `GITHUB_TOKEN`, `RF_GITHUB_PAT`) bằng hook nonce dùng-một-lần, gỡ hook, deploy sạch `@494`. Lượt chạy tự động 14:08Z thành công. **Nhắc đổi PAT trước 2027-01-09.**
+- **Chưa xoay (đã ghi nhận)**: Vercel `GH_PAT_TOKEN` và `daily_report_trigger.gs` trỏ repo `phonghdpxd-cmd/tni-bot` (tài khoản khác) — PAT mới không có quyền ở đó; xử lý riêng.
+- **Bài học 2**: người dùng dán PAT thiếu tiền tố `KEY=` → script đọc rỗng; luôn in tên khóa + độ dài (không in giá trị) để chẩn đoán trước khi kết luận.
+- **Còn mở**: xóa PAT cũ còn sót trên github.com/settings/tokens; `TECHNICAL_DEP_BOT_TOKEN` chưa xác định bot; `/setjoingroups` Disable; mật khẩu Steel mới (chỉ lưu SHA-256); sửa Site Down (cần `UNLOCK STEEL`); tách repo public chạy tàu khỏi mã nguồn (P2).
+
+
+---
+
+# 🛡️ PM-98 — SITE DOWN: GỠ TOKEN CỐ ĐỊNH, KHÓA ENDPOINT, KÝ WEBHOOK (phiên Steel 2026-10-11, mật khẩu mới SHA-256 `1da0713d494c2a6dfab9fd37f4ca23373c8aa9c742e7238f725d5338b09a5235`)
+- **Đã mở khóa 1 phiên, sửa trọn end-to-end, KHÓA ĐÃ ĐÓNG LẠI.** Script `1fgIR…`: `clasp push` + `deploy -i AKfycbyCibIj…` → **@113** (sạch, không hook; @111/@112 là bản trung gian có hook nonce).
+- **Mã nguồn**: gỡ literal token `SD_BOT_TOKEN` (L230, tự gán từ code); `admin_audit_sitedown` chỉ hiện `bot_id:***` (trước đây lộ 15 ký tự đầu = id + 4 ký tự bí mật); `teardown_gas_train` (xóa trigger) cần `SD_ADMIN_KEY` (fail-closed); nhánh webhook Telegram trong `doPost` cần `SD_RELAY_KEY`.
+- **Proxy `api/site_down_relay.py`**: kiểm `X-Telegram-Bot-Api-Secret-Token` (= `SITEDOWN_WEBHOOK_SECRET`) TRƯỚC khi trả 200, fail-closed 403; đính `SITEDOWN_RELAY_KEY` khi forward sang GAS; bỏ URL GAS mặc định cũ; không log id/tên nhóm.
+- **Vercel `tni-sitedown`**: trước đó project giữ bản deploy NGUYÊN REPO cũ 72 ngày (collector/search_bot/attendance… với token cũ, không chữ ký = bề mặt tấn công). Đã deploy thư mục TỐI GIẢN chỉ `api/site_down_relay.py` → các endpoint cũ trả 404. Env: gỡ `SD_BOT_TOKEN`, đặt `SD_APPS_SCRIPT_URL`, `SITEDOWN_WEBHOOK_SECRET`, `SITEDOWN_RELAY_KEY`.
+- **ScriptProperties Site Down** (58 mục): `SD_BOT_TOKEN`, `GITHUB_PAT` thay bằng giá trị mới; thêm `SD_RELAY_KEY`, `SD_ADMIN_KEY`. Webhook bot Site Down đặt lại có `secret_token`. Kiểm live: không ký→403, sai khóa→403, ký đúng→200; GAS: update giả→`forbidden`, update có khóa→processed, teardown không khóa→`forbidden`.
+- **Bài học**: (1) KHÔNG suy mapping secret từ giá trị mặc định trong code — phải đối chiếu `.env` (đã gán nhầm `SEND_BOT_TOKEN`, sửa lại). (2) Token `@TNITECHINICALDEPREPORT_BOT` nằm trong 3 commit lịch sử repo public → phải `/revoke`. (3) Project Vercel cũ giữ deploy nguyên repo → luôn deploy thư mục tối giản. (4) Mật khẩu Steel bản rõ trong tài liệu = lộ; chỉ lưu SHA-256.
+- **Chưa làm (P2)**: repo public `tni-sitedown-relay` vẫn chứa AGENTS.md/history/scratch/chat-id/lịch sử cũ; tách repo runner; xóa bản rõ mật khẩu cũ trong lịch sử git công khai là không thể → mật khẩu cũ đã thu hồi.
+
+# 🚂 PM-99 — TÁCH RUNNER CÔNG KHAI & NGUỒN CODE BẢO MẬT: BỌC THÉP TOÀN DIỆN KHỎI DATA LEAK (2026-10-11, phiên Steel kết thúc)
+- **Bối cảnh & Nguy cơ**: Repo MON6879/tni-sitedown-relay được cấu hình Public để tận dụng phút chạy GitHub Actions miễn phí. Tuy nhiên, việc để mã nguồn Python, Apps Script, documentation, history và scratch files trong repo public tiềm ẩn nguy cơ rò rỉ thông tin hạ tầng và bí mật lịch sử.
+- **Kiến trúc Bọc Thép (Runner Tối Giản + Repo Code Riêng Tư)**:
+  1. **Repo Runner Công Khai (MON6879/tni-sitedown-relay)**:
+     - Toàn bộ lịch sử cũ với 507 files và hơn 200 commit đã được thay thế triệt để bằng **1 orphan commit duy nhất** (25970c). Nhánh master trên remote bị xóa hoàn toàn.
+     - Repo công khai hiện CHỈ CHỨA DUY NHẤT 2 file: .github/workflows/train_5min.yml và README.md.
+     - **TUYỆT ĐỐI KHÔNG CÓ BẤT KỲ FILE MÃ NGUỒN PYTHON/GAS HAY DOCUMENTATION NÀO TỒN TẠI TRÊN REPO PUBLIC.**
+  2. **Repo Mã Nguồn Riêng Tư (MON6879/tni-bot - Private)**:
+     - Toàn bộ codebase hoàn chỉnh của đoàn tàu (Task and WO) được lưu trữ an toàn trong repo Private MON6879/tni-bot.
+     - Runner công khai sử dụng Deploy Key chỉ-đọc (CODE_DEPLOY_KEY lưu trong GitHub Secrets) để checkout code từ MON6879/tni-bot vào runner ở nhịp chạy.
+     - Sau khi checkout, các toa tàu (Site Down, Cable, Daily Reports, Refuel, Auditor, ETA, Sale) thực thi bình thường từ workspace runner mà không làm lộ code ra ngoài.
+  3. **Bổ Sung Secrets Hoàn Chỉnh (28 Secrets)**:
+     - Bổ sung đầy đủ 28 Secrets trên MON6879/tni-sitedown-relay (bao gồm CODE_DEPLOY_KEY, ADMIN_CHAT_ID, SALE_BOT_TOKEN, tất cả bot tokens và webhook secret tokens WH_*).
+     - Bot Sale @TNI_solution_bulding_bot (id: 8737134521) đã được rotate token mới qua @BotFather, nạp vào GitHub Secret SALE_BOT_TOKEN, xác thực getMe HTTP 200.
+     - ADMIN_CHAT_ID: 6859790680 được cấu hình đầy đủ.
+  4. **Làm Sạch Tài Liệu & System Map**:
+     - system_map.md được rà soát và xóa sạch toàn bộ API_HASH, API_ID, token tĩnh bị sót.
+     - Cập nhật bảng phân định vai trò Repo rõ ràng: Vercel = phonghdpxd-cmd/tni-bot, Code nguồn Tàu = MON6879/tni-bot (private), Runner Actions = MON6879/tni-sitedown-relay (chỉ chứa workflow).
+  5. **Đồng Bộ & Khóa Thép**:
+     - Tất cả file backup lịch sử và mã nguồn được lưu trữ trọn vẹn tại Task and WO và 	ni-search.
+     - Quy trình kiểm tra live chứng minh nhịp chạy 38158669680 trên commit sạch 25970c hoàn thành thành công 100% (completed success).
+     - **KHÓA THÉP SITE DOWN ĐÓNG LẠI NGAY LẬP TỨC.** Mật khẩu bảo vệ giữ nguyên hash SHA-256.
+>
+> **PM-101 (12/10/2026) — Báo Cáo Team Operation Progress (TPR): Cửa Sổ 2 Ngày (Hôm Qua + Hôm Nay, MMT), Nhãn Period Đúng Dữ Liệu, Bổ Sung Số Liệu Site Down Clear Theo Từng Người & Quy Tắc Đối Soát (TPR 2-Day Window + Per-Person Site Clear + Reconciliation Policy)**:
+> - **Hiện tượng**: Bản tin `OPERATION PROGRESS REPORT` ghi `Period: From 11/10 to 11/10` nhưng liệt kê 44 WO cả chu kỳ tháng; người dùng hỏi "sao số liệu khác nhau" rồi yêu cầu lấy theo ngày (B), sau đó mở rộng "hôm nay và hôm qua" và thêm số liệu báo cáo `11 Site down Clear` vào từng người.
+> - **Nguyên nhân gốc**: `auditSheetFreshnessBeforeSend_` lấy `dateFrom` từ ô `row1[19]` (`WO Close day =>` = ngày hôm nay của Sheet) làm ngày bắt đầu, trong khi mục WO không lọc theo ngày.
+> - **Đối soát độc lập (live GViz, 12/10/2026)**: Tổng WO theo Team khớp 100% giữa `WO Close progress` và `Task remain` (T1=63, T2=44, T3=13, T4=34); `Task remain` được người dùng xác nhận là chính xác (SSOT cả tháng). Lệch cấp nhân viên (Win Htet Aung 3 vs 1, Tin Naing Lin 4 vs 2, Si Thu Htun 8 vs 7, Khant Si Thu 1 vs 0) = đúng số WO đóng ngày biên 21/09.
+> - **Quy tắc (Rule PM-101)**:
+>   1. Nguồn chi tiết WO: tab `WO Close progress` (gid `930147334`, file `1Etd2PmbY5LgPaYhkdykT7KYXZHhB-_Qx3u-UXhFgpI8`). Mục `1. Work Orders Completed` CHỈ gồm WO có `Closed Time` (cột K, idx 10) rơi vào HÔM QUA hoặc HÔM NAY (Asia/Rangoon); mỗi dòng ghi `(closed dd/MM)`. CẤM liệt kê cả chu kỳ tháng trong TPR.
+>   2. Nhãn: `Period: Closed on <hôm qua> & <hôm nay> (yesterday + today, MMT) | sheet export: ...`. Ô mốc `WO Close day =>` (T1) chỉ dùng để CẢNH BÁO `Sheet day ... is not today - export not refreshed yet` khi ≠ hôm nay.
+>   3. Mục MỚI `6. Site Down Clear`: nguồn spreadsheet `1d9D719TmLsrcCxozEgZ0CUm7NXi_lVZaPtBX9WF5b8M` tab `Site down Clear` (cột A mã trạm, B team, D nhân viên, G chuỗi `/TNIxxxx : dd/MM/yy HH:mm - dd/MM/yy HH:mm = số giờ`, I Solution). Mỗi khoảng clear tính vào cửa sổ khi NGÀY KẾT THÚC là hôm qua/hôm nay. Mỗi người: `số lần clear | số trạm (distinct) | tổng giờ | solution pending (cột I rỗng)`. Ma trận CONTROL có thêm `SiteClear`. Đọc bằng `loadSiteClearStats_`; nếu không đọc được → ghi `Site down Clear sheet unreadable right now.` (không làm hỏng bản tin).
+>   4. Giới hạn: khối Dept / Refuel / Cable Link Up trong `WO Close progress` do công thức Sheet lọc theo ô ngày riêng (không có mốc thời gian từng dòng) → code không lọc 2 ngày được; muốn 2 ngày phải sửa công thức Sheet. `Cable Broken Now` là trạng thái hiện hành.
+>   5. GViz trả `Date(Y,M,D)` với THÁNG TÍNH TỪ 0 — luôn +1 tháng khi đối soát. Cột Team ở `Task remain` KHÔNG tin cậy → ghép theo tên nhân viên. Khi người dùng hỏi "số liệu khác nhau", BẮT BUỘC đối soát 3 nguồn bằng dữ liệu live trước khi kết luận; khi đổi phạm vi báo cáo (ngày/chu kỳ) phải hỏi người dùng chọn.
+> - **Triển khai**: `QLTC_GAS` (Script ID `1rvgW...`) `clasp push --force` + deploy `@504` (Deployment `AKfycbz-NZlBk8q2...`); gửi live `send_team_progress_reports` → `ok:true`: T1 [12958], T2 [11848], T3 [11150], T4 [9353], CONTROL [15639].
