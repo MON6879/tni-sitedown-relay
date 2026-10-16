@@ -440,11 +440,19 @@ function processSiteDownColC(sheet, isDirectPush) {
 
   let colC = sheet.getRange(1, 3, lastRow, 1).getValues().flat().map(v => (v || "").toString().trim());
 
-  // ✅ Header chuẩn: C1 và C2
-  const header = [colC[0] || "", colC[1] || ""].filter(l => l.length > 0);
+  // ✅ Header chuẩn: Lấy các dòng tiêu đề chung ở đầu cột C (trước các dòng Team)
+  const header = [];
+  for (let i = 0; i < Math.min(colC.length, 5); i++) {
+    const line = colC[i] || "";
+    if (/^Team\s*0?[1-4]\b/i.test(line)) break;
+    if (line && line !== "...") header.push(line);
+  }
   
-  // ✅ Danh sách trạm: Từ C10 trở đi
-  const rawSites = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !/^Team\s*0?[1-4]/i.test(l));
+  // ✅ Danh sách trạm: Trích xuất mọi dòng chứa dấu '|' và mã trạm TNIxxxx (tránh lệch offset khi thêm/bớt hàng)
+  const rawSites = colC.filter(l => {
+    if (!l || l === "..." || /^Team\s*0?[1-4]/i.test(l) || /^Total\s*Site\s*down/i.test(l) || /^TNI\s*Site\s*down/i.test(l)) return false;
+    return l.indexOf("|") !== -1 && /TNI\d{4}/i.test(l);
+  });
 
   const teamDefs = [
     { key: "T1", label: "🟠 Team 1" },
@@ -469,14 +477,29 @@ function processSiteDownColC(sheet, isDirectPush) {
     }
   }
 
+  // ✅ PM-111: Tự động tìm Header của từng Team từ 15 dòng đầu (chống lệch hàng khi xóa/chèn dòng ở đầu Sheet)
   const teamHeaderMap = {
-    T1: colC[3] || "🟠 Team 1",
-    T2: colC[4] || "🔵 Team 2",
-    T3: colC[5] || "🟢 Team 3",
-    T4: colC[6] || "🟡 Team 4",
+    T1: "🟠 Team 1",
+    T2: "🔵 Team 2",
+    T3: "🟢 Team 3",
+    T4: "🟡 Team 4",
   };
+  for (let i = 0; i < Math.min(colC.length, 15); i++) {
+    const line = colC[i] || "";
+    if (/^Team\s*0?1\b/i.test(line)) teamHeaderMap["T1"] = line;
+    else if (/^Team\s*0?2\b/i.test(line)) teamHeaderMap["T2"] = line;
+    else if (/^Team\s*0?3\b/i.test(line)) teamHeaderMap["T3"] = line;
+    else if (/^Team\s*0?4\b/i.test(line)) teamHeaderMap["T4"] = line;
+  }
 
-  // 1. Gửi nhóm CONTROL (Header C1:C2 + C10:C liên tục, không tách bảng Team, chỉ gắn icon màu)
+  // ⏱️ LIÊN KẾT BOT 2D -> BOT 5T (QUY TẮC ĐẢO THỨ TỰ THEO YÊU CẦU NGƯỜI DÙNG):
+  // 1. Kích hoạt Bot 2D (2. TNI Auto Report Daily) phát bản tin ETA Update TRƯỚC
+  triggerBot2dEta_(true);
+  
+  // 2. Chờ 5 giây để Bot 2D hoàn tất việc xóa tin cũ và bắn tin ETA mới vào Telegram
+  Utilities.sleep(5000);
+
+  // 3. Gửi nhóm CONTROL (Bot 5T)
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
@@ -490,7 +513,7 @@ function processSiteDownColC(sheet, isDirectPush) {
     }
   }
 
-  // 2. Gửi sang 4 nhóm Team (Nguyên bản: C4..C7 + C10:C phân theo Team)
+  // 4. Gửi sang 4 nhóm Team (Bot 5T) — Tin Site Down sẽ nằm dưới cùng (đáy chat)
   for (const td of teamDefs) {
     try {
       const chatId = SD_GROUPS[td.key];
@@ -501,7 +524,13 @@ function processSiteDownColC(sheet, isDirectPush) {
         const parts = summary ? [summary, ...sites] : [...sites];
         sendOrEditTelegramPre(chatId, addKeywordIcons(colorizeTeams(parts.join("\n"))), "TIN1_" + td.key, "[Tin1][" + td.key + "]");
       } else if (summary) {
-        sendOrEditTelegramPre(chatId, addKeywordIcons(colorizeTeams(summary)), "TIN1_" + td.key, "[Tin1][" + td.key + "]");
+        // Chống gửi tin rác rỗng khi không có trạm down và summary chỉ chứa khung rỗng < > | | | | | |
+        const isBasicallyEmpty = !summary || /<\s*>\s*\|\s*\|\s*\|\s*\|\s*\|\s*\|\s*\|?/.test(summary) || summary === td.label;
+        if (!isBasicallyEmpty) {
+          sendOrEditTelegramPre(chatId, addKeywordIcons(colorizeTeams(summary)), "TIN1_" + td.key, "[Tin1][" + td.key + "]");
+        } else {
+          Logger.log("[Luồng A1][" + td.key + "] ℹ️ Không có trạm down và summary rỗng -> Bỏ qua không gửi rác.");
+        }
       }
     } catch (e) {
       Logger.log("[Luồng A1][" + td.key + "] ❌ " + e.message);
@@ -511,10 +540,7 @@ function processSiteDownColC(sheet, isDirectPush) {
   const now = new Date();
   const sentSlot = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHH") + (now.getMinutes() < 30 ? "_00" : "_30");
   props.setProperty("SD_LAST_SENT_SLOT", sentSlot);
-  Logger.log("[Luồng A1] ✅ Hoàn tất gửi Tin 1!");
-
-  // ⏱️ LIÊN KẾT BOT 5T -> BOT 2D: Đợi đúng 30 giây rồi kích hoạt Bot 2D phát tin ETA Update
-  triggerBot2dEta_();
+  Logger.log("[Luồng A1] ✅ Hoàn tất gửi Tin 1 (Bot 5T nằm đáy chat sau Bot 2D)!");
 
   return true;
 }
