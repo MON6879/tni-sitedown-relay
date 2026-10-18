@@ -284,6 +284,16 @@ function doGet(e) {
 
     // ── Xử lý Luồng AW7 Summary (Tin 2) qua GET ─────────────────────────
     if (action === "process_aw_az") {
+      // 🛡️ PM-99: Kiểm tra khung giờ hoạt động 03:30–22:30 MMT trước khi xử lý AW7
+      // Keepalive gọi endpoint này MỌI 5 phút (kể cả 23:53) → phải chặn ngoài giờ ở đây
+      const _nowAw = new Date();
+      const _hAw   = parseInt(Utilities.formatDate(_nowAw, "Asia/Rangoon", "H"), 10);
+      const _mAw   = parseInt(Utilities.formatDate(_nowAw, "Asia/Rangoon", "m"), 10);
+      const _inWin = (_hAw > 3 || (_hAw === 3 && _mAw >= 30)) && (_hAw < 22 || (_hAw === 22 && _mAw <= 30));
+      if (!_inWin) {
+        Logger.log("[doGet/process_aw_az] 🌙 Ngoài khung giờ " + _hAw + ":" + (_mAw < 10 ? "0" : "") + _mAw + " MMT — Bỏ qua AW7, không gửi tin cũ!");
+        return _json({ ok: false, msg: "Outside active window (03:30-22:30 MMT)", skipped: true });
+      }
       ensureGasTrain1min_();
       const ss    = SpreadsheetApp.openById(SD_SHEET_ID);
       const sheet = getSheetByGid(ss, SD_SHEET_GID);
@@ -440,19 +450,11 @@ function processSiteDownColC(sheet, isDirectPush) {
 
   let colC = sheet.getRange(1, 3, lastRow, 1).getValues().flat().map(v => (v || "").toString().trim());
 
-  // ✅ Header chuẩn: Lấy các dòng tiêu đề chung ở đầu cột C (trước các dòng Team)
-  const header = [];
-  for (let i = 0; i < Math.min(colC.length, 5); i++) {
-    const line = colC[i] || "";
-    if (/^Team\s*0?[1-4]\b/i.test(line)) break;
-    if (line && line !== "...") header.push(line);
-  }
+  // ✅ Header chuẩn: C1 và C2
+  const header = [colC[0] || "", colC[1] || ""].filter(l => l.length > 0);
   
-  // ✅ Danh sách trạm: Trích xuất mọi dòng chứa dấu '|' và mã trạm TNIxxxx (tránh lệch offset khi thêm/bớt hàng)
-  const rawSites = colC.filter(l => {
-    if (!l || l === "..." || /^Team\s*0?[1-4]/i.test(l) || /^Total\s*Site\s*down/i.test(l) || /^TNI\s*Site\s*down/i.test(l)) return false;
-    return l.indexOf("|") !== -1 && /TNI\d{4}/i.test(l);
-  });
+  // ✅ Danh sách trạm: Từ C10 trở đi
+  const rawSites = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !/^Team\s*0?[1-4]/i.test(l));
 
   const teamDefs = [
     { key: "T1", label: "🟠 Team 1" },
@@ -477,29 +479,14 @@ function processSiteDownColC(sheet, isDirectPush) {
     }
   }
 
-  // ✅ PM-111: Tự động tìm Header của từng Team từ 15 dòng đầu (chống lệch hàng khi xóa/chèn dòng ở đầu Sheet)
   const teamHeaderMap = {
-    T1: "🟠 Team 1",
-    T2: "🔵 Team 2",
-    T3: "🟢 Team 3",
-    T4: "🟡 Team 4",
+    T1: colC[3] || "🟠 Team 1",
+    T2: colC[4] || "🔵 Team 2",
+    T3: colC[5] || "🟢 Team 3",
+    T4: colC[6] || "🟡 Team 4",
   };
-  for (let i = 0; i < Math.min(colC.length, 15); i++) {
-    const line = colC[i] || "";
-    if (/^Team\s*0?1\b/i.test(line)) teamHeaderMap["T1"] = line;
-    else if (/^Team\s*0?2\b/i.test(line)) teamHeaderMap["T2"] = line;
-    else if (/^Team\s*0?3\b/i.test(line)) teamHeaderMap["T3"] = line;
-    else if (/^Team\s*0?4\b/i.test(line)) teamHeaderMap["T4"] = line;
-  }
 
-  // ⏱️ LIÊN KẾT BOT 2D -> BOT 5T (QUY TẮC ĐẢO THỨ TỰ THEO YÊU CẦU NGƯỜI DÙNG):
-  // 1. Kích hoạt Bot 2D (2. TNI Auto Report Daily) phát bản tin ETA Update TRƯỚC
-  triggerBot2dEta_(true);
-  
-  // 2. Chờ 5 giây để Bot 2D hoàn tất việc xóa tin cũ và bắn tin ETA mới vào Telegram
-  Utilities.sleep(5000);
-
-  // 3. Gửi nhóm CONTROL (Bot 5T)
+  // 1. Gửi nhóm CONTROL (Header C1:C2 + C10:C liên tục, không tách bảng Team, chỉ gắn icon màu)
   const controlId = SD_GROUPS["CONTROL"];
   if (controlId) {
     try {
@@ -513,7 +500,7 @@ function processSiteDownColC(sheet, isDirectPush) {
     }
   }
 
-  // 4. Gửi sang 4 nhóm Team (Bot 5T) — Tin Site Down sẽ nằm dưới cùng (đáy chat)
+  // 2. Gửi sang 4 nhóm Team (Nguyên bản: C4..C7 + C10:C phân theo Team)
   for (const td of teamDefs) {
     try {
       const chatId = SD_GROUPS[td.key];
@@ -524,13 +511,7 @@ function processSiteDownColC(sheet, isDirectPush) {
         const parts = summary ? [summary, ...sites] : [...sites];
         sendOrEditTelegramPre(chatId, addKeywordIcons(colorizeTeams(parts.join("\n"))), "TIN1_" + td.key, "[Tin1][" + td.key + "]");
       } else if (summary) {
-        // Chống gửi tin rác rỗng khi không có trạm down và summary chỉ chứa khung rỗng < > | | | | | |
-        const isBasicallyEmpty = !summary || /<\s*>\s*\|\s*\|\s*\|\s*\|\s*\|\s*\|\s*\|?/.test(summary) || summary === td.label;
-        if (!isBasicallyEmpty) {
-          sendOrEditTelegramPre(chatId, addKeywordIcons(colorizeTeams(summary)), "TIN1_" + td.key, "[Tin1][" + td.key + "]");
-        } else {
-          Logger.log("[Luồng A1][" + td.key + "] ℹ️ Không có trạm down và summary rỗng -> Bỏ qua không gửi rác.");
-        }
+        sendOrEditTelegramPre(chatId, addKeywordIcons(colorizeTeams(summary)), "TIN1_" + td.key, "[Tin1][" + td.key + "]");
       }
     } catch (e) {
       Logger.log("[Luồng A1][" + td.key + "] ❌ " + e.message);
@@ -540,7 +521,10 @@ function processSiteDownColC(sheet, isDirectPush) {
   const now = new Date();
   const sentSlot = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMddHH") + (now.getMinutes() < 30 ? "_00" : "_30");
   props.setProperty("SD_LAST_SENT_SLOT", sentSlot);
-  Logger.log("[Luồng A1] ✅ Hoàn tất gửi Tin 1 (Bot 5T nằm đáy chat sau Bot 2D)!");
+  Logger.log("[Luồng A1] ✅ Hoàn tất gửi Tin 1!");
+
+  // ⏱️ LIÊN KẾT BOT 5T -> BOT 2D: Đợi đúng 30 giây rồi kích hoạt Bot 2D phát tin ETA Update
+  triggerBot2dEta_();
 
   return true;
 }
@@ -1370,16 +1354,21 @@ function triggerBotlookupRelay() {
 function ensureGasTrain1min_() {
   try {
     const triggers = ScriptApp.getProjectTriggers();
-    const has1min = triggers.some(t => t.getHandlerFunction() === "checkAndSend_1min");
-    if (!has1min) {
-      ScriptApp.newTrigger("checkAndSend_1min")
-        .timeBased()
-        .everyMinutes(1)
-        .create();
-      Logger.log("[ensureGasTrain1min_] 🔄 Đã tự động phục hồi trigger 1 phút checkAndSend_1min!");
+    const mins1 = triggers.filter(t => t.getHandlerFunction() === "checkAndSend_1min");
+    if (mins1.length === 1) {
+      // Đúng 1 trigger — hoàn hảo, không làm gì để tránh tạo trùng
+      return;
     }
+    // 🛡️ PM-99: Nếu 0 hoặc >1 trigger → xóa hết, tạo lại đúng 1 cái duy nhất
+    // Tránh race condition: nhiều trigger chạy đồng thời làm DEDUP mất tác dụng
+    mins1.forEach(t => { try { ScriptApp.deleteTrigger(t); } catch(ed) {} });
+    ScriptApp.newTrigger("checkAndSend_1min")
+      .timeBased()
+      .everyMinutes(1)
+      .create();
+    Logger.log("[ensureGasTrain1min_] 🔄 Đã đồng bộ trigger 1 phút (xóa " + mins1.length + " cũ, tạo 1 mới).");
   } catch (err) {
-    Logger.log("[ensureGasTrain1min_] ⚠️ Lỗi tạo trigger 1 phút: " + err.message);
+    Logger.log("[ensureGasTrain1min_] ⚠️ Lỗi đồng bộ trigger 1 phút: " + err.message);
   }
 }
 
