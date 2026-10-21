@@ -241,8 +241,7 @@ jobs:
           check_time 20 26 && REFUEL_READ=true && NEED_PYTHON=true && echo "🚃 Toa Refuel Read: Refuel Group 9 Read Report (20:26 MMT)"
           #  20:56 → Refuel Merged Report + Members Not Joined (📱 Telethon)
           check_time 20 56 && REFUEL_P1=true && REFUEL_P4=true && NEED_PYTHON=true && echo "🚃 Toa 9+11: Refuel Merged + Members (20:56 MMT)"
-          #  22:06 → Plan 5C Evening
-          check_time 22 06 && P5C=true && NEED_PYTHON=true && echo "🚃 Toa 5: Plan 5C Evening (22:06 MMT)"
+          #  22:06 -> [DISABLED] Plan 5C Evening disabled at night (already covered by 18:41 EOD & 19:11 Update)
 
           # 🚨 TOA SITE DOWN: Khởi hành tại nhịp :06 và :36 MMT mỗi giờ (hoạt động 03:30 - 22:15 MMT)
           CURR_M=$(( 10#$M ))
@@ -779,4 +778,6 @@ jobs:
           (github.event_name == 'workflow_dispatch' && inputs.report_type == 'Toa Sale - Sale Summary Report')
         env:
           SALE_BOT_TOKEN: ${{ secrets.SALE_BOT_TOKEN }}
+          SEND_BOT_TOKEN: ${{ secrets.SEND_BOT_TOKEN }}
+          ADMIN_CHAT_ID: "6859790680"
         run: python sale_summary_report.py || true
