@@ -69,66 +69,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # ═══════════════════════════════════════════════
-      # 🏥 TOA 0: KEEPALIVE — Sưởi ấm server (MỌI CHUYẾN)
+      # 🕐 SCHEDULE CHECK — Xác định toa nào cần chạy (CHẠY ĐẦU TIÊN TRƯỚC KEEPALIVE ĐỂ KHÔNG TRỄ PHÚT!)
       # ═══════════════════════════════════════════════
-      # Endpoints được sưởi ấm:
-      # 1. Search Bot (Vercel /api/search_bot) — tránh cold start 3-5s
-      # 2. Asset Collector (Vercel /api/collector) — tránh cold start
-      # 3. Site Down Relay (Vercel /api/site_down_relay) — phản hồi nhanh khi site sập
-      # 4. Main GAS Backend (@302) — giữ Apps Script quota active
-      # 5. Auto Copy Paste GAS — giữ active
-      # 6. Construction Bot 10 (GAS) — setWebhook auto-recover
-      # Khi thêm hệ thống mới: thêm 1 dòng curl ở đây (~1s/endpoint, max ~150 endpoints)
-      - name: "🏥 Toa 0 — Keepalive Ping All Endpoints & Webhooks"
-        run: |
-          echo "🚂 Train tick: $(TZ='Asia/Yangon' date '+%Y-%m-%d %H:%M:%S MMT')"
-
-          echo "1️⃣ Search Bot Proxy (Vercel)..."
-          curl -s -f "https://tni-bot.vercel.app/api/search_bot" || true
-
-          echo "2️⃣ Asset Collector Proxy (Vercel)..."
-          curl -s -f "https://tni-bot.vercel.app/api/collector" || true
-
-          echo "3️⃣ Site Down Relay Proxy (Vercel)..."
-          curl -s -f "https://tni-sitedown.vercel.app/api/site_down_relay" || true
-          # 🛡️ PM-99: AW7 Summary — chỉ gọi trong khung giờ 03:30–22:30 MMT (tránh gửi tin cũ ngoài giờ)
-          HOUR_MMT=$(TZ='Asia/Yangon' date '+%H' | sed 's/^0*//')
-          HOUR_MMT=${HOUR_MMT:-0}
-          if [ "$HOUR_MMT" -ge 3 ] && [ "$HOUR_MMT" -le 22 ]; then
-            echo "3️⃣.1 Site Down AW7 Summary (Auto-check new data, in-window H=$HOUR_MMT)..."
-            curl -s -L "https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec?action=process_aw_az" || true
-          else
-            echo "3️⃣.1 Skip AW7 — ngoài khung giờ hoạt động (H=$HOUR_MMT MMT)"
-          fi
-          echo "3️⃣.2 Site Down Ensure 1-Min Train (Self-healing)..."
-          curl -s -L "https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec?action=setup_gas_train_1min" || true
-
-
-          echo "4️⃣ Main GAS Backend..."
-          curl -s -L "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=ping" || true
-
-          echo "5️⃣ Auto Copy Paste GAS..."
-          curl -s -L "https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec?action=ping" || true
-
-          echo "6️⃣ Construction Bot 10 Proxy (Vercel)..."
-          curl -s -f "https://tni-bot.vercel.app/api/construction" || true
-
-          echo "7️⃣ Cable Bot 15 Proxy (Vercel)..."
-          curl -s -f "https://tni-bot.vercel.app/api/cable_bot" || true
-
-          echo "8️⃣ Attendance Bot Proxy (Vercel & GAS)..."
-          curl -s -f "https://tni-bot.vercel.app/api/attendance" || true
-          curl -s -L "https://script.google.com/macros/s/AKfycbzSz_ISXgertxBDadw4BBQX1JdMjW650_o4He0o4Lh-uf1hV5O3YaE-ohlqI2CHyAcVFg/exec?action=ping" || true
-
-          echo "9️⃣ Refuel Collector Bot Proxy (Vercel)..."
-          curl -s -f "https://tni-bot.vercel.app/api/refuel_collector" || true
-
-          echo "✅ Keepalive done (100% Zero-Secret In Public Workflow)"
-
-      # ═══════════════════════════════════════════════
-      # 🕐 SCHEDULE CHECK — Xác định toa nào cần chạy
-      # ═══════════════════════════════════════════════
-      # Tolerance: ±2 phút (GitHub Actions cron có thể delay)
+      # Tolerance: ±2 phút (kèm snap 1 phút nếu runner khởi động trễ sang phút M%5==4)
       - name: "🕐 Schedule Check — Determine Active Train Cars"
         id: sched
         run: |
@@ -137,6 +80,16 @@ jobs:
           M=$(TZ='Asia/Yangon' date '+%M')
           echo "🕐 Myanmar Time: $MMT (H=$H M=$M)"
           echo "mmt=$MMT" >> $GITHUB_OUTPUT
+
+          RAW_MIN=$(( 10#$H * 60 + 10#$M ))
+          if [ $(( 10#$M % 5 )) -eq 4 ]; then
+            EFF_MIN=$(( RAW_MIN - 1 ))
+            EFF_M=$(( 10#$M - 1 ))
+            echo "⏱️ Snap 1-min runner startup delay: raw M=$M -> effective M=$EFF_M"
+          else
+            EFF_MIN=$RAW_MIN
+            EFF_M=$(( 10#$M ))
+          fi
 
           # Flags
           NEED_PYTHON=false
@@ -147,10 +100,10 @@ jobs:
           AUDITOR91=false; SHARE_ETA=false; SITE_DOWN=false; CABLE_LD=false
           BI_WO_SYNC=false; SALE_SUM=false
 
-          # check_time <hour> <target_minute> — dung sai ±2 phút (mỗi cửa sổ 5 phút chứa ĐÚNG 1 nhịp tàu 5p, chống chạy lặp 2-3 lần!)
+          # check_time <hour> <target_minute> — dung sai ±2 phút trên EFF_MIN (mỗi cửa sổ 5 phút chứa ĐÚNG 1 nhịp tàu 5p, chống chạy lặp 2-3 lần & không sót phút :11/:51!)
           check_time() {
             local TH=$1 TM=$2
-            local CURR_MIN=$(( 10#$H * 60 + 10#$M ))
+            local CURR_MIN=$EFF_MIN
             local TARG_MIN=$(( 10#$TH * 60 + 10#$TM ))
             local DIFF=$(( CURR_MIN - TARG_MIN ))
             [ $DIFF -lt 0 ] && DIFF=$(( -DIFF ))
@@ -159,10 +112,10 @@ jobs:
           }
 
 
-          # check_time_tolerance_4m <hour> <target_minute> — dung sai ±2 phút (1 cửa sổ 5 phút = đúng 1 nhịp tàu 5p duy nhất)
+          # check_time_tolerance_4m <hour> <target_minute> — dung sai ±2 phút trên EFF_MIN (1 cửa sổ 5 phút = đúng 1 nhịp tàu 5p duy nhất)
           check_time_tolerance_4m() {
             local TH=$1 TM=$2
-            local CURR_MIN=$(( 10#$H * 60 + 10#$M ))
+            local CURR_MIN=$EFF_MIN
             local TARG_MIN=$(( 10#$TH * 60 + 10#$TM ))
             local DIFF=$(( CURR_MIN - TARG_MIN ))
             [ $DIFF -lt 0 ] && DIFF=$(( -DIFF ))
@@ -170,10 +123,10 @@ jobs:
             return 1
           }
 
-          # check_time_exact <hour> <target_minute> — dung sai ±2 phút cho các mốc đơn lẻ duy nhất (kháng trùng lặp nhịp 5p)
+          # check_time_exact <hour> <target_minute> — dung sai ±2 phút trên EFF_MIN cho các mốc đơn lẻ duy nhất (kháng trùng lặp nhịp 5p)
           check_time_exact() {
             local TH=$1 TM=$2
-            local CURR_MIN=$(( 10#$H * 60 + 10#$M ))
+            local CURR_MIN=$EFF_MIN
             local TARG_MIN=$(( 10#$TH * 60 + 10#$TM ))
             local DIFF=$(( CURR_MIN - TARG_MIN ))
             [ $DIFF -lt 0 ] && DIFF=$(( -DIFF ))
@@ -244,13 +197,13 @@ jobs:
           #  22:06 -> [DISABLED] Plan 5C Evening disabled at night (already covered by 18:41 EOD & 19:11 Update)
 
           # 🚨 TOA SITE DOWN: Khởi hành tại nhịp :06 và :36 MMT mỗi giờ (hoạt động 03:30 - 22:15 MMT)
-          CURR_M=$(( 10#$M ))
+          CURR_M=$EFF_M
           DIFF_06=$(( CURR_M - 6 ))
           [ $DIFF_06 -lt 0 ] && DIFF_06=$(( -DIFF_06 ))
           DIFF_36=$(( CURR_M - 36 ))
           [ $DIFF_36 -lt 0 ] && DIFF_36=$(( -DIFF_36 ))
           if [ $DIFF_06 -le 2 ] || [ $DIFF_36 -le 2 ]; then
-            CURR_TOTAL_MIN=$(( 10#$H * 60 + 10#$M ))
+            CURR_TOTAL_MIN=$EFF_MIN
             if [ $CURR_TOTAL_MIN -ge $(( 3 * 60 + 30 )) ] && [ $CURR_TOTAL_MIN -le $(( 22 * 60 + 15 )) ]; then
               SITE_DOWN=true
               NEED_PYTHON=true
@@ -313,6 +266,54 @@ jobs:
           if [ "$NEED_PYTHON" = "false" ]; then
             echo "🏥 Keepalive-only tick, no reports to send."
           fi
+
+      # ═══════════════════════════════════════════════
+      # 🏥 TOA 0: KEEPALIVE — Sưởi ấm server (MỌI CHUYẾN)
+      # ═══════════════════════════════════════════════
+      - name: "🏥 Toa 0 — Keepalive Ping All Endpoints & Webhooks"
+        run: |
+          echo "🚂 Train tick: $(TZ='Asia/Yangon' date '+%Y-%m-%d %H:%M:%S MMT')"
+
+          echo "1️⃣ Search Bot Proxy (Vercel)..."
+          curl -s -f "https://tni-bot.vercel.app/api/search_bot" || true
+
+          echo "2️⃣ Asset Collector Proxy (Vercel)..."
+          curl -s -f "https://tni-bot.vercel.app/api/collector" || true
+
+          echo "3️⃣ Site Down Relay Proxy (Vercel)..."
+          curl -s -f "https://tni-sitedown.vercel.app/api/site_down_relay" || true
+          # 🛡️ PM-99: AW7 Summary — chỉ gọi trong khung giờ 03:30–22:30 MMT (tránh gửi tin cũ ngoài giờ)
+          HOUR_MMT=$(TZ='Asia/Yangon' date '+%H' | sed 's/^0*//')
+          HOUR_MMT=${HOUR_MMT:-0}
+          if [ "$HOUR_MMT" -ge 3 ] && [ "$HOUR_MMT" -le 22 ]; then
+            echo "3️⃣.1 Site Down AW7 Summary (Auto-check new data, in-window H=$HOUR_MMT)..."
+            curl -s -L "https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec?action=process_aw_az" || true
+          else
+            echo "3️⃣.1 Skip AW7 — ngoài khung giờ hoạt động (H=$HOUR_MMT MMT)"
+          fi
+          echo "3️⃣.2 Site Down Ensure 1-Min Train (Self-healing)..."
+          curl -s -L "https://script.google.com/macros/s/AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF-/exec?action=setup_gas_train_1min" || true
+
+          echo "4️⃣ Main GAS Backend..."
+          curl -s -L "https://script.google.com/macros/s/AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA/exec?action=ping" || true
+
+          echo "5️⃣ Auto Copy Paste GAS..."
+          curl -s -L "https://script.google.com/macros/s/AKfycbwi3J0VrrIE91mnPvIUuykPjwGvNc4y9JDxCNPvJTtOmVAvvalDXu5ZwYZmu5jW-fSo0w/exec?action=ping" || true
+
+          echo "6️⃣ Construction Bot 10 Proxy (Vercel)..."
+          curl -s -f "https://tni-bot.vercel.app/api/construction" || true
+
+          echo "7️⃣ Cable Bot 15 Proxy (Vercel)..."
+          curl -s -f "https://tni-bot.vercel.app/api/cable_bot" || true
+
+          echo "8️⃣ Attendance Bot Proxy (Vercel & GAS)..."
+          curl -s -f "https://tni-bot.vercel.app/api/attendance" || true
+          curl -s -L "https://script.google.com/macros/s/AKfycbzSz_ISXgertxBDadw4BBQX1JdMjW650_o4He0o4Lh-uf1hV5O3YaE-ohlqI2CHyAcVFg/exec?action=ping" || true
+
+          echo "9️⃣ Refuel Collector Bot Proxy (Vercel)..."
+          curl -s -f "https://tni-bot.vercel.app/api/refuel_collector" || true
+
+          echo "✅ Keepalive done (100% Zero-Secret In Public Workflow)"
 
       # ═══════════════════════════════════════════════
       # 🐍 SETUP PYTHON (chỉ khi có report cần chạy)
