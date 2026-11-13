@@ -128,10 +128,6 @@ function doPost(e) {
       }
       Logger.log("[doPost] store_site_down — " + lines.length + " dòng ghi vào Col A (Atomic Overwrite) | relay_ts=" + relayTs);
 
-      // ✅ MỞ KHÓA LUỒNG 1: Xóa chìa khóa A1 để dữ liệu Cột A vừa dán luôn được gửi Tin 1
-      props.deleteProperty(TS_KEY_A1);
-      // 🛑 TUYỆT ĐỐI KHÔNG XÓA TS_KEY_AW7: Luồng 2 (AW7 Summary) chỉ gửi khi ô AW7 thực sự có mốc giờ MỚI!
-
       if (relayTs > 0) props.setProperty("SD_LAST_RELAY_TS", relayTs.toString());
 
       SpreadsheetApp.flush();
@@ -139,6 +135,10 @@ function doPost(e) {
 
       Utilities.sleep(5000); // ⏱️ Chờ đúng 5s + flush để Google Sheets hoàn tất 100% tính toán đồng bộ công thức Cột C
       SpreadsheetApp.flush();
+
+      // ✅ MỞ KHÓA LUỒNG 1 SAU KHI SLEEP 5S: Xóa chìa khóa A1 ngay trước khi gọi processSiteDownColC
+      props.deleteProperty(TS_KEY_A1);
+      // 🛑 TUYỆT ĐỐI KHÔNG XÓA TS_KEY_AW7: Luồng 2 (AW7 Summary) chỉ gửi khi ô AW7 thực sự có mốc giờ MỚI!
 
       // ✅ THỰC THI GỬI:
       // Luồng 1 (Cột C): Dành riêng cho dữ liệu trạm sập chi tiết của đợt cào mới vừa dán vào Cột A
@@ -246,6 +246,8 @@ function doPost(e) {
 
   } catch (err) {
     return _json({ ok: false, msg: err.message });
+  } finally {
+    try { lock.releaseLock(); } catch(eLockEnd) {}
   }
 }
 
@@ -370,6 +372,12 @@ function _json(obj) {
 // MAIN TRIGGER — checkAndSend() (CHẠY 2 LUỒNG ĐỘC LẬP TÁCH BIỆT)
 // ============================================================
 function checkAndSend(isWebhookCall) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) {
+    Logger.log("[checkAndSend] ⏳ Đang có doPost / tiến trình khác giữ ScriptLock → Bỏ qua nhịp này tránh gửi đúp!");
+    return { sent_tin1: false, sent_tin2: false };
+  }
+  try {
   const now    = new Date();
   const mytime = Utilities.formatDate(now, "Asia/Rangoon", "H:mm");
   const hour   = parseInt(Utilities.formatDate(now, "Asia/Rangoon", "H"), 10);
@@ -377,14 +385,15 @@ function checkAndSend(isWebhookCall) {
 
   const props = PropertiesService.getScriptProperties();
 
-  // ── 1. Reset đệm Cột A vào 03:30 AM đầu ngày ─────────────────────────
+  // ── 1. Đầu ngày mới 03:30 AM: Sweep tin cũ — TUYỆT ĐỐI KHÔNG xóa TS_KEY_A1 / TS_KEY_AW7 ──
+  // 🛡️ PM-111 FIX: Lúc 03:30 AM, ô A1 vẫn chứa dữ liệu 22:00 tối hôm qua (vì relay chạy lúc 03:38).
+  // Nếu xóa TS_KEY_A1 tại 03:30 AM, processSiteDownColC() sẽ tưởng dữ liệu 22:00 hôm qua là mới và bắn nhầm lên Telegram!
+  // Chỉ xóa TS_KEY_A1 trong doPost(store_site_down) khi thực sự dán dữ liệu mới vào Cột A.
   const todayStr = Utilities.formatDate(now, "Asia/Rangoon", "yyyyMMdd");
   const lastDay  = props.getProperty("SD_LAST_RUN_DATE") || "";
   if (todayStr !== lastDay) {
     props.setProperty("SD_LAST_RUN_DATE", todayStr);
-    props.deleteProperty(TS_KEY_A1);
-    // 🛑 TUYỆT ĐỐI KHÔNG XÓA TS_KEY_AW7: AW7 độc lập 100%, chỉ cập nhật khi ô AW7 có mốc giờ mới!
-    Logger.log("🌅 NGÀY MỚI (" + todayStr + ") — Đã reset chìa khóa A1!");
+    Logger.log("🌅 NGÀY MỚI (" + todayStr + ") — Giữ nguyên TS_KEY_A1 & TS_KEY_AW7 (chống bắn lại tin 22:00 hôm qua)!");
     // ✅ PM-59 FIX RC-2: Sweep dọn tin cũ TẤT CẢ 5 nhóm khi ngày mới bắt đầu.
     // Tin hôm qua >48h Bot API không xóa được → phải chủ động dọn trước khi gửi tin sáng mới.
     try {
@@ -435,6 +444,9 @@ function checkAndSend(isWebhookCall) {
   }
 
   return { sent_tin1: r1, sent_tin2: r2 };
+  } finally {
+    try { lock.releaseLock(); } catch(eCheckLock) {}
+  }
 }
 
 
@@ -449,34 +461,51 @@ function processSiteDownColC(sheet, isDirectPush) {
     return false;
   }
 
+  // 🛡️ PM-111 FRESHNESS GUARD: Chặn tuyệt đối gửi dữ liệu A1 của ngày hôm qua!
+  // Dù TS_KEY_A1 bị xóa hay gọi trực tiếp, nếu ngày trên A1 ≠ hôm nay (MMT) thì BỎ QUA 100%.
+  const todayMmt = Utilities.formatDate(new Date(), "Asia/Rangoon", "dd/MM/yyyy");
+  const a1DateMatch = storeKey.match(/(\d{2}\/\d{2}\/\d{4})/);
+  if (a1DateMatch && a1DateMatch[1] !== todayMmt) {
+    Logger.log("[Luồng A1] 🚫 FRESHNESS GUARD: Dữ liệu A1 KHÔNG phải hôm nay! (" + a1DateMatch[1] + " vs hôm nay " + todayMmt + ") — Chặn tuyệt đối, KHÔNG gửi tin cũ!");
+    return false;
+  }
+
   const props   = PropertiesService.getScriptProperties();
   const lastKey = props.getProperty(TS_KEY_A1) || "";
 
-
   // 🛑 DEDUP: Nếu timestamp A1 không đổi → bỏ qua (đã gửi rồi)
-  // Logic đúng: storeKey mới ≠ lastKey → GỬI NGAY. Không cần freshness check.
   if (storeKey === lastKey && !isDirectPush) {
     Logger.log("[Luồng A1] Timestamp A1 không đổi (" + storeKey.substring(0, 30) + ") → Bỏ qua Luồng 1");
     return false;
   }
-
-  // ✅ Timestamp mới → gửi ngay lập tức (không giới hạn thời gian)
-  Logger.log("[Luồng A1] 🆕 Timestamp mới: " + storeKey + " (cũ: " + lastKey.substring(0,30) + ") → Gửi ngay!");
-
-  // ✅ v660: Lưu ngay khóa A1 — Sheet ổn định, chỉ cần so timestamp cũ/mới
-  props.setProperty(TS_KEY_A1, storeKey);
-  Logger.log("[Luồng A1] 🆕 Timestamp A1 thay đổi: " + storeKey + " (isDirectPush=" + !!isDirectPush + ") → Đang gửi Tin 1...");
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 1) return false;
 
   let colC = sheet.getRange(1, 3, lastRow, 1).getValues().flat().map(v => (v || "").toString().trim());
 
+  // 🛡️ PM-111 FORMULA SYNC GUARD: Nếu C1..C7 đang nạp IMPORTRANGE (#REF! hoặc khung mẫu rỗng "< > | | |"), chờ 3s + flush
+  const isBrokenHeader_ = (arr) => arr.slice(0, 7).some(l => /^#(REF!|N\/A|ERROR!|VALUE!)/i.test(l) || /^<\s*>\s*\|\s*\|/.test(l));
+  if (isBrokenHeader_(colC)) {
+    Logger.log("[Luồng A1] ⏳ Phát hiện C1..C7 đang nạp công thức (#REF! / < > | |) → Chờ 3s + flush...");
+    SpreadsheetApp.flush();
+    Utilities.sleep(3000);
+    colC = sheet.getRange(1, 3, lastRow, 1).getValues().flat().map(v => (v || "").toString().trim());
+    if (isBrokenHeader_(colC)) {
+      Logger.log("[Luồng A1] ⚠️ C1..C7 vẫn đang nạp IMPORTRANGE → Chưa lưu TS_KEY_A1, đợi nhịp kế tiếp!");
+      return false;
+    }
+  }
+
+  // ✅ Lưu khóa A1 sau khi đã vượt qua Freshness Guard & Formula Sync Guard
+  props.setProperty(TS_KEY_A1, storeKey);
+  Logger.log("[Luồng A1] 🆕 Timestamp A1 mới hợp lệ: " + storeKey + " (cũ: " + lastKey.substring(0, 30) + ", isDirectPush=" + !!isDirectPush + ") → Đang gửi Tin 1...");
+
   // ✅ Header chuẩn: C1 và C2
   const header = [colC[0] || "", colC[1] || ""].filter(l => l.length > 0);
   
-  // ✅ Danh sách trạm: Từ C10 trở đi
-  const rawSites = colC.slice(9).filter(l => l.length > 0 && l !== "..." && !/^Team\s*0?[1-4]/i.test(l));
+  // ✅ Danh sách trạm: Quét từ dòng 8 trở đi, lọc dòng có "|" và mã trạm TNIxxxx
+  const rawSites = colC.slice(7).filter(l => l.length > 0 && l !== "..." && l.indexOf("|") !== -1 && /TNI\d{4}/i.test(l) && !/^Team\s*0?[1-4]/i.test(l));
 
   const teamDefs = [
     { key: "T1", label: "🟠 Team 1" },
@@ -501,11 +530,22 @@ function processSiteDownColC(sheet, isDirectPush) {
     }
   }
 
+  // ✅ PM-106 + PM-111: Quét động Header Team 1..4 trong 12 dòng đầu Cột C (có fallback vị trí cố định)
+  const findTeamHeader_ = (tn, fallbackIdx, defaultLbl) => {
+    const reg = new RegExp("^(?:[🔴🔵🟢🟡🟠🟣⚪⚫]\\s*)?Team\\s*0?" + tn + "\\b", "i");
+    for (let idx = 0; idx < Math.min(12, colC.length); idx++) {
+      if (reg.test(colC[idx])) return colC[idx];
+    }
+    const fb = colC[fallbackIdx] || "";
+    if (fb && !/^<\s*>\s*\|/.test(fb) && !/^Team\s*0?[1-4]\b/i.test(fb)) return fb;
+    return defaultLbl;
+  };
+
   const teamHeaderMap = {
-    T1: colC[3] || "🟠 Team 1",
-    T2: colC[4] || "🔵 Team 2",
-    T3: colC[5] || "🟢 Team 3",
-    T4: colC[6] || "🟡 Team 4",
+    T1: findTeamHeader_(1, 3, "🟠 Team 1"),
+    T2: findTeamHeader_(2, 4, "🔵 Team 2"),
+    T3: findTeamHeader_(3, 5, "🟢 Team 3"),
+    T4: findTeamHeader_(4, 6, "🟡 Team 4"),
   };
 
   // ⚡ PM-100-v2: Trigger Bot 2D ETA TRƯỚC khi gửi Tin 1 (5T)
@@ -633,8 +673,13 @@ function processSummaryAwAz(sheet, isDirectPush) {
       return false;
     }
 
-    // ✅ Đọc trực tiếp bảng AW:AZ và kiểm tra signature trạm
+    // ✅ Đọc trực tiếp bảng AW:AZ và kiểm tra #REF! khi IMPORTRANGE đang tải lại
     let awaz = readAwAz(sheet);
+    const hasRefErr_ = (grid) => grid.some(row => row.some(cell => /^#(REF!|LOADING|ERROR!)/i.test(String(cell || "").trim())));
+    if (/^#(REF!|LOADING|ERROR!)/i.test(rawTs) || hasRefErr_(awaz)) {
+      Logger.log("[Luồng AW7] ⏳ Phát hiện AW7:AZ18 đang nạp IMPORTRANGE (#REF!) → Bỏ qua tạm thời, đợi nhịp 1 phút kế tiếp!");
+      return false;
+    }
 
     // 🛑 DEDUP ĐƠN GIẢN — RULE PM-102 (19/10/2026):
     // Chỉ dùng tsKey (mốc giờ AW7) làm chìa khóa dedup.
@@ -660,24 +705,11 @@ function processSummaryAwAz(sheet, isDirectPush) {
     props.setProperty(TS_KEY_AW7, sigKey);
     Logger.log("[Luồng AW7] ✅ Đã lưu TS_KEY_AW7: " + sigKey);
 
-    const teams = ["T1", "T2", "T3", "T4"];
     let sentCount = 0;
 
-    // Gửi sang 4 nhóm Team (Gửi nguyên vẹn 100% nội dung ô kèm Icon)
-    for (const team of teams) {
-      try {
-        const chatId = SD_GROUPS[team];
-        if (!chatId) continue;
-        const colIdx = AWAZ_COL[team];
-        if (colIdx === undefined) continue;
-        const msg = buildAwAzTeamMessage(team, tsKey, awaz, colIdx);
-        if (!msg) continue;
-        sendOrEditTelegram(chatId, msg, "TIN2_" + team, "[Tin2][" + team + "]");
-        sentCount++;
-      } catch (err) {
-        Logger.log("[Luồng AW7][" + team + "] ❌ " + err.message);
-      }
-    }
+    // 🛑 [VIBER MIGRATION] Đã chuyển gửi bản tin SUMMARY Team 1..4 (TIN2_T1..T4) sang 5 nhóm Team Viber trực tiếp trên máy local.
+    // Tắt phần gửi TIN2_T1..T4 vào các nhóm Telegram TNI TEAM 1..4 PLAN - ALARM.
+    Logger.log("[Luồng AW7] ℹ️ Đã tắt gửi TIN2_T1..T4 sang Telegram Team 1..4 (đã chuyển sang Viber local).");
 
     // Gửi nhóm CONTROL (Tổng hợp cả 4 Team nguyên vẹn 100%)
     const controlId = SD_GROUPS["CONTROL"];
@@ -686,6 +718,7 @@ function processSummaryAwAz(sheet, isDirectPush) {
         const msg = buildAwAzControlMessage(tsKey, awaz);
         if (msg) {
           sendOrEditTelegram(controlId, msg, "TIN2_CONTROL", "[Tin2][CONTROL]");
+          sentCount++;
         }
       } catch(e) {
         Logger.log("[Luồng AW7][CONTROL] ❌ " + e.message);
@@ -697,6 +730,7 @@ function processSummaryAwAz(sheet, isDirectPush) {
         const sdOnlyMsg = buildSiteDownOnlyControlMessage(tsKey, awaz, sheet);
         if (sdOnlyMsg) {
           sendOrEditTelegram(controlId, sdOnlyMsg, "TIN2_CONTROL_SD_ONLY", "[Tin2][CONTROL_SD_ONLY]");
+          sentCount++;
         }
       } catch(eSd) {
         Logger.log("[Luồng AW7][CONTROL_SD_ONLY] ❌ " + eSd.message);
@@ -1333,12 +1367,13 @@ function addKeywordIcons(text) {
 
   s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(DG Run>16H:)\s*([^\n\|]*)/gi, function(match, keyword, dataStr) {
      let c = dataStr.replace(/[*_]/g, "").trim();
-     let icon = (c && c !== "0" && c !== "-" && c.toLowerCase() !== "none") ? "❌" : "✅";
+     let isZero = !c || c === "0" || c === "-" || c.toLowerCase() === "none" || /^\/?0(\s*=?\s*\/?)*$/.test(c);
+     let icon = isZero ? "✅" : "❌";
      return "\n" + icon + " " + keyword + " " + dataStr;
   });
 
   // DG.Low Oil Pressure, Battery Temperature High, Smoke, DOOR — xuống hàng + icon riêng
-  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(DG\.?Low Oil Pressure:)/gi, "\n🟣 DG.Low Oil Pressure:");
+  s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(DG\.?Low Oil Pressure:)\s*([^\n\|]*)\s*(?:\|\s*)?/gi, "\n🟣 $1 $2");
   s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(Battery Temperature High:)/gi, "\n🌡️ Battery Temperature High:");
   s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(Smoke:)/gi, "\n💨 Smoke:");
   s = s.replace(/(?:(?:^|\n|\s*)>|\|)\s*(DOOR:)/gi, "\n🚪 DOOR:");
