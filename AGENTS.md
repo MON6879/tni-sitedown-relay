@@ -3292,9 +3292,10 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 > - **2. Cập Nhật Ghế Giám Sát AUDITOR-1.2 Trong `system_auditor.py`**:
 >   - Đã bỏ `Operation Progress Report (11:46 & 17:21)` khỏi danh sách `SCHEDULE_RULES` của Telethon để tránh cảnh báo sai thiếu tin trên nhóm Telegram `CONTROL`.
 >   - Trong `audit_team_progress_report_sync()`, khi nhận `data.get("disabled") == True`, lập tức trả về `status: PASS`, nhãn `OK (VIBER)` với chi tiết `"Telegram TPR đã tắt — chuyển sang gửi Viber trực tiếp trên máy 2"`, tuyệt đối không kích hoạt Auto-Heal gửi bù Telegram.
-> - **3. Lưu Ý Hạn Ngạch 200 Version của Google Apps Script**:
->   - Script ID `1rvgWwrAMDbqtmqwOfqzguXB7m9snA5UZeOs9iGu64VJbejlNAkH2m6uR` đã chạm mốc kịch trần 200 phiên bản của Google (`limit of 200 versions`).
->   - Toàn bộ mã nguồn mới đã được đẩy lên Google (`clasp push --force`). Để deploy phiên bản mới vào Deployment ID `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA`, người dùng chỉ cần vào giao diện web Apps Script (tab Project History / Lịch sử dự án) bấm xóa bớt các phiên bản cũ không dùng (Bulk delete), sau đó chạy lệnh deploy.
+> - **3. Phiên Bản Triển Khai Production**:
+>   - Đã giải phóng hạn ngạch 200 versions của Google Apps Script bằng cách xóa các version cũ không dùng.
+>   - Đã triển khai thành công mã nguồn mới lên Deployment ID `AKfycbz-NZlBk8q2jWb7no6P6zWyD7a_9D3eqpZmPNqniSXJdwkfBPJMJZQ0Babbx2nX_pLEGA` tại phiên bản **`@547`**.
+>   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
 ---
