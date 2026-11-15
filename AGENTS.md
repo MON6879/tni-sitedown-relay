@@ -3298,6 +3298,14 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-116 (15/11/2026) — Tắt Hoàn Toàn Bản Tin `5. Report — Daily Plan & Results` (EOD 18:41 & Update 19:11 MMT), Chỉ Giữ Lại Bản Tin `5.1 Report — Plan` (Morning)**:
+> - **1. Bối cảnh & Yêu cầu**: Bản tin `5. Report [Updated/EOD] — Daily Plan & Results` gửi hàng đêm vào 18:41 và 19:11 MMT đã không còn cần thiết. Hệ thống chỉ giữ lại bản tin `5.1 Report — Plan` buổi sáng (06:06, 08:28, 09:56, 15:26 MMT).
+> - **2. Các Thay Đổi Áp Dụng (Zero Impact Policy)**:
+>   - `train_5min.yml` (**Toa 3** & **Toa 4**): Vô hiệu hóa cờ kích hoạt `P5A` và `P5B` trong khối lịch và thêm `if: false` vào bước GitHub Actions. Script `daily_plan_report.py --mode eod` và `--mode update` sẽ KHÔNG bao giờ chạy tự động.
+>   - `system_auditor.py`: Đã comment out 2 mục `Report 5A (Plan EOD)` và `Report 5B (Plan Update)` khỏi `SCHEDULE_RULES`. Auditor sẽ không cảnh báo thiếu tin 18:41 và 19:11 nữa. Đồng thời bỏ `superseded_by_times` cho `Report 5C` vì không còn bị "thay thế" bởi EOD/Update.
+>   - **Giữ nguyên 100%**: Toa 5 (`--mode morning`, Report 5.1) và toàn bộ Toa còn lại trong Đoàn Tàu.
+
+
 ---
 
 ## 🌐 STRICT RULE: KHÓA THÉP ĐỒNG BỘ 3 NGÔN NGỮ ĐỐI XỨNG 2 CHIỀU (`VI ⇄ EN ⇄ MM`) & BẢNG TÍNH KÝ GỞI TRỰC TIẾP TRÊN WEB BI SALE (PM 2026-11-07 — 100 NHÂN SỰ RÀ SOÁT & 10 CHUYÊN GIA LẬP RULE)
