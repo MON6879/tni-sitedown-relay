@@ -3298,6 +3298,12 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-117 (15/11/2026) — Thêm Lịch 19:11 MMT Vào Bản Tin `5.1 Report — Plan` (Morning Mode)**:
+> - **Yêu cầu**: Bản tin `5.1 Report — Plan` (`--mode morning`, P5C) chạy thêm vào lúc **19:11 MMT (19:41 VN)** ngoài 4 lịch buổi sáng hiện có (06:06, 08:28, 09:56, 15:26 MMT).
+> - **Thay đổi**: `train_5min.yml` — Thêm `check_time 19 11 && P5C=true` vào khối lịch. Giờ cũ 19:11 của P5B (đã hủy PM-116) được tái dụng cho P5C. Toa 5 (`--mode morning`) đã có `if: steps.sched.outputs.p5c == 'true'` nên sẽ tự kích hoạt đúng.
+> - **Lịch 5.1 mới (5 lần/ngày MMT)**: 06:06 | 08:28 | 09:56 | 15:26 | **19:11**
+> - **Không thay đổi**: Toa 3 (P5A/EOD) và Toa 4 (P5B/Update) vẫn `if: false` theo PM-116.
+
 > **PM-116 (15/11/2026) — Tắt Hoàn Toàn Bản Tin `5. Report — Daily Plan & Results` (EOD 18:41 & Update 19:11 MMT), Chỉ Giữ Lại Bản Tin `5.1 Report — Plan` (Morning)**:
 > - **1. Bối cảnh & Yêu cầu**: Bản tin `5. Report [Updated/EOD] — Daily Plan & Results` gửi hàng đêm vào 18:41 và 19:11 MMT đã không còn cần thiết. Hệ thống chỉ giữ lại bản tin `5.1 Report — Plan` buổi sáng (06:06, 08:28, 09:56, 15:26 MMT).
 > - **2. Các Thay Đổi Áp Dụng (Zero Impact Policy)**:
