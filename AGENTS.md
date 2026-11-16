@@ -3298,6 +3298,19 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-118 (16/11/2026) — Chuyển Web `TNI Refuel BI` Sang Static HTML Vercel (`/refuel`) Giống Cấu Trúc `TNI Car BI` (`/car`), Sửa Drop TNI / Tự Điền / Phân Tách Staff vs Đối Tác / Camera Trực Tiếp**:
+> - **Root Causes (5 lỗi gốc)**:
+>   1. `bi_refuel/appsscript.json` đặt `"access": "ANYONE"` thay vì `"ANYONE_ANONYMOUS"` → mọi `fetch()` từ HTML bị redirect sang `accounts.google.com` → `SITE_DB` rỗng `[]`, không xổ danh sách `TNI...` và không tự điền `DG Type`, `Power Mode`, `Team`, `Following`.
+>   2. Ô `2. DG ID` chỉ mở dropdown khi đã gõ chữ (`if (!q) close`), chưa có nút `▼` bấm thả toàn bộ danh sách trạm `Site Database` ngay lập tức.
+>   3. Trang cũ chạy trực tiếp trên `script.google.com/macros/` (bị sandbox iframe chặn `getUserMedia` → màn hình camera đen kịt `"Camera not ready"` & hiện thanh cảnh báo GAS).
+>   4. Mục `0. Người Báo Cáo` chỉ có dropdown Staff của Car BI, chưa tách rõ `👷 Nhân viên TNI (Staff)` và `🤝 Đối tác (Partner)` kèm tự đối chiếu Gmail từ 2 tab `List Gmail Staff` + `List Gmail partner` mà không khóa đăng nhập.
+>   5. `Code.gs` ghép `dateStr + 'T00:00:00'` trên chuỗi `"YYYY-MM-DDTHH:MM"` gây lỗi `Invalid Date` (`NaN-NaN-NaN`) và thiếu cột 30 (`19 Make video lock all DG`); đồng thời `Actual Filled` phải ưu tiên `(After cm − Before cm) × CM/L` theo `Template Refuel`.
+> - **Giải Pháp Áp Dụng (Vercel Static Web + Direct Sheet GViz Read + Anonymous GAS Write)**:
+>   - **Trang chính thức**: `Task and WO/refuel.html` phục vụ tại `https://tni-bot.vercel.app/refuel` (cùng cấu trúc `vercel.json` với `/car`, đặt `Permissions-Policy: camera=(self), geolocation=(self), microphone=(self)`), đồng bộ `tni-search/refuel.html` & `bi_refuel/index.html`, liên kết trực tiếp với `/car` (`TNI Car BI`) và `/` (`BI Hub`).
+>   - **Backend đọc nhanh (`Task and WO/api/refuel_web.py`)**: Đọc `Site Database` (170 trạm), `List Gmail Staff` (39), `List Gmail partner` (3) & lịch sử `Refuel Database` trực tiếp qua Google Sheets GViz (`0%` phụ thuộc GAS khi đọc; dữ liệu 170 trạm nhúng sẵn trong `refuel.html` cho tốc độ `0ms`). Proxy CORS-free chỉ cho tác vụ ghi Drive/Sheet (`saveRefuelData`, `uploadPhotoToDrive`, `uploadVideoToDrive`, `createVideoUploadSession`).
+>   - **GAS API (`bi_refuel`)**: Chuyển `"access": "ANYONE_ANONYMOUS"`, sửa `parseRefuelDate_()`, đủ 30 cột (`1..19`), chuyển hướng URL cũ `script.google.com` về `https://tni-bot.vercel.app/refuel` (deploy `@20`).
+>   - **Camera trực tiếp & Không Login**: Không gắn `bi_security_sentinel.js`; Staff/Đối tác chọn vai trò riêng, tự nhập Gmail; Camera WebRTC kiểm tra `videoWidth > 0` trước khi mở modal, đóng dấu 3 dòng (`DG ID + GPS + DD/MM/YYYY HH:MM:SS`) lên cả ảnh chụp và khung hình video (`canvas.captureStream`), nút rõ ràng `🔄 Đổi Cam`, `✕ Đóng`, Zoom `1x/2x/3x` & `📱 Cam hệ thống` dự phòng (loại bỏ nút `📂 File` gallery).
+
 > **PM-117 (15/11/2026) — Thêm Lịch 19:11 MMT Vào Bản Tin `5.1 Report — Plan` (Morning Mode)**:
 > - **Yêu cầu**: Bản tin `5.1 Report — Plan` (`--mode morning`, P5C) chạy thêm vào lúc **19:11 MMT (19:41 VN)** ngoài 4 lịch buổi sáng hiện có (06:06, 08:28, 09:56, 15:26 MMT).
 > - **Thay đổi**: `train_5min.yml` — Thêm `check_time 19 11 && P5C=true` vào khối lịch. Giờ cũ 19:11 của P5B (đã hủy PM-116) được tái dụng cho P5C. Toa 5 (`--mode morning`) đã có `if: steps.sched.outputs.p5c == 'true'` nên sẽ tự kích hoạt đúng.
