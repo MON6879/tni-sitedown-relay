@@ -3298,6 +3298,13 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-121 (16/11/2026) — Gỡ Hộp Nhập `18. Google Drive Link` Trùng Lặp Giữa Form, Đặt Cụm 3 Nút Chuẩn Độc Lập Ngay Dưới `DG #1` & `DG #2`**:
+> - **Gỡ bỏ hộp `.drive-share-box` thừa khỏi Section 5 (DG #1 & DG #2)** và bỏ thanh sticky dưới đáy màn hình `#reportActionBar` để phần trên form thuần túy làm nhiệm vụ thu thập số liệu/ảnh/video.
+> - **Đưa đúng cụm Link Google Drive + 3 nút hành động theo thứ tự chuẩn** ngay bên dưới **Refuel DG #1** (trước nút `➕ Thêm Máy Phát DG #2`) và **thêm cụm y hệt ngay bên dưới Refuel DG #2**:
+>   - Dải link Google Drive tự động (`#driveStrip1` / `#driveStrip2` — bấm mở thẳng thư mục ảnh & video hoặc copy link).
+>   - Thứ tự 3 nút: **① `☁️ Lưu DG #n` (`saveSingleDG(n)`) → ② `📋 Copy Text` (`copyViberDG(n)`) → ③ `📤 Share Photo & Video → Viber` (`shareMediaToViber(n)`)**.
+>   - Modal sau khi Lưu giữ nguyên tùy chọn đóng tiếp tục để làm DG #2 (`closeSuccessModal`) hoặc tạo phiếu mới cho trạm khác (`newReportReset`). `verify_refuel.py`: `111 i18n keys x 3 languages`.
+>
 > **PM-120 (16/11/2026) — Đủ Toàn Bộ Nút Chụp Hình / Quay Video Từng Mục Theo Đúng Cột `E` (`Template Refuel`) & Đặt Tên Thư Mục Drive `DD-MM-YYYY_HH-mm_SiteID`**:
 > - **Đủ 13 nút chụp ảnh trực tiếp + 3 nút quay video cho DG #1 (và đủ cặp tương ứng cho DG #2 = 31 nút capture)** khớp 100% từng dòng yêu cầu trong Cột `E` tab `Template Refuel`:
 >   - `5` (`gov1/2`: Government Price ★), `6` (`price1/2`: Partner Price / Bill ★), `6.1` (`qual1/2`: Quality Premium — bắt buộc khi có nhập > 0), `9` (`runhr1/2`: DG Running Hour ★), `9.1` (`kwh1/2`: DG KWH Hour ★), `13.1` (`blv1/2`: Before Fuel Level % ★), `13.2` (`bcsu1/2`: Before CSU Reading ★), `13.3` (`bcsukwh1/2`: CSU KWH ★), `13.4` (`bvid1/2`: Video Before check cm), `13.5` (`before1/2`: Before Fuel check cm ★), `14.1` (`alv1/2`: After Fuel Level % ★), `14.2` (`acsu1/2`: After CSU Reading ★), `14.3` (`avid1/2`: Video After check cm), `14.4` (`after1/2`: After Fuel check cm ★), `14.5` (`alcm1/2`: After Fuel L/cm ★), và `19` (`ovid1`: Video khóa cửa & toàn cảnh DG ★).
