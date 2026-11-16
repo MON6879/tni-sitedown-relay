@@ -3298,6 +3298,15 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-119 (16/11/2026) — Cô Lập Header `TNI Refuel BI`, Đưa Nút `⛽ Refuel BI` Lên `BI Hub` & Bổ Sung Link Google Drive + Share Tất Cả Ảnh/Video Qua Viber (`Mục 18`)**:
+> - **Cô lập giao diện giữa Refuel BI và BI Hub**:
+>   - Loại bỏ khối liên kết `🚗 Car BI` / `🏛️ BI Hub` khỏi `<header>` của `TNI Refuel BI` (`refuel.html`, giữ nguyên tắc `Isolation: BI Refuel shows no links to other BI apps`).
+>   - Thêm nút `<a href="/refuel">⛽ Refuel BI</a>` vào `.bi-3hub-switcher` trên `BI Hub` (`index.html` và `executive_dashboard.html` đồng bộ cả `Task and WO` lẫn `tni-search`).
+> - **Mục `18. Link Google Drive (Tất cả Ảnh & Video — Share Viber)` + Nút Share Viber Mọi Điểm Chạm**:
+>   - `bi_refuel/Code.gs` (`@21`): Bổ sung `action=getOrCreateFolder` (`doGet`/`doPost`); tự động bật quyền `subFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)` cho thư mục `[DG_ID]_[DD-MM-YYYY]`; `saveRefuelData()` luôn tự điền và trả về `photoFolderUrl` (cột 18/AC).
+>   - `refuel.html`: Tự động lấy trước link Google Drive ngay khi chọn trạm hoặc ngay sau mỗi lần tải ảnh/video; hiển thị trực tiếp **Mục 18** trên form (lẫn DG #2), trong **Success Modal** sau khi lưu Sheet, và trong **Tab `📋 Lịch Sử / Audit`** (tải trọn dải `A:AD`).
+>   - `📋 Copy Viber` (`buildViberText`) đính kèm luôn dòng `18. Photo & Video (Google Drive): <folderUrl>`; nút `📤 Gửi Ảnh & Video Viber` ưu tiên gọi `navigator.share({ files })` để gửi thẳng toàn bộ ảnh + video vào bất kỳ nhóm/người Viber nào trên điện thoại (tự fallback copy text + link Drive và mở `viber://forward?text=...` + nút `📁 Mở Link Drive`). Toàn bộ nhãn/nút mới đủ 3 ngôn ngữ (`VN / EN / MM`, `verify_refuel.py`: `110 i18n keys x 3 languages`).
+>
 > **PM-118 (16/11/2026) — Chuyển Web `TNI Refuel BI` Sang Static HTML Vercel (`/refuel`) Giống Cấu Trúc `TNI Car BI` (`/car`), Sửa Drop TNI / Tự Điền / Phân Tách Staff vs Đối Tác / Camera Trực Tiếp**:
 > - **Root Causes (5 lỗi gốc)**:
 >   1. `bi_refuel/appsscript.json` đặt `"access": "ANYONE"` thay vì `"ANYONE_ANONYMOUS"` → mọi `fetch()` từ HTML bị redirect sang `accounts.google.com` → `SITE_DB` rỗng `[]`, không xổ danh sách `TNI...` và không tự điền `DG Type`, `Power Mode`, `Team`, `Following`.
