@@ -3298,6 +3298,13 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-120 (16/11/2026) — Đủ Toàn Bộ Nút Chụp Hình / Quay Video Từng Mục Theo Đúng Cột `E` (`Template Refuel`) & Đặt Tên Thư Mục Drive `DD-MM-YYYY_HH-mm_SiteID`**:
+> - **Đủ 13 nút chụp ảnh trực tiếp + 3 nút quay video cho DG #1 (và đủ cặp tương ứng cho DG #2 = 31 nút capture)** khớp 100% từng dòng yêu cầu trong Cột `E` tab `Template Refuel`:
+>   - `5` (`gov1/2`: Government Price ★), `6` (`price1/2`: Partner Price / Bill ★), `6.1` (`qual1/2`: Quality Premium — bắt buộc khi có nhập > 0), `9` (`runhr1/2`: DG Running Hour ★), `9.1` (`kwh1/2`: DG KWH Hour ★), `13.1` (`blv1/2`: Before Fuel Level % ★), `13.2` (`bcsu1/2`: Before CSU Reading ★), `13.3` (`bcsukwh1/2`: CSU KWH ★), `13.4` (`bvid1/2`: Video Before check cm), `13.5` (`before1/2`: Before Fuel check cm ★), `14.1` (`alv1/2`: After Fuel Level % ★), `14.2` (`acsu1/2`: After CSU Reading ★), `14.3` (`avid1/2`: Video After check cm), `14.4` (`after1/2`: After Fuel check cm ★), `14.5` (`alcm1/2`: After Fuel L/cm ★), và `19` (`ovid1`: Video khóa cửa & toàn cảnh DG ★).
+>   - Mọi ảnh/video đều chụp/quay trực tiếp (không thêm ảnh từ thư viện), đóng dấu 3 dòng (`DG ID + Lat/Long + Date/Time`), đặt tên file gắn rõ số mục (`5_GovPrice_...` → `19_LockOverviewDG_...`) và đủ 3 ngôn ngữ (`115 i18n keys x 3 languages`).
+> - **Tên thư mục Google Drive chuẩn Ngày giờ + Site ID (`Code.gs` `@22`)**:
+>   - Đồng bộ `folderTimeTag` (`visitTimeTag` lưu cùng Draft) + `LockService.getScriptLock()` trong `getOrCreateSubFolder()` tạo đúng 1 thư mục duy nhất dạng `DD-MM-YYYY_HH-mm_<DG_ID>` (mở quyền `ANYONE_WITH_LINK` View để share qua Viber).
+>
 > **PM-119 (16/11/2026) — Cô Lập Header `TNI Refuel BI`, Đưa Nút `⛽ Refuel BI` Lên `BI Hub` & Bổ Sung Link Google Drive + Share Tất Cả Ảnh/Video Qua Viber (`Mục 18`)**:
 > - **Cô lập giao diện giữa Refuel BI và BI Hub**:
 >   - Loại bỏ khối liên kết `🚗 Car BI` / `🏛️ BI Hub` khỏi `<header>` của `TNI Refuel BI` (`refuel.html`, giữ nguyên tắc `Isolation: BI Refuel shows no links to other BI apps`).
