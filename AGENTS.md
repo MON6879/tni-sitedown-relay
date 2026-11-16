@@ -3298,6 +3298,13 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-122 (16/11/2026) — Sửa Công Thức Mục `7` (`After % − Before %`) & Làm Rõ Mục `19. Make video lock all DG` Cả DG #1, DG #2, Viber & Audit**:
+> - **Mục `7. How many %` (`calcPct(n)` & `collectPayload(n)`)**: Chuyển từ công thức chênh giá sang **đúng công thức `After Fuel Level % − Before Fuel Level %`** (`aFuelLv - bFuelLv`), gắn `oninput="calcFilled(n);calcPct(n)"` lên các ô `13.1` (`bFuelLv1/2`) và `14.1` (`aFuelLv1/2`), cập nhật nhãn `lblPctInc` cả 3 ngôn ngữ (`VN / EN / MM`).
+> - **Mục `19. Make video lock all DG`**:
+>   - Hiển thị trực tiếp dòng chữ **`19. Make video lock all DG ★`** trên cả tiêu đề lẫn nút quay (`btn-ovid1` ở DG #1 & bổ sung `btn-ovid2` ngay dưới Note của DG #2) trong cả 3 ngôn ngữ (`VN / EN / MM`).
+>   - `uploadVideoNow()` trích xuất `fileUrl` từng video (`https://drive.google.com/file/d/<id>/view`) cho các cột `13.4`, `14.3` & `19` (`overviewVideoUrl`), giữ `folderUrl` cho cột `18` (`photoFolderUrl`).
+>   - `buildViberText()` & `renderAudit()` đính kèm đầy đủ dòng `19. Make video lock all DG: ...`.
+>
 > **PM-121 (16/11/2026) — Gỡ Hộp Nhập `18. Google Drive Link` Trùng Lặp Giữa Form, Đặt Cụm 3 Nút Chuẩn Độc Lập Ngay Dưới `DG #1` & `DG #2`**:
 > - **Gỡ bỏ hộp `.drive-share-box` thừa khỏi Section 5 (DG #1 & DG #2)** và bỏ thanh sticky dưới đáy màn hình `#reportActionBar` để phần trên form thuần túy làm nhiệm vụ thu thập số liệu/ảnh/video.
 > - **Đưa đúng cụm Link Google Drive + 3 nút hành động theo thứ tự chuẩn** ngay bên dưới **Refuel DG #1** (trước nút `➕ Thêm Máy Phát DG #2`) và **thêm cụm y hệt ngay bên dưới Refuel DG #2**:
