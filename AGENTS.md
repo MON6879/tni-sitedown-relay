@@ -3298,6 +3298,18 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-124 (17/11/2026) — Bổ Sung Tab `📊 Tổng Hợp` (Chọn Tháng • Theo Ngày Mới→Cũ • Đang Bắt Đầu Refuel Đưa Lên Trên → Đã Hoàn Thành Bên Dưới) & Theo Dõi Tiến Độ Trực Tiếp (`Refuel Progress`)**:
+> - **Backend `bi_refuel/Code.gs` `@24`**:
+>   - Tự động tạo & quản lý sheet `Refuel Progress` (`getOrCreateProgressSheet_`, `LockService.getScriptLock()`, force format `@` chống Google Sheets tự đổi định dạng ngày).
+>   - Thêm `action=updateRefuelProgress` (`IN_PROGRESS` / `COMPLETED` / `CANCELLED`), `action=getRefuelSummary` (trả về đồng thời `progress` + `completed` từ `getDisplayValues()` giữ nguyên định dạng `%` và `dd/MM/yyyy HH:mm:ss`).
+>   - `saveRefuelData()` tự động gọi `markRefuelCompletedFromSave_()` chuyển phiên `IN_PROGRESS` tương ứng thành `COMPLETED` ngay khi nhân viên bấm `Lưu DG #n`.
+> - **Frontend `Task and WO/refuel.html`**:
+>   - Thanh trạng thái `🟡 Báo Bắt Đầu` (`dgStartBtn1/2`) + hủy (`dgCancelBtn1/2`) ngay trên tiêu đề bảng `DG #1` & `DG #2`, tự động đẩy trạng thái `IN_PROGRESS` lên `Refuel Progress` khi nhân viên chọn trạm / chụp ảnh-video đầu tiên.
+>   - Tab thứ 3 **`📊 Tổng Hợp` (`#summaryPage`)**:
+>     - Bộ lọc **Chọn tháng (`#sumMonthSelect`)** mới nhất lên trên + lọc Team + tìm kiếm + 4 KPI tháng (`Đang bắt đầu | Đã hoàn thành | Tổng | Tổng Lít`).
+>     - Bảng **Thống Kê Theo Ngày (`#sumDailyBody`)** sắp xếp **từ mới nhất đến cũ nhất** trong tháng đã chọn (`Đang làm | Đã xong | ∑ Tổng | ⛽ Lít`), bấm 1 ngày để lọc nhanh danh sách bên dưới.
+>     - Danh sách trạm tách rõ **Khối 1 trên cùng (`#sumActiveList`) — `🟡 ĐANG BẮT ĐẦU REFUEL`**, bên dưới là **Khối 2 (`#sumDoneBody`) — `🟢 ĐÃ HOÀN THÀNH`** kèm nút `🔍 Soi` nhảy thẳng sang Inspector của Tab Phúc Tra. Hoàn toàn Read-Only (0 nút camera trong Tab Tổng Hợp & Tab Phúc Tra).
+>
 > **PM-123 (17/11/2026) — Chuyển Refuel BI Sang Dạng Bảng `Template Refuel` (Cố Định Cột A+B = `25vw`, Cột C Nội Dung, Cột D Thêm/Sửa/Xóa Hình/Video) & Tab Phúc Tra Chỉ Xem Ảnh + Tô Màu Cảnh Báo**:
 > - **Bảng `Template Refuel` gọn chuẩn `BI Asset` (`Task and WO/refuel.html`, `scratch/build_refuel_html.py`)**:
 >   - Giao diện sáng kiểu Google Sheet 4 cột: **Cột A (STT `1..19`) + Cột B (Hạng mục)** cố định bên trái bằng `position: sticky` trên bảng `border-collapse: separate` chiếm chính xác **`1/4` chiều rộng màn hình điện thoại (`25vw`)** (`--col-a-w: 36px`, `--col-b-w: calc(25vw - 36px)`), **Cột C** nhập/tự tính nội dung, **Cột D** chụp ảnh/quay video trực tiếp từ camera (chống gian lận gallery upload, giữ nguyên watermark 3 dòng `DG ID + GPS + Date/Time`).
