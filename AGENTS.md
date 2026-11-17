@@ -3298,6 +3298,19 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-134 (17/11/2026) — Gia Cố An Ninh Mạng & Chống Gian Lận `BI Refuel` + Khóa Live Sheet SSOT & Chống XSS `BI Car` (`bi_refuel/Code.gs @28`, `apps_script_ups_solar @59`, `Task and WO/refuel.html`, `car.html`, `bi_security_sentinel.js`, `vercel.json`)**:
+> - **1. Gia cố an ninh `BI Refuel` (`bi_refuel/Code.gs @28` & `Task and WO/refuel.html`)**:
+>   - Chống Formula Injection (`=`, `+`, `-`, `@`, Tab, CR): thêm `sanitizeSheetCell_()` / `sanitizeSheetRow_()` khi ghi `Refuel Database` và `Fuel Plan`; kiểm tra URL `https://` (`isSafeHttpUrl_()` & `safeHref()` trên UI).
+>   - Idempotency & chống ghi trùng: thêm `reportUuid` + `LockService` + `CacheService` (`180s`) và kiểm tra trùng dòng cuối trong `saveRefuelData()`; reset `activeReportUuids` khi làm mới/xóa trạm.
+>   - Bảo vệ PII & phân quyền Server-side: `stripRosterPii_()` loại bỏ toàn bộ email/empId/danh sách `permits` khỏi `getLiveBootstrap`, `getRefuelSummary`, `getFuelPlanData`; `resolveEmailServerSide_()` tự điền Gmail đúng của dòng đã nộp ở Backend; `getRefuelHistory()` & `listFolderMedia()` yêu cầu `actorEmail` hợp lệ và kiểm tra quyền Team/Folder trên `Refuel Database`; xóa toàn bộ `DEFAULT_STAFF_ROSTER`/`INITIAL_BOOTSTRAP` email và lời gọi `fetchSheetGviz` phía trình duyệt.
+>   - Audit Trail & chống gian lận số liệu: `deleteRefuelRecord()` lưu bản sao dòng bị xóa + người xóa sang tab `Deleted Audit Log` trước khi trash Drive/xóa dòng; `evaluateAuditAlerts()` + `attachMonotonicAuditAlerts()` bổ sung cảnh báo tụt đồng hồ `DG Run Hour`/`KWH` giữa các kỳ (`alMeterDrop`) và lệch thể tích CSU vs thước đo que (`alCsuMismatch`).
+> - **2. Chuẩn hóa Live Sheet SSOT & chống XSS `BI Car` (`apps_script_ups_solar @59`, `car.html`, `bi_security_sentinel.js`)**:
+>   - `getAssetStaffRoster_()` đọc trực tiếp tab `Staff` (`ASSET_COLLECT_SS_ID`) làm SSOT (chỉ fallback `ASSET_DEFAULT_STAFF_ROSTER_` khi Sheet lỗi/rỗng 0 dòng) và lọc bỏ hàng tiêu đề giả `customgmail`/`Staff Name`.
+>   - Thêm endpoint `asset_car_bootstrap` (`getBiCarBootstrap_()`) đọc động danh sách nhân sự theo Team từ `Staff` và danh sách biển số xe thực tế từ cột E tab `TNI` + cột F tab `BI_CAR_LOG` (bao gồm `6M-1230` v.v.).
+>   - `car.html` gỡ bỏ mảng cứng `ASSET_STAFF_GROUPS` và `<select id="car-plate">` cứng; nạp trực tiếp từ `asset_car_bootstrap` + hỗ trợ nhập biển số ngoài (`car-plate-custom`); bọc `escHtml()` / `safeDriveUrl()` toàn bộ DOM động trong `renderTicketPanel()`, `checkCrossDayTicket()`, `populateStaffSelect()` chống XSS; thêm `LockService` + `CacheService` chống ghi trùng `BI_CAR_LOG`.
+>   - `bi_security_sentinel.js`: dọn sạch email giả/sai chính tả (`admin@tni.com`, `coadmin@tni.com`, `investor.tni@gmail.com`, `yelin@2026`, `naungninage12@gamil.com`, `phyokoko9320@email.com`, `@tni.local`, `@tni.com`) và ưu tiên thay thế hoàn toàn bằng `tni_master_cloud_staff_roster_v1` khi online.
+> - **3. Security Headers (`Task and WO/vercel.json`)**: Bổ sung `Referrer-Policy: no-referrer`, `Strict-Transport-Security`, và `Content-Security-Policy` cho `/car`, `/car.html`, `/refuel`, `/refuel.html`.
+>
 > **PM-133 (17/11/2026) — Khóa Phân Quyền Theo Team Cho Tab `📅 Fuel Progress + Plan` & Chuẩn Hóa Đa-Team Trên Toàn Bộ Server + UI (`bi_refuel/Code.gs` `@27`, `Task and WO/refuel.html`)**:
 > - **Phân quyền 3 danh sách Gmail trên cả Tab `📅 Fuel Progress + Plan` (`#planPage`) lẫn Server (`getFuelPlanData`, `saveFuelPlanDate`, `getRefuelSummary`)**:
 >   - Thêm `extractTeamCodes_()` / `extractTeamCodes()` hỗ trợ tách nhiều Team cả khi tách nhiều dòng hoặc viết gộp 1 ô (`"Team 1, Team 2"`).
