@@ -3298,6 +3298,16 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-125 (17/11/2026) — Lưu Tạm Toàn Diện Trên Máy Khi Mạng Yếu / Offline & Tự Động Cập Nhật Refuel + Ảnh/Video Khi Có Mạng Trở Lại (`Task and WO/refuel.html`)**:
+> - **Phát hiện mạng yếu & chống treo UI (`isConnectionWeak`, `fetchWithTimeout`, `checkServerReachable`)**:
+>   - `apiPost` / `apiGet` / upload video có `AbortController` timeout (`16–45s`), phát hiện `effectiveType` (`slow-2g`/`2g`), `rtt > 1800ms`, `downlink < 0.35`, hoặc lỗi/timeout vừa xảy ra (`markNetWeak` → hiện pill vàng `📶 Mạng yếu (Lưu tạm)`).
+> - **Lưu bền vững cả Ảnh (`dataUrl`) lẫn Video (`Blob/File`) trong IndexedDB v2 (`DB_STORE` + `queued_media`)**:
+>   - Chụp/quay trong lúc mạng yếu hoặc offline đều lưu tức thì xuống IndexedDB (`media_items`), không bao giờ mất video khi tải lại trang.
+>   - Khi bấm `☁️ Lưu DG #n` lúc Offline, mạng yếu, hoặc có bất kỳ ảnh/video nào chưa tải xong lên Drive (`MEDIA_UPLOAD_INCOMPLETE`), `enqueueReportForSync()` đóng gói toàn bộ số liệu + snapshot mọi ảnh/video chưa gửi vào store độc lập `queued_media` + hàng đợi `QUEUE_KEY` (tách biệt khỏi `clearDraft()` để tạo phiếu trạm tiếp theo không làm mất dữ liệu trạm cũ chờ mạng).
+>   - Trạng thái `Bắt đầu Refuel` lúc Offline / mạng yếu được xếp vào `QUEUE_PROG_KEY`, và các phiếu chờ gửi xuất hiện ngay trên đầu Tab `📊 Tổng Hợp` với badge `💾 Lưu tạm trên máy`.
+> - **Tự động đồng bộ khi có mạng trở lại (`syncAllPending`)**:
+>   - Tự chạy khi sự kiện `online`, `navigator.connection.change`, mở lại app (`visibilitychange`), hoặc vòng kiểm tra định kỳ `18s` sau khi `ping` GAS (`?action=ping` trong `6.5s`) xác nhận mạng đã khỏe: đẩy `QUEUE_PROG_KEY` → tải từng ảnh/video còn thiếu từ `queued_media` lên Drive (cập nhật dần URL sau mỗi file) → gắn đủ link Drive/Video 19 vào payload → gửi `saveRefuelData` lên Google Sheet → giải phóng hàng đợi & tự làm mới Tab Tổng Hợp.
+>
 > **PM-124 (17/11/2026) — Bổ Sung Tab `📊 Tổng Hợp` (Chọn Tháng • Theo Ngày Mới→Cũ • Đang Bắt Đầu Refuel Đưa Lên Trên → Đã Hoàn Thành Bên Dưới) & Theo Dõi Tiến Độ Trực Tiếp (`Refuel Progress`)**:
 > - **Backend `bi_refuel/Code.gs` `@24`**:
 >   - Tự động tạo & quản lý sheet `Refuel Progress` (`getOrCreateProgressSheet_`, `LockService.getScriptLock()`, force format `@` chống Google Sheets tự đổi định dạng ngày).
