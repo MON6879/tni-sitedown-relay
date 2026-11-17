@@ -3501,3 +3501,22 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 > 10. **Chuyên gia 10 (Thời Gian Ký Gởi Mặc Định 60 Ngày & Đồng Bộ 12 File Mirror)**:
 >    - Toàn bộ ô hạn ký gởi (`#kg-han`, `#kgs-def-han`, mỗi dòng trên `#kg-web-sheet-table`, và mẫu CSV `downloadKGTemplate`) BẮT BUỘC mặc định là **`60` ngày**.
 >    - Mọi cập nhật trên `Task and WO/sale.html` BẮT BUỘC kiểm tra cú pháp `node --check` 0 lỗi và đồng bộ 100% SHA-256 sang toàn bộ 11 file mirror (`tni-sale.html`, `tni_sale.html`, `ups_64951110_app.html` tại `Task and WO`, `tni-search`, và thư mục gốc).
+
+---
+
+## 🛡️ STRICT RULE: KHÓA THÉP BẢO MẬT CẤP 2 (`GOOGLE SIGN-IN id_token` + `7-DAY SESSION TOKEN`) & ĐA NGÔN NGỮ ĐỐI XỨNG TRÊN CẢ 4 CỔNG BI (PM-135 — 17/11/2026)
+
+> ⚠️ **NGUYÊN TẮC CỐT LÕI (ZERO-BREAKAGE DUAL-MODE CAP-2 OAUTH + MULTI-LANGUAGE SYMMETRY)**:
+> 1. **Bảo Mật Cấp 2 Chống Giả Mạo 100% Tại Backend GAS (`bi_refuel @30` & `apps_script_ups_solar @60`)**:
+>    - Toàn bộ 4 cổng BI (`BI Hub`, `BI Asset`, `BI Car`, `BI Fuel`) hỗ trợ xác thực **Google Identity Services 1 chạm** (`id_token` kiểm tra chữ ký + `aud` Client ID + `email_verified` qua `https://oauth2.googleapis.com/tokeninfo`) và cấp **Session Token ngẫu nhiên 7 ngày** lưu trong `PropertiesService` (`REFSESS_*` / `TNISESS_*`) + cache nóng `CacheService`.
+>    - Mọi API đọc/ghi nhạy cảm (`getLiveBootstrap`, `getRefuelSummary`, `getAuditData`, `saveRefuelData`, `asset_verify_staff`, `asset_save_staff_roster`, `asset_save_audit_batch`, `asset_approve_transfer`, `google_auth_verify`) tự động ưu tiên danh tính thực tế đã xác thực từ `sessionToken` ở Server, KHÔNG tin trường `email` / `actorEmail` tự gửi từ trình duyệt khi bật Cấp 2.
+>    - **Chế độ Dual-Mode Zero-Breakage**: Trước khi `GOOGLE_OAUTH_CLIENT_ID` thật và `REQUIRE_OAUTH_CAP2 = 'true'` được cài trong `ScriptProperties` trên GAS, hệ thống vận hành êm mượt ở chế độ dự phòng không gây lỗi `401 invalid_client` ngoài trạm. Khi Admin điền `GOOGLE_OAUTH_CLIENT_ID` và bật `REQUIRE_OAUTH_CAP2 = 'true'`, cả Frontend lẫn Backend tự động khóa cứng xác thực Cấp 2 ngay lập tức mà không cần sửa code lại.
+> 2. **Xóa Sạch Backdoor `admin@tni.com` / `coadmin@tni.com` Trong `index.html` (`BI Hub`)**:
+>    - Nghiêm cấm tự động cấp quyền Super Admin cho các email ảo không phải Google (`admin@tni.com`, `coadmin@tni.com`); chỉ duy nhất danh sách Google Account thực trên Sheet và Master Admin được phép truy cập.
+> 3. **Kiểm Toán & Đồng Bộ Đầy Đủ Ngôn Ngữ Cho Từng BI**:
+>    - **`bi_security_sentinel.js`**: Đầy đủ 3 ngôn ngữ đối xứng `vn` / `en` / `mm` (cả Gate đăng nhập Cấp 2 lẫn Modal Auditor), tự đồng bộ theo `tni_bi_lang_v3` / `tni_refuel_lang_v2` / `sale_lang`.
+>    - **BI Fuel (`refuel.html`)**: Đầy đủ 3 ngôn ngữ `vn` / `en` / `mm` (`362` khóa đối xứng × 3 ngôn ngữ = `0` ký tự Việt sót trong `en`/`mm`), bao gồm toàn bộ chuỗi Cấp 2, Offline Queue, Progress và Share/Copy.
+>    - **BI Car (`car.html`)**: Đầy đủ 3 ngôn ngữ `vn` / `en` / `mm`, tích hợp Cấp 2 (`asset_oauth_config` / `asset_auth_google_session`) và bỏ hoàn toàn dữ liệu hardcode.
+>    - **BI Asset (`asset_audit.html`)**: Chuẩn hóa tiếng Anh đồng bộ cùng Google Sign-In Cấp 2 + chuyển tiếp `sessionToken` qua cả `apiGet`, `apiPost`, `apiPostWithTimeout` và proxy `api/asset_audit.py`.
+>    - **BI Hub (`index.html`)**: Xóa backdoor, nối `asset_oauth_config` + `asset_auth_google_session` để cấp `sessionToken` 7 ngày, giữ nguyên đa ngôn ngữ Việt/Anh & đọc giọng nói 3 thứ tiếng (`vi-VN`, `en-US`, `my-MM`).
+> 4. **Giới Hạn CSP (`vercel.json`)**: Cho phép `https://accounts.google.com` và `https://oauth2.googleapis.com` trên `/car`, `/car.html`, `/refuel`, `/refuel.html`.
