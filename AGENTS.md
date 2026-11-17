@@ -3298,6 +3298,10 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-126 (17/11/2026) — Chỉ Cho Phép Chọn Ảnh Từ Album Tại Mục `5. Gov Price` (`gov1`, `gov2`), Khóa Camera Trực Tiếp Toàn Bộ Các Mục Còn Lại**:
+> - **Row `5. Gov Price` (`build_refuel_html.py`, `Task and WO/refuel.html`)**: Bổ sung nút **`🖼️ +Album`** (`btn-album-gov1`, `btn-album-gov2`) bên cạnh nút chụp camera trực tiếp và `<input type="file" id="albumInputGovOnly" accept="image/*" multiple>` (tự resize max `1280px` + đóng dấu watermark 3 dòng qua helper dùng chung `stampImageFileToDataUrl()`).
+> - **Khóa chặt phạm vi (`/^gov[12]$/.test(key)`)**: `pickFromAlbum()` & `onGovAlbumSelected()` kiểm tra regex chặn mọi key khác ngoài `gov1`/`gov2`; toàn bộ các mục ảnh/video còn lại tiếp tục bắt buộc chụp/quay trực tiếp (`capture="environment"`), `verify_refuel.py` kiểm định `re.findall(r'id="(btn-album-[^"]+)"', html) == ["btn-album-gov1", "btn-album-gov2"]`.
+>
 > **PM-125 (17/11/2026) — Lưu Tạm Toàn Diện Trên Máy Khi Mạng Yếu / Offline & Tự Động Cập Nhật Refuel + Ảnh/Video Khi Có Mạng Trở Lại (`Task and WO/refuel.html`)**:
 > - **Phát hiện mạng yếu & chống treo UI (`isConnectionWeak`, `fetchWithTimeout`, `checkServerReachable`)**:
 >   - `apiPost` / `apiGet` / upload video có `AbortController` timeout (`16–45s`), phát hiện `effectiveType` (`slow-2g`/`2g`), `rtt > 1800ms`, `downlink < 0.35`, hoặc lỗi/timeout vừa xảy ra (`markNetWeak` → hiện pill vàng `📶 Mạng yếu (Lưu tạm)`).
