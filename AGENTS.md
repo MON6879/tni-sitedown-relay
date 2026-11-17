@@ -3298,8 +3298,8 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
-> **PM-129 (17/11/2026) — Mở Chọn Ảnh Album Cho Mục `6. Partner Price` & Mặc Định Sẵn `"Premium"` Tại Mục `6.1 Quality Prem.` (`Task and WO/refuel.html`)**:
-> - **Mục `6 · Partner Price` (`price1`, `price2`)**: Bổ sung nút **`🖼️ +Album`** (`btn-album-price1`, `btn-album-price2`) chọn ảnh hóa đơn/giá từ thư mục/album thiết bị giống mục `5 · Gov Price`; nới regex khóa trong `pickFromAlbum()` & `onGovAlbumSelected()` thành `/^(gov|price)[12]$/` (các mục ảnh/video còn lại vẫn khóa cứng chụp/quay trực tiếp).
+> **PM-129 (17/11/2026) — Mở Chọn Ảnh Album Cho Mục `6. Partner Price`, Không Bắt Buộc Cả Mục `5` & `6`, Và Mặc Định Sẵn `"Premium"` Tại Mục `6.1 Quality Prem.` (`Task and WO/refuel.html`)**:
+> - **Mục `5 · Gov Price` & `6 · Partner Price` (`gov1/2`, `price1/2`)**: Bổ sung nút **`🖼️ +Album`** (`btn-album-price1`, `btn-album-price2`) cạnh mục `5 · Gov Price` (regex `/^(gov|price)[12]$/`); đồng thời **bỏ bắt buộc cả nhập giá lẫn chụp hình** ở cả 2 mục `5` và `6` (bỏ dấu `*` đỏ, gỡ khỏi `REQ_PHOTOS_1`/`REQ_PHOTOS_2` còn `9` ảnh bắt buộc).
 > - **Mục `6.1 · Quality Prem.` (`qualPrem1`, `qualPrem2`)**: Đổi sang `value="Premium" readonly` (tự động điền sẵn `"Premium"`, gỡ khỏi `TEXT_FIELDS` để bản nháp cũ không ghi đè rỗng); nhân viên ngoài trạm không cần điền thông tin mà chỉ cần bấm `📷 +Chụp`.
 >
 > **PM-128 (17/11/2026) — Bổ Sung Tab `📅 Fuel Progress + Plan` Trên Refuel BI (Bảng Kẻ Khung 10 Cột × Chọn Ngày Plan × Tự Động Cập Nhật Thực Đổ BI Sau Ngày Request)**:
