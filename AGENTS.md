@@ -3298,6 +3298,13 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-128 (17/11/2026) — Bổ Sung Tab `📅 Fuel Progress + Plan` Trên Refuel BI (Bảng Kẻ Khung 10 Cột × Chọn Ngày Plan × Tự Động Cập Nhật Thực Đổ BI Sau Ngày Request)**:
+> - **Backend (`bi_refuel/Code.gs`, Deployment `@25`)**: Bổ sung `getFuelPlanData()` (đọc `Request Partner Refuel` gồm các cột `No`, `DG ID`, `Fuel Remain`, `Littel need refuel`, `Filter refuel`, `Request Date` [Cột V] chuẩn hóa múi giờ `Asia/Rangoon` tránh lệch định dạng Mỹ/Việt, `Fuel L Request` [Cột W], `Note`, `Township/Team` + danh sách đã lập kế hoạch trong tab mới `Fuel Plan` + toàn bộ bản ghi `Refuel Database`) và `saveFuelPlanDate()` (lưu/cập nhật ngày Plan kèm `updatedBy`/`updatedAt` có `LockService`).
+> - **Giao Diện & Logic Đối Chiếu (`scratch/build_refuel_html.py`, `Task and WO/refuel.html`)**:
+>   - Thêm Tab thứ 4 **`📅 Fuel Progress + Plan`** (`#planPage`, hỗ trợ 3 ngôn ngữ `VN/EN/MM`, `260` key đồng bộ trong `I18N_UI`, không chứa nút chụp camera).
+>   - Dựng bảng kẻ khung rõ nét (`plan-sheet`) cố định cột **`1 · No`** + **`2 · DG ID`** gồm đúng 10 cột: `1 · No` | `2 · DG ID` | `3 · Remain` | `4 · Request Date` | `5 · Team` | `6 · Fuel L Request` | `7 · Plan (Chọn ngày)` | `8 · Ngày thực đổ` | `9 · Lít thực đổ` | `10 · Diffrent` (`Request − Thực đổ`).
+>   - **`matchPostRequestRefuel()`**: Để trống hoàn toàn Cột 8–10 nếu trạm chưa có `Request Date` hoặc chưa có dữ liệu thu thập mới trên Google Refuel BI (`Refuel Database`) vào **đúng ngày hoặc sau ngày Request** (`dp.iso >= reqDateIso`); tự động cập nhật ngay khi có phiếu hoàn thành mới hoặc đồng bộ Offline.
+>
 > **PM-127 (17/11/2026) — Hoàn Thiện Đa Ngôn Ngữ 100% (`VN / EN / MM`) Toàn Bộ 3 Tab (`Nhập Refuel`, `Tổng Hợp`, `Phúc Tra`) & Inspector**:
 > - Mở rộng `I18N_UI` lên **224 key x 3 ngôn ngữ** (`130` thuộc tính DOM `data-t`/`data-t-ph` + toàn bộ nhãn động trong `renderSummary`, `populateSummarySelectors`, `evaluateAuditAlerts`, `loadAudit`, `filterAudit`, `renderAudit`, `openAuditInspector`, `updateNetPill`, `startGPS`, `updateStartPillUI`, `populateStaffSelect`, `populatePartnerSelect`, `renderMediaCell`, `toggleEmg`).
 > - Bổ sung `localizeStepInfo()` tự chuyển trạng thái lưu từ Sheet (`Đang nhập / chọn trạm...`, `Đã chọn trạm...`, `Lưu tạm trên máy...`) sang ngôn ngữ đang chọn (`VN / EN / MM`); `setLang()` tự re-render trực tiếp cả Tab Tổng Hợp, Tab Phúc Tra và khung Inspector đang mở.
