@@ -3298,6 +3298,16 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-123 (17/11/2026) — Chuyển Refuel BI Sang Dạng Bảng `Template Refuel` (Cố Định Cột A+B = `25vw`, Cột C Nội Dung, Cột D Thêm/Sửa/Xóa Hình/Video) & Tab Phúc Tra Chỉ Xem Ảnh + Tô Màu Cảnh Báo**:
+> - **Bảng `Template Refuel` gọn chuẩn `BI Asset` (`Task and WO/refuel.html`, `scratch/build_refuel_html.py`)**:
+>   - Giao diện sáng kiểu Google Sheet 4 cột: **Cột A (STT `1..19`) + Cột B (Hạng mục)** cố định bên trái bằng `position: sticky` trên bảng `border-collapse: separate` chiếm chính xác **`1/4` chiều rộng màn hình điện thoại (`25vw`)** (`--col-a-w: 36px`, `--col-b-w: calc(25vw - 36px)`), **Cột C** nhập/tự tính nội dung, **Cột D** chụp ảnh/quay video trực tiếp từ camera (chống gian lận gallery upload, giữ nguyên watermark 3 dòng `DG ID + GPS + Date/Time`).
+>   - Hỗ trợ **thêm nhiều ảnh/video, xem trước, chụp/quay đè để sửa (`✏️`), và xóa (`🗑️`)** ngay trong từng ô cột `D` (`mediaStore[key]`, lưu bền vững bằng IndexedDB `tni_refuel_media_v3`).
+>   - Giữ nguyên **3 nút dưới DG #1 và dưới DG #2** đúng thứ tự: **`☁️ Lưu DG #n → 📋 Copy Text → 📤 Share Photo & Video → Viber`** (kèm dải Link Drive); sửa lỗi hiển thị literal `&AMP;` ở giao diện EN (bỏ `&amp;` khỏi `I18N_UI`).
+>   - Portal dropdown chọn trạm `#dgDropFloating` gắn ở `<body>` giúp danh sách không bị `overflow-x: auto` của bảng cắt mất.
+> - **Tab Phúc Tra / Cảnh Báo (`#auditPage` + `bi_refuel/Code.gs` `@23`)**:
+>   - **Bỏ 100% nút chụp hình/quay video** khỏi màn hình Phúc Tra (`#auditPage` thuần túy Read-Only); bổ sung `action=listFolderMedia` trong `Code.gs` `@23` trả về danh sách toàn bộ ảnh (`thumbUrl`/`previewUrl`) & video (`viewUrl`) trong folder Drive của lượt đổ dầu để soi trực tiếp (lightbox phóng to có Prev/Next).
+>   - Tô màu cảnh báo theo mức độ (`🔴 danger` / `🟡 warn` / `🟢 ok`) ở bảng danh sách lẫn từng ô đối chiếu trong Inspector (`evaluateAuditAlerts`).
+>
 > **PM-122 (16/11/2026) — Sửa Công Thức Mục `7` (`After % − Before %`) & Làm Rõ Mục `19. Make video lock all DG` Cả DG #1, DG #2, Viber & Audit**:
 > - **Mục `7. How many %` (`calcPct(n)` & `collectPayload(n)`)**: Chuyển từ công thức chênh giá sang **đúng công thức `After Fuel Level % − Before Fuel Level %`** (`aFuelLv - bFuelLv`), gắn `oninput="calcFilled(n);calcPct(n)"` lên các ô `13.1` (`bFuelLv1/2`) và `14.1` (`aFuelLv1/2`), cập nhật nhãn `lblPctInc` cả 3 ngôn ngữ (`VN / EN / MM`).
 > - **Mục `19. Make video lock all DG`**:
