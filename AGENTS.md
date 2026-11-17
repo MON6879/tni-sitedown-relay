@@ -3282,6 +3282,21 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - GAS Deployment ID: AKfycbyCibIj4QN7oG5BZc_ju1iS-DUmd9nNdrMn9UN-WD8qf6jVoU_OKOf2yfbi10qGMFF- (Version @127).
 >   - Sau khi hoàn thành kiểm thử live, phân hệ Site Down tự động đóng khóa thép 100%.
 
+
+> **PM-115 (17/11/2026) — Khóa Thép Chốt Chặn 1 Giờ (1-Hour Expiration Guard), Dọn Triggers & Chống Kẹt Hàng Đợi Báo Cáo Điểm Danh (Group 10)**:
+> - **1. Bối cảnh & Root Cause Lỗi Bắn Tin Lúc 00:00 (Midnight Phantom Report)**:
+>   - *Root cause*: (a) Hàm sendDailyAttendanceTemplates() và sendDailyAttendanceReport() trong TNI attendance.js (Script ID 166XawHNCvkXmo7NGjydYJPTpaQMr1FTk_cqFSjFm8yiSxLEjsyr73XtW) trước đây hoàn toàn không có chốt chặn kiểm tra giờ hiện tại. (b) Trên Google Apps Script tồn tại 4 triggers clock (trong đó có 2 trigger trùng lặp và 1 trigger gọi nhầm vào hàm setup setupDailyAttendanceReportTrigger). Khi hệ thống bị nghẽn mạng/quota vào ban ngày, GAS đưa task trễ vào hàng đợi retry và nhả ra chạy bù lúc 00:00 khi reset quota ngày mới, dẫn tới phát tin báo cáo ngày hôm trước vào Telegram Group 10. TNI DAILY ADDTENDANCE lúc nửa đêm.
+> - **2. Khóa Thép Chốt Chặn 1 Giờ — Quá 1 Giờ HỦY BỎ Khỏi Hàng Đợi (1-Hour Expiration Policy)**:
+>   - Giờ quy định phát báo cáo Điểm danh Group 10 (sendDailyAttendanceTemplates) là 08:45 MMT (đợt 1) và 09:15 MMT (đợt 2 chốt). Khung giờ hợp lệ cho phép là 08:30 MMT đến tối đa 10:15 MMT (trễ tối đa 1 giờ sau mốc chốt).
+>   - Giờ quy định phát báo cáo chi tiết (sendDailyAttendanceReport) là 09:00 MMT (khung giờ hợp lệ 08:50 MMT đến 10:00 MMT).
+>   - Nếu bất kỳ trigger, retry của Google Apps Script, hoặc tác vụ đồng bộ nào kích hoạt quá 1 giờ so với thời gian quy định (sau 10:15 MMT, chiều, tối, đặc biệt là lúc nửa đêm 00:00): Hàm BẮT BUỘC HỦY BỎ NGAY LẬP TỨC (ABORT), ghi log cảnh báo và trả về false, TUYỆT ĐỐI KHÔNG gửi bù ra Group 10 làm phiền người dùng. Cho phép bypass chỉ khi người dùng kiểm thử thủ công có chủ đích (force === true qua ?action=send_templates_now).
+> - **3. Chống Nghẽn Hàng Đợi (Anti-Queue Congestion Lock)**:
+>   - Mọi hàm gửi báo cáo điểm danh được bọc qua LockService.getScriptLock() với timeout ngắn 5000ms. Nếu có tiến trình khác đang giữ khóa (tránh xung đột deadlock làm task bị dồn ứ đến nửa đêm), hệ thống tự động bỏ qua ngay lập tức.
+> - **4. Dọn Sạch Triggers & Triển Khai Deployment Live**:
+>   - Đã xóa sạch toàn bộ các triggers rác và thiết lập lại chuẩn xác 3 trigger time-driven: 08:45 MMT (sendDailyAttendanceTemplates), 09:00 MMT (sendDailyAttendanceReport), và 09:15 MMT (sendDailyAttendanceTemplates).
+>   - WebApp Deployment ID: AKfycbzSz_ISXgertxBDadw4BBQX1JdMjW650_o4He0o4Lh-uf1hV5O3YaE-ohlqI2CHyAcVFg (Version @154).
+
+
 > **PM-115 (14/11/2026) — Tắt Bản Tin Telegram OPERATION PROGRESS REPORT (11:46 & 17:21 MMT / TPR), Chuyển Sang Gửi Viber Trực Tiếp Trên Máy 2 & Cập Nhật Ghế Giám Sát AUDITOR-1.2**:
 > - **1. Bối cảnh & Yêu cầu thực tế (Viber Migration cho Operation Progress Report)**:
 >   - Bản tin `[OPERATION PROGRESS REPORT - TEAM 1..4]` và `[OVERALL OPERATION PROGRESS MATRIX - CONTROL]` (gửi lúc 11:46 & 17:21 MMT) đã được chuyển giao hoàn toàn cho máy 2 (`máy 2`) tự động gửi trực tiếp lên các nhóm Viber.
