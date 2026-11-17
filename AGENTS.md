@@ -3298,6 +3298,11 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-127 (17/11/2026) — Hoàn Thiện Đa Ngôn Ngữ 100% (`VN / EN / MM`) Toàn Bộ 3 Tab (`Nhập Refuel`, `Tổng Hợp`, `Phúc Tra`) & Inspector**:
+> - Mở rộng `I18N_UI` lên **224 key x 3 ngôn ngữ** (`130` thuộc tính DOM `data-t`/`data-t-ph` + toàn bộ nhãn động trong `renderSummary`, `populateSummarySelectors`, `evaluateAuditAlerts`, `loadAudit`, `filterAudit`, `renderAudit`, `openAuditInspector`, `updateNetPill`, `startGPS`, `updateStartPillUI`, `populateStaffSelect`, `populatePartnerSelect`, `renderMediaCell`, `toggleEmg`).
+> - Bổ sung `localizeStepInfo()` tự chuyển trạng thái lưu từ Sheet (`Đang nhập / chọn trạm...`, `Đã chọn trạm...`, `Lưu tạm trên máy...`) sang ngôn ngữ đang chọn (`VN / EN / MM`); `setLang()` tự re-render trực tiếp cả Tab Tổng Hợp, Tab Phúc Tra và khung Inspector đang mở.
+> - `verify_refuel.py` kiểm định cứng `VN leaks inside EN/MM I18N_UI == []` và đồng bộ tuyệt đối `224` key giữa cả 3 ngôn ngữ.
+>
 > **PM-126 (17/11/2026) — Chỉ Cho Phép Chọn Ảnh Từ Album Tại Mục `5. Gov Price` (`gov1`, `gov2`), Khóa Camera Trực Tiếp Toàn Bộ Các Mục Còn Lại**:
 > - **Row `5. Gov Price` (`build_refuel_html.py`, `Task and WO/refuel.html`)**: Bổ sung nút **`🖼️ +Album`** (`btn-album-gov1`, `btn-album-gov2`) bên cạnh nút chụp camera trực tiếp và `<input type="file" id="albumInputGovOnly" accept="image/*" multiple>` (tự resize max `1280px` + đóng dấu watermark 3 dòng qua helper dùng chung `stampImageFileToDataUrl()`).
 > - **Khóa chặt phạm vi (`/^gov[12]$/.test(key)`)**: `pickFromAlbum()` & `onGovAlbumSelected()` kiểm tra regex chặn mọi key khác ngoài `gov1`/`gov2`; toàn bộ các mục ảnh/video còn lại tiếp tục bắt buộc chụp/quay trực tiếp (`capture="environment"`), `verify_refuel.py` kiểm định `re.findall(r'id="(btn-album-[^"]+)"', html) == ["btn-album-gov1", "btn-album-gov2"]`.
