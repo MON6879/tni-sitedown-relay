@@ -3298,6 +3298,13 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-133 (17/11/2026) — Khóa Phân Quyền Theo Team Cho Tab `📅 Fuel Progress + Plan` & Chuẩn Hóa Đa-Team Trên Toàn Bộ Server + UI (`bi_refuel/Code.gs` `@27`, `Task and WO/refuel.html`)**:
+> - **Phân quyền 3 danh sách Gmail trên cả Tab `📅 Fuel Progress + Plan` (`#planPage`) lẫn Server (`getFuelPlanData`, `saveFuelPlanDate`, `getRefuelSummary`)**:
+>   - Thêm `extractTeamCodes_()` / `extractTeamCodes()` hỗ trợ tách nhiều Team cả khi tách nhiều dòng hoặc viết gộp 1 ô (`"Team 1, Team 2"`).
+>   - `getFuelPlanData(actorEmail)` & `getRefuelSummary(actorEmail)` lọc nghiêm ngặt ngay tại Google Apps Script theo `perm.sumIsAll` / `perm.sumTeams`; `saveFuelPlanDate(body)` kiểm tra quyền của Gmail đối với Team của trạm `dgId` trước khi ghi tab `Fuel Plan`.
+>   - Trên UI `#planPage`: bổ sung thanh nhập Gmail `planViewerGmail` (đồng bộ 2 chiều với `userGmail` & `sumViewerGmail`), nhãn quyền `planPermBadge`, banner khóa `planLockBox`, bọc dữ liệu trong `#planDataWrap`, lọc dropdown `planTeamSelect` theo đúng Team được phân, và tự động nạp lại dữ liệu từ Server (`scheduleScopedTabReloadIfActorChanged`) khi đổi Gmail trên tab đang mở.
+>   - `#teamSyncAuditorBox` (`renderTeamSyncAuditor`) chỉ hiển thị lệch Team thuộc phạm vi Team được phép xem khi tài khoản không có `All`.
+>
 > **PM-132 (17/11/2026) — Bắt Buộc Nhập Đủ Toàn Bộ Dữ Liệu, Camera (10 Ảnh) & Video (3 Video) & Khóa Save + Copy/Share Viber Khi Còn Thiếu (`Task and WO/refuel.html`)**:
 > - **Bắt buộc toàn bộ trường nhập & media (trừ Mục `5 Gov Price`, `6 Partner Price` và các mục tự động/không cần nhập)**:
 >   - Cấp nhãn đỏ `*` (`REQ_CODES`) cho mọi mục nhập/quay bắt buộc: `userGmail`, `reporterName`, `staffTeam`, `2 DG ID`, `4 Power Mode`, `6.1` (giữ chữ `Premium` `readonly` theo PM-129 nhưng **bắt buộc chụp ảnh `qual1/2`**), `9 DG Run Hour`, `9.1 DG KWH`, `11 Fuel Filling Team`, `12 Following`, `13.1`–`13.5` (kể cả **`13.4 Before Vid cm` `bvid`**), `14.1`–`14.4` (kể cả **`14.3 After Vid cm` `avid`**), và **`19 Lock Overview` (`ovid`)** — tổng **10 ảnh bắt buộc** (`REQ_PHOTOS_1/2`) + **3 video bắt buộc** (`bvid`, `avid`, `ovid`).
