@@ -3309,6 +3309,7 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >     - Bộ lọc **Chọn tháng (`#sumMonthSelect`)** mới nhất lên trên + lọc Team + tìm kiếm + 4 KPI tháng (`Đang bắt đầu | Đã hoàn thành | Tổng | Tổng Lít`).
 >     - Bảng **Thống Kê Theo Ngày (`#sumDailyBody`)** sắp xếp **từ mới nhất đến cũ nhất** trong tháng đã chọn (`Đang làm | Đã xong | ∑ Tổng | ⛽ Lít`), bấm 1 ngày để lọc nhanh danh sách bên dưới.
 >     - Danh sách trạm tách rõ **Khối 1 trên cùng (`#sumActiveList`) — `🟡 ĐANG BẮT ĐẦU REFUEL`**, bên dưới là **Khối 2 (`#sumDoneBody`) — `🟢 ĐÃ HOÀN THÀNH`** kèm nút `🔍 Soi` nhảy thẳng sang Inspector của Tab Phúc Tra. Hoàn toàn Read-Only (0 nút camera trong Tab Tổng Hợp & Tab Phúc Tra).
+>   - **Bỏ chụp hình mục `14.5 After L/cm`** (`Auto: cm × L/cm`, chuyển về `— Auto` giống `13.6`, bỏ khỏi `REQ_PHOTOS_1/2` và `ALL_PHOTO_KEYS_1/2` còn `11` ảnh bắt buộc).
 >
 > **PM-123 (17/11/2026) — Chuyển Refuel BI Sang Dạng Bảng `Template Refuel` (Cố Định Cột A+B = `25vw`, Cột C Nội Dung, Cột D Thêm/Sửa/Xóa Hình/Video) & Tab Phúc Tra Chỉ Xem Ảnh + Tô Màu Cảnh Báo**:
 > - **Bảng `Template Refuel` gọn chuẩn `BI Asset` (`Task and WO/refuel.html`, `scratch/build_refuel_html.py`)**:
