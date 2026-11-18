@@ -3520,3 +3520,20 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >    - **BI Asset (`asset_audit.html`)**: Chuẩn hóa tiếng Anh đồng bộ cùng Google Sign-In Cấp 2 + chuyển tiếp `sessionToken` qua cả `apiGet`, `apiPost`, `apiPostWithTimeout` và proxy `api/asset_audit.py`.
 >    - **BI Hub (`index.html`)**: Xóa backdoor, nối `asset_oauth_config` + `asset_auth_google_session` để cấp `sessionToken` 7 ngày, giữ nguyên đa ngôn ngữ Việt/Anh & đọc giọng nói 3 thứ tiếng (`vi-VN`, `en-US`, `my-MM`).
 > 4. **Giới Hạn CSP (`vercel.json`)**: Cho phép `https://accounts.google.com` và `https://oauth2.googleapis.com` trên `/car`, `/car.html`, `/refuel`, `/refuel.html`.
+
+---
+
+## 🛡️ STRICT RULE: KHÓA THÉP PHÂN TÁCH TEAM BI HUB & GỘP TEAM 5 VÀO TEAM 2 THEO SSOT SHEET `Staff` (PM-136 — 18/11/2026)
+
+> ⚠️ **NGUYÊN TẮC TỐI THƯỢNG (BI HUB SERVER-SIDE TEAM ISOLATION & STAFF SSOT POLICY)**:
+> 1. **Danh Sách Nhân Sự Duy Nhất Từ Live Sheet `Staff` (`1Z1mRG_skVoRifOjw08T0zon4nCGa7ZfXZSZMdf7kFt0` → tab `Staff`)**:
+>    - Mọi quyền Team / Non-Team trên BI Hub (`index.html`, `api/bi_data.py`, `api/plan_dep.py`, `api/task_notes.py`) BẮT BUỘC đối chiếu trực tiếp qua GAS trung gian (`asset_get_staff_roster`, normalize Team 5/Team 05/T5 → **Team 2 / Team 02**).
+>    - Tài khoản Investor (`chudautu.vcm@gmail.com`) chỉ được xem Asset BI (`/asset`), bị chặn tuyệt đối (HTTP 403) trên BI Hub.
+> 2. **Nguyên Tắc Gộp Team 5 Và Team 2 Thành Team 2**:
+>    - Toàn bộ dữ liệu nhân sự, `Department Assign` (`GID 1755404595`), `WO Detail` (`GID 159298579`), và bộ lọc ma trận trên cả Backend lẫn Frontend BẮT BUỘC gộp `Team 05` / `Team 5` / `T5` vào **`Team 2` (`Team 02` / `team2`)**. Nghiêm cấm hiển thị cột/dòng riêng mang tên `Team 05`.
+> 3. **Hai Chế Độ Hiển Thị Độc Lập Tuyệt Đối**:
+>    - **Nhân Sự Thuộc Team (`Team 1..4`)**: Chỉ được phép xem duy nhất **Tab Team Workspace (`#team-workspace-panel`)** với 5 tab con (`📊 Tổng Quan Team`, `📋 WO Detail Team`, `🏢 Việc Phòng Ban Team`, `📡 Site & Link Down Team`, `🔗 Công Cụ & Hướng Dẫn`) và 2 tab hướng dẫn (`Guide For Staff`, `System Guide`). Toàn bộ các tab quản trị/toàn vùng (`Executive Summary`, `Department Assign`, `WO Detail`, `BOD Assign`, `Plan Week`, `Note Đầu Việc`, `Gmail Access List`, `Virtual Secretary`, `Site & Link Down`) và dữ liệu các Team khác đều bị ẩn hoàn toàn ở UI và chặn cứng (HTTP 403 `TEAM_RESTRICTED`) tại API.
+>    - **Nhân Sự Non-Team (`BOD`, `Admin`, `Staff`, `Asset`, `CM`, `PM`, `M&E`, `HR & Finance`, `Transmission`, `Technical Manager`, `Infrastructure`)**: Giữ nguyên 100% giao diện & quyền hạn toàn vùng hiện tại (đã cập nhật gộp `Team 5` vào `Team 2`), kèm quyền xem trước từng Team Workspace (`Team 1..4`) trong tab `Team Workspaces (T1–T4)`.
+> 4. **Zero HTML Static Leaks & Chặn Direct CSV Fallback Cho Team**:
+>    - Toàn bộ các bảng dữ liệu tĩnh đa-team trong `index.html` (`#dept-assign-tbody`, `#wo-detail-tables-container`, `#bod-assign-tbody`, `#dept-team-matrix-tbody`) đã được gỡ sạch; mọi luồng nạp sống đều đi qua `/api/bi_data` (kèm `X-Tni-User-Email` & `X-Tni-Session-Token`), cắt dữ liệu các Team khác ngay trên Server trước khi trả JSON, và cấm trình duyệt Team fallback sang đọc CSV công khai của Google Sheets.
+
