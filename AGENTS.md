@@ -3630,3 +3630,18 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >    - Mọi chuỗi giao diện mới tích hợp đủ **3 ngôn ngữ đối xứng (`309 keys × 3 langs: VN / EN / MM`, `0` ký tự Việt rò rỉ)** ngay từ lần viết đầu tiên (`SW v8`).
 
 
+---
+
+## 🛠️✅ STRICT RULE: GỘP `BI PHÚC TRA` VÀO `SỬA CHỮA` THÀNH 1 TAB DUY NHẤT + KHÓA THÉP `LIST APPROVE` & HIỂN THỊ KHOẢNG CÁCH NGƯỜI TICK ↔ ĐIỂM TICK BÊN CẠNH NÚT TICK TRÊN CABLE SURVEY BI (PM-143 — 19/11/2026)
+
+> ⚠️ **NGUYÊN TẮC CỐT LÕI (UNIFIED REPAIR & AUDIT APPROVE TAB + LIST APPROVE LOCK + APPROVER-TO-POINT DISTANCE TRACKING POLICY)**:
+> 1. **Gộp Chung `BI Phúc Tra` Trực Tiếp Vào Phần `Sửa Chữa` (`🛠️✅ Sửa Chữa & Phúc Tra` — 4 Tab Tinh Gọn)**:
+>    - Hợp nhất tab `✅ BI Phúc Tra` vào chung tab **`🛠️✅ Sửa Chữa & Phúc Tra` (`#page-repair`)** trên `cable_survey.html` (toàn hệ thống còn đúng 4 tab rõ ràng: `Tuần Tra Tuyến`, `Gia Cố Cáp Đứt`, `Tổng Hợp`, `Sửa Chữa & Phúc Tra`).
+>    - Trên cùng một màn hình `🛠️✅ Sửa Chữa & Phúc Tra`, hiển thị đồng thời: bộ lọc tìm kiếm & trạng thái tuyến, bản đồ Google Maps Street (`lyrs=m`), hộp chi tiết chụp ảnh sửa chữa + tick duyệt của điểm đang chọn (`#rpPointDetailCard`), và bảng đầy đủ toàn bộ các điểm trên tuyến (`#rpPointsTableCard`) có nút `🎯 Map` nhảy tâm bản đồ tới từng chấm.
+> 2. **Khóa Thép Quyền Tick `Confirm Approve` & Cho Phép Tick Linh Hoạt (Ở Nhà Hoặc Ra Tuyến)**:
+>    - **Chỉ nhân sự nằm trong `List Approve`** (`state.user.canApprove === true`, đồng thời xác thực lại trên Server `csAssertApprover_`) mới mở khóa ô checkbox **`Tick Approve` (`Confirm Approve`)** và nút duyệt hàng loạt. Nhân sự không có trong `List Approve` bị khóa cứng (`🔒 Chờ List Approve`), chỉ được xem trạng thái và khoảng cách đã lưu.
+>    - **Không chặn khoảng cách khi tick**: Người duyệt trong `List Approve` có thể tick `Confirm Approve` **khi đang ở nhà/văn phòng hoặc khi trực tiếp đi ra tuyến**.
+> 3. **Hiển Thị & Lưu Vĩnh Viễn Khoảng Cách Giữa Người Tick Và Điểm Tick Ngay Bên Cạnh Nút Tick (`GAS @72` + `SW v9`)**:
+>    - **Trước khi tick (Live GPS Preview ngay cạnh checkbox)**: Hệ thống đo và hiển thị trực tiếp ngay bên cạnh mỗi nút tick khoảng cách thực tế từ vị trí hiện tại của người mở trang tới tọa độ điểm đó (`📍 Khoảng cách bạn ↔ điểm: 14.2 m (Ra tuyến)` màu xanh lá nếu `≤ 100m`, hoặc `🏠 Khoảng cách bạn ↔ điểm: 14.82 km (Ở nhà/Từ xa)` màu vàng hổ phách nếu `> 100m`).
+>    - **Khi bấm tick & Lưu vĩnh viễn lên Google Sheet (`Survey Points DB` cột `37..39` & `Cable Broken Reinforce Log` cột `34..36`)**: Ghi nhận `Approver Lat`, `Approver Lng` tại đúng thời điểm bấm tick, tính Haversine lưu cột **`Approver Distance (m)`** trên Sheet (`apps_script_ups_solar` `@72`), và hiển thị huy hiệu cố định ngay cạnh nút tick cho lãnh đạo kiểm soát minh bạch (**`📍 Ra tuyến: cách điểm 14.2 m`** nếu `≤ 100m`, **`🏠 Ở nhà/Từ xa: cách điểm 14.82 km`** nếu `> 100m`, hoặc **`🌐 Tick không bật GPS`** nếu duyệt trên máy tính tắt định vị).
+>    - Chuẩn hóa định dạng mốc giờ `Date` từ Google Sheet (`dd/MM/yyyy HH:mm:ss` thay vì chuỗi thô `Thu Nov 19...`) và đảm bảo **100% đối xứng 3 ngôn ngữ (`320 keys × 3 langs: VN / EN / MM`, `0` ký tự Việt rò rỉ)** ngay từ lượt build đầu tiên.
