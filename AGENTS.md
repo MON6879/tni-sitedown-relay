@@ -102,6 +102,19 @@
 
 ---
 
+# 🌐 STRICT FIRST-PASS 3-LANGUAGE RULE: VIẾT CODE MỚI / SỬA UI BẮT BUỘC TÍCH HỢP ĐỦ 3 NGÔN NGỮ (`VN` / `EN` / `MM` MYANMAR) NGAY TỪ LẦN ĐẦU — CHẤP NHẬN LÀM KỸ CHẬM MỘT NHỊP, TUYỆT ĐỐI CẤM SỬA ĐI SỬA LẠI (FIRST-PASS TRILINGUAL ZERO-REWORK POLICY — PM 2026-11-19)
+
+> ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (FIRST-PASS 100% TRILINGUAL SYMMETRY & ZERO-REWORK POLICY)**:
+> 1. **Tích Hợp Sẵn 3 Ngôn Ngữ Ngay Khi Đặt Bút Viết Code (`VN` Tiếng Việt • `EN` English • `MM` မြန်မာဘာသာ)**:
+>    - Bất cứ khi nào tạo mới hoặc chỉnh sửa giao diện Web UI, cổng BI (`BI Hub`, `BI Asset`, `BI Car`, `BI Fuel`, `BI Cable`, `BI Sale`, `Checklist BI`...), biểu mẫu, nút bấm, thanh tìm kiếm, bảng dữ liệu, hộp thoại, Camera, thông báo Toast hay thông báo lỗi từ Backend trả về cho người dùng, AI **BẮT BUỘC phải viết đầy đủ từ điển đối xứng 100% cả 3 ngôn ngữ (`vn` / `en` / `mm`) ngay trong lượt code đầu tiên**.
+>    - Kể cả màn hình Cổng đăng nhập (`Login Gate`), `placeholder` tìm kiếm, `title` tooltip, `<option>` dropdown, tiêu đề cột bảng và dữ liệu động đọc từ Google Sheet cũng phải được gắn khóa đa ngôn ngữ ngay lập tức.
+> 2. **Chấp Nhận Làm Kỹ Hơn Một Nhịp Đầu — Cấm Làm Tắt Rồi Sửa Tới Sửa Lui**:
+>    - Cho phép dành thêm vài giây ở bước viết code đầu tiên để thiết kế trọn vẹn từ điển 3 ngôn ngữ + công cụ tìm kiếm đa ngôn ngữ (hỗ trợ cả chữ Myanmar & tiếng Anh/Việt) thay vì viết tạm 1 ngôn ngữ rồi bắt Người Dùng phải nhắc dịch lại nhiều lần.
+> 3. **Khóa Kiểm Toán Tự Động `0` Rò Rỉ Trước Khi Deploy**:
+>    - Mọi script build giao diện BẮT BUỘC chạy kiểm tra tự động: `keys(vn) == keys(en) == keys(mm)`, `0` ký tự dấu tiếng Việt lọt vào `en`/`mm`, và `0` chuỗi tiếng Việt hardcode nằm ngoài từ điển `vn` trước khi đẩy lên Production.
+
+---
+
 # 📊 STRICT RULE: CẤM QUÉT GROUP KHI ĐÃ CÓ SHEET THU THẬP — ĐỌC TRỰC TIẾP 100% DỮ LIỆU SỐNG TỪ GOOGLE SHEET & CẤM CACHE CŨ TRÊN MÂY (STRICT SHEET SSOT & ZERO REDUNDANT GROUP SCANNING & ZERO STALE CACHE POLICY)
 
 > ⚠️ **QUY TẮC BẮT BUỘC TỐI THƯỢNG (SHEET SSOT & LIVE READ ONLY POLICY)**:
@@ -3313,6 +3326,17 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >   - Kiểm toán thực tế live: `action=audit_team_progress_reports` trả về `disabled: true, status: "DISABLED_MOVED_TO_VIBER"`, `action=send_team_progress_reports` trả về `disabled: true, skipped: true`, và `system_auditor.py` trả về `PASS` (`OK (VIBER)`).
 
 
+> **PM-140 (19/11/2026) — Nâng Cấp Bản Đồ Google Maps (`Road` + `Satellite Hybrid` Không Cần API Key), Tự Động Lưu Ngầm Map Offline Khi Bấm Tìm Link (Bỏ Nút Bấm Tay), Khóa Chặt Phân Quyền `Team` vs `List Approve` & Ban Hành Luật Bắt Buộc 3 Ngôn Ngữ Ngay Lần Viết Đầu (`apps_script_ups_solar @67`, `cable_survey.html`, `vercel.json`)**:
+> - **1. Thay thế CartoDB (`API KEY REQUIRED`) bằng `Google Maps Road & Satellite Hybrid` (`mt0..3.google.com`) + Dự phòng `Esri`**:
+>   - Khắc phục triệt để lỗi CartoDB đòi `API KEY REQUIRED` trên domain `*.vercel.app`: chuyển sang **Google Maps Đường phố (`lyrs=m`)** và **Google Maps Vệ tinh Hybrid (`lyrs=y`)** hỗ trợ CORS `Access-Control-Allow-Origin: *` đến `zoom 20`, tự động xóa sạch cache `v2_*` cũ trong `IndexedDB` và nâng sang `v3_groad_` / `v3_ghyb_`.
+> - **2. Bỏ nút `Lưu Map Offline` — Tự động lưu ngầm Map Offline ngay khi nhân viên bấm tìm/chọn Link (`autoCacheCorridorTilesSilent`)**:
+>   - Khi nhân viên chọn tuyến cáp (hoặc tìm bay tới Site / mở tuyến Sửa chữa), bản đồ tự động bay tới tuyến đó ĐỒNG THỜI tải ngầm toàn bộ các ô bản đồ dọc hành lang sợi cáp (`zoom 13–16`, tối đa 180 ô ≈ `1.2 MB`) lưu vào bộ nhớ Flash `IndexedDB` (`0 MB` chiếm RAM) kèm cơ chế tự dọn vòng lặp `LRU 2.600 ô (~19 MB)`. Dung lượng hành lang cáp toàn Team nếu lưu sẵn cũng siêu nhẹ (`TEAM01: ~9.1 MB`, `TEAM02: ~8.0 MB`, `TEAM03: ~9.1 MB`, `TEAM04: ~2.4 MB` ở zoom `12–15`, nằm trên đĩa Flash nên không hề nặng RAM 2GB).
+> - **3. Khóa thép Phân quyền `Staff Cable BI` vs `List Approve` trên cả Backend GAS `@67` và Frontend**:
+>   - **Nhân sự có Team (`Team 01..04`)** (không thuộc `List Approve`): Chỉ được xem duy nhất dữ liệu & bản đồ KMZ của đúng Team mình (`canViewAll = false`).
+>   - **Nhân sự trong bảng `Staff` KHÔNG gắn Team** (và không thuộc `List Approve`): **CHẶN TUYỆT ĐỐI (`ok: false`)**, không được phép xem `BI Cable` (kể cả thu hồi ngay phiên đăng nhập cũ nếu có).
+>   - **Duy nhất danh sách `List Approve` (bảng bên phải)**: Mới được cấp `canApprove = true` & `canViewAll = true` để chọn xem từng Team hoặc xem hết cả 4 Team.
+> - **4. Ban hành Luật Tối Thượng `FIRST-PASS 3-LANGUAGE RULE`**: Mọi code UI/BI viết mới hoặc cập nhật bắt buộc tích hợp sẵn 100% 3 ngôn ngữ (`VN / EN / MM`) ngay từ lần đầu, không sửa đi sửa lại.
+>
 > **PM-139 (19/11/2026) — Hội Đồng 10 Chuyên Gia Kiểm Toán Tìm Kiếm Đa Năng & Chuẩn Hóa Đối Xứng 100% 3 Ngôn Ngữ (`VN` / `EN` / `MM` Myanmar) Trên Toàn Bộ `BI Cable Survey & Action` (`cable_survey.html`, `cable_survey_sw.js`)**:
 > - **1. Nâng cấp Công cụ Tìm kiếm Đa Năng 3 Ngôn ngữ trên cả 4 Tab (`smartTrilingualMatch`)**:
 >   - **Tab 1 (`Đi Tuyến`)**: Ô Combobox `#svRouteComboInput` tìm đồng thời theo **Mã tuyến rút gọn (`"66"`, `"tni 66"` $\rightarrow$ `TNI0066`)**, **Tên Trạm đầu/cuối (`Start → End`)**, **Township bằng cả Tiếng Anh lẫn chữ Myanmar (`ထားဝယ်`↔`Dawei`, `မြိတ်`↔`Myeik`, `ကော့သောင်း`↔`Kawthoung`, `ဘုတ်ပြင်း`↔`Bokpyin`, `ရေဖြူ`↔`Yebyu`, `လောင်းလုံး`↔`Launglon`, `သရက်ချောင်း`↔`Thayetchaung`, `ပုလော`↔`Palaw`, `တနင်္သာရီ`↔`Tanintharyi`, `ကျွန်းစု`↔`Kyunsu`)**, **Loại cáp (`24FO`, `48FO`)**, và **Ngầm/Treo (`ngầm`/`မြေအောက်`↔`U`, `treo`/`တိုင်တင်`↔`A`)**, kèm danh sách **📍 Trạm/JB trên Bản đồ** để nhân viên bấm bay thẳng tới tọa độ trạm.
