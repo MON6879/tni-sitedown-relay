@@ -3645,3 +3645,28 @@ ightarrow$ Ghế `BI-WEEKLY-MONTHLY` (`bi_weekly_monthly_ai.py`)**: Chỉ ghi v�
 >    - **Trước khi tick (Live GPS Preview ngay cạnh checkbox)**: Hệ thống đo và hiển thị trực tiếp ngay bên cạnh mỗi nút tick khoảng cách thực tế từ vị trí hiện tại của người mở trang tới tọa độ điểm đó (`📍 Khoảng cách bạn ↔ điểm: 14.2 m (Ra tuyến)` màu xanh lá nếu `≤ 100m`, hoặc `🏠 Khoảng cách bạn ↔ điểm: 14.82 km (Ở nhà/Từ xa)` màu vàng hổ phách nếu `> 100m`).
 >    - **Khi bấm tick & Lưu vĩnh viễn lên Google Sheet (`Survey Points DB` cột `37..39` & `Cable Broken Reinforce Log` cột `34..36`)**: Ghi nhận `Approver Lat`, `Approver Lng` tại đúng thời điểm bấm tick, tính Haversine lưu cột **`Approver Distance (m)`** trên Sheet (`apps_script_ups_solar` `@72`), và hiển thị huy hiệu cố định ngay cạnh nút tick cho lãnh đạo kiểm soát minh bạch (**`📍 Ra tuyến: cách điểm 14.2 m`** nếu `≤ 100m`, **`🏠 Ở nhà/Từ xa: cách điểm 14.82 km`** nếu `> 100m`, hoặc **`🌐 Tick không bật GPS`** nếu duyệt trên máy tính tắt định vị).
 >    - Chuẩn hóa định dạng mốc giờ `Date` từ Google Sheet (`dd/MM/yyyy HH:mm:ss` thay vì chuỗi thô `Thu Nov 19...`) và đảm bảo **100% đối xứng 3 ngôn ngữ (`320 keys × 3 langs: VN / EN / MM`, `0` ký tự Việt rò rỉ)** ngay từ lượt build đầu tiên.
+
+---
+
+## 📊 STRICT RULE: ĐỔI TAB 4 THÀNH "📊 XUẤT EXCEL" + QUY TRÌNH 3 BƯỚC ĐỒNG BỘ THAO TÁC TRÊN ICON (KHẢO SÁT → SỬA CHỮA → PHÚC TRA) & XUẤT FILE EXCEL NHÚNG HÌNH CLIENT-SIDE (PM-144 — 19/11/2026)
+
+> ⚠️ **NGUYÊN TẮC CỐT LÕI (TAB 4 EXPORT EXCEL RENAME + ICON-CENTRIC 3-STEP WORKFLOW + CLIENT-SIDE EMBEDDED-IMAGE EXCEL EXPORT POLICY)**:
+> 1. **Đổi Tên Tab 4 Thành `📊 Xuất Excel` (`tabRepair: "Xuất Excel" / "Export Excel" / "Excel ထုတ်ရန်"`)**:
+>    - Không thêm tab thứ 5 rời rạc gây rối mắt; thay vào đó đổi tên Tab 4 thành **`📊 Xuất Excel` (`#tabBtn-repair` / `#page-repair`)**, tích hợp toàn diện: Sửa chữa, Duyệt phúc tra theo tọa độ sống và Xuất báo cáo Excel chuyên nghiệp có ảnh nhúng.
+> 2. **Quy Trình 3 Bước Khép Kín Thao Tác Trực Tiếp Trên Icon (Center-on-Icon UX)**:
+>    - **Tọa độ sống dẫn đường**: Người dùng ở bất kỳ vị trí nào, GPS sống trên bản đồ sẽ hiển thị vị trí hiện tại và khoảng cách tới từng Icon trên tuyến để biết chính xác đang đứng ở lỗi nào.
+>    - **Bước 1 — Người Đi Khảo Sát**: Chấm điểm trên bản đồ hoặc ghim GPS → chụp hình lỗi bắt buộc → lưu tuyến lên Sheet & Drive.
+>    - **Bước 2 — Người Đi Sửa Chữa**: Theo GPS di chuyển tới trạm/tuyến → nhấp trực tiếp vào Icon trên bản đồ → chụp hình kết quả sửa chữa (chụp thực địa trực tiếp) → bấm `💾 Lưu Kết Quả Đã Sửa`.
+>    - **Bước 3 — Người Đi Phúc Tra (List Approve)**: Tiếp cận hiện trường hoặc duyệt từ xa → nhấp trực tiếp vào Icon (trên bản đồ hoặc chấm màu trên bảng) → mở giao diện phúc tra:
+>      + Hiển thị huy hiệu khoảng cách sống bạn ↔ điểm.
+>      + Nút **`📷 Chụp hình phúc tra (tùy chọn)`**: cho phép chụp thêm 1..5 hình ảnh nghiệm thu thực tế tại hiện trường (không bắt buộc, hỗ trợ cả camera và album).
+>      + Nút **`✅ Tick Approve & Lưu`**: tải ảnh phúc tra lên Drive + gửi API cập nhật trạng thái đã duyệt kèm khoảng cách GPS sống và danh sách link ảnh duyệt.
+> 3. **Xuất File Excel (.xlsx) Kèm Hình Ảnh Nhúng Trực Tiếp Vào Ô (Client-Side ExcelJS Engine)**:
+>    - Tích hợp thư viện `ExcelJS 4.4.0` xử lý hoàn toàn phía Client (trên điện thoại/máy tính, không qua backend trung gian).
+>    - Nút **`📊 Xuất Excel (kèm hình)`** nằm nổi bật trên thanh tác vụ tuyến (`#rpRouteQuickBar`).
+>    - Tự động nạp toàn bộ danh sách điểm của tuyến: Tuyến Cáp, Township, Km, Loại Cáp, Team, Người Khảo Sát, Ngày KS, Nội Dung Icon, Lat/Lng, **Hình Yêu Cầu (nhúng ảnh trực tiếp vào ô)**, Tình Trạng Sửa, Người Sửa, Ngày Sửa, **Hình Sửa Chữa (nhúng ảnh trực tiếp vào ô)**, Trạng Thái Phúc Tra, Người Duyệt, Ngày Duyệt, Khoảng Cách Duyệt (kèm phân loại `Ra tuyến` / `Từ xa`).
+>    - Các dòng có nhiều ảnh sẽ tự động chia đều chiều rộng và nhúng gọn gàng trong cùng 1 cell mà không bị tràn hay đè ô.
+> 4. **Khóa Thép 3 Ngôn Ngữ Tuyệt Đối & SW Cache v10**:
+>    - Bổ sung 42 keys i18n cho header và giá trị cell Excel, nâng tổng số lên **362 keys × 3 ngôn ngữ (VN / EN / MM)**, kiểm tra `0` chuỗi cứng tiếng Việt.
+>    - Service Worker nâng cấp lên **`tni-cable-survey-shell-v10`** đảm bảo tự động làm mới tài nguyên trên điện thoại nhân sự.
+
